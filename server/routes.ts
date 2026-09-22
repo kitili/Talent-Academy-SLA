@@ -71,6 +71,29 @@ function isAuthenticatedAny(req: Request, res: Response, next: NextFunction) {
 export async function registerRoutes(app: Express): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
+  app.get("/api/health", async (_req, res) => {
+    const database = Boolean(process.env.DATABASE_URL);
+    const sessionSecret = Boolean(process.env.SESSION_SECRET);
+    const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+    let databaseReachable = false;
+    if (database) {
+      try {
+        await db.execute(sql`select 1`);
+        databaseReachable = true;
+      } catch {
+        databaseReachable = false;
+      }
+    }
+    const ok = database && sessionSecret && databaseReachable;
+    res.status(ok ? 200 : 503).json({
+      ok,
+      database,
+      databaseReachable,
+      sessionSecret,
+      blob,
+    });
+  });
+
   // Setup authentication (username/password)
   setupAuth(app);
   setupTeacherAuth(app);

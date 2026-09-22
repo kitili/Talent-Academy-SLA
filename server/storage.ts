@@ -386,11 +386,13 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      conString: process.env.DATABASE_URL,
-      createTableIfMissing: false,
-      tableName: "sessions",
-    });
+    this.sessionStore = process.env.DATABASE_URL
+      ? new PostgresSessionStore({
+          conString: process.env.DATABASE_URL,
+          createTableIfMissing: true,
+          tableName: "sessions",
+        })
+      : new session.MemoryStore();
   }
 
   async getAllTrainingWeeks(): Promise<TrainingWeek[]> {

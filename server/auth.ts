@@ -46,13 +46,14 @@ export async function comparePasswords(supplied: string, stored: string) {
 
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET || "local-dev-only-change-me",
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || !!process.env.VERCEL,
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
     },
   };

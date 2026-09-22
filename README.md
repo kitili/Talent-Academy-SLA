@@ -2,6 +2,12 @@
 
 Silverleaf / Taleemabad Talent Academy LMS.
 
+## What is production-ready
+
+- **Postgres** holds users, courses, quizzes, and progress. Use Neon (or any hosted Postgres) for Vercel. Local data stays in the machine Postgres until you restore it.
+- **Vercel Blob** holds uploaded slides. Without `BLOB_READ_WRITE_TOKEN`, uploads only last on this computer.
+- **Sessions** live in the `sessions` table in Postgres, so login survives deploys.
+
 ## Local
 
 ```bash
@@ -15,8 +21,21 @@ npm run dev
 
 Open http://127.0.0.1:8765
 
-## Vercel
+## Vercel (durable data)
 
-This app needs a Postgres `DATABASE_URL` and `SESSION_SECRET` in the Vercel project environment. File uploads persist only if object storage env vars are set; otherwise they use ephemeral local disk.
+1. Create a Neon project and copy the **pooled** connection string.
+2. In the Vercel project **talent-academy-sla** set:
+   - `DATABASE_URL` — Neon URL (`sslmode=require`)
+   - `SESSION_SECRET` — long random string
+   - `BLOB_READ_WRITE_TOKEN` — from Vercel Storage → Blob
+3. From this repo, apply schema and copy local data:
 
-After the first deploy, run `npm run db:push` against that database (or apply the schema from a machine that has `DATABASE_URL` pointed at production).
+```bash
+export DATABASE_URL="postgresql://..."
+npm run db:push
+bash scripts/restore-to-remote.sh
+```
+
+4. Redeploy. `GET /api/health` should return `"ok": true`.
+
+The site is https://talent-academy-sla.vercel.app

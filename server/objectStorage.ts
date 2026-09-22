@@ -1,4 +1,5 @@
 import { Storage, File } from "@google-cloud/storage";
+import { list, put } from "@vercel/blob";
 import { Response } from "express";
 import { randomUUID } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
@@ -8,8 +9,12 @@ import { join } from "path";
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 const LOCAL_UPLOAD_DIR = join(process.cwd(), "local-uploads");
 
+function usesBlobStorage(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+}
+
 function usesLocalObjectStorage(): boolean {
-  return !process.env.PRIVATE_OBJECT_DIR;
+  return !process.env.PRIVATE_OBJECT_DIR && !usesBlobStorage();
 }
 
 export function localObjectId(objectPath: string): string | null {
@@ -72,11 +77,26 @@ export class ObjectStorageService {
   }
 
   async saveLocalObject(id: string, data: Buffer): Promise<void> {
+    if (usesBlobStorage()) {
+      await put(`training/${id}`, data, {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+      });
+      return;
+    }
     await mkdir(LOCAL_UPLOAD_DIR, { recursive: true });
     await writeFile(join(LOCAL_UPLOAD_DIR, id), data);
   }
 
   async readLocalObject(id: string): Promise<Buffer> {
+    if (usesBlobStorage()) {
+      const { blobs } = await list({ prefix: `training/${id}` });
+      if (!blobs[0]?.url) throw new ObjectNotFoundError();
+      const response = await fetch(blobs[0].url);
+      if (!response.ok) throw new ObjectNotFoundError();
+      return Buffer.from(await response.arrayBuffer());
+    }
     const path = join(LOCAL_UPLOAD_DIR, id);
     if (!existsSync(path)) throw new ObjectNotFoundError();
     return readFile(path);

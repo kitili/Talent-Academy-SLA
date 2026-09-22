@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/vercel-handler.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/api.js --alias:@shared=./shared",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "test": "tsx --test tests/feedback-fixes.test.ts",
@@ -54,6 +54,7 @@
     "@uppy/core": "^5.1.0",
     "@uppy/dashboard": "^5.0.2",
     "@uppy/react": "^5.1.0",
+    "@vercel/blob": "^2.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
