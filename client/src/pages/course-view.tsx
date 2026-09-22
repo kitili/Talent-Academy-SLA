@@ -12,6 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ChevronLeft, ChevronRight, ChevronDown, FileText, CheckCircle2, Circle, Maximize2, Minimize2, ZoomIn, ZoomOut, X, Award, List, PanelLeftClose, PanelLeftOpen, Menu } from "lucide-react";
 import { Document, Page, pdfjs } from 'react-pdf';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -76,8 +77,7 @@ function DocumentViewer({ url }: { url: string }) {
   );
 }
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 interface DeckFile {
   id: string;
@@ -127,6 +127,7 @@ export default function CourseView() {
   
   // Track previous file ID to detect actual file changes
   const prevFileIdRef = useRef<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
   
   // Responsive breakpoint detection
   const { isMobile, isTablet } = useBreakpoint();
@@ -230,41 +231,64 @@ export default function CourseView() {
 
   // Fetch presigned URL when file is selected
   useEffect(() => {
+    const revokeObjectUrl = () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+
     const fetchViewUrl = async () => {
       if (!selectedFile) {
+        revokeObjectUrl();
         setViewUrl(null);
         setDocumentLoadError(false);
         return;
       }
 
+      const isPptx = selectedFile.fileName.toLowerCase().endsWith('.pptx') || 
+                     selectedFile.fileName.toLowerCase().endsWith('.ppt');
+      const isDocx = selectedFile.fileName.toLowerCase().endsWith('.docx') || 
+                     selectedFile.fileName.toLowerCase().endsWith('.doc');
+      const isPdf = selectedFile.fileName.toLowerCase().endsWith('.pdf');
+
       try {
-        const isPptx = selectedFile.fileName.toLowerCase().endsWith('.pptx') || 
-                       selectedFile.fileName.toLowerCase().endsWith('.ppt');
-        const isDocx = selectedFile.fileName.toLowerCase().endsWith('.docx') || 
-                       selectedFile.fileName.toLowerCase().endsWith('.doc');
-        
-        if (isPptx) {
-          // For PowerPoint files, convert to PDF for HD viewing
-          const convertUrl = `/api/files/convert-to-pdf?url=${encodeURIComponent(selectedFile.fileUrl)}`;
+        if (isPptx || isPdf) {
+          const sourceUrl = isPptx
+            ? `/api/files/convert-to-pdf?url=${encodeURIComponent(selectedFile.fileUrl)}`
+            : `/api/files/proxy?url=${encodeURIComponent(selectedFile.fileUrl)}`;
+          const response = await fetch(sourceUrl, { credentials: "include" });
+          const contentType = response.headers.get("content-type") || "";
+          if (!response.ok || !contentType.includes("pdf")) {
+            revokeObjectUrl();
+            setViewUrl(null);
+            setDocumentLoadError(true);
+            return;
+          }
+          const blob = await response.blob();
+          revokeObjectUrl();
+          const objectUrl = URL.createObjectURL(blob);
+          objectUrlRef.current = objectUrl;
           setDocumentLoadError(false);
-          setViewUrl(convertUrl);
-        } else if (isDocx) {
-          // For Word documents, convert to HTML using mammoth
-          const convertUrl = `/api/files/convert-to-html?url=${encodeURIComponent(selectedFile.fileUrl)}`;
-          setDocumentLoadError(false);
-          setViewUrl(convertUrl);
-        } else {
-          // For all other files (videos, documents, etc.), use the proxy endpoint
-          // This ensures files are served with inline disposition headers
-          const proxyUrl = `/api/files/proxy?url=${encodeURIComponent(selectedFile.fileUrl)}`;
-          setDocumentLoadError(false);
-          setViewUrl(proxyUrl);
+          setViewUrl(objectUrl);
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching view URL:', error);
-        // Fallback to proxy endpoint
+
+        if (isDocx) {
+          revokeObjectUrl();
+          setDocumentLoadError(false);
+          setViewUrl(`/api/files/convert-to-html?url=${encodeURIComponent(selectedFile.fileUrl)}`);
+          return;
+        }
+
+        revokeObjectUrl();
         setDocumentLoadError(false);
         setViewUrl(`/api/files/proxy?url=${encodeURIComponent(selectedFile.fileUrl)}`);
+      } catch (error) {
+        console.error('Error fetching view URL:', error);
+        revokeObjectUrl();
+        setViewUrl(null);
+        setDocumentLoadError(true);
       }
     };
 
@@ -283,6 +307,15 @@ export default function CourseView() {
       prevFileIdRef.current = currentFileId;
     }
   }, [selectedFile, intendedPage]);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, []);
 
   // Handle file click - reset completion flag and auto-expand ToC
   const handleFileClick = (file: DeckFile) => {
@@ -516,11 +549,14 @@ export default function CourseView() {
                   style={{ touchAction: zoomScale > 1 ? 'none' : 'pan-y' }}
                 >
                   {viewUrl ? (
-                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} className="shadow-lg flex-shrink-0">
+                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-muted-foreground text-sm">Preview not available</div>} loading={<div className="p-8 text-muted-foreground text-sm">Loading document...</div>} className="shadow-lg flex-shrink-0">
                       <Page pageNumber={pageNumber} width={mobilePdfWidth} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={false} renderAnnotationLayer={false} />
                     </Document>
-                  ) : (<div className="p-8 text-muted-foreground text-sm">Loading document...</div>)}
-                  {documentLoadError && <div className="p-8 text-muted-foreground text-sm">Preview not available</div>}
+                  ) : documentLoadError ? (
+                    <div className="p-8 text-muted-foreground text-sm">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</div>
+                  ) : (
+                    <div className="p-8 text-muted-foreground text-sm">Loading document...</div>
+                  )}
                   {zoomScale > 1.05 && (
                     <button onClick={() => setZoomScale(1.0)} className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full z-10">Reset zoom</button>
                   )}
@@ -529,13 +565,16 @@ export default function CourseView() {
               <div className="flex flex-col items-center p-2 sm:p-8 pb-24 overflow-x-auto">
                 <div className="w-full max-w-5xl flex flex-col items-center gap-6">
                   {viewUrl ? (
-                    <>
-                      <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={(error) => { console.error('PDF load error:', error); setDocumentLoadError(true); }} className="shadow-2xl rounded-xl overflow-hidden">
-                        <Page pageNumber={pageNumber} scale={scale} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={true} renderAnnotationLayer={true} />
-                      </Document>
-                      {documentLoadError && (<div className="h-96 bg-muted rounded-xl flex items-center justify-center"><p className="text-xs text-muted-foreground">Preview not available</p></div>)}
-                    </>
-                  ) : (<div className="p-8 text-center text-muted-foreground">Loading document...</div>)}
+                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="h-96 bg-muted rounded-xl flex items-center justify-center"><p className="text-sm text-muted-foreground">Preview not available</p></div>} loading={<div className="p-8 text-center text-muted-foreground">Loading document...</div>} className="shadow-2xl rounded-xl overflow-hidden">
+                      <Page pageNumber={pageNumber} scale={scale} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={true} renderAnnotationLayer={true} />
+                    </Document>
+                  ) : documentLoadError ? (
+                    <div className="h-96 bg-muted rounded-xl flex items-center justify-center p-8 text-center">
+                      <p className="text-sm text-muted-foreground">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</p>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-muted-foreground">Loading document...</div>
+                  )}
                 </div>
               </div>
               )
@@ -709,7 +748,7 @@ export default function CourseView() {
                     {viewUrl ? (
                       <>
                         <div className="select-none flex-shrink-0" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
-                          <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={(error) => { console.error('PDF load error:', error); setDocumentLoadError(true); }} className="shadow-2xl">
+                          <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-sm text-muted-foreground">Preview not available</div>} className="shadow-2xl">
                             <Page pageNumber={pageNumber} width={(isMobile || isTablet) ? mobilePdfWidth : undefined} scale={(isMobile || isTablet) ? undefined : scale} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={!(isMobile || isTablet)} renderAnnotationLayer={!(isMobile || isTablet)} />
                           </Document>
                         </div>

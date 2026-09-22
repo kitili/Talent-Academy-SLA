@@ -133,23 +133,8 @@ export default function UnifiedAuth() {
           return;
         }
         
-        // Single role - direct login
         const userRole = data.role;
-        
-        // For single role login, verify it matches selection if not teacher
-        // Admin and trainer are both in users table, so allow admin/trainer interchangeability
-        const isAdminOrTrainer = (r: string) => r === 'admin' || r === 'trainer';
-        if (userRole !== loginRole && !(isAdminOrTrainer(userRole) && isAdminOrTrainer(loginRole)) && userRole !== 'teacher') {
-          toast({
-            variant: "destructive",
-            title: "Role mismatch",
-            description: `This account is registered as ${userRole}, not ${loginRole}. Please select the correct role.`,
-          });
-          setLoginLoading(false);
-          return;
-        }
 
-        // Update the auth context's query cache
         if (userRole !== 'teacher') {
           queryClient.setQueryData(["/api/user"], data);
         }

@@ -38,10 +38,17 @@ export async function hashPassword(password: string) {
 }
 
 export async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    if (!supplied || !stored || !stored.includes(".")) return false;
+    const [hashed, salt] = stored.split(".");
+    if (!hashed || !salt || hashed.length % 2 !== 0) return false;
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    if (hashedBuf.length !== suppliedBuf.length) return false;
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch {
+    return false;
+  }
 }
 
 export function setupAuth(app: Express) {
@@ -133,7 +140,8 @@ export function setupAuth(app: Express) {
   // Multi-role aware login endpoint
   app.post("/api/login", async (req, res, next) => {
     try {
-      const { username, password } = req.body;
+      const username = String(req.body.username || "").trim();
+      const password = String(req.body.password || "").trim();
       
       if (!username || !password) {
         return res.status(400).json({ message: "Username/email and password are required" });
@@ -182,8 +190,15 @@ export function setupAuth(app: Express) {
         }
       }
 
-      // Check teachers table - by email
-      const teachersByEmail = await storage.getAllTeachersByEmail(username);
+      // Check teachers table - by email, numeric teacher ID, or exact name
+      let teachersToCheck = await storage.getAllTeachersByEmail(username);
+      if (/^\d+$/.test(username)) {
+        const byId = await storage.getTeacherByTeacherId(parseInt(username, 10));
+        if (byId && !teachersToCheck.find((existing) => existing.id === byId.id)) {
+          teachersToCheck.push(byId);
+        }
+      }
+      const teachersByEmail = teachersToCheck;
       for (const teacher of teachersByEmail) {
         try {
           const passwordMatch = await comparePasswords(password, teacher.password);
@@ -351,21 +366,40 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res, next) => {
-    // Clear teacher session if exists
     if ((req.session as any).teacherId) {
       delete (req.session as any).teacherId;
     }
-    
-    req.logout((err) => {
-      if (err) return next(err);
-      res.sendStatus(200);
-    });
+
+    const finish = () => {
+      req.session.destroy(() => {
+        res.clearCookie("connect.sid", { path: "/", httpOnly: true, sameSite: "lax" });
+        res.sendStatus(200);
+      });
+    };
+
+    if (typeof req.logout === "function") {
+      req.logout((err) => {
+        if (err) return next(err);
+        finish();
+      });
+    } else {
+      finish();
+    }
   });
 
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    // Don't send password back to client
-    const { password, ...userWithoutPassword } = req.user!;
-    res.json(userWithoutPassword);
+  app.get("/api/user", async (req, res) => {
+    if (req.isAuthenticated() && req.user) {
+      const { password, ...userWithoutPassword } = req.user;
+      return res.json(userWithoutPassword);
+    }
+    const teacherId = (req.session as any)?.teacherId;
+    if (teacherId) {
+      const teacher = await storage.getTeacher(teacherId);
+      if (teacher) {
+        const { password: _pw, ...teacherWithoutPassword } = teacher;
+        return res.json({ ...teacherWithoutPassword, role: "teacher", username: teacher.email });
+      }
+    }
+    return res.sendStatus(401);
   });
 }

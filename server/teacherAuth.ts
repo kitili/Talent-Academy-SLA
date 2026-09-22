@@ -1,12 +1,8 @@
 // Teacher Authentication (separate from Trainer/Admin users)
 import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
-import { hashPassword } from "./auth";
+import { hashPassword, comparePasswords } from "./auth";
 import { Teacher as SelectTeacher } from "@shared/schema";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
-
-const scryptAsync = promisify(scrypt);
 
 // Extend Express Request type to include teacherId
 declare global {
@@ -15,13 +11,6 @@ declare global {
       teacherId?: string;
     }
   }
-}
-
-async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
 export function setupTeacherAuth(app: Express) {
@@ -126,7 +115,10 @@ export function setupTeacherAuth(app: Express) {
   // Teacher logout
   app.post("/api/teacher/logout", (req, res) => {
     (req.session as any).teacherId = undefined;
-    res.sendStatus(200);
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid", { path: "/", httpOnly: true, sameSite: "lax" });
+      res.sendStatus(200);
+    });
   });
 
   // Get current teacher

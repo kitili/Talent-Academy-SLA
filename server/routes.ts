@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { promisify } from "util";
 import { exec } from "child_process";
 import { existsSync } from "fs";
-import { writeFile, readFile, unlink, mkdir } from "fs/promises";
+import { writeFile, readFile, unlink, mkdir, readdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
@@ -1337,8 +1337,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await execAsync(command, { timeout: 60000 });
 
-      // Read the converted PDF
-      const pdfBuffer = await readFile(outputPath);
+      let pdfPath = outputPath;
+      if (!existsSync(pdfPath)) {
+        const produced = (await readdir(outputDir)).find((name) => name.toLowerCase().endsWith(".pdf"));
+        if (produced) {
+          pdfPath = join(outputDir, produced);
+          tempFiles.push(pdfPath);
+        }
+      }
+
+      const pdfBuffer = await readFile(pdfPath);
 
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');

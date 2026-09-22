@@ -138,6 +138,30 @@ async function main() {
     `HTTP ${courseCompletion.status} courses=${Array.isArray(courseCompletion.json) ? courseCompletion.json.length : 0}`,
   );
 
+  for (const account of [
+    { name: "Admin", username: "admin", password: "admin123", role: "admin" },
+    { name: "Trainer", username: "trainer1", password: "trainer123", role: "trainer" },
+    { name: "Teacher", username: "teacher@test.com", password: "teacher123", role: "teacher" },
+  ]) {
+    const first = await request("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ username: account.username, password: account.password }),
+    });
+    const firstCookies = cookieHeader(first.setCookie);
+    const logout = await request("/api/logout", { method: "POST" }, firstCookies);
+    const second = await request("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ username: account.username, password: account.password }),
+    });
+    record(
+      `${account.name} login works twice after logout`,
+      first.status === 200 && first.json?.role === account.role
+        && logout.status === 200
+        && second.status === 200 && second.json?.role === account.role,
+      `first=${first.status} logout=${logout.status} second=${second.status} role=${second.json?.role || "none"}`,
+    );
+  }
+
   const reset = await request("/api/emergency-admin-reset", {
     method: "POST",
     body: JSON.stringify({ masterKey: "x", username: "admin", newPassword: "admin123" }),
