@@ -118,6 +118,9 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 
 const PostgresSessionStore = connectPg(session);
+const hostedDatabase = /neon\.tech|supabase\.co|sslmode=require|amazonaws\.com|vercel/.test(
+  process.env.DATABASE_URL || "",
+) || Boolean(process.env.VERCEL);
 
 export interface IStorage {
   // Training week operations
@@ -388,7 +391,10 @@ export class DatabaseStorage implements IStorage {
   constructor() {
     this.sessionStore = process.env.DATABASE_URL
       ? new PostgresSessionStore({
-          conString: process.env.DATABASE_URL,
+          conObject: {
+            connectionString: process.env.DATABASE_URL,
+            ssl: hostedDatabase ? { rejectUnauthorized: false } : undefined,
+          },
           createTableIfMissing: true,
           tableName: "sessions",
         })

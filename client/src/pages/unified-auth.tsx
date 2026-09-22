@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -48,6 +48,14 @@ export default function UnifiedAuth() {
   // Floating label states
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [databaseReady, setDatabaseReady] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data) => setDatabaseReady(Boolean(data?.ok && data?.databaseReachable)))
+      .catch(() => setDatabaseReady(false));
+  }, []);
 
   // Handle role selection when multiple roles are available
   const handleRoleSelection = async (selectedRole: MultiRoleOption) => {
@@ -357,6 +365,11 @@ export default function UnifiedAuth() {
 
       <div className="flex-1 flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8 relative z-10">
         <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 lg:gap-12 items-center">
+          {databaseReady === false && (
+            <div className="w-full lg:absolute lg:top-4 lg:left-1/2 lg:-translate-x-1/2 lg:max-w-xl rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground z-20">
+              Trainer and teacher sign-in cannot open yet: this Vercel site has no database. Add a Neon <code>DATABASE_URL</code> in the Vercel project, then redeploy.
+            </div>
+          )}
           {/* Left side - Welcome section (hidden on mobile in login, shown in register) */}
           <div className="hidden lg:flex flex-1 flex-col justify-center space-y-4 lg:space-y-6 text-center lg:text-left">
             <div className="flex items-center justify-center lg:justify-start gap-4 mb-4">

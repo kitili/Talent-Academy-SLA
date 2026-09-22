@@ -6,6 +6,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
+import { hasDatabaseUrl } from "./db";
 import { User as SelectUser, Teacher as SelectTeacher } from "@shared/schema";
 
 declare global {
@@ -145,6 +146,12 @@ export function setupAuth(app: Express) {
       
       if (!username || !password) {
         return res.status(400).json({ message: "Username/email and password are required" });
+      }
+
+      if (!hasDatabaseUrl()) {
+        return res.status(503).json({
+          message: "Sign-in is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+        });
       }
 
       // Collect all matching accounts across both tables

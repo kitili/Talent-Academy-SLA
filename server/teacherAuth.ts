@@ -2,6 +2,7 @@
 import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { hashPassword, comparePasswords } from "./auth";
+import { hasDatabaseUrl } from "./db";
 import { Teacher as SelectTeacher } from "@shared/schema";
 
 // Extend Express Request type to include teacherId
@@ -63,6 +64,12 @@ export function setupTeacherAuth(app: Express) {
       if (!identifier || !password) {
         return res.status(400).json({ message: "Identifier and password are required" });
       }
+
+      if (!hasDatabaseUrl()) {
+        return res.status(503).json({
+          message: "Sign-in is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+        });
+      }
       
       // Determine if identifier is a Teacher ID (numeric) or email (contains @)
       let teacher;
@@ -100,10 +107,11 @@ export function setupTeacherAuth(app: Express) {
         });
       }
 
-      // Store teacher session
       (req.session as any).teacherId = teacher.id;
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => (err ? reject(err) : resolve()));
+      });
 
-      // Don't send password back to client
       const { password: _, ...teacherWithoutPassword } = teacher;
       res.status(200).json(teacherWithoutPassword);
     } catch (error: any) {
