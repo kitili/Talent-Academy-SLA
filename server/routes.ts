@@ -72,7 +72,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
   app.get("/api/health", async (_req, res) => {
-    const database = Boolean(process.env.DATABASE_URL);
+    const database = Boolean(
+      process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL,
+    );
     const sessionSecret = Boolean(process.env.SESSION_SECRET);
     const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
     let databaseReachable = false;

@@ -9,3 +9,4 @@ vite.config.ts.*
 .env.*
 .vercel
 temp-add-users.sql
+.env*

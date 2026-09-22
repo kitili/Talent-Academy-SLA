@@ -113,6 +113,12 @@ export function setupAuth(app: Express) {
   // Register new trainer account (public registration for trainers)
   app.post("/api/register", async (req, res, next) => {
     try {
+      if (!hasDatabaseUrl()) {
+        return res.status(503).json({
+          message: "Registration is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+        });
+      }
+
       // Check if username already exists
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {

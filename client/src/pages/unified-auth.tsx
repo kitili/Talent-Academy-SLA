@@ -211,11 +211,17 @@ export default function UnifiedAuth() {
           setRegPassword("");
           setAccountType(null);
         } else {
-          const error = await response.text();
+          let description = "Could not create account";
+          try {
+            const data = await response.json();
+            description = data.message || description;
+          } catch {
+            /* ignore non-JSON body */
+          }
           toast({
             variant: "destructive",
             title: "Registration failed",
-            description: error || "Could not create account",
+            description,
           });
         }
       } else if (accountType === "trainer") {

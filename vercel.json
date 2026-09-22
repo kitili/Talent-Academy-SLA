@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run db:push && NODE_ENV=production tsx server/init-db.ts && npm run build",
   "outputDirectory": "dist/public",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" },

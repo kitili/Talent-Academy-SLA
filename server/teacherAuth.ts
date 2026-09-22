@@ -18,6 +18,12 @@ export function setupTeacherAuth(app: Express) {
   // Teacher registration (public)
   app.post("/api/teacher/register", async (req, res) => {
     try {
+      if (!hasDatabaseUrl()) {
+        return res.status(503).json({
+          message: "Registration is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+        });
+      }
+
       const { name, email, password } = req.body;
       
       // Check if teacher with this email already exists
