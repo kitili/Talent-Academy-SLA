@@ -24,20 +24,26 @@ export function setupTeacherAuth(app: Express) {
         });
       }
 
-      const { name, email, password } = req.body;
-      
-      // Check if teacher with this email already exists
+      const name = String(req.body.name || "").trim();
+      const email = String(req.body.email || "").trim().toLowerCase();
+      const password = String(req.body.password || "");
+
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "Name, email, and password are required" });
+      }
+
       const existingTeacher = await storage.getTeacherByEmail(email);
       if (existingTeacher) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
-      // Create teacher with auto-incrementing teacherId and pending approval status
       const teacher = await storage.createTeacher({
         name,
         email,
         password: await hashPassword(password),
-        approvalStatus: "pending",
+        approvalStatus: "approved",
+        approvedAt: new Date(),
+        approvedByRole: "system",
       });
 
       // Create initial report card
@@ -53,7 +59,7 @@ export function setupTeacherAuth(app: Express) {
       const { password: _, ...teacherWithoutPassword } = teacher;
       res.status(201).json({
         ...teacherWithoutPassword,
-        message: "Account created successfully. Your account is pending approval from admin or trainer."
+        message: "Account created successfully. You can sign in with your email and password."
       });
     } catch (error: any) {
       console.error("Teacher registration error:", error);

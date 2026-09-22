@@ -119,24 +119,32 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(req.body.username);
+      const username = String(req.body.username || "").trim();
+      const email = String(req.body.email || username).trim().toLowerCase();
+      const password = String(req.body.password || "");
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
-      // Public registration only allows trainer accounts - admins must be created by existing admins
       const user = await storage.createUser({
         ...req.body,
-        role: "trainer", // Force trainer role for public registration
-        password: await hashPassword(req.body.password),
-        approvalStatus: "pending",
+        username,
+        email,
+        role: "trainer",
+        password: await hashPassword(password),
+        approvalStatus: "approved",
+        approvedAt: new Date(),
       });
 
-      const { password, ...userWithoutPassword } = user;
+      const { password: _pw, ...userWithoutPassword } = user;
       res.status(201).json({
         ...userWithoutPassword,
-        message: "Trainer account created. Your account is pending admin approval."
+        message: "Trainer account created. You can sign in now."
       });
     } catch (error: any) {
       console.error('[AUTH] Registration error:', error);

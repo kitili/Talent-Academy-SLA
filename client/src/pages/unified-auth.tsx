@@ -201,7 +201,7 @@ export default function UnifiedAuth() {
           const data = await response.json();
           toast({
             title: "Account created!",
-            description: `Your Teacher ID is: ${data.teacherId}. ${data.message || "Your account is pending approval from admin or trainer."}`,
+            description: `Your Teacher ID is: ${data.teacherId}. You can sign in now with this email and password.`,
             duration: 8000,
           });
 
@@ -242,7 +242,7 @@ export default function UnifiedAuth() {
         if (response.ok) {
           toast({
             title: "Account created!",
-            description: "Your trainer account is pending admin approval.",
+            description: "Your trainer account is ready. You can sign in now.",
             duration: 8000,
           });
 
@@ -690,7 +690,7 @@ export default function UnifiedAuth() {
                         </Button>
 
                         <p className="text-xs text-muted-foreground text-center">
-                          Your account will need to be approved by an admin{accountType === "teacher" ? " or trainer" : ""} before you can log in.
+                          After you create the account you can sign in immediately with the same email and password.
                         </p>
                       </form>
                     )}
