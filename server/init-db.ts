@@ -36,24 +36,10 @@ async function initializeDatabase() {
       .limit(1);
     
     if (existingAdmin.length > 0) {
-      console.log("✅ Admin user already exists");
+      console.log("✅ Admin user already exists — leaving password unchanged");
       console.log(`   Email: ${adminEmail}`);
       console.log(`   Username: ${existingAdmin[0].username}`);
       console.log(`   Role: ${existingAdmin[0].role}`);
-      
-      // Update username, password and approval status to ensure they're correct
-      const hashedPassword = await hashPassword("admin123");
-      await db
-        .update(users)
-        .set({ 
-          username: "admin",
-          password: hashedPassword,
-          approvalStatus: "approved"
-        })
-        .where(eq(users.email, adminEmail));
-      
-      console.log("🔑 Admin username set to: admin");
-      console.log("🔑 Admin password updated to: admin123");
     } else {
       // Create admin user
       console.log("📝 Creating admin user...");
