@@ -1,0 +1,32 @@
+Design a responsive “Silver Leaf – Admin Analytics Dashboard” for an education/training platform with three roles: Admin (CEO), Trainer, Teacher.
+
+Context:
+
+Teachers are the ones taking courses (learners).
+Trainers deliver trainings and manage course content.
+Admin is the CEO-level user who oversees the whole organization.
+This prompt is only for the Admin interface dashboard. The goal is to let the Admin understand overall health in under 30 seconds and then drill down.
+
+Required sections on the page:
+
+Global Summary (top strip)
+Show 4–6 key KPIs: total teachers, total trainers, total active courses, total active batches, average completion rate, number of at‑risk batches.
+Use large numbers, short labels, and clear visual status (color or small trend indicator).
+Batches Overview
+For each batch, display: batch name, number of teachers enrolled, number of trainers assigned, number of active courses, and a simple status (On track / At risk).
+Allow expand/collapse for each batch and a “View batch details” action.
+Courses Overview
+For each course: course name, owning trainer(s), number of enrolled teachers, completion %, overdue assignments count, and course status.
+Add an action like “Open course analytics”.
+People Overview
+Two subsections: Trainers and Teachers.
+For Trainers: number of active trainers, per‑trainer list with assigned courses and latest activity.
+For Teachers: number of active teachers, per‑teacher list with enrolled courses and risk flag (e.g., low progress).
+Design and interaction requirements:
+
+Use a clean, modern card-based layout similar to SaaS dashboards: light background, subtle shadows, consistent typography.
+Minimize vertical scrolling; on desktop, use a two‑column layout where it makes sense.
+Provide clear CTAs from each card so the Admin can jump to management views (e.g., “Manage trainers”, “View teacher profile”).
+Handle empty states gracefully with helpful copy and a CTA (e.g., “No trainers yet – invite a trainer”).
+Ensure the layout is responsive for laptop and tablet widths.
+Output the complete HTML, CSS, and minimal JavaScript (if needed) in a single file, ready to run in Replit.

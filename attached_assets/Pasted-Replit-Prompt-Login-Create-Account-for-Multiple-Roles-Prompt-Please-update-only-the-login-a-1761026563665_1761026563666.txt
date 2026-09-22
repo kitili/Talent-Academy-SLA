@@ -1,0 +1,37 @@
+Replit Prompt (Login + Create Account for Multiple Roles)
+Prompt:
+
+Please update only the login and account creation functionality of my existing web app (do not change or remove unrelated logic). Make the following changes:
+
+1. Login Page
+On the login screen, let users select their role: Admin, Teacher, or Trainer (using radio buttons, tabs, or dropdown).
+Users enter their email and password, and select one of the three roles before logging in.
+On successful login, the system routes each user to the correct dashboard/interface:
+Admin: Opens the admin dashboard
+Teacher: Opens the teacher dashboard
+Trainer: Opens the trainer dashboard
+2. Create Account Page
+On the "Create Account" tab, show two large buttons or tabs:
+Create Teacher Account
+Create Trainer Account
+When the user clicks one, display only the relevant form fields (username, password, email, first name, last name).
+Teacher Account: The backend must automatically generate a unique Teacher ID starting from 7100 for each new teacher.
+Trainer Account: Create a standard trainer profile (no special ID needed).
+The selected form creates ONLY the selected account type, and does not affect any other roles.
+3. UI Guidance
+On login:
+“Please select your role before logging in:”
+On create account:
+“Select account type to create:”
+When a user clicks one of the create account buttons/tabs, show only the corresponding fields and submit button.
+4. Requirements & Constraints
+Do NOT change, remove, or affect any existing application flows, business logic, or database unrelated to login and registration.
+All login/registration is with email, and each user only sees their role’s dashboard after login.
+Admin login remains as-is.
+5. Deliverable
+Code for new/updated login and registration UI.
+Backend logic for authenticating by role and creating unique teacher IDs.
+Brief comments indicating where code was added or changed.
+Note:
+The existing app must remain intact except for these enhancements to login and account creation. No existing user or feature should be disrupted.
+

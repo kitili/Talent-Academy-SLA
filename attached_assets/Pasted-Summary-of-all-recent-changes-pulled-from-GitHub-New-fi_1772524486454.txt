@@ -1,0 +1,44 @@
+Summary of all recent changes pulled from GitHub:
+
+New files:
+
+client/src/components/QuizRunner.tsx — one-question-at-a-time quiz UI with countdown timer per question, auto-submits on timer expiry, shows pending review state for open-ended answers
+client/src/components/QuizEditDialog.tsx — trainer/admin dialog to add, edit, and delete quiz questions, with correct answer marking
+Modified files:
+
+shared/schema.ts
+
+Added boolean to drizzle imports
+Extended QuizQuestion type to include open_ended type, optional options/correctAnswer, and timeLimit field
+Extended teacherQuizAttempts table with openEndedPending and finalPassed columns
+Added openEndedReviews table for manual trainer grading of open-ended answers
+server/quizService.ts
+
+Both generateQuizQuestions and generateSingleFileQuiz now support openEndedCount parameter
+File quiz defaults: 10 questions (8 MCQ + 2 open-ended); Checkpoint quiz: 25 questions (20 MCQ + 5 open-ended)
+Each question gets a timeLimit (30s MCQ, 180s open-ended)
+Token budget increased to min(8000, 400 + numQuestions * 250)
+server/storage.ts
+
+Added updateAssignedQuizQuestions(quizId, questions)
+Added resetTeacherQuizAttempts(quizId, teacherId) — deletes a teacher's attempts + open-ended reviews so they can retake
+Added createOpenEndedReview, getOpenEndedReviews, updateAttemptReviewStatus, getPendingReviewsForTrainer
+server/routes.ts
+
+POST /api/batches/:id/assign-quiz — checkpoint quiz fixed at 25 questions (20 MCQ + 5 open-ended)
+File upload background task now generates 10 questions (8 MCQ + 2 open-ended) instead of 5
+Quiz submit route handles open-ended scoring separately; saves open-ended answers as pending reviews
+New: PATCH /api/assigned-quizzes/:id — edit quiz questions (trainer/admin)
+New: POST /api/assigned-quizzes/:id/reset-teacher/:teacherId — reset a teacher's attempts
+New: GET /api/assigned-quizzes/:id/all-teacher-attempts — trainer view of all teachers' attempt status
+New: POST /api/quiz-attempts/:id/review-open-ended — trainer grades open-ended answers
+New: GET /api/trainer/pending-reviews — get all pending open-ended reviews for trainer's batches
+client/src/components/FileQuizDialog.tsx
+
+Replaced all-questions-at-once UI with one-question-at-a-time runner with countdown timer per question
+Added open-ended (textarea) question support
+client/src/pages/trainer-batches.tsx
+
+Quiz cards now have: Users button (view teacher attempts), Edit button (opens QuizEditDialog), Delete button
+"View Teacher Attempts" dialog shows each teacher's pass/fail/exhausted status with Reset Attempts button
+Pending open-ended reviews section in Quizzes tab with Pass/Fail buttons

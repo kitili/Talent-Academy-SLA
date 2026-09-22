@@ -1,0 +1,43 @@
+Replit Prompt — Add Teacher Interface, Batch/Quiz Workflow, and Trainer Renaming
+Prompt:
+
+This is an existing web application with core features already implemented.
+Do NOT change or remove existing functions or interfaces except as specified below. Only add or update the areas clarifed.
+
+Please implement the following enhancements:
+
+1. Add "Teacher" User Type and Interface
+Teachers should be able to register/sign up with name, email, and password.
+On registration, the system generates a unique numeric Teacher ID (starting at 7100 and incrementing for new teachers).
+Add a Teacher Login capability.
+After login, add a new Teacher Dashboard where teachers can:
+View all quizzes assigned to their batches.
+Attempt quizzes (one attempt per quiz).
+View quiz scores and a report card summarizing their performance, current level (Beginner/Intermediate/Advanced), and course progress.
+2. Rename Existing "Teacher" Interface to "Trainer" (if not already)
+Change all existing places where the "teacher" user type/interface currently refers to the (admin/quiz generator) role, to now use the label "Trainer" instead.
+The "Trainer" dashboard and workflows remain unchanged but update all interface labels and internal variable names for clarity (do not break any existing logic).
+3. Batch, Course, and Quiz Assignment (Trainer Side)
+Allow Trainers to:
+Create and manage Batches.
+Add Teachers to a Batch by entering their unique Teacher IDs.
+Select a Batch to view assigned Courses and Weeks.
+For a selected Batch + Course + Week, generate quizzes (5–15 questions).
+Assign a quiz to a Batch, making it available to those Teachers.
+4. Quiz Completion and Reporting
+When a Teacher completes a quiz:
+Record their answers and compute their score automatically.
+Update their progress for the relevant Course/Week.
+Update a report card that places them into Beginner/Intermediate/Advanced based on defined criteria (by cumulative or average score).
+Trainers can view progress, quiz scores, and report cards for all Teachers in a Batch.
+Teachers can view their own report card, level, and progress.
+5. Non-goals/Constraints
+Do NOT modify, disrupt, or remove any existing unrelated functionalities.
+Do NOT change the behavior of other user roles.
+Only add new schemas, UI screens, or logic needed to support these enhanced workflows for Teachers and (renamed) Trainers.
+Deliverables:
+
+Only the code and UI for: new Teacher registration/login/dashboard, Trainer batch/quiz additions, Teacher ID generation, and reporting enhancements as per above.
+Where applicable, provide only incremental code changes (backend models/fields, UI routes/components, forms, etc).
+Brief notes or comments describing where new/modified code was inserted, so it can merge cleanly with the existing base.
+Do not re-architect or refactor existing features beyond what is stated. Ensure compatibility with current user roles, data models, and interface flows.

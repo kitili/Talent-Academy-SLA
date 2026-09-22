@@ -1,0 +1,42 @@
+Unified Replit Agent Task: Automated Quiz Generation & Caching System
+Objective: Build a Python application that simulates an Ed-Tech platform's system for instantaneously serving quizzes to students by performing the slow quiz generation work on the Admin's side at the moment of content upload.
+
+1. Initial Setup and Data
+Technology: Use Python and its time library to simulate delays.
+
+Quiz Cache (Database): Initialize a global Python dictionary named QUIZ_CACHE. This dictionary will store all generated quizzes and act as our instant database.
+
+2. Admin Content Upload and Background Processing
+Create a function named admin_upload_content(content_name, week_id) that simulates the slow, one-time task of processing content:
+
+Simulate Delay: Immediately after the upload is confirmed, use time.sleep() for a significant duration (e.g., 5-8 seconds) to represent the time the AI/LLM takes to analyze the content and generate questions.
+
+Generate and Cache Quizzes: After the delay, the function must simulate generating and saving TWO distinct quizzes into the QUIZ_CACHE dictionary:
+
+Content-Specific Quiz: A quiz unique to the uploaded content (e.g., content_name).
+
+Weekly Checkpoint Quiz: The function must also find the existing "Checkpoint Quiz" for that week_id in the cache and add the new questions to it.
+
+Confirmation: Print a clear message showing that the caching is complete and the time it took.
+
+3. Universal, Instant Quiz Retrieval (The Payoff)
+The most important requirement is proving the instant availability of the cached quizzes across the entire application.
+
+Create a generic retrieval function named retrieve_quiz_instantly(quiz_id) (where quiz_id is the content name or the week name, e.g., "Presentation1.pptx" or "Week 1 Checkpoint").
+
+This function must instantly look up the quiz data in the QUIZ_CACHE dictionary and print it.
+
+CRITICAL CONSTRAINT: This retrieval function MUST NOT contain any time.sleep() delay.
+
+4. Final Demonstration
+The program's final execution should run the simulation and clearly contrast the slow cost with the instant benefit:
+
+Slow Step: Call admin_upload_content("Presentation-on-Classroom-Control.pdf", "Week 1").
+
+Instant Step (App-Wide Access): Immediately after the slow upload finishes, call retrieve_quiz_instantly multiple times to show the instant access:
+
+Once for the specific content quiz.
+
+Once for the updated Week 1 Checkpoint quiz.
+
+The output must clearly confirm that the slow process only runs once on the admin side, while retrieval is near-zero time for the student every time.

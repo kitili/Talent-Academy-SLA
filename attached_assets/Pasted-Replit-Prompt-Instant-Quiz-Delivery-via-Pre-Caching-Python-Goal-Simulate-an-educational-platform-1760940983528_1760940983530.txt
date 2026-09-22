@@ -1,0 +1,83 @@
+Replit Prompt: Instant Quiz Delivery via Pre-Caching (Python)
+Goal: Simulate an educational platform's quiz generation and retrieval system. The primary objective is to demonstrate how pre-caching the AI-generated quiz questions during the file upload stage eliminates frustrating loading times for the end-user.
+
+1. Setup
+Use a simple Python script (main.py) and the time module to simulate delays. We will use a dictionary to act as our simple database/cache where pre-generated quizzes are stored.
+
+2. Mock Data and Constants
+Define the time constants and the file data. The "file size" will directly influence the simulated processing time.
+
+Python
+
+import time
+import random
+
+# --- Constants for Simulation ---
+AI_PROCESSING_TIME_PER_MB = 2.5  # Seconds per MB to simulate AI analysis delay
+CACHE_RETRIEVAL_TIME = 0.05      # Seconds for instant retrieval from cache
+
+# --- Mock Database / Cache ---
+# Stores the generated quiz data: {file_id: quiz_content}
+QUIZ_CACHE = {}
+
+# --- Mock Content ---
+FILE_DATA = {
+    "file_a": {"name": "Presentation1.pptx", "size_mb": 1.2},
+    "file_b": {"name": "DEMO DAY 2 - USTAAD DOST ITERATIONS.pptx", "size_mb": 3.27}, # The slow file
+    "file_c": {"name": "Summary_Notes_V2.pdf", "size_mb": 0.8},
+}
+3. Core Functions
+Implement three key functions:
+
+A. simulate_ai_processing(file_id, size_mb)
+Calculates the total time based on the file size and the constant.
+
+Simulates the long wait time using time.sleep().
+
+Returns: A mock quiz string (e.g., "Quiz for [file name]: Q1, Q2, Q3...") to be stored in the cache.
+
+B. admin_upload_file(file_id, file_info)
+Simulates the Admin uploading a file.
+
+Action: Calls simulate_ai_processing() and stores the result in the global QUIZ_CACHE dictionary. This represents the "Pre-caching" step.
+
+Reports the time taken for the upload (which includes the slow AI processing).
+
+C. user_take_quiz(file_id)
+Simulates the Student clicking "Take Quiz."
+
+Action: Checks the QUIZ_CACHE.
+
+If the quiz exists (a Cache Hit), it uses time.sleep(CACHE_RETRIEVAL_TIME) and returns the quiz instantly.
+
+If the quiz is missing (a Cache Miss), it performs the slow simulate_ai_processing() on-demand.
+
+Reports the time taken for the student to start the quiz.
+
+4. Execution Flow
+Admin Pre-Caching: Loop through the FILE_DATA and call admin_upload_file() for all files. Print the time taken for each upload.
+
+Student Test (Cache Hit): Call user_take_quiz() for the largest file (file_b). The result should be instant because it was pre-cached.
+
+Student Test (Cache Miss / Slow System): Manually clear the cache for one file (e.g., del QUIZ_CACHE["file_a"]). Call user_take_quiz("file_a"). The result should be slow, demonstrating the poor user experience if pre-caching is forgotten.
+
+Expected Outcome
+The output must clearly contrast the slow initial upload/caching time with the fast user-facing retrieval time, proving the efficiency of the pre-caching approach.
+
+Example Log Snippet:
+
+--- Admin Upload (Pre-Caching Phase) ---
+Starting upload for DEMO DAY 2 - USTAAD DOST ITERATIONS.pptx (3.27 MB)...
+...Simulating 8.175 seconds of AI analysis...
+✅ Upload and Pre-caching COMPLETE for file_b in 8.18 seconds.
+
+--- Student Take Quiz (Cached / FAST) ---
+Student is loading quiz for DEMO DAY 2 - USTAAD DOST ITERATIONS.pptx.
+Retrieving from cache...
+🚀 Quiz Loaded Instantly for file_b in 0.05 seconds.
+
+--- Student Take Quiz (Uncached / SLOW) ---
+! WARNING: Cache MISS for file_a. Processing On-Demand.
+Analyzing Presentation1.pptx (1.2 MB)...
+...Simulating 3.00 seconds of AI analysis...
+❌ Quiz Loaded SLOWLY for file_a in 3.01 seconds.

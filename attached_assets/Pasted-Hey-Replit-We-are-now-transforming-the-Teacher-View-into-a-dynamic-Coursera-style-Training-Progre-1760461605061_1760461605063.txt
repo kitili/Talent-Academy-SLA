@@ -1,0 +1,36 @@
+Hey Replit,
+
+We are now transforming the Teacher View into a dynamic, Coursera-style Training Progress Tracker. The Admin view (the Week Cards) should remain as the content builder for now, but the Teacher experience must change completely.
+
+New Teacher User Interface & Flow (LMS Style)
+The main Training Planner screen for a logged-in Teacher must be replaced with a new interface when they click a Week Card.
+
+1. Sidebar Navigation (The Coursera Menu)
+When a Teacher selects a "Week," a new page should open with a permanent sidebar menu on the left (like a Coursera course menu).
+
+This menu should list all the content for that week in order (e.g., "Video 1: Topic," "Presentation Deck 1," "Video 2: Topic," etc.).
+
+Each item in the sidebar should have a visual indicator for its status: Pending, In Progress, or Completed.
+
+2. Content Tracking and Resumption (Progress Save)
+Video Player: When a Teacher clicks a video link, the video should play within the main content area of the page.
+
+Progress Saving: The application must track the Teacher's progress:
+
+If a Teacher closes the app or navigates away from a video, the system must save their exact stop time in the backend.
+
+When they return, the video should resume playback from that saved time.
+
+Completion Status: When a video reaches 100% playback, the system must automatically mark that item in the sidebar as "Completed."
+
+3. Overall Progress Bar
+At the top of the course page (or in the sidebar), display a prominent progress bar.
+
+This bar should calculate the overall completion percentage for the entire Week's content. For example, if there are 10 items in the week and the Teacher completes 3, the progress bar should show "30% Complete."
+
+4. File Download & Viewing
+The presentation files (2025 Deck) should also be listed in the sidebar. Clicking these should open the file for viewing/downloading in the main content area. Once the file is opened/downloaded, it should be marked as "Completed."
+
+This requires significant changes to the backend (to store user progress) and the frontend (to build the sidebar and video player). Please prioritize this new flow for the Teacher experience.
+
+Thanks for this complex update!

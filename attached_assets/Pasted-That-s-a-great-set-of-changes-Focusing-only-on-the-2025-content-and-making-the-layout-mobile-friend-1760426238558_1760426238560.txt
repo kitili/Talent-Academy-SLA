@@ -1,0 +1,47 @@
+That's a great set of changes! Focusing only on the 2025 content and making the layout mobile-friendly (responsive design) is smart. Switching to a vertical format will also improve how it looks on smaller screens.
+
+Here is the final, comprehensive prompt. It combines the login/roles, the training planner concept, the vertical layout, responsive design, and the removal of the 2024 Deck:
+
+Hey Replit,
+
+Let's finalize the web app for the Silver Leaf Training Program Planner.
+
+1. Core Content Changes
+Remove "2024 Deck": The planner should only include the 2025 Deck column.
+
+Final Table Structure: The new table columns are: Weeks, Competency Focus, Objective, and 2025 Deck.
+
+2. Design and Layout
+Robust and Flexible Design (Responsive): The entire application (login page and planner) must use a responsive design so it looks robust and functions perfectly on any device (desktops, tablets, and phones).
+
+Vertical/Card Layout: Change the display from a traditional horizontal table to a vertical format. Each "Week" should be displayed as a distinct, collapsible card or section.
+
+For example, each card should clearly show the Week number and then list the content below it:
+
+Weeks: Week 1
+
+Competency Focus: [Text Here]
+
+Objective: [Text Here]
+
+2025 Deck: [File Link/Upload Button]
+
+3. Login and User Roles
+Create a clean Login Page.
+
+Admin Role: Can log in and has full edit/manage access (Add New Week, Edit text fields, Upload/Replace files, Delete Week).
+
+Teacher Role (View-Only): Can log in and view all the card content and download the files. They must not see any edit or management buttons.
+
+4. Planner Functionality
+A main "Add New Week" button should add a new card/section.
+
+The text fields (Competency Focus and Objective) must be editable in place for Admins.
+
+CRITICAL FIX: Ensure the edit field remains focused and active so the Admin can type without the cursor immediately moving away.
+
+The 2025 Deck section needs a dedicated Upload button (for Admins) and displays the file as a clickable link.
+
+Each Week card needs a clear Edit and Delete button (for Admins only).
+
+Use a clean, modern aesthetic for the design. A simple backend for user auth, data, and file storage will be perfect.

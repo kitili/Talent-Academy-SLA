@@ -1,0 +1,54 @@
+Replit Prompt: Content-Specific Quiz Generator for Ed-Tech Platform
+Goal: Develop a streamlined quiz generation feature for an educational technology platform (like Taleemabad) that improves performance by generating content-specific checkpoints rather than one large quiz for an entire week's worth of material.
+
+The Challenge
+Generating a single checkpoint quiz from multiple large files (PowerPoints, PDFs, etc.) is slow and often results in low-quality questions due to the excessive context size. You need to create a simplified system design and a working Python script to demonstrate the improved efficiency of modular content processing.
+
+Tasks
+1. Design the Mock File Structure
+Define a dictionary (or a simple list of tuples) in your Python code to represent the "Week 1" content shown in the image, associating a mock "file size" with each item.
+
+Python
+
+# Example: (Filename, Content_Length_Units)
+WEEK_1_CONTENT = [
+    ("Presentation1.pptx", 1000),
+    ("db2b5092-307a-....pptx", 900),
+    ("DEMO DAY 2 - USTAAD DOST ITERATIONS.pptx", 3500), # The largest file
+    # ... more files
+]
+2. Implement Mock Processing Functions
+Create two core functions that simulate the time taken to process content and generate a quiz:
+
+simulate_processing_time(content_units):
+
+This function should return a value representing the time taken.
+
+Formula: return content_units * 0.005 (where 0.005 is a mock time multiplier).
+
+generate_quiz(file_name, content_units):
+
+Print a message like: "Analyzing {file_name}..."
+
+Call simulate_processing_time() to get the time.
+
+Print a message like: "Generated 5-question quiz for {file_name} in {time} seconds."
+
+3. Compare Modular vs. Monolithic Approach
+Implement the following two execution paths:
+
+Monolithic (Current Slow System): Calculate the total content units for all files in WEEK_1_CONTENT and run a single generate_quiz call on the aggregate total.
+
+Modular (Suggested Fast System): Iterate through WEEK_1_CONTENT, calling generate_quiz for each file individually.
+
+Expected Output
+The final output should clearly show:
+
+The long processing time for the Monolithic approach.
+
+The much shorter, file-specific processing times for the Modular approach, highlighting that the user gets the first quiz faster.
+
+Extension (Optional)
+Add a function take_quiz(file_name) that prints "Quiz taken for {file_name}. Score: 8/10." to simulate the user experience flow.
+
+Use the time module's sleep() function to actually pause the script, making the time difference more visible.
