@@ -758,7 +758,7 @@ export default function AdminAnalytics() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-8">
+      <div className="sl-page min-h-screen p-4 sm:p-8">
         <Button onClick={() => navigate("/")} variant="outline" className="mb-8" data-testid="button-back">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
@@ -807,7 +807,7 @@ export default function AdminAnalytics() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="sl-page min-h-screen">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-6">

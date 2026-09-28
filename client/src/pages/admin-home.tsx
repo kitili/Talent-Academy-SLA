@@ -5,10 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Users, Award, BarChart3, ArrowRight, FileText, Layers } from "lucide-react";
+import { AcademyShell } from "@/components/AcademyShell";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -28,7 +28,7 @@ interface DashboardStats {
 }
 
 export default function AdminHome() {
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -78,19 +78,15 @@ export default function AdminHome() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">Admin Dashboard</h1>
-            <p className="text-muted-foreground">
-              Manage trainers, teachers, and view system statistics
-            </p>
-          </div>
+    <AcademyShell
+      title="Silverleaf Academy"
+      subtitle="Admin operations · trainers, cohorts, and the gradebook"
+      userLabel={user?.username}
+      onLogout={() => logoutMutation.mutate()}
+      actions={
           <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-reset-password">
+              <Button variant="secondary" className="bg-white/10 text-white border-white/20 hover:bg-white/20" data-testid="button-reset-password">
                 Reset User Password
               </Button>
             </DialogTrigger>
@@ -137,7 +133,14 @@ export default function AdminHome() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+      }
+    >
+        <div className="mb-8 sl-rise">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Command board</h1>
+          <p className="text-muted-foreground mt-1">
+            People, cohorts, quizzes, and certificates — one navy desk.
+          </p>
         </div>
 
         {/* Stats Grid */}
@@ -149,7 +152,7 @@ export default function AdminHome() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="p-6">
+            <Card className="p-6 sl-stat-card sl-rise">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -163,7 +166,7 @@ export default function AdminHome() {
               </div>
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-6 sl-stat-card sl-rise">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -177,7 +180,7 @@ export default function AdminHome() {
               </div>
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-6 sl-stat-card sl-rise">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -191,7 +194,7 @@ export default function AdminHome() {
               </div>
             </Card>
 
-            <Card className="p-6">
+            <Card className="p-6 sl-stat-card sl-rise">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -209,7 +212,7 @@ export default function AdminHome() {
 
         {/* Quick Navigation */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="p-8 hover:shadow-lg transition-shadow cursor-pointer"
+          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
             onClick={() => navigate("/admin/trainers")}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -234,7 +237,7 @@ export default function AdminHome() {
             </Button>
           </Card>
 
-          <Card className="p-8 hover:shadow-lg transition-shadow cursor-pointer"
+          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
             onClick={() => navigate("/admin/teachers")}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -259,7 +262,7 @@ export default function AdminHome() {
             </Button>
           </Card>
 
-          <Card className="p-8 hover:shadow-lg transition-shadow cursor-pointer"
+          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
             onClick={() => navigate("/admin/batches")}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -284,7 +287,7 @@ export default function AdminHome() {
             </Button>
           </Card>
 
-          <Card className="p-8 hover:shadow-lg transition-shadow cursor-pointer"
+          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
             onClick={() => navigate("/admin/analytics")}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -309,7 +312,7 @@ export default function AdminHome() {
             </Button>
           </Card>
 
-          <Card className="p-8 hover:shadow-lg transition-shadow cursor-pointer"
+          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
             onClick={() => navigate("/admin/teachers")}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -334,7 +337,6 @@ export default function AdminHome() {
             </Button>
           </Card>
         </div>
-      </div>
-    </div>
+    </AcademyShell>
   );
 }

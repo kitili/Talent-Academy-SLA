@@ -868,6 +868,33 @@ svg rect[fill*="green"] {
   display: none !important;
 }
 
+.sl-page {
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(900px 280px at 8% -8%, hsl(220 80% 32% / 0.10), transparent 55%),
+    radial-gradient(700px 240px at 100% 0%, hsl(220 80% 32% / 0.06), transparent 45%);
+}
+
+.sl-stat-card {
+  border-left: 4px solid hsl(var(--primary));
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.sl-stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.sl-nav-card {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  transition: transform 200ms ease, border-color 200ms ease;
+}
+
+.sl-nav-card:hover {
+  transform: translateY(-3px);
+  border-color: hsl(var(--primary) / 0.45);
+}
+
 @keyframes sl-rise {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }

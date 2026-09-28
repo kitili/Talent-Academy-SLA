@@ -5,70 +5,45 @@ import { users, teachers, batchTeachers, teacherReportCards } from "@shared/sche
 
 const BATCH_ID = "49c90cb7-04d6-4402-b5b8-93a3ae5b6db9";
 
-async function upsertAdmin() {
-  const password = await hashPassword("admin123");
-  const existing = await db.select().from(users).where(eq(users.username, "admin")).limit(1);
+/** Create a staff user only when missing. Never overwrite an existing hash. */
+async function ensureUser(opts: {
+  username: string;
+  email: string;
+  role: "admin" | "trainer";
+  password: string;
+  firstName: string;
+  lastName: string;
+}) {
+  const existing = await db.select().from(users).where(eq(users.username, opts.username)).limit(1);
   if (existing[0]) {
-    await db
-      .update(users)
-      .set({ password, approvalStatus: "approved", email: existing[0].email || "admin@silverleaf.com" })
-      .where(eq(users.id, existing[0].id));
-    console.log("updated admin");
-    return;
-  }
-  await db.insert(users).values({
-    username: "admin",
-    email: "admin@silverleaf.com",
-    password,
-    role: "admin",
-    approvalStatus: "approved",
-    firstName: "Admin",
-    lastName: "User",
-  });
-  console.log("created admin");
-}
-
-async function upsertTrainer() {
-  const password = await hashPassword("trainer123");
-  const existing = await db.select().from(users).where(eq(users.username, "trainer1")).limit(1);
-  if (existing[0]) {
-    await db
-      .update(users)
-      .set({ password, approvalStatus: "approved", role: "trainer" })
-      .where(eq(users.id, existing[0].id));
-    console.log("updated trainer1");
+    console.log(`keep existing ${opts.role} ${opts.username} (password unchanged)`);
     return existing[0].id;
   }
   const [created] = await db
     .insert(users)
     .values({
-      username: "trainer1",
-      email: "trainer@test.com",
-      password,
-      role: "trainer",
+      username: opts.username,
+      email: opts.email,
+      password: await hashPassword(opts.password),
+      role: opts.role,
       approvalStatus: "approved",
-      firstName: "Test",
-      lastName: "Trainer",
+      firstName: opts.firstName,
+      lastName: opts.lastName,
     })
     .returning();
-  console.log("created trainer1");
+  console.log(`created ${opts.role} ${opts.username}`);
   return created.id;
 }
 
-async function upsertTeacher() {
-  const password = await hashPassword("teacher123");
+async function ensureTeacher(email: string, name: string) {
   const existing = await db
     .select()
     .from(teachers)
-    .where(sql`LOWER(${teachers.email}) = LOWER('teacher@test.com')`)
+    .where(sql`LOWER(${teachers.email}) = LOWER(${email})`)
     .limit(1);
   let teacher = existing[0];
   if (teacher) {
-    await db
-      .update(teachers)
-      .set({ password, approvalStatus: "approved", name: teacher.name || "Test Teacher" })
-      .where(eq(teachers.id, teacher.id));
-    console.log("updated teacher@test.com");
+    console.log(`keep existing ${email} (password unchanged)`);
   } else {
     const [maxRow] = await db.select({ maxId: sql<number>`COALESCE(MAX(${teachers.teacherId}), 7099)` }).from(teachers);
     const nextId = Number(maxRow?.maxId || 7099) + 1;
@@ -76,14 +51,14 @@ async function upsertTeacher() {
       .insert(teachers)
       .values({
         teacherId: nextId,
-        name: "Test Teacher",
-        email: "teacher@test.com",
-        password,
+        name,
+        email,
+        password: await hashPassword("teacher123"),
         approvalStatus: "approved",
       })
       .returning();
     teacher = created;
-    console.log("created teacher@test.com");
+    console.log(`created ${email}`);
   }
 
   const enrolled = await db
@@ -109,10 +84,41 @@ async function upsertTeacher() {
 }
 
 async function main() {
-  await upsertAdmin();
-  await upsertTrainer();
-  await upsertTeacher();
-  console.log("test accounts ready");
+  await ensureUser({
+    username: "admin",
+    email: "admin@silverleaf.com",
+    role: "admin",
+    password: "admin123",
+    firstName: "Admin",
+    lastName: "User",
+  });
+  await ensureUser({
+    username: "test.admin",
+    email: "test.admin@silverleaf.academy",
+    role: "admin",
+    password: "admin123",
+    firstName: "Test",
+    lastName: "Admin",
+  });
+  await ensureUser({
+    username: "trainer1",
+    email: "trainer@test.com",
+    role: "trainer",
+    password: "trainer123",
+    firstName: "Test",
+    lastName: "Trainer",
+  });
+  await ensureUser({
+    username: "test.trainer",
+    email: "test.trainer@silverleaf.academy",
+    role: "trainer",
+    password: "trainer123",
+    firstName: "Test",
+    lastName: "Trainer",
+  });
+  await ensureTeacher("teacher@test.com", "Test Teacher");
+  await ensureTeacher("qa.teacher@silverleaf.academy", "QA Teacher");
+  console.log("test accounts ready; existing hashes were not overwritten");
 }
 
 main().catch((error) => {

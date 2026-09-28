@@ -392,31 +392,31 @@ export default function UnifiedAuth() {
             
             <div className="space-y-4">
               <h2 className="text-3xl font-bold text-foreground leading-tight">
-                Welcome to Your Learning Journey
+                The classroom, in one navy desk
               </h2>
               <p className="text-lg text-muted-foreground">
-                Empowering educators and learners with comprehensive training programs and management tools.
+                Cohorts, the register, module quizzes, written work, and the calendar — for Silverleaf trainers and teachers.
               </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 pt-6">
-              <div className="flex items-start gap-3 p-4 bg-card/50 rounded-lg backdrop-blur-sm border border-border/50">
+              <div className="flex items-start gap-3 p-4 bg-card rounded-lg border-l-4 border-l-primary">
                 <div className="p-2 bg-primary/10 rounded-lg">
                   <Sparkles className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Interactive Learning</h3>
-                  <p className="text-sm text-muted-foreground">Engage with dynamic content and assessments</p>
+                  <h3 className="font-semibold text-foreground">Continue the week</h3>
+                  <p className="text-sm text-muted-foreground">Modules, slide quizzes, and written assignments in one place</p>
                 </div>
               </div>
               
-              <div className="flex items-start gap-3 p-4 bg-card/50 rounded-lg backdrop-blur-sm border border-border/50">
+              <div className="flex items-start gap-3 p-4 bg-card rounded-lg border-l-4 border-l-primary">
                 <div className="p-2 bg-primary/10 rounded-lg">
                   <Shield className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Secure Platform</h3>
-                  <p className="text-sm text-muted-foreground">Your data is protected with enterprise security</p>
+                  <h3 className="font-semibold text-foreground">Your role stays yours</h3>
+                  <p className="text-sm text-muted-foreground">Admin, trainer, or teacher — sign in with the account you already have</p>
                 </div>
               </div>
             </div>
@@ -430,7 +430,7 @@ export default function UnifiedAuth() {
                   <SilverleafLogo className="w-12 h-12 sm:w-14 sm:h-14" />
                 </div>
                 <CardTitle className="text-2xl sm:text-3xl font-bold">Welcome Back</CardTitle>
-                <CardDescription className="text-sm sm:text-base">Sign in to continue your learning journey</CardDescription>
+                <CardDescription className="text-sm sm:text-base">Sign in with your existing Silverleaf account, or create a trainer or teacher account</CardDescription>
               </CardHeader>
               
               <CardContent className="px-4 sm:px-6">

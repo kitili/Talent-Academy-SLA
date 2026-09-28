@@ -183,7 +183,7 @@ export default function CohortWorkspace() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="sl-page min-h-screen">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

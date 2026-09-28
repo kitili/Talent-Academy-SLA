@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Badge } from "@/components/ui/badge";
+import { AcademyShell } from "@/components/AcademyShell";
 
 interface Batch {
   id: string;
@@ -88,8 +88,11 @@ export default function AdminBatches() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-8">
-      <div className="max-w-5xl mx-auto">
+    <AcademyShell
+      title="Silverleaf Academy"
+      subtitle="Cohorts"
+      userLabel={user?.username}
+    >
         <div className="mb-6">
           <Button
             variant="ghost"
@@ -121,7 +124,7 @@ export default function AdminBatches() {
             {batches.map((batch) => (
               <Card
                 key={batch.id}
-                className="p-4 sm:p-6"
+                className="p-4 sm:p-6 sl-stat-card sl-rise"
                 data-testid={`card-batch-${batch.id}`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -213,7 +216,6 @@ export default function AdminBatches() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+    </AcademyShell>
   );
 }
