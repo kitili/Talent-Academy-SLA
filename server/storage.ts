@@ -3114,8 +3114,12 @@ export class DatabaseStorage implements IStorage {
   // ── Teacher Profile Operations ──
 
   async getTeacherProfile(teacherId: string): Promise<TeacherProfile | undefined> {
-    const [profile] = await db.select().from(teacherProfiles).where(eq(teacherProfiles.teacherId, teacherId));
-    return profile;
+    try {
+      const [profile] = await db.select().from(teacherProfiles).where(eq(teacherProfiles.teacherId, teacherId));
+      return profile;
+    } catch {
+      return undefined;
+    }
   }
 
   async upsertTeacherProfile(teacherId: string, data: Partial<InsertTeacherProfile>): Promise<TeacherProfile> {
