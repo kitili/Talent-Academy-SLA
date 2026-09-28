@@ -131,11 +131,18 @@ async function main() {
     `HTTP ${assignedWeeks.status} count=${Array.isArray(assignedWeeks.json) ? assignedWeeks.json.length : 0}`,
   );
 
-  const courseCompletion = await request("/api/analytics/course-completion", {}, cookies);
+  const pipeline = await request("/api/admin/analytics/pipeline", {}, cookies);
   record(
-    "Course completion overview",
-    courseCompletion.status === 200 && Array.isArray(courseCompletion.json),
-    `HTTP ${courseCompletion.status} courses=${Array.isArray(courseCompletion.json) ? courseCompletion.json.length : 0}`,
+    "Pipeline analytics",
+    pipeline.status === 200 && typeof pipeline.json?.totalCandidates === "number",
+    `HTTP ${pipeline.status} candidates=${pipeline.json?.totalCandidates ?? "n/a"}`,
+  );
+
+  const cohorts = await request("/api/admin/analytics/cohorts", {}, cookies);
+  record(
+    "Cohort analytics",
+    cohorts.status === 200 && Array.isArray(cohorts.json) && cohorts.json.length > 0,
+    `HTTP ${cohorts.status} cohorts=${Array.isArray(cohorts.json) ? cohorts.json.length : 0}`,
   );
 
   for (const account of [

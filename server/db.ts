@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 
 const databaseUrl =
+  process.env.NEON_DATABASE_URL ||
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL ||
   process.env.POSTGRES_PRISMA_URL ||
@@ -29,4 +30,8 @@ export const db = drizzle({ client: pool, schema });
 
 export function hasDatabaseUrl() {
   return Boolean(databaseUrl);
+}
+
+export function getDatabaseUrl() {
+  return databaseUrl;
 }

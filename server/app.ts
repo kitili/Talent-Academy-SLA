@@ -35,10 +35,16 @@ export async function createApp() {
     next();
   });
 
-  const dbUrl = process.env.DATABASE_URL;
+  const dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
   const env = process.env.NODE_ENV || "development";
   if (dbUrl) {
-    log(`📊 Database: ${env.toUpperCase()} (${dbUrl.substring(0, 30)}...)`);
+    let host = "configured";
+    try {
+      host = new URL(dbUrl).host;
+    } catch {
+      host = "configured";
+    }
+    log(`📊 Database: ${env.toUpperCase()} (${host})`);
   } else {
     log("⚠️  WARNING: DATABASE_URL not set!");
   }

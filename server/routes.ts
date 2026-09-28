@@ -14,7 +14,7 @@ import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
 import * as mammoth from "mammoth";
-import { db } from "./db";
+import { db, getDatabaseUrl } from "./db";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
 
@@ -73,7 +73,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/health", async (_req, res) => {
     const database = Boolean(
-      process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL,
+      process.env.NEON_DATABASE_URL ||
+        process.env.DATABASE_URL ||
+        process.env.POSTGRES_URL ||
+        process.env.POSTGRES_PRISMA_URL,
     );
     const sessionSecret = Boolean(process.env.SESSION_SECRET);
     const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
@@ -87,10 +90,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     const ok = database && sessionSecret && databaseReachable;
+    let databaseHost = "";
+    try {
+      databaseHost = new URL(getDatabaseUrl()).host;
+    } catch {
+      databaseHost = "";
+    }
     res.status(ok ? 200 : 503).json({
       ok,
       database,
       databaseReachable,
+      databaseHost,
       sessionSecret,
       blob,
     });
@@ -2029,11 +2039,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all batches (optionally filter by creator)
   app.get("/api/batches", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      // Admins can see all batches, trainers only see their own
-      const batches = req.user!.role === "admin" 
-        ? await storage.getAllBatches() 
-        : await storage.getAllBatches(req.user!.id);
-      res.json(batches);
+      const batchesList = await storage.getAllBatches();
+      res.json(batchesList);
     } catch (error) {
       console.error("Error fetching batches:", error);
       res.status(500).json({ error: "Internal server error" });

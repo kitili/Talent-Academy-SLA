@@ -112,14 +112,19 @@ import {
   type QuizQuestion,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql as sqlOp, desc, max } from "drizzle-orm";
+import { eq, and, or, sql as sqlOp, desc, max, inArray } from "drizzle-orm";
 import { batchRiskStatus, moduleCoveragePercentage } from "./progressLogic";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
 const PostgresSessionStore = connectPg(session);
+const sessionDatabaseUrl =
+  process.env.NEON_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  "";
 const hostedDatabase = /neon\.tech|supabase\.co|sslmode=require|amazonaws\.com|vercel/.test(
-  process.env.DATABASE_URL || "",
+  sessionDatabaseUrl,
 ) || Boolean(process.env.VERCEL);
 
 export interface IStorage {
@@ -389,10 +394,10 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = process.env.DATABASE_URL
+    this.sessionStore = sessionDatabaseUrl
       ? new PostgresSessionStore({
           conObject: {
-            connectionString: process.env.DATABASE_URL,
+            connectionString: sessionDatabaseUrl,
             ssl: hostedDatabase ? { rejectUnauthorized: false } : undefined,
           },
           createTableIfMissing: true,
@@ -1038,13 +1043,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTeacherByEmail(email: string): Promise<Teacher | undefined> {
-    const [teacher] = await db.select().from(teachers).where(eq(teachers.email, email));
+    const [teacher] = await db
+      .select()
+      .from(teachers)
+      .where(sqlOp`LOWER(${teachers.email}) = LOWER(${email})`);
     return teacher;
   }
 
   async getAllTeachersByEmail(email: string): Promise<Teacher[]> {
-    const allTeachers = await db.select().from(teachers).where(eq(teachers.email, email));
-    return allTeachers;
+    return db
+      .select()
+      .from(teachers)
+      .where(sqlOp`LOWER(${teachers.email}) = LOWER(${email})`);
   }
 
   async getTeacherByTeacherId(teacherId: number): Promise<Teacher | undefined> {
@@ -1155,7 +1165,9 @@ export class DatabaseStorage implements IStorage {
       .groupBy(batches.id);
     
     if (trainerId) {
-      return await query.where(eq(batches.trainerId, trainerId));
+      return await query.where(
+        or(eq(batches.trainerId, trainerId), eq(batches.createdBy, trainerId)),
+      );
     }
     return await query;
   }
@@ -2087,7 +2099,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTrainerAnalytics(trainerId: string): Promise<any> {
-    const createdBatches = await this.getAllBatches(trainerId);
+    const createdBatches = await this.getAllBatches();
     const assignedCourses = await db
       .select({ count: sqlOp`COUNT(DISTINCT ${batchCourses.courseId})::int` })
       .from(batchCourses)
@@ -2102,7 +2114,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTeacherAnalyticsForTrainer(trainerId: string): Promise<any> {
-    const trainerBatches = await this.getAllBatches(trainerId);
+    const trainerBatches = await this.getAllBatches();
     const batchIds = trainerBatches.map(b => b.id);
     
     if (batchIds.length === 0) {
@@ -2110,14 +2122,14 @@ export class DatabaseStorage implements IStorage {
     }
     
     const teacherResults = await db
-      .select({ 
-        teacher: users,
+      .select({
+        teacher: teachers,
         batchCount: sqlOp`COUNT(DISTINCT ${batchTeachers.batchId})::int`,
       })
       .from(batchTeachers)
-      .innerJoin(users, eq(batchTeachers.teacherId, users.id))
-      .where(sqlOp`${batchTeachers.batchId} IN (${batchIds.join(",")})`)
-      .groupBy(users.id);
+      .innerJoin(teachers, eq(batchTeachers.teacherId, teachers.id))
+      .where(inArray(batchTeachers.batchId, batchIds))
+      .groupBy(teachers.id);
     
     return {
       trainerId,
