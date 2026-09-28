@@ -138,7 +138,7 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Checkpoint Quiz</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">Module quiz</DialogTitle>
           <DialogDescription>
             {quizState === 'quiz' && "Answer all questions to complete this week's checkpoint."}
             {quizState === 'results' && "Review your quiz results below."}
@@ -206,7 +206,7 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
               </p>
               <p className="text-sm text-muted-foreground">
                 {results.passed 
-                  ? "You've successfully completed this checkpoint quiz!" 
+                  ? "You've successfully completed this module quiz!" 
                   : "You need 70% or higher to pass. Review the materials and try again."}
               </p>
             </div>

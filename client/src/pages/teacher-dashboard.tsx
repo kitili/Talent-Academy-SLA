@@ -44,6 +44,7 @@ export default function TeacherDashboard() {
   const [reflectionRating, setReflectionRating] = useState(0);
   const [satisfactionScore, setSatisfactionScore] = useState(0);
   const [satisfactionCourseId, setSatisfactionCourseId] = useState("");
+  const [workDrafts, setWorkDrafts] = useState<Record<string, string>>({});
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -223,6 +224,42 @@ export default function TeacherDashboard() {
     },
   }));
 
+  const nextLesson = [...assignedWeeks]
+    .sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0))
+    .find((week: any) => !week.locked && (week.progress?.percentage || 0) < 100);
+
+  const { data: upcomingEvents = [] } = useQuery<any[]>({
+    queryKey: ["/api/teacher/events"],
+    queryFn: async () => {
+      const res = await fetch("/api/teacher/events");
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
+  const { data: myWork = [] } = useQuery<any[]>({
+    queryKey: ["/api/teacher/assignments"],
+    queryFn: async () => {
+      const res = await fetch("/api/teacher/assignments");
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
+  const submitWork = useMutation({
+    mutationFn: async ({ id, response }: { id: string; response: string }) => {
+      const res = await apiRequest("POST", `/api/teacher/assignments/${id}/submit`, { response });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Work submitted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/assignments"] });
+    },
+    onError: () => toast({ title: "Could not submit work", variant: "destructive" }),
+  });
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header matching Admin dashboard */}
@@ -286,6 +323,112 @@ export default function TeacherDashboard() {
           <p className="text-muted-foreground">
             Your personalized learning dashboard
           </p>
+        </div>
+
+        <Card className="sl-continue shadow-lg rounded-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Continue learning
+            </CardTitle>
+            <CardDescription>
+              {nextLesson
+                ? "Jump back into the next unlocked module. Finish it to open the one after."
+                : assignedWeeks.length === 0
+                  ? "Your trainer has not assigned modules yet. You are in the right place when they do."
+                  : "Every assigned module is complete. Brilliant — check certificates or reflections next."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">
+                {nextLesson
+                  ? (nextLesson.competencyFocus || `Module ${nextLesson.weekNumber}`)
+                  : assignedWeeks.length === 0
+                    ? "Waiting for your first lesson"
+                    : "You are caught up"}
+              </p>
+              {upcomingEvents[0] && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Next session: {upcomingEvents[0].title || "Class"} {upcomingEvents[0].startDate ? `· ${new Date(upcomingEvents[0].startDate).toLocaleString()}` : ""}
+                </p>
+              )}
+            </div>
+            {nextLesson && (
+              <Button onClick={() => setLocation(`/teacher/week/${nextLesson.id}/content`)}>
+                Resume
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card className="sl-rise">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                My calendar
+              </CardTitle>
+              <CardDescription>Sessions and deadlines for your cohorts</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {upcomingEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nothing scheduled yet.</p>
+              ) : upcomingEvents.slice(0, 8).map((event: any) => (
+                <div key={event.id} className="text-sm">
+                  <p className="font-medium">{event.title}</p>
+                  <p className="text-muted-foreground">
+                    {event.eventType || event.event_type} · {new Date(event.startDate || event.start_date).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Card className="sl-rise">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                My work
+              </CardTitle>
+              <CardDescription>Written assignments besides quizzes</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {myWork.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No written work assigned yet.</p>
+              ) : myWork.map((item: any) => {
+                const id = item.id;
+                const submitted = item.my_response || item.myResponse;
+                return (
+                  <div key={id} className="space-y-2">
+                    <p className="font-medium">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.instructions}</p>
+                    {item.due_date || item.dueDate ? (
+                      <p className="text-xs text-muted-foreground">Due {new Date(item.due_date || item.dueDate).toLocaleString()}</p>
+                    ) : null}
+                    {submitted ? (
+                      <p className="text-sm">Submitted: {submitted}</p>
+                    ) : (
+                      <>
+                        <Textarea
+                          placeholder="Your response"
+                          value={workDrafts[id] || ""}
+                          onChange={(e) => setWorkDrafts((current) => ({ ...current, [id]: e.target.value }))}
+                        />
+                        <Button
+                          size="sm"
+                          disabled={!workDrafts[id]?.trim() || submitWork.isPending}
+                          onClick={() => submitWork.mutate({ id, response: workDrafts[id] })}
+                        >
+                          Submit
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">

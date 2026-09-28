@@ -1,6 +1,6 @@
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
@@ -16,7 +16,7 @@ async function initializeDatabase() {
   console.log("🔧 Initializing database...");
   
   // Check database connection
-  const dbUrl = process.env.DATABASE_URL;
+  const dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
   if (!dbUrl) {
     throw new Error("DATABASE_URL is not set!");
   }
@@ -25,6 +25,28 @@ async function initializeDatabase() {
   const isProduction = process.env.NODE_ENV === "production";
   console.log(`📊 Database environment: ${isProduction ? "PRODUCTION" : "DEVELOPMENT"}`);
   console.log(`🔗 Database URL starts with: ${dbUrl.substring(0, 30)}...`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS written_assignments (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      batch_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      title varchar NOT NULL,
+      instructions text NOT NULL,
+      due_date timestamp,
+      created_by varchar REFERENCES users(id),
+      created_at timestamp DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS assignment_submissions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      assignment_id varchar NOT NULL REFERENCES written_assignments(id) ON DELETE CASCADE,
+      teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      response text NOT NULL,
+      submitted_at timestamp DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_submission_unique
+      ON assignment_submissions(assignment_id, teacher_id);
+  `);
+  console.log("✅ Written assignment tables are present");
   
   try {
     // Check if admin user exists

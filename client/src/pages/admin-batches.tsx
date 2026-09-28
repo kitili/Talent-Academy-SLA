@@ -192,18 +192,18 @@ export default function AdminBatches() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => navigate(`/cohorts/${batch.id}`)}
+                          data-testid={`button-open-cohort-${batch.id}`}
+                        >
+                          Open cohort
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setAssigningBatchId(batch.id)}
                           data-testid={`button-assign-trainer-${batch.id}`}
                         >
                           {batch.trainerId ? "Change Trainer" : "Assign Trainer"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => navigate(`/trainer/batches?view=${batch.id}`)}
-                          data-testid={`button-view-batch-${batch.id}`}
-                        >
-                          <ChevronRight className="h-5 w-5" />
                         </Button>
                       </>
                     )}

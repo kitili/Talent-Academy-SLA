@@ -107,6 +107,8 @@ import {
   userProfiles,
   teacherProfiles,
   openEndedReviews,
+  writtenAssignments,
+  assignmentSubmissions,
   type OpenEndedReview,
   type InsertOpenEndedReview,
   type QuizQuestion,
@@ -352,6 +354,7 @@ export interface IStorage {
 
   // Attendance operations
   createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord>;
+  upsertAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord>;
   getAttendanceByTeacher(teacherId: string, batchId?: string): Promise<AttendanceRecord[]>;
   getAttendanceByBatch(batchId: string, date?: Date): Promise<AttendanceRecord[]>;
   getAttendanceSummary(teacherId: string, batchId?: string): Promise<any>;
@@ -2894,6 +2897,22 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async upsertAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord> {
+    const [result] = await db
+      .insert(attendanceRecords)
+      .values(record)
+      .onConflictDoUpdate({
+        target: [attendanceRecords.teacherId, attendanceRecords.batchId, attendanceRecords.date],
+        set: {
+          status: record.status,
+          markedBy: record.markedBy,
+          notes: record.notes ?? null,
+        },
+      })
+      .returning();
+    return result;
+  }
+
   async getAttendanceByTeacher(teacherId: string, batchId?: string): Promise<AttendanceRecord[]> {
     if (batchId) {
       return db.select().from(attendanceRecords)
@@ -3135,6 +3154,41 @@ export class DatabaseStorage implements IStorage {
       .values({ teacherId, ...data })
       .returning();
     return created;
+  }
+
+  async createWrittenAssignment(data: typeof writtenAssignments.$inferInsert) {
+    const [row] = await db.insert(writtenAssignments).values(data).returning();
+    return row;
+  }
+
+  async getWrittenAssignments(batchId: string) {
+    return db.select().from(writtenAssignments).where(eq(writtenAssignments.batchId, batchId)).orderBy(desc(writtenAssignments.createdAt));
+  }
+
+  async getWrittenAssignmentsForTeacher(teacherId: string) {
+    const result = await db.execute(sqlOp`
+      SELECT wa.*,
+        (SELECT response FROM assignment_submissions s WHERE s.assignment_id = wa.id AND s.teacher_id = ${teacherId} LIMIT 1) as my_response
+      FROM written_assignments wa
+      JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
+      WHERE bt.teacher_id = ${teacherId}
+      ORDER BY wa.created_at DESC
+    `);
+    return result.rows;
+  }
+
+  async upsertAssignmentSubmission(assignmentId: string, teacherId: string, response: string) {
+    const [row] = await db.insert(assignmentSubmissions).values({ assignmentId, teacherId, response })
+      .onConflictDoUpdate({
+        target: [assignmentSubmissions.assignmentId, assignmentSubmissions.teacherId],
+        set: { response, submittedAt: new Date() },
+      })
+      .returning();
+    return row;
+  }
+
+  async getAssignmentSubmissions(assignmentId: string) {
+    return db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.assignmentId, assignmentId));
   }
 }
 

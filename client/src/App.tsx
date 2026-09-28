@@ -10,7 +10,8 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import CoursesList from "@/pages/courses-list";
 import CourseWeeks from "@/pages/course-weeks";
 import CourseView from "@/pages/course-view";
-import Home from "@/pages/home";
+import RoleHome from "@/pages/role-home";
+import CohortWorkspace from "@/pages/cohort-workspace";
 import UnifiedAuth from "@/pages/unified-auth";
 import TeacherDashboard from "@/pages/teacher-dashboard";
 import TeacherContentView from "@/pages/teacher-content-view";
@@ -35,9 +36,11 @@ function Router() {
   return (
     <Switch>
       {/* New course hierarchy */}
-      <ProtectedRoute path="/" component={CoursesList} />
+      <ProtectedRoute path="/" component={RoleHome} />
+      <ProtectedRoute path="/courses" component={CoursesList} />
       <ProtectedRoute path="/courses/:courseId" component={CourseWeeks} />
       <ProtectedRoute path="/courses/:courseId/weeks/:weekId" component={CourseView} />
+      <ProtectedRoute path="/cohorts/:batchId" component={CohortWorkspace} />
       
       {/* Legacy routes for backward compatibility */}
       <ProtectedRoute path="/course/:weekId" component={CourseView} />

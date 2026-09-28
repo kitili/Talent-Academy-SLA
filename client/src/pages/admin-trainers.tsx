@@ -247,7 +247,7 @@ export default function AdminTrainers() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
-                          Progress
+                          Has a cohort
                         </p>
                         <p className="text-sm font-semibold">
                           {trainer.progress || 0}%
@@ -255,7 +255,7 @@ export default function AdminTrainers() {
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
-                          Files Completed
+                          Cohorts
                         </p>
                         <p className="text-sm font-semibold">
                           {trainer.filesCompleted || 0}

@@ -50,7 +50,7 @@ a, button, [role="button"] {
 
   --sidebar-border: 216 12% 90%;
 
-  --sidebar-primary: 216 89% 34%;
+  --sidebar-primary: 220 80% 32%;
 
   --sidebar-primary-foreground: 0 0% 100%;
 
@@ -58,7 +58,7 @@ a, button, [role="button"] {
 
   --sidebar-accent-foreground: 216 20% 15%;
 
-  --sidebar-ring: 216 89% 34%;
+  --sidebar-ring: 220 80% 32%;
 
   --popover: 216 6% 94%;
 
@@ -66,7 +66,7 @@ a, button, [role="button"] {
 
   --popover-border: 216 12% 88%;
 
-  --primary: 216 89% 34%;
+  --primary: 220 80% 32%;
 
   --primary-foreground: 0 0% 100%;
 
@@ -87,8 +87,8 @@ a, button, [role="button"] {
   --destructive-foreground: 0 0% 100%;
 
   --input: 216 15% 75%;
-  --ring: 216 89% 34%;
-  --chart-1: 216 89% 34%;
+  --ring: 220 80% 32%;
+  --chart-1: 220 80% 32%;
   --chart-2: 142 76% 36%;
   --chart-3: 280 65% 55%;
   --chart-4: 25 95% 53%;
@@ -186,7 +186,7 @@ a, button, [role="button"] {
 
   --sidebar-border: 216 12% 20%;
 
-  --sidebar-primary: 216 89% 45%;
+  --sidebar-primary: 220 75% 55%;
 
   --sidebar-primary-foreground: 0 0% 100%;
 
@@ -194,7 +194,7 @@ a, button, [role="button"] {
 
   --sidebar-accent-foreground: 216 15% 95%;
 
-  --sidebar-ring: 216 89% 45%;
+  --sidebar-ring: 220 75% 55%;
 
   --popover: 216 15% 18%;
 
@@ -202,7 +202,7 @@ a, button, [role="button"] {
 
   --popover-border: 216 15% 24%;
 
-  --primary: 216 89% 45%;
+  --primary: 220 75% 55%;
 
   --primary-foreground: 0 0% 100%;
 
@@ -223,8 +223,8 @@ a, button, [role="button"] {
   --destructive-foreground: 0 0% 100%;
 
   --input: 216 15% 40%;
-  --ring: 216 89% 45%;
-  --chart-1: 216 89% 45%;
+  --ring: 220 75% 55%;
+  --chart-1: 220 75% 55%;
   --chart-2: 142 76% 50%;
   --chart-3: 280 65% 70%;
   --chart-4: 25 95% 60%;
@@ -866,4 +866,27 @@ svg rect[fill*="green"] {
 .uppy-Dashboard-Item-previewIconWrap::after,
 .uppy-Dashboard-Item-statusIcon {
   display: none !important;
+}
+
+@keyframes sl-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sl-pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(220 80% 32% / 0.35); }
+  50% { box-shadow: 0 0 0 10px hsl(220 80% 32% / 0); }
+}
+
+.sl-rise {
+  animation: sl-rise 0.45s ease-out both;
+}
+
+.sl-rise-delay-1 { animation-delay: 0.06s; }
+.sl-rise-delay-2 { animation-delay: 0.12s; }
+.sl-rise-delay-3 { animation-delay: 0.18s; }
+
+.sl-continue {
+  animation: sl-rise 0.45s ease-out both, sl-pulse-ring 2.4s ease-in-out 0.5s infinite;
+  border-left: 4px solid hsl(var(--primary));
 }

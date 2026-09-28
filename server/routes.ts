@@ -52,6 +52,28 @@ function isStrictAdmin(req: Request, res: Response, next: NextFunction) {
   res.status(403).json({ message: "Forbidden: Admin-only access required" });
 }
 
+function staffCanAccessBatch(user?: Express.User) {
+  return Boolean(user && (user.role === "admin" || user.role === "trainer"));
+}
+
+async function notifyTeacher(teacherId: string, title: string, message: string, type = "general", metadata: Record<string, unknown> = {}) {
+  await storage.createNotification({
+    recipientId: teacherId,
+    recipientType: "teacher",
+    type,
+    title,
+    message,
+    metadata,
+  });
+}
+
+async function notifyBatchTeachers(batchId: string, title: string, message: string, type = "general") {
+  const enrolled = await storage.getTeachersInBatch(batchId);
+  for (const teacher of enrolled) {
+    await notifyTeacher(teacher.id, title, message, type, { batchId });
+  }
+}
+
 // Middleware to allow both regular auth and teacher auth
 function isAuthenticatedAny(req: Request, res: Response, next: NextFunction) {
   const isRegularUser = req.isAuthenticated();
@@ -2070,7 +2092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership - only admins can access any batch, trainers only their own
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
@@ -2089,7 +2111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership - only admins can delete any batch, trainers only their own
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const deleted = await storage.deleteBatch(req.params.batchId);
@@ -2179,7 +2201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2207,6 +2229,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teacherId: teacher.id,
       });
 
+      await notifyTeacher(
+        teacher.id,
+        "You're in",
+        `You have been added to ${batch.name}. Open your dashboard to continue learning.`,
+        "general",
+        { batchId: batch.id },
+      );
+
       res.status(201).json({ message: "Teacher added to batch", teacher: { id: teacher.teacherId, name: teacher.name } });
     } catch (error) {
       console.error("Error adding teacher to batch:", error);
@@ -2219,7 +2249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!batch) return res.status(404).json({ error: "Batch not found" });
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2235,6 +2265,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           await storage.addTeacherToBatch({ batchId: req.params.batchId, teacherId: tid });
           added++;
+          await notifyTeacher(
+            tid,
+            "You're in",
+            `You have been added to ${batch.name}. Open your dashboard to continue learning.`,
+            "general",
+            { batchId: batch.id },
+          );
         } catch (err: any) {
           // Unique constraint violation = already enrolled
           if (err?.code === "23505" || String(err?.message).includes("duplicate")) {
@@ -2260,7 +2297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const deleted = await storage.removeTeacherFromBatch(
@@ -2289,7 +2326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2335,6 +2372,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.status(201).json(assignedQuiz);
+      notifyBatchTeachers(
+        req.params.batchId,
+        "A quiz is ready",
+        `${title || "A module quiz"} is ready for ${batch.name}. Open your modules to take it.`,
+        "deadline",
+      ).catch((error) => console.error("Quiz ready notice failed:", error));
     } catch (error) {
       console.error("Error assigning quiz:", error);
       res.status(500).json({ error: "Failed to assign quiz" });
@@ -2349,7 +2392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2400,6 +2443,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.status(201).json(assignedQuiz);
+      notifyBatchTeachers(
+        req.params.batchId,
+        "A quiz is ready",
+        `${title || selectedFile.fileName || "A slide quiz"} is ready for ${batch.name}. Open your modules to take it.`,
+        "deadline",
+      ).catch((error) => console.error("Quiz ready notice failed:", error));
     } catch (error: any) {
       console.error("Error assigning file quiz:", error);
       const errorMessage = error?.message || "Failed to assign file quiz";
@@ -2415,7 +2464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const quizzes = await storage.getAssignedQuizzesForBatch(req.params.batchId);
@@ -2433,7 +2482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!batch) {
         return res.status(404).json({ error: "Batch not found" });
       }
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const quizzes = await storage.getFileQuizzesForBatch(req.params.batchId);
@@ -2453,7 +2502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Verify ownership through batch
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (batch && !staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(quiz);
@@ -2472,7 +2521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Verify ownership through batch
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (batch && !staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const deleted = await storage.deleteAssignedQuiz(req.params.quizId);
@@ -2489,7 +2538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       if (!quiz) return res.status(404).json({ error: "Quiz not found" });
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (batch && !staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       await storage.resetTeacherQuizAttempts(req.params.quizId, req.params.teacherId);
@@ -2510,7 +2559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       if (!quiz) return res.status(404).json({ error: "Quiz not found" });
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (batch && !staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const updated = await storage.updateAssignedQuizQuestions(req.params.quizId, questions);
@@ -2742,7 +2791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       if (!quiz) return res.status(404).json({ error: "Quiz not found" });
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (batch && !staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const batchTeachersData = await storage.getTeachersInBatch(quiz.batchId);
@@ -2848,7 +2897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
@@ -2914,7 +2963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (req.user!.role !== "admin" && batch.createdBy !== req.user!.id) {
+      if (!staffCanAccessBatch(req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -3443,19 +3492,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/trainers", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const allTrainers = await db.select().from(users).where(eq(users.role, "trainer")).orderBy(users.createdAt);
-      
-      // Sanitize and add progress data
-      const trainersData = allTrainers.map((trainer: any) => ({
-        id: trainer.id,
-        username: trainer.username,
-        email: trainer.email,
-        role: trainer.role,
-        approvalStatus: trainer.approvalStatus,
-        createdAt: trainer.createdAt,
-        lastLogin: trainer.lastLogin,
-        progress: Math.floor(Math.random() * 100), // Mock progress for now
-        filesCompleted: Math.floor(Math.random() * 20),
-      }));
+      const allBatches = await storage.getAllBatches();
+      const trainersData = allTrainers.map((trainer: any) => {
+        const cohortCount = allBatches.filter((batch: any) => batch.createdBy === trainer.id || batch.trainerId === trainer.id).length;
+        return {
+          id: trainer.id,
+          username: trainer.username,
+          email: trainer.email,
+          role: trainer.role,
+          approvalStatus: trainer.approvalStatus,
+          createdAt: trainer.createdAt,
+          lastLogin: trainer.lastLogin,
+          progress: cohortCount > 0 ? 100 : 0,
+          filesCompleted: cohortCount,
+        };
+      });
       
       res.json(trainersData);
     } catch (error) {
@@ -3475,23 +3526,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { password, ...sanitized } = trainer;
+      const trainerBatches = (await storage.getAllBatches()).filter(
+        (batch: any) => batch.createdBy === id || batch.trainerId === id,
+      );
       res.json({
         ...sanitized,
-        progress: Math.floor(Math.random() * 100),
-        filesCompleted: Math.floor(Math.random() * 20),
-        completedLessons: ["Week 1 Overview", "Module 2: Basics"],
-        activityTimeline: [
-          {
-            action: "login",
-            timestamp: new Date().toISOString(),
-            details: "Logged in to system",
-          },
-          {
-            action: "view",
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-            details: "Viewed training materials",
-          },
-        ],
+        progress: trainerBatches.length > 0 ? 100 : 0,
+        filesCompleted: trainerBatches.length,
+        completedLessons: trainerBatches.map((batch: any) => batch.name),
+        activityTimeline: [],
       });
     } catch (error) {
       console.error("Error getting trainer details:", error);
@@ -3503,20 +3546,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/teachers", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const allTeachers = await db.select().from(teachers);
-      
-      // Sanitize and add progress data
-      const teachersData = (allTeachers as any).map((teacher: any) => ({
-        id: teacher.id,
-        teacherId: teacher.teacherId,
-        name: teacher.name,
-        email: teacher.email,
-        role: "teacher",
-        approvalStatus: teacher.approvalStatus,
-        createdAt: teacher.createdAt,
-        lastLogin: teacher.lastLogin,
-        progress: Math.floor(Math.random() * 100),
-        filesViewed: Math.floor(Math.random() * 50),
-        courseCompletion: Math.floor(Math.random() * 100),
+      const teachersData = await Promise.all(allTeachers.map(async (teacher: any) => {
+        const reportCard = await storage.refreshTeacherReportCard(teacher.id);
+        const enrolled = await storage.getBatchesForTeacher(teacher.id);
+        return {
+          id: teacher.id,
+          teacherId: teacher.teacherId,
+          name: teacher.name,
+          email: teacher.email,
+          role: "teacher",
+          approvalStatus: teacher.approvalStatus,
+          createdAt: teacher.createdAt,
+          progress: reportCard?.averageScore || 0,
+          filesViewed: reportCard?.totalQuizzesTaken || 0,
+          courseCompletion: enrolled.length > 0 ? Math.min(100, (reportCard?.totalQuizzesPassed || 0) * 10) : 0,
+        };
       }));
       
       res.json(teachersData);
@@ -4733,28 +4777,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "date and records array are required" });
       }
       const markerId = (req.user as any)?.id;
-      const attendanceDate = new Date(date);
+      const attendanceDate = new Date(`${date}T00:00:00.000Z`);
       const results = [];
       for (const record of records) {
         if (!record.teacherId || !record.status) continue;
-        try {
-          const result = await storage.createAttendanceRecord({
-            teacherId: record.teacherId,
-            batchId,
-            date: attendanceDate,
-            status: record.status,
-            markedBy: markerId,
-            notes: record.notes || null,
-          });
-          results.push(result);
-        } catch (err: any) {
-          if (err.code === '23505') {
-            // Duplicate - update instead
-            results.push({ teacherId: record.teacherId, status: 'duplicate_skipped' });
-          } else {
-            throw err;
-          }
-        }
+        const result = await storage.upsertAttendanceRecord({
+          teacherId: record.teacherId,
+          batchId,
+          date: attendanceDate,
+          status: record.status,
+          markedBy: markerId,
+          notes: record.notes || null,
+        });
+        results.push(result);
       }
       res.json({ created: results.length, records: results });
     } catch (error) {
@@ -4785,6 +4820,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(summary);
     } catch (error) {
       console.error("Error getting attendance summary:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/batches/:batchId/announce", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const { title, message } = req.body;
+      if (!title || !message) {
+        return res.status(400).json({ error: "title and message are required" });
+      }
+      const enrolled = await storage.getTeachersInBatch(req.params.batchId);
+      const created = [];
+      for (const teacher of enrolled) {
+        created.push(await storage.createNotification({
+          recipientId: teacher.id,
+          recipientType: "teacher",
+          type: "general",
+          title: String(title).slice(0, 120),
+          message: String(message),
+          metadata: { batchId: req.params.batchId },
+        }));
+      }
+      res.json({ sent: created.length });
+    } catch (error) {
+      console.error("Error sending cohort announcement:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -5035,6 +5095,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/batches/:batchId/teachers/import-csv", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+
+      const csv = String(req.body?.csv || "");
+      const lines = csv.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      if (lines.length === 0) return res.status(400).json({ error: "CSV is empty" });
+
+      const parseRow = (line: string) => {
+        const cells: string[] = [];
+        let current = "";
+        let quoted = false;
+        for (const ch of line) {
+          if (ch === '"') quoted = !quoted;
+          else if (ch === "," && !quoted) {
+            cells.push(current.trim());
+            current = "";
+          } else current += ch;
+        }
+        cells.push(current.trim());
+        return cells.map((cell) => cell.replace(/^"|"$/g, ""));
+      };
+
+      let start = 0;
+      const header = parseRow(lines[0]).map((h) => h.toLowerCase());
+      if (header.includes("email") || header.includes("name")) start = 1;
+      const emailIdx = header.includes("email") ? header.indexOf("email") : 1;
+      const nameIdx = header.includes("name") ? header.indexOf("name") : 0;
+      const passwordIdx = header.includes("password") ? header.indexOf("password") : -1;
+
+      let created = 0;
+      let enrolled = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+      const alreadyIn = new Set((await storage.getTeachersInBatch(batch.id)).map((t) => t.id));
+
+      for (let i = start; i < lines.length; i++) {
+        const cells = parseRow(lines[i]);
+        const name = cells[nameIdx] || cells[0];
+        const email = (cells[emailIdx] || cells[1] || "").trim().toLowerCase();
+        const password = passwordIdx >= 0 ? cells[passwordIdx] : "Teacher123!";
+        if (!email || !email.includes("@")) {
+          errors.push(`Row ${i + 1}: missing email`);
+          continue;
+        }
+        try {
+          let teacher = await storage.getTeacherByEmail(email);
+          if (!teacher) {
+            teacher = await storage.createTeacher({
+              name: name || email.split("@")[0],
+              email,
+              password: await hashPassword(password.length >= 6 ? password : "Teacher123!"),
+              approvalStatus: "approved",
+            });
+            created++;
+          }
+          if (alreadyIn.has(teacher.id)) {
+            skipped++;
+            continue;
+          }
+          await storage.addTeacherToBatch({ batchId: batch.id, teacherId: teacher.id });
+          alreadyIn.add(teacher.id);
+          enrolled++;
+          await notifyTeacher(
+            teacher.id,
+            "You're in",
+            `You have been added to ${batch.name}. Open your dashboard to continue learning.`,
+            "general",
+            { batchId: batch.id },
+          );
+        } catch (error: any) {
+          if (String(error?.message || "").includes("duplicate") || String(error?.code) === "23505") {
+            skipped++;
+          } else {
+            errors.push(`Row ${i + 1}: ${error?.message || "failed"}`);
+          }
+        }
+      }
+
+      res.json({ created, enrolled, skipped, errors });
+    } catch (error) {
+      console.error("CSV import failed:", error);
+      res.status(500).json({ error: "Failed to import roster" });
+    }
+  });
+
+  app.get("/api/batches/:batchId/assignments", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      res.json(await storage.getWrittenAssignments(req.params.batchId));
+    } catch (error) {
+      console.error("Error listing assignments:", error);
+      res.status(500).json({ error: "Failed to list assignments" });
+    }
+  });
+
+  app.post("/api/batches/:batchId/assignments", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      const { title, instructions, dueDate } = req.body;
+      if (!title || !instructions) return res.status(400).json({ error: "title and instructions are required" });
+      const assignment = await storage.createWrittenAssignment({
+        batchId: batch.id,
+        title,
+        instructions,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        createdBy: req.user!.id,
+      });
+      notifyBatchTeachers(
+        batch.id,
+        "Written work is ready",
+        `${title} is waiting in ${batch.name}. Open My work on your dashboard.`,
+        "deadline",
+      ).catch((error) => console.error("Assignment notice failed:", error));
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating assignment:", error);
+      res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  app.get("/api/batches/:batchId/assignments/:assignmentId/submissions", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      res.json(await storage.getAssignmentSubmissions(req.params.assignmentId));
+    } catch (error) {
+      console.error("Error listing submissions:", error);
+      res.status(500).json({ error: "Failed to list submissions" });
+    }
+  });
+
+  app.get("/api/teacher/assignments", isTeacherAuthenticated, async (req, res) => {
+    try {
+      res.json(await storage.getWrittenAssignmentsForTeacher(req.teacherId!));
+    } catch (error) {
+      console.error("Error listing teacher assignments:", error);
+      res.status(500).json({ error: "Failed to list assignments" });
+    }
+  });
+
+  app.post("/api/teacher/assignments/:assignmentId/submit", isTeacherAuthenticated, async (req, res) => {
+    try {
+      const response = String(req.body?.response || "").trim();
+      if (!response) return res.status(400).json({ error: "response is required" });
+      const row = await storage.upsertAssignmentSubmission(req.params.assignmentId, req.teacherId!, response);
+      res.json(row);
+    } catch (error) {
+      console.error("Error submitting assignment:", error);
+      res.status(500).json({ error: "Failed to submit assignment" });
+    }
+  });
+
   // ══════════════════════════════════════════════════════════════
   // Scheduled Event Endpoints
   // ══════════════════════════════════════════════════════════════
@@ -5056,6 +5272,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batchId,
         createdBy: (req.user as any)?.id,
       });
+      notifyBatchTeachers(
+        batchId,
+        "New on the calendar",
+        `${title} is scheduled for this cohort.`,
+        eventType === "deadline" ? "deadline" : "session_reminder",
+      ).catch((error) => console.error("Calendar notice failed:", error));
       res.json(event);
     } catch (error) {
       console.error("Error creating event:", error);

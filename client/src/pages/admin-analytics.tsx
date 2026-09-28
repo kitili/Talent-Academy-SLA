@@ -3086,7 +3086,7 @@ export default function AdminAnalytics() {
       <Dialog open={assignCheckpointQuizOpen} onOpenChange={setAssignCheckpointQuizOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Checkpoint Quiz</DialogTitle>
+            <DialogTitle>Assign module quiz</DialogTitle>
             <DialogDescription>Create a quiz based on a training week's content</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

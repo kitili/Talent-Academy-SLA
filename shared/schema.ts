@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, jsonb, index, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, jsonb, index, uniqueIndex, unique, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -868,3 +868,39 @@ export const insertTeacherProfileSchema = createInsertSchema(teacherProfiles).om
 
 export type InsertTeacherProfile = z.infer<typeof insertTeacherProfileSchema>;
 export type TeacherProfile = typeof teacherProfiles.$inferSelect;
+
+export const writtenAssignments = pgTable("written_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
+  title: varchar("title").notNull(),
+  instructions: text("instructions").notNull(),
+  dueDate: timestamp("due_date"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWrittenAssignmentSchema = createInsertSchema(writtenAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertWrittenAssignment = z.infer<typeof insertWrittenAssignmentSchema>;
+export type WrittenAssignment = typeof writtenAssignments.$inferSelect;
+
+export const assignmentSubmissions = pgTable("assignment_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentId: varchar("assignment_id").notNull().references(() => writtenAssignments.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
+  response: text("response").notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+}, (table) => [
+  unique("idx_assignment_submission_unique").on(table.assignmentId, table.teacherId),
+]);
+
+export const insertAssignmentSubmissionSchema = createInsertSchema(assignmentSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
+export type InsertAssignmentSubmission = z.infer<typeof insertAssignmentSubmissionSchema>;
+export type AssignmentSubmission = typeof assignmentSubmissions.$inferSelect;

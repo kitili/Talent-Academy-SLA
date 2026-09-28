@@ -263,9 +263,9 @@ export default function AdminHome() {
             onClick={() => navigate("/admin/batches")}>
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-2xl font-bold mb-2">Batches</h3>
+                <h3 className="text-2xl font-bold mb-2">Cohorts</h3>
                 <p className="text-muted-foreground">
-                  View all batches and assign trainers
+                  Open a cohort room for people, quizzes, attendance, performance, and graduates
                 </p>
               </div>
               <Layers className="h-12 w-12 text-primary/20" />

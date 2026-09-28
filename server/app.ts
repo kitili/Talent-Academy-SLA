@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
+import { ensureWrittenAssignmentTables } from "./db";
 
 export async function createApp() {
   const app = express();
@@ -47,6 +48,12 @@ export async function createApp() {
     log(`📊 Database: ${env.toUpperCase()} (${host})`);
   } else {
     log("⚠️  WARNING: DATABASE_URL not set!");
+  }
+
+  try {
+    await ensureWrittenAssignmentTables();
+  } catch (error) {
+    log(`Written assignment tables: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   await registerRoutes(app);

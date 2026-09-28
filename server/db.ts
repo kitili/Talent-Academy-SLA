@@ -35,3 +35,27 @@ export function hasDatabaseUrl() {
 export function getDatabaseUrl() {
   return databaseUrl;
 }
+
+export async function ensureWrittenAssignmentTables() {
+  if (!databaseUrl) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS written_assignments (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      batch_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      title varchar NOT NULL,
+      instructions text NOT NULL,
+      due_date timestamp,
+      created_by varchar REFERENCES users(id),
+      created_at timestamp DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS assignment_submissions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      assignment_id varchar NOT NULL REFERENCES written_assignments(id) ON DELETE CASCADE,
+      teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      response text NOT NULL,
+      submitted_at timestamp DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_submission_unique
+      ON assignment_submissions(assignment_id, teacher_id);
+  `);
+}

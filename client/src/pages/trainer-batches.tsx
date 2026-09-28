@@ -653,6 +653,14 @@ export default function TrainerBatches() {
                     <p className="text-sm text-muted-foreground mt-1">{selectedBatch.description}</p>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation(`/cohorts/${selectedBatch.id}`)}
+                >
+                  Open cohort room
+                </Button>
                 <Button
                   variant="destructive"
                   size="sm"
@@ -880,8 +888,8 @@ export default function TrainerBatches() {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Assign Checkpoint Quiz</DialogTitle>
-                            <DialogDescription>Generate and assign a new checkpoint quiz</DialogDescription>
+                            <DialogTitle>Assign module quiz</DialogTitle>
+                            <DialogDescription>Generate and assign a new module quiz</DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
                             <div className="space-y-2">
@@ -889,7 +897,7 @@ export default function TrainerBatches() {
                               <Input
                                 id="quiz-title"
                                 data-testid="input-quiz-title"
-                                placeholder="e.g., Week 1 Checkpoint"
+                                placeholder="e.g., Week 1 module quiz"
                                 value={quizTitle}
                                 onChange={(e) => setQuizTitle(e.target.value)}
                               />

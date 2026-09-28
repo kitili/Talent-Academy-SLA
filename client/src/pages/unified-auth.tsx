@@ -89,8 +89,10 @@ export default function UnifiedAuth() {
         // Redirect based on role
         if (selectedRole.role === 'teacher') {
           window.location.href = "/teacher/dashboard";
+        } else if (selectedRole.role === 'admin') {
+          window.location.href = "/admin";
         } else {
-          window.location.href = "/";
+          window.location.href = "/trainer/batches";
         }
       } else {
         const data = await response.json();
@@ -155,8 +157,10 @@ export default function UnifiedAuth() {
         // Redirect based on role
         if (userRole === 'teacher') {
           window.location.href = "/teacher/dashboard";
+        } else if (userRole === 'admin') {
+          window.location.href = "/admin";
         } else {
-          window.location.href = "/";
+          window.location.href = "/trainer/batches";
         }
       } else {
         toast({

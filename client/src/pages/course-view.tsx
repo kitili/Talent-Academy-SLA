@@ -514,10 +514,10 @@ export default function CourseView() {
             <div className="pt-4">
               <Button onClick={() => setQuizDialogOpen(true)} className="w-full" variant={quizStatus?.passed ? "outline" : "default"} data-testid="button-take-quiz">
                 {quizStatus?.passed ? <CheckCircle2 className="mr-2 h-5 w-5 text-green-600" /> : <Award className="mr-2 h-5 w-5" />}
-                {quizStatus?.passed ? "Quiz Passed" : "Take Checkpoint Quiz"}
+                {quizStatus?.passed ? "Quiz Passed" : "Take module quiz"}
               </Button>
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                {quizStatus?.passed ? "You've completed this checkpoint quiz" : "Test your knowledge on this week's content"}
+                {quizStatus?.passed ? "You've completed this module quiz" : "Test your knowledge on this week's content"}
               </p>
             </div>
           )}
