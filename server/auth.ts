@@ -6,6 +6,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
+import { hasDatabaseUrl } from "./db";
 import { loginRateLimit } from "./security";
 import { User as SelectUser, Teacher as SelectTeacher } from "@shared/schema";
 
