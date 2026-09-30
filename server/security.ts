@@ -15,7 +15,7 @@ export function loginRateLimit(req: Request, res: Response, next: NextFunction) 
   const key = req.ip || req.socket.remoteAddress || "unknown";
   const now = Date.now();
   const windowMs = 15 * 60 * 1000;
-  const max = 20;
+  const max = 80;
   const entry = loginHits.get(key);
   if (!entry || entry.resetAt < now) {
     loginHits.set(key, { count: 1, resetAt: now + windowMs });
