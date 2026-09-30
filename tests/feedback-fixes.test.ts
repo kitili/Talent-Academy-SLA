@@ -148,3 +148,17 @@ describe("Taleemabad feedback: cohort status and coverage", () => {
     assert.equal(formatCourseProgress("in_progress", 1, 2), "1/2 modules");
   });
 });
+
+describe("TA spec learning status labels", () => {
+  it("uses Not Started, In Progress, Completed, Passed, Failed, Locked", async () => {
+    const { learningStatus, staffWatchLabel } = await import("../shared/learningStatus.ts");
+    assert.equal(learningStatus({ percentage: 0 }), "Not Started");
+    assert.equal(learningStatus({ percentage: 20 }), "In Progress");
+    assert.equal(learningStatus({ percentage: 100 }), "Completed");
+    assert.equal(learningStatus({ percentage: 100, passed: true }), "Passed");
+    assert.equal(learningStatus({ percentage: 100, passed: false }), "Failed");
+    assert.equal(learningStatus({ percentage: 40, locked: true }), "Locked");
+    assert.equal(staffWatchLabel(100, "Completed"), null);
+    assert.equal(staffWatchLabel(10, "In Progress"), "Needs support");
+  });
+});

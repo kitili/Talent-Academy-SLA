@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Shield, GraduationCap, Users, Mail, Sparkles } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { ClassroomArt } from "@/components/ClassroomArt";
 
 type Role = "admin" | "trainer" | "teacher";
 type AccountType = "teacher" | "trainer";
@@ -382,6 +383,7 @@ export default function UnifiedAuth() {
           )}
           {/* Left side - Welcome section (hidden on mobile in login, shown in register) */}
           <div className="hidden lg:flex flex-1 flex-col justify-center space-y-4 lg:space-y-6 text-center lg:text-left">
+            <ClassroomArt className="max-w-xl" />
             <div className="flex items-center justify-center lg:justify-start gap-4 mb-4">
               <SilverleafLogo className="w-16 h-16" />
               <div>

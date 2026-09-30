@@ -1,11 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
-import { ensureWrittenAssignmentTables } from "./db";
+import { applySecurity, redactForLog } from "./security";
 
 export async function createApp() {
   const app = express();
-  app.use(express.json());
+  applySecurity(app);
+  app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: false }));
 
   app.use((req, res, next) => {
@@ -24,7 +25,7 @@ export async function createApp() {
       if (path.startsWith("/api")) {
         let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
         if (capturedJsonResponse) {
-          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+          logLine += ` :: ${JSON.stringify(redactForLog(capturedJsonResponse))}`;
         }
         if (logLine.length > 80) {
           logLine = logLine.slice(0, 79) + "…";

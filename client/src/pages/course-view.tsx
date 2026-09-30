@@ -399,7 +399,7 @@ export default function CourseView() {
       <div className="p-4 sm:p-6 border-b flex-shrink-0">
         <Button variant="ghost" size="sm" onClick={() => courseId ? navigate(`/courses/${courseId}`) : navigate('/')} className="mb-4 -ml-2" data-testid="button-back-to-weeks">
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to {courseId ? 'Weeks' : 'Courses'}
+          Back to {courseId ? "modules" : "courses"}
         </Button>
         <h2 className="text-2xl sm:text-3xl font-bold mb-2">Module {currentWeek?.weekNumber}</h2>
       </div>
@@ -407,7 +407,7 @@ export default function CourseView() {
         <div className="p-4 sm:p-6 pb-32 space-y-6">
           <div>
             <h3 className="text-base font-semibold uppercase tracking-wider text-[#666] mb-3">Competency Focus</h3>
-            <p className="text-sm text-foreground leading-relaxed font-normal">{currentWeek?.competencyFocus || 'Training Content'}</p>
+            <p className="text-sm text-foreground leading-relaxed font-normal">{currentWeek?.competencyFocus || "This module"}</p>
           </div>
           {currentWeek?.objective && (
             <div>
@@ -441,7 +441,7 @@ export default function CourseView() {
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
                   <p className="text-sm font-medium text-muted-foreground mb-1">No content available yet</p>
-                  <p className="text-xs text-muted-foreground/70">An administrator needs to add files to this training week.</p>
+                  <p className="text-xs text-muted-foreground/70">An administrator needs to add files to this module.</p>
                 </div>
               ) : (
                 deckFiles.map((file) => {

@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, ClipboardCheck, BookOpen } from "lucide-react";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 
 export default function TeacherDashboard() {
   const [, setLocation] = useLocation();
@@ -198,18 +198,19 @@ export default function TeacherDashboard() {
 
   // Group weeks by course name and aggregate progress
   const groupedCourses = assignedWeeks.reduce((acc: any, week: any) => {
-    const courseName = week.courseName || week.title;
-    if (!acc[courseName]) {
-      acc[courseName] = {
-        courseName,
+    const key = week.courseId || week.courseName || week.title;
+    if (!acc[key]) {
+      acc[key] = {
+        courseId: week.courseId,
+        courseName: week.courseName || week.title,
         weeks: [],
         totalCompleted: 0,
         totalFiles: 0,
       };
     }
-    acc[courseName].weeks.push(week);
-    acc[courseName].totalCompleted += week.progress?.completed || 0;
-    acc[courseName].totalFiles += week.progress?.total || 0;
+    acc[key].weeks.push(week);
+    acc[key].totalCompleted += week.progress?.completed || 0;
+    acc[key].totalFiles += week.progress?.total || 0;
     return acc;
   }, {});
 
@@ -227,6 +228,9 @@ export default function TeacherDashboard() {
   const nextLesson = [...assignedWeeks]
     .sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0))
     .find((week: any) => !week.locked && (week.progress?.percentage || 0) < 100);
+  const lastWeekId = typeof window !== "undefined" ? sessionStorage.getItem("sl-last-week") : null;
+  const resumeWeek =
+    assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson;
 
   const { data: upcomingEvents = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/events"],
@@ -315,13 +319,14 @@ export default function TeacherDashboard() {
       </header>
 
       {/* Main Content */}
-      <div className="container mx-auto p-4 sm:p-6 space-y-6">
+      <div className="container mx-auto p-4 sm:p-6 space-y-6 pb-20 sm:pb-6">
+        <ClassroomArt />
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold" data-testid="text-welcome">
             Welcome, {teacher?.name}
           </h2>
           <p className="text-muted-foreground">
-            Your personalized learning dashboard
+            Know what to learn, what to do next, and whether you have understood it.
           </p>
         </div>
 
@@ -332,7 +337,7 @@ export default function TeacherDashboard() {
               Continue learning
             </CardTitle>
             <CardDescription>
-              {nextLesson
+              {resumeWeek
                 ? "Jump back into the next unlocked module. Finish it to open the one after."
                 : assignedWeeks.length === 0
                   ? "Your trainer has not assigned modules yet. You are in the right place when they do."
@@ -342,8 +347,8 @@ export default function TeacherDashboard() {
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold">
-                {nextLesson
-                  ? (nextLesson.competencyFocus || `Module ${nextLesson.weekNumber}`)
+                {resumeWeek
+                  ? (resumeWeek.competencyFocus || `Module ${resumeWeek.weekNumber}`)
                   : assignedWeeks.length === 0
                     ? "Waiting for your first lesson"
                     : "You are caught up"}
@@ -354,11 +359,53 @@ export default function TeacherDashboard() {
                 </p>
               )}
             </div>
-            {nextLesson && (
-              <Button onClick={() => setLocation(`/teacher/week/${nextLesson.id}/content`)}>
+            {resumeWeek && (
+              <Button onClick={() => setLocation(`/teacher/week/${resumeWeek.id}/content`)}>
                 Resume
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card id="my-learning" className="sl-rise sl-stat-card">
+          <CardHeader>
+            <CardTitle>My learning</CardTitle>
+            <CardDescription>
+              Assigned courses, progress, and the same status your trainer sees.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            {uniqueCourses.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No courses assigned yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b">
+                    <th className="py-2 pr-3 font-medium">Course</th>
+                    <th className="py-2 pr-3 font-medium">Progress</th>
+                    <th className="py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {uniqueCourses.map((course: any) => {
+                    const anyLocked = course.weeks.some((w: any) => w.locked && (w.progress?.percentage || 0) < 100);
+                    const status = learningStatus({
+                      percentage: course.aggregateProgress.percentage,
+                      locked: anyLocked && course.aggregateProgress.percentage === 0,
+                    });
+                    return (
+                      <tr key={course.courseId || course.courseName} className="border-b last:border-0">
+                        <td className="py-3 pr-3 font-medium">{course.courseName}</td>
+                        <td className="py-3 pr-3">{course.aggregateProgress.percentage}%</td>
+                        <td className="py-3">
+                          <Badge variant={learningStatusBadgeVariant(status)}>{status}</Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </CardContent>
         </Card>
@@ -511,9 +558,11 @@ export default function TeacherDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5" />
-              Training Content
+              My courses
             </CardTitle>
-            <CardDescription>View course materials and complete quizzes to progress</CardDescription>
+            <CardDescription>
+              Course → module → lesson. Learn, practise, check understanding, then the next module unlocks.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {uniqueCourses.length === 0 ? (
@@ -522,8 +571,10 @@ export default function TeacherDashboard() {
               </p>
             ) : (
               <div className="space-y-4">
-                {uniqueCourses.map((course: any) => (
-                  <Card key={course.courseName} data-testid={`card-course-${course.courseName}`} className="shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-border/50 rounded-lg">
+                {uniqueCourses.map((course: any) => {
+                  const status = learningStatus({ percentage: course.aggregateProgress.percentage });
+                  return (
+                  <Card key={course.courseId || course.courseName} data-testid={`card-course-${course.courseName}`} className="shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-border/50 rounded-lg sl-stat-card">
                     <CardHeader>
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -532,8 +583,8 @@ export default function TeacherDashboard() {
                             {course.weeks.length} module{course.weeks.length !== 1 ? "s" : ""} assigned
                           </CardDescription>
                         </div>
-                        <Badge variant={course.aggregateProgress.percentage === 100 ? "default" : "secondary"}>
-                          {course.aggregateProgress.completed}/{course.aggregateProgress.total} Completed
+                        <Badge variant={learningStatusBadgeVariant(status)}>
+                          {status} · {course.aggregateProgress.percentage}%
                         </Badge>
                       </div>
                     </CardHeader>
@@ -574,10 +625,10 @@ export default function TeacherDashboard() {
                               </span>
                               {isLocked ? (
                                 <span className="text-xs text-muted-foreground ml-2">Locked</span>
-                              ) : week.progress?.percentage === 100 ? (
-                                <CheckCircle className="ml-2 h-4 w-4 text-green-600" />
                               ) : (
-                                <ArrowRight className="ml-2 h-4 w-4" />
+                                <span className="text-xs ml-2">
+                                  {learningStatus({ percentage: week.progress?.percentage || 0 })}
+                                </span>
                               )}
                             </Button>
                           );
@@ -585,7 +636,8 @@ export default function TeacherDashboard() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -980,6 +1032,7 @@ export default function TeacherDashboard() {
           </CardContent>
         </Card>
 
+        <TeacherLearnerNav />
       </div>
     </div>
   );

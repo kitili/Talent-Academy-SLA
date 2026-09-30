@@ -6,7 +6,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { hasDatabaseUrl } from "./db";
+import { loginRateLimit } from "./security";
 import { User as SelectUser, Teacher as SelectTeacher } from "@shared/schema";
 
 declare global {
@@ -74,28 +74,18 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        console.log('[AUTH] Login attempt for username:', username);
-        // UPDATED: Try both username and email for login
+        console.log("[AUTH] Login attempt");
         let user = await storage.getUserByUsername(username);
         if (!user) {
           user = await storage.getUserByEmail(username);
         }
-        console.log('[AUTH] User found:', !!user);
-        
         if (!user) {
-          console.log('[AUTH] User not found');
           return done(null, false);
         }
-        
         const passwordMatch = await comparePasswords(password, user.password);
-        console.log('[AUTH] Password match:', passwordMatch);
-        
         if (!passwordMatch) {
-          console.log('[AUTH] Password mismatch');
           return done(null, false);
         }
-        
-        console.log('[AUTH] Login successful for user:', user.username);
         return done(null, user);
       } catch (error) {
         console.error('[AUTH] Error during authentication:', error);
@@ -153,7 +143,7 @@ export function setupAuth(app: Express) {
   });
 
   // Multi-role aware login endpoint
-  app.post("/api/login", async (req, res, next) => {
+  app.post("/api/login", loginRateLimit, async (req, res, next) => {
     try {
       const username = String(req.body.username || "").trim();
       const password = String(req.body.password || "").trim();

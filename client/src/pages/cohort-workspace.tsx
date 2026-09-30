@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Users, ClipboardCheck, Award, BarChart3, GraduationCap, Megaphone, Calendar, FileText, Upload } from "lucide-react";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { learningStatus, staffWatchLabel } from "@shared/learningStatus";
 
 export default function CohortWorkspace() {
   const params = useParams<{ batchId: string }>();
@@ -95,6 +95,17 @@ export default function CohortWorkspace() {
     () => progress.filter((row) => (row.overallPercentage || 0) >= 80 && (row.overallPercentage || 0) < 100),
     [progress],
   );
+  const overview = useMemo(() => {
+    const rows = Array.isArray(progress) ? progress : [];
+    const statuses = rows.map((row) => learningStatus({ percentage: row.overallPercentage || 0 }));
+    return {
+      total: teachers.length,
+      completed: statuses.filter((s) => s === "Completed" || s === "Passed").length,
+      inProgress: statuses.filter((s) => s === "In Progress").length,
+      notStarted: statuses.filter((s) => s === "Not Started").length,
+      needsSupport: rows.filter((row) => staffWatchLabel(row.overallPercentage || 0, learningStatus({ percentage: row.overallPercentage || 0 })) === "Needs support").length,
+    };
+  }, [progress, teachers.length]);
 
   const saveAttendance = useMutation({
     mutationFn: async () => {
@@ -205,12 +216,13 @@ export default function CohortWorkspace() {
           {batch?.description || "People, quizzes, the register, performance, and graduates — in one classroom."}
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Stat label="People" value={teachers.length} delay="sl-rise-delay-1" />
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <Stat label="People" value={overview.total} delay="sl-rise-delay-1" />
           <Stat label="Quizzes" value={quizzes.length + fileQuizzes.length} delay="sl-rise-delay-2" />
           <Stat label="On the register" value={Array.isArray(attendance) ? attendance.length : 0} delay="sl-rise-delay-3" />
-          <Stat label="In progress" value={progress.filter((row) => (row.overallPercentage || 0) < 100).length} />
-          <Stat label="Graduates" value={certificates.length} />
+          <Stat label="In progress" value={overview.inProgress} />
+          <Stat label="Completed" value={overview.completed} />
+          <Stat label="Needs support" value={overview.needsSupport} />
         </div>
 
         <Tabs defaultValue="people">
@@ -325,7 +337,11 @@ export default function CohortWorkspace() {
                   <CardDescription>
                     {row.overallPercentage ?? 0}% of the course
                     {row.reportCard?.averageScore != null ? ` · quiz average ${row.reportCard.averageScore}%` : ""}
-                    {(row.overallPercentage || 0) < 30 ? " · at risk" : (row.overallPercentage || 0) >= 80 ? " · on track" : ""}
+                    {(() => {
+                      const status = learningStatus({ percentage: row.overallPercentage || 0 });
+                      const watch = staffWatchLabel(row.overallPercentage || 0, status);
+                      return ` · ${status}${watch ? ` · ${watch}` : ""}`;
+                    })()}
                   </CardDescription>
                 </CardHeader>
               </Card>

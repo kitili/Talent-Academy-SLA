@@ -20,7 +20,7 @@ import { FileQuizDialog } from "@/components/FileQuizDialog";
 import { useScreenshotProtection } from "@/hooks/use-screenshot-protection";
 import { ScreenshotWarning } from "@/components/ScreenshotWarning";
 import { TableOfContents } from "@/components/TableOfContents";
-import type { TocEntry } from "@shared/schema";
+import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 
 // DocumentViewer component for displaying DOCX files converted to HTML
 function DocumentViewer({ url }: { url: string }) {
@@ -129,6 +129,10 @@ export default function TeacherContentView() {
   
   // Responsive breakpoint detection
   const { isMobile, isTablet } = useBreakpoint();
+
+  useEffect(() => {
+    if (weekId) sessionStorage.setItem("sl-last-week", weekId);
+  }, [weekId]);
 
   // Pinch-to-zoom state for mobile PDF
   const [zoomScale, setZoomScale] = useState<number>(1.0);
@@ -397,7 +401,7 @@ export default function TeacherContentView() {
             Competency Focus
           </h3>
           <p className="text-sm text-foreground leading-relaxed">
-            {currentWeek?.competencyFocus || 'Training Content'}
+            {currentWeek?.competencyFocus || "This module"}
           </p>
         </div>
 
@@ -551,7 +555,7 @@ export default function TeacherContentView() {
             <span className="text-sm font-medium">Back</span>
           </Button>
           <span className="text-base font-semibold truncate max-w-[140px]">
-            {selectedFile?.fileName || `Week ${currentWeek?.weekNumber}`}
+            {selectedFile?.fileName || `Module ${currentWeek?.weekNumber}`}
           </span>
           <Button variant="ghost" size="sm" onClick={handleSidebarOpen} className="-mr-2">
             <Menu className="h-5 w-5" />
@@ -730,6 +734,7 @@ export default function TeacherContentView() {
           />
         )}
         <ScreenshotWarning visible={showWarning} onDismiss={dismissWarning} />
+        <TeacherLearnerNav />
       </div>
     );
   }
@@ -753,9 +758,12 @@ export default function TeacherContentView() {
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back to Dashboard
               </Button>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold mb-1">
                 Module {currentWeek?.weekNumber}
               </h2>
+              <p className="text-xs text-muted-foreground mb-2">
+                Course → Module → Lesson · Learn, then take the quiz to unlock the next module
+              </p>
               {currentWeek?.competencyFocus && (
                 <p className="text-sm text-muted-foreground">{currentWeek.competencyFocus}</p>
               )}
@@ -792,7 +800,7 @@ export default function TeacherContentView() {
                     Competency Focus
                   </h3>
                   <p className="text-sm text-foreground leading-relaxed font-normal">
-                    {currentWeek?.competencyFocus || 'Training Content'}
+                    {currentWeek?.competencyFocus || "This module"}
                   </p>
                 </div>
 
@@ -1374,6 +1382,7 @@ export default function TeacherContentView() {
 
       {/* Screenshot Warning Overlay */}
       <ScreenshotWarning visible={showWarning} onDismiss={dismissWarning} />
+      <TeacherLearnerNav />
     </div>
   );
 }

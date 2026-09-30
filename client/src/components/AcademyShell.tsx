@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { LogOut } from "lucide-react";
+import { ClassroomArt } from "@/components/ClassroomArt";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 type AcademyShellProps = {
@@ -51,7 +52,10 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, ch
           </div>
         </div>
       </header>
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10">{children}</div>
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
+        <ClassroomArt />
+        {children}
+      </div>
     </div>
   );
 }

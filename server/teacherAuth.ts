@@ -1,7 +1,7 @@
 // Teacher Authentication (separate from Trainer/Admin users)
 import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
-import { hashPassword, comparePasswords } from "./auth";
+import { loginRateLimit } from "./security";
 import { hasDatabaseUrl } from "./db";
 import { Teacher as SelectTeacher } from "@shared/schema";
 
@@ -69,7 +69,7 @@ export function setupTeacherAuth(app: Express) {
 
   // Teacher login
   // UPDATED: Accept either teacherId (numeric ID) or email for login
-  app.post("/api/teacher/login", async (req, res) => {
+  app.post("/api/teacher/login", loginRateLimit, async (req, res) => {
     try {
       const { identifier, password } = req.body;
       

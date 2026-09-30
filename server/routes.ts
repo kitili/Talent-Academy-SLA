@@ -125,6 +125,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       databaseHost,
       sessionSecret,
       blob,
+      week: 1,
+      backup: "Use the Postgres provider point-in-time restore (Neon or Supabase). Do not keep a second app database.",
     });
   });
 

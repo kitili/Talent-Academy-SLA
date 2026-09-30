@@ -21,7 +21,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar } from "lucide-react";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 
 export default function TrainerBatches() {
   const [, setLocation] = useLocation();
@@ -1178,7 +1178,26 @@ export default function TrainerBatches() {
 
                 {/* Progress Tab */}
                 <TabsContent value="progress" className="space-y-4 flex-1 overflow-y-auto p-4">
-                  <h3 className="text-lg font-semibold">Teacher Progress</h3>
+                  <h3 className="text-lg font-semibold">Cohort overview</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
+                    {(() => {
+                      const statuses = batchProgress.map((row: any) => learningStatus({ percentage: row.overallPercentage || 0 }));
+                      const cells = [
+                        ["Total learners", batchProgress.length],
+                        ["Completed", statuses.filter((s) => s === "Completed" || s === "Passed").length],
+                        ["In Progress", statuses.filter((s) => s === "In Progress").length],
+                        ["Not Started", statuses.filter((s) => s === "Not Started").length],
+                        ["Needs support", batchProgress.filter((row: any) => (row.overallPercentage || 0) > 0 && (row.overallPercentage || 0) < 30).length],
+                      ];
+                      return cells.map(([label, value]) => (
+                        <div key={String(label)} className="text-center p-3 bg-muted rounded sl-stat-card">
+                          <p className="text-muted-foreground text-xs">{label}</p>
+                          <p className="font-semibold text-lg">{value}</p>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                  <h3 className="text-lg font-semibold">Teacher progress</h3>
                   {isLoadingProgress ? (
                     <div className="text-center py-8 text-muted-foreground">
                       Loading progress...
@@ -1229,8 +1248,8 @@ export default function TrainerBatches() {
                                 {teacherProgress.courseCompletions.map((c: any) => (
                                   <div key={c.courseId} className="flex justify-between text-sm gap-2">
                                     <span className="truncate">{c.courseName}</span>
-                                    <Badge variant={c.status === "completed" ? "default" : "secondary"}>
-                                      {c.status === "completed" ? "Completed" : `${c.percentage || 0}%`}
+                                    <Badge variant={learningStatusBadgeVariant(learningStatus({ percentage: c.percentage || 0, passed: c.status === "completed" ? true : undefined }))}>
+                                      {learningStatus({ percentage: c.percentage || (c.status === "completed" ? 100 : 0), passed: c.status === "completed" ? true : undefined })}
                                     </Badge>
                                   </div>
                                 ))}

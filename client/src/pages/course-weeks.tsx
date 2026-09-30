@@ -730,7 +730,16 @@ export default function CourseWeeks() {
         </div>
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold">Training Weeks</h2>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Course</p>
+            <h2 className="text-2xl sm:text-3xl font-bold">{isLoadingCourse ? "…" : course?.name || "Course"}</h2>
+            {course?.description && (
+              <p className="text-muted-foreground mt-2 max-w-3xl">{course.description}</p>
+            )}
+            <p className="text-sm text-muted-foreground mt-3">
+              Course → Module → Lesson → Activity → Assessment. Completing a lesson is not course mastery until every required quiz is passed.
+            </p>
+          </div>
           {isAdmin && (
             <Button
               onClick={() => createWeekMutation.mutate()}
@@ -738,7 +747,7 @@ export default function CourseWeeks() {
               data-testid="button-add-week"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Week
+              Add module
             </Button>
           )}
         </div>
@@ -747,7 +756,7 @@ export default function CourseWeeks() {
           <div className="text-center py-12 text-muted-foreground">Loading weeks...</div>
         ) : sortedWeeks.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            {isAdmin ? "No weeks yet. Click 'Add Week' to get started!" : "No weeks in this course yet."}
+            {isAdmin ? "No modules yet. Click Add module to get started." : "No modules in this course yet."}
           </div>
         ) : isAdmin ? (
           <DndContext

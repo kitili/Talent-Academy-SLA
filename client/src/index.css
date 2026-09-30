@@ -917,3 +917,17 @@ svg rect[fill*="green"] {
   animation: sl-rise 0.45s ease-out both, sl-pulse-ring 2.4s ease-in-out 0.5s infinite;
   border-left: 4px solid hsl(var(--primary));
 }
+
+.sl-art-float {
+  animation: sl-art-bob 4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes sl-art-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.sl-art {
+  animation: sl-rise 0.6s ease-out both;
+}

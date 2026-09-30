@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
-import { Download, Award, ArrowLeft } from "lucide-react";
+import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 
 export default function TeacherCertificates() {
   const { user, logoutMutation } = useAuth();
@@ -26,7 +26,7 @@ export default function TeacherCertificates() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="sl-page min-h-screen pb-20 sm:pb-0">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
@@ -98,6 +98,7 @@ export default function TeacherCertificates() {
           </div>
         )}
       </main>
+      <TeacherLearnerNav />
     </div>
   );
 }

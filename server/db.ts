@@ -39,6 +39,36 @@ export function getDatabaseUrl() {
 export async function ensureWrittenAssignmentTables() {
   if (!databaseUrl) return;
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      recipient_id varchar NOT NULL,
+      recipient_type varchar NOT NULL,
+      type varchar NOT NULL,
+      title varchar NOT NULL,
+      message text NOT NULL,
+      metadata jsonb,
+      is_read varchar NOT NULL DEFAULT 'no',
+      created_at timestamp DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS scheduled_events (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      title varchar NOT NULL,
+      description text,
+      event_type varchar NOT NULL,
+      start_date timestamp NOT NULL,
+      end_date timestamp,
+      batch_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      created_by varchar REFERENCES users(id),
+      created_at timestamp DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS teacher_profiles (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      teacher_id varchar NOT NULL UNIQUE REFERENCES teachers(id) ON DELETE CASCADE,
+      father_name varchar,
+      phone_number varchar,
+      cnic varchar,
+      updated_at timestamp DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS written_assignments (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       batch_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
