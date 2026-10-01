@@ -37,7 +37,7 @@ function Router() {
   return (
     <Switch>
       {/* New course hierarchy */}
-      <ProtectedRoute path="/" component={RoleHome} />
+      <Route path="/" component={RoleHome} />
       <ProtectedRoute path="/courses" component={CoursesList} />
       <ProtectedRoute path="/courses/:courseId" component={CourseWeeks} />
       <ProtectedRoute path="/courses/:courseId/weeks/:weekId" component={CourseView} />
