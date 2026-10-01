@@ -127,6 +127,7 @@ export default function UnifiedAuth() {
           password: loginPassword 
         }),
         credentials: "include",
+        signal: AbortSignal.timeout(20000),
       });
 
       const data = await response.json();
@@ -150,6 +151,7 @@ export default function UnifiedAuth() {
           title: "Welcome!",
           description: `Successfully logged in as ${userRole}`,
         });
+        setLoginLoading(false);
         setLocation(homeForRole(userRole));
       } else {
         toast({
