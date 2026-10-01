@@ -98,7 +98,7 @@ The application is built with a modern web stack, emphasizing a clean UI/UX and 
 - **Project Structure**: Organized into `client/`, `server/`, and `shared/` directories for clear separation of concerns.
 
 ## External Dependencies
-- **Database**: PostgreSQL (specifically Neon for deployment)
+- **Database**: PostgreSQL (Supabase for deployment)
 - **ORM**: Drizzle ORM
 - **Authentication**: Passport.js (Local Strategy), connect-pg-simple (for PostgreSQL session storage)
 - **File Storage**: Replit Object Storage (backed by Google Cloud Storage)

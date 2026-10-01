@@ -84,6 +84,8 @@ export const courses = pgTable("courses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
+  objectives: text("objectives"),
+  publishStatus: varchar("publish_status").notNull().default("published"),
   orderIndex: integer("order_index").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -334,6 +336,8 @@ export const assignedQuizzes = pgTable("assigned_quizzes", {
   title: varchar("title").notNull(),
   description: text("description"),
   numQuestions: integer("num_questions").notNull().default(5),
+  passMark: integer("pass_mark").notNull().default(80),
+  shuffleQuestions: varchar("shuffle_questions").notNull().default("yes"),
   questions: jsonb("questions").$type<QuizQuestion[]>().notNull(),
   assignedBy: varchar("assigned_by").notNull().references(() => users.id, { onDelete: "cascade" }),
   assignedAt: timestamp("assigned_at").defaultNow(),

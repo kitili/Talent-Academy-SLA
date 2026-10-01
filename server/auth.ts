@@ -106,7 +106,7 @@ export function setupAuth(app: Express) {
     try {
       if (!hasDatabaseUrl()) {
         return res.status(503).json({
-          message: "Registration is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+          message: "Registration is unavailable because the live site has no DATABASE_URL. Add SUPABASE_DATABASE_URL in Vercel, then redeploy.",
         });
       }
 
@@ -155,7 +155,7 @@ export function setupAuth(app: Express) {
 
       if (!hasDatabaseUrl()) {
         return res.status(503).json({
-          message: "Sign-in is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+          message: "Sign-in is unavailable because the live site has no DATABASE_URL. Add SUPABASE_DATABASE_URL in Vercel, then redeploy.",
         });
       }
 

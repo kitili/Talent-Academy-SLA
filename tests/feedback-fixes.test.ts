@@ -149,6 +149,20 @@ describe("Taleemabad feedback: cohort status and coverage", () => {
   });
 });
 
+describe("Supabase ops catalog", () => {
+  it("tags every LMS table with one ops area and no duplicates", async () => {
+    const { OPS_AREAS, OPS_TABLES } = await import("../shared/opsCatalog.ts");
+    const areaIds = new Set(OPS_AREAS.map((area) => area.id));
+    const tables = OPS_TABLES.map((row) => row.table);
+    assert.equal(new Set(tables).size, tables.length);
+    assert.ok(areaIds.has("onboarding"));
+    assert.ok(areaIds.has("marketing"));
+    assert.ok(OPS_TABLES.every((row) => areaIds.has(row.area)));
+    assert.ok(tables.includes("teachers"));
+    assert.ok(tables.includes("satisfaction_scores"));
+  });
+});
+
 describe("TA spec learning status labels", () => {
   it("uses Not Started, In Progress, Completed, Passed, Failed, Locked", async () => {
     const { learningStatus, staffWatchLabel } = await import("../shared/learningStatus.ts");

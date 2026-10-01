@@ -15,8 +15,13 @@ import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
 import * as mammoth from "mammoth";
 import { db, getDatabaseUrl } from "./db";
+import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
+import { recordAudit } from "./audit";
+import { sanitizeLessonHtml } from "./htmlSanitize";
+import { signFileGrant, verifyFileGrant } from "./fileGrant";
+import { passMarkOf, shuffleQuestions } from "./quizDelivery";
 
 const execAsync = promisify(exec);
 
@@ -54,6 +59,17 @@ function isStrictAdmin(req: Request, res: Response, next: NextFunction) {
 
 function staffCanAccessBatch(user?: Express.User) {
   return Boolean(user && (user.role === "admin" || user.role === "trainer"));
+}
+
+function fileRequestAllowed(req: Request) {
+  if (req.isAuthenticated?.() && req.user) return true;
+  if ((req.session as any)?.teacherId) return true;
+  return verifyFileGrant(String(req.query.url || ""), req.query.exp, req.query.sig);
+}
+
+function publishedOnly<T extends { publishStatus?: string | null }>(rows: T[], req: Request) {
+  if (staffCanAccessBatch(req.user)) return rows;
+  return rows.filter((row) => row.publishStatus !== "draft");
 }
 
 async function notifyTeacher(teacherId: string, title: string, message: string, type = "general", metadata: Record<string, unknown> = {}) {
@@ -94,12 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
   app.get("/api/health", async (_req, res) => {
-    const database = Boolean(
-      process.env.NEON_DATABASE_URL ||
-        process.env.DATABASE_URL ||
-        process.env.POSTGRES_URL ||
-        process.env.POSTGRES_PRISMA_URL,
-    );
+    const database = Boolean(getDatabaseUrl());
     const sessionSecret = Boolean(process.env.SESSION_SECRET);
     const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
     let databaseReachable = false;
@@ -126,12 +137,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sessionSecret,
       blob,
       week: 1,
-      backup: "Use the Postgres provider point-in-time restore (Neon or Supabase). Do not keep a second app database.",
+      backup: "Use the Supabase project point-in-time restore. Do not keep a second app database.",
     });
   });
 
   // Setup authentication (username/password)
   setupAuth(app);
+
+  app.get("/api/admin/ops-catalog", isAuthenticated, isStrictAdmin, async (_req, res) => {
+    res.json({
+      areas: OPS_AREAS,
+      tables: OPS_TABLES,
+      documents: OPS_DOCUMENTS,
+      howToFind:
+        "In Supabase Table Editor every table description starts with [identity], [onboarding], [learning], [classroom], [communications], [marketing], or [security]. Query SELECT * FROM ops.catalog for the same map.",
+    });
+  });
   setupTeacherAuth(app);
   // Note: /api/register, /api/login, /api/logout, /api/user are now in auth.ts
   // Note: /api/teacher/* routes are in teacherAuth.ts
@@ -1265,18 +1286,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate a public viewing URL for a file (authenticated users)
-  app.get("/api/files/view-url", isAuthenticated, async (req, res) => {
+  app.get("/api/files/view-url", isAuthenticatedAny, async (req, res) => {
     try {
       const { fileUrl } = req.query;
       if (!fileUrl || typeof fileUrl !== 'string') {
         return res.status(400).json({ error: "fileUrl parameter required" });
       }
 
-      // Return a proxied URL that will serve the file through our backend
+      const grant = signFileGrant(fileUrl);
       const encodedUrl = encodeURIComponent(fileUrl);
-      const viewUrl = `/api/files/proxy?url=${encodedUrl}`;
+      const viewUrl = `/api/files/proxy?url=${encodedUrl}&exp=${grant.exp}&sig=${grant.sig}`;
       
-      res.json({ viewUrl });
+      res.json({ viewUrl, expiresAt: grant.exp });
     } catch (error) {
       console.error("Error generating view URL:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -1286,6 +1307,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Proxy file requests to make them publicly accessible for Office viewer
   app.get("/api/files/proxy", async (req, res) => {
     try {
+      if (!fileRequestAllowed(req)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const { url } = req.query;
       if (!url || typeof url !== 'string') {
         return res.status(400).json({ error: "url parameter required" });
@@ -1293,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const buffer = await objectStorageService.getObjectEntity(url);
       res.setHeader("Content-Type", "application/octet-stream");
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Cache-Control", "private, max-age=60");
       res.setHeader("Content-Disposition", "inline");
       return res.send(buffer);
     } catch (error) {
@@ -1306,8 +1330,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Convert DOCX to HTML for viewing in the app
-  app.get("/api/files/convert-to-html", isAuthenticated, async (req, res) => {
+  app.get("/api/files/convert-to-html", async (req, res) => {
     try {
+      if (!fileRequestAllowed(req)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const { url } = req.query;
       if (!url || typeof url !== 'string') {
         return res.status(400).json({ error: "url parameter required" });
@@ -1319,7 +1346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.setHeader('Content-Type', 'application/json');
       res.json({ 
-        html: result.value,
+        html: sanitizeLessonHtml(result.value),
         messages: result.messages 
       });
     } catch (error) {
@@ -2644,7 +2671,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quiz) {
         return res.status(404).json({ error: "Quiz not found" });
       }
-      res.json(quiz);
+      const questions = quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
+      res.json({ ...quiz, questions, passMark: passMarkOf(quiz.passMark) });
     } catch (error) {
       console.error("Error fetching quiz:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -2667,9 +2695,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.params.quizId
       );
 
-      // Check if teacher has already passed (>= 80%)
+      const passMark = passMarkOf((quiz as { passMark?: number }).passMark);
       const hasPassedAttempt = existingAttempts.some(
-        (attempt) => (attempt.score / attempt.totalQuestions) * 100 >= 80
+        (attempt) => (attempt.score / attempt.totalQuestions) * 100 >= passMark
       );
 
       if (hasPassedAttempt) {
@@ -2697,7 +2725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const percentage = mcqTotal > 0 ? Math.round((score / mcqTotal) * 100) : 100;
       const hasOpenEnded = openEndedQuestions.length > 0;
       // If no open-ended, pass/fail determined immediately; if open-ended, MCQ must pass first
-      const passed = (!hasOpenEnded && percentage >= 80) ? "yes" : (hasOpenEnded && percentage >= 80) ? "pending" : "no";
+      const passed = (!hasOpenEnded && percentage >= passMark) ? "yes" : (hasOpenEnded && percentage >= passMark) ? "pending" : "no";
       const attemptNumber = existingAttempts.length + 1;
 
       // Save attempt
@@ -2712,7 +2740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } as any);
 
       // If there are open-ended answers, save them as pending reviews
-      if (hasOpenEnded && percentage >= 80) {
+      if (hasOpenEnded && percentage >= passMark) {
         for (const q of openEndedQuestions) {
           await storage.createOpenEndedReview({
             attemptId: attempt.id,
@@ -3672,8 +3700,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create course (admin only)
   app.post("/api/courses", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const { name, description, orderIndex } = req.body;
-      const course = await storage.createCourse({ name, description, orderIndex: orderIndex || 0 });
+      const { name, description, orderIndex, objectives, publishStatus } = req.body;
+      const course = await storage.createCourse({
+        name,
+        description,
+        objectives,
+        publishStatus: publishStatus === "draft" ? "draft" : "published",
+        orderIndex: orderIndex || 0,
+      });
       res.json(course);
     } catch (error) {
       console.error("Error creating course:", error);
@@ -3722,6 +3756,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batchId: targetId,
         courseId,
         assignedBy: req.user!.id,
+      });
+      await recordAudit({
+        actorId: req.user!.id,
+        actorRole: req.user!.role,
+        action: "course_assigned",
+        targetType: "batch",
+        targetId: targetId,
+        metadata: { courseId },
       });
       res.json(assignment);
     } catch (error) {
@@ -5432,6 +5474,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error getting progress summary:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/ops/catalog", isAuthenticated, isTrainer, async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT a.id AS area, a.title, a.description, m.table_name
+        FROM ops.table_map m
+        JOIN ops.areas a ON a.id = m.area_id
+        ORDER BY a.id, m.table_name
+      `);
+      res.json(result.rows);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  app.get("/api/reports/batches/:batchId.csv", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch || !staffCanAccessBatch(req.user)) {
+        return res.status(404).json({ error: "Batch not found" });
+      }
+      const teachers = await storage.getTeachersInBatch(req.params.batchId);
+      const assignedCourses = await storage.getCoursesForBatch(req.params.batchId);
+      const lines = [
+        "learner,email,courses_assigned,courses_completed,overall_percent,status",
+      ];
+      for (const teacher of teachers) {
+        const completions = await db
+          .select()
+          .from(teacherCourseCompletion)
+          .where(and(eq(teacherCourseCompletion.teacherId, teacher.id), eq(teacherCourseCompletion.batchId, req.params.batchId)));
+        const completed = completions.filter((c) => c.status === "completed").length;
+        const overall = assignedCourses.length > 0 ? Math.round((completed / assignedCourses.length) * 100) : 0;
+        const status = overall >= 100 ? "Completed" : overall > 0 ? "In Progress" : "Not Started";
+        const safe = (v: string) => `"${String(v || "").replace(/"/g, '""')}"`;
+        lines.push([safe(teacher.name), safe(teacher.email), assignedCourses.length, completed, overall, status].join(","));
+      }
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${batch.name.replace(/[^a-z0-9]+/gi, "-")}-cohort.csv"`);
+      res.send(lines.join("\n"));
+    } catch (error) {
+      console.error("cohort csv:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/reports/courses/:courseId.csv", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const course = await storage.getCourse(req.params.courseId);
+      if (!course) return res.status(404).json({ error: "Course not found" });
+      const rows = await db
+        .select()
+        .from(teacherCourseCompletion)
+        .where(eq(teacherCourseCompletion.courseId, req.params.courseId));
+      const lines = ["teacher_id,status,completed_weeks,total_weeks,percent"];
+      for (const row of rows) {
+        const percent = row.totalWeeks ? Math.round((row.completedWeeks / row.totalWeeks) * 100) : row.status === "completed" ? 100 : 0;
+        lines.push([row.teacherId, row.status, row.completedWeeks, row.totalWeeks, percent].join(","));
+      }
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${course.name.replace(/[^a-z0-9]+/gi, "-")}-course.csv"`);
+      res.send(lines.join("\n"));
+    } catch (error) {
+      console.error("course csv:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

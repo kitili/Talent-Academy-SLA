@@ -1,6 +1,7 @@
 import { defineConfig } from "drizzle-kit";
+import { resolveDatabaseUrl } from "./server/databaseUrl";
 
-const databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+const databaseUrl = resolveDatabaseUrl();
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL, ensure the database is provisioned");

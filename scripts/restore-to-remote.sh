@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "Set DATABASE_URL to the Neon/production connection string first."
+TARGET_URL="${SUPABASE_DATABASE_URL:-${DATABASE_URL:-}}"
+if [[ -z "$TARGET_URL" ]]; then
+  echo "Set SUPABASE_DATABASE_URL (or DATABASE_URL) to the Supabase pooler URI first."
   exit 1
 fi
 
@@ -11,6 +12,6 @@ echo "Dumping local talent_academy to $DUMP"
 pg_dump --format=custom --no-owner --no-acl \
   "postgresql:///talent_academy?host=/var/run/postgresql" > "$DUMP"
 
-echo "Restoring into remote DATABASE_URL"
-pg_restore --clean --if-exists --no-owner --no-acl --dbname="$DATABASE_URL" "$DUMP"
+echo "Restoring into remote Postgres"
+pg_restore --clean --if-exists --no-owner --no-acl --dbname="$TARGET_URL" "$DUMP"
 echo "Done."

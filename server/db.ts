@@ -1,16 +1,10 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
+import { isHostedPostgres, resolveDatabaseUrl } from "./databaseUrl";
 
-const databaseUrl =
-  process.env.NEON_DATABASE_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  process.env.POSTGRES_PRISMA_URL ||
-  "";
-const hosted =
-  !!process.env.VERCEL ||
-  /neon\.tech|supabase\.co|sslmode=require|amazonaws\.com/.test(databaseUrl);
+const databaseUrl = resolveDatabaseUrl();
+const hosted = isHostedPostgres(databaseUrl);
 
 export const pool = new Pool(
   databaseUrl
@@ -87,5 +81,19 @@ export async function ensureWrittenAssignmentTables() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_submission_unique
       ON assignment_submissions(assignment_id, teacher_id);
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      actor_id varchar,
+      actor_role varchar,
+      action varchar NOT NULL,
+      target_type varchar,
+      target_id varchar,
+      metadata jsonb,
+      created_at timestamp DEFAULT now()
+    );
+    ALTER TABLE courses ADD COLUMN IF NOT EXISTS publish_status varchar NOT NULL DEFAULT 'published';
+    ALTER TABLE courses ADD COLUMN IF NOT EXISTS objectives text;
+    ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS pass_mark integer NOT NULL DEFAULT 80;
+    ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS shuffle_questions varchar NOT NULL DEFAULT 'yes';
   `);
 }

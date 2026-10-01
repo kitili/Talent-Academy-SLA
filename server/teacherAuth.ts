@@ -3,6 +3,7 @@ import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { loginRateLimit } from "./security";
 import { hasDatabaseUrl } from "./db";
+import { hashPassword, comparePasswords } from "./auth";
 import { Teacher as SelectTeacher } from "@shared/schema";
 
 // Extend Express Request type to include teacherId
@@ -20,7 +21,7 @@ export function setupTeacherAuth(app: Express) {
     try {
       if (!hasDatabaseUrl()) {
         return res.status(503).json({
-          message: "Registration is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+          message: "Registration is unavailable because the live site has no DATABASE_URL. Add SUPABASE_DATABASE_URL in Vercel, then redeploy.",
         });
       }
 
@@ -79,7 +80,7 @@ export function setupTeacherAuth(app: Express) {
 
       if (!hasDatabaseUrl()) {
         return res.status(503).json({
-          message: "Sign-in is unavailable because the live site has no DATABASE_URL. Add a Neon Postgres URL in Vercel, then redeploy.",
+          message: "Sign-in is unavailable because the live site has no DATABASE_URL. Add SUPABASE_DATABASE_URL in Vercel, then redeploy.",
         });
       }
       

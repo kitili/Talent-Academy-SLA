@@ -36,6 +36,8 @@ export default function CoursesList() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
   const [newCourseDescription, setNewCourseDescription] = useState("");
+  const [newCourseObjectives, setNewCourseObjectives] = useState("");
+  const [newCoursePublish, setNewCoursePublish] = useState("draft");
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [resetUserIdentifier, setResetUserIdentifier] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
@@ -75,6 +77,8 @@ export default function CoursesList() {
       return apiRequest("POST", "/api/courses", {
         name: newCourseName,
         description: newCourseDescription,
+        objectives: newCourseObjectives,
+        publishStatus: newCoursePublish,
         orderIndex: courses.length,
       });
     },
@@ -85,6 +89,8 @@ export default function CoursesList() {
       }
       setNewCourseName("");
       setNewCourseDescription("");
+      setNewCourseObjectives("");
+      setNewCoursePublish("draft");
       setCreateOpen(false);
       toast({ title: "Course created" });
     },

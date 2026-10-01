@@ -4,7 +4,7 @@ Silverleaf / Taleemabad Talent Academy LMS.
 
 ## What is production-ready
 
-- **Postgres** holds users, courses, quizzes, and progress. Use Neon (or any hosted Postgres) for Vercel. Local data stays in the machine Postgres until you restore it.
+- **Postgres** holds users, courses, quizzes, and progress. Use **one Supabase project** (`SUPABASE_DATABASE_URL` or `DATABASE_URL`). Schema and ops catalog: `docs/ops/README.md` and `supabase/migrations/0001_talent_academy.sql`.
 - **Vercel Blob** holds uploaded slides. Without `BLOB_READ_WRITE_TOKEN`, uploads only last on this computer.
 - **Sessions** live in the `sessions` table in Postgres, so login survives deploys.
 
@@ -23,19 +23,20 @@ Open http://127.0.0.1:8765
 
 ## Vercel (durable data)
 
-1. Create a Neon project and copy the **pooled** connection string.
+1. Create a Supabase project, run `supabase/migrations/0001_talent_academy.sql`, copy the **transaction pooler** URI.
 2. In the Vercel project **talent-academy-sla** set:
-   - `DATABASE_URL` — Neon URL (`sslmode=require`)
+   - `SUPABASE_DATABASE_URL` (or `DATABASE_URL`) — pooler URI with `sslmode=require`
    - `SESSION_SECRET` — long random string
    - `BLOB_READ_WRITE_TOKEN` — from Vercel Storage → Blob
-3. From this repo, apply schema and copy local data:
+3. Remove `NEON_DATABASE_URL` from Vercel so the app does not keep using Neon.
+4. From this repo, apply schema and copy existing data if needed:
 
 ```bash
-export DATABASE_URL="postgresql://..."
+export SUPABASE_DATABASE_URL="postgresql://..."
 npm run db:push
 bash scripts/restore-to-remote.sh
 ```
 
-4. Redeploy. `GET /api/health` should return `"ok": true`.
+5. Redeploy. `GET /api/health` should return `"ok": true`.
 
 The site is https://talent-academy-sla.vercel.app

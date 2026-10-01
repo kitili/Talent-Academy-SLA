@@ -119,13 +119,11 @@ import { batchRiskStatus, moduleCoveragePercentage } from "./progressLogic";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
+import { resolveDatabaseUrl } from "./databaseUrl";
+
 const PostgresSessionStore = connectPg(session);
-const sessionDatabaseUrl =
-  process.env.NEON_DATABASE_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  "";
-const hostedDatabase = /neon\.tech|supabase\.co|sslmode=require|amazonaws\.com|vercel/.test(
+const sessionDatabaseUrl = resolveDatabaseUrl();
+const hostedDatabase = /supabase\.co|neon\.tech|sslmode=require|amazonaws\.com|vercel/.test(
   sessionDatabaseUrl,
 ) || Boolean(process.env.VERCEL);
 

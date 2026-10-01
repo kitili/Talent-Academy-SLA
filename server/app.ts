@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
 import { applySecurity, redactForLog } from "./security";
+import { resolveDatabaseUrl } from "./databaseUrl";
+import { ensureWrittenAssignmentTables } from "./db";
 
 export async function createApp() {
   const app = express();
@@ -37,7 +39,7 @@ export async function createApp() {
     next();
   });
 
-  const dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+  const dbUrl = resolveDatabaseUrl();
   const env = process.env.NODE_ENV || "development";
   if (dbUrl) {
     let host = "configured";

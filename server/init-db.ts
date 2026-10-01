@@ -1,6 +1,7 @@
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { db, pool } from "./db";
+import { resolveDatabaseUrl } from "./databaseUrl";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
@@ -16,7 +17,7 @@ async function initializeDatabase() {
   console.log("🔧 Initializing database...");
   
   // Check database connection
-  const dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+  const dbUrl = resolveDatabaseUrl();
   if (!dbUrl) {
     throw new Error("DATABASE_URL is not set!");
   }
