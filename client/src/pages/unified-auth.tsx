@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
+import { homeForRole, persistSessionUser } from "@/lib/sessionUser";
 import { Shield, GraduationCap, Users, Mail, Sparkles } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { ClassroomArt } from "@/components/ClassroomArt";
@@ -27,6 +29,7 @@ const SilverleafLogo = ({ className = "w-12 h-12" }: { className?: string }) => 
 
 export default function UnifiedAuth() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   
   // Login state
   const [loginRole, setLoginRole] = useState<Role>("admin");
@@ -77,24 +80,17 @@ export default function UnifiedAuth() {
         const user = await response.json();
         setShowRolePicker(false);
         
-        // Update the auth context's query cache
-        if (user.role !== 'teacher') {
-          queryClient.setQueryData(["/api/user"], user);
+        persistSessionUser(user);
+        queryClient.setQueryData(["/api/user"], user);
+        if (user.role === "teacher") {
+          queryClient.setQueryData(["/api/teacher/me"], user);
         }
 
         toast({
           title: "Welcome!",
           description: `Successfully logged in as ${selectedRole.role}`,
         });
-        
-        // Redirect based on role
-        if (selectedRole.role === 'teacher') {
-          window.location.href = "/teacher/dashboard";
-        } else if (selectedRole.role === 'admin') {
-          window.location.href = "/admin";
-        } else {
-          window.location.href = "/trainer/batches";
-        }
+        setLocation(homeForRole(user.role || selectedRole.role));
       } else {
         const data = await response.json();
         toast({
@@ -144,25 +140,17 @@ export default function UnifiedAuth() {
           return;
         }
         
-        const userRole = data.role;
-
-        if (userRole !== 'teacher') {
-          queryClient.setQueryData(["/api/user"], data);
+        persistSessionUser(data);
+        queryClient.setQueryData(["/api/user"], data);
+        if (userRole === "teacher") {
+          queryClient.setQueryData(["/api/teacher/me"], data);
         }
 
         toast({
           title: "Welcome!",
           description: `Successfully logged in as ${userRole}`,
         });
-        
-        // Redirect based on role
-        if (userRole === 'teacher') {
-          window.location.href = "/teacher/dashboard";
-        } else if (userRole === 'admin') {
-          window.location.href = "/admin";
-        } else {
-          window.location.href = "/trainer/batches";
-        }
+        setLocation(homeForRole(userRole));
       } else {
         toast({
           variant: "destructive",

@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { clearSessionUser, persistSessionUser, readSessionUser } from "../lib/sessionUser";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -27,6 +28,7 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const cachedUser = readSessionUser();
   const {
     data: user,
     error,
@@ -34,7 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    initialData: cachedUser,
   });
+
+  useEffect(() => {
+    if (user) persistSessionUser(user);
+    else if (!isLoading) clearSessionUser();
+  }, [user, isLoading]);
 
   // Identify user in PostHog when user data is available
   useEffect(() => {
@@ -61,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      persistSessionUser(user);
       posthog.capture("user_login", {
         role: user.role,
         email: user.email
@@ -110,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      clearSessionUser();
       posthog.capture("user_logout");
       posthog.reset();
       window.location.href = "/auth";
