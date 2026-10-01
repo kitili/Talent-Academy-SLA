@@ -29,16 +29,26 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      const res = await fetch(queryKey.join("/") as string, {
+        credentials: "include",
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer));
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
