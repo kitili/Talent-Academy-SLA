@@ -21,6 +21,8 @@ import { useScreenshotProtection } from "@/hooks/use-screenshot-protection";
 import { ScreenshotWarning } from "@/components/ScreenshotWarning";
 import { TableOfContents } from "@/components/TableOfContents";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
+import { ModuleScene } from "@/components/ModuleScene";
+import { sanitizeLessonHtml } from "@shared/htmlSanitize";
 
 // DocumentViewer component for displaying DOCX files converted to HTML
 function DocumentViewer({ url }: { url: string }) {
@@ -79,11 +81,27 @@ function DocumentViewer({ url }: { url: string }) {
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+function LessonPage({ title, html, onRead }: { title: string; html: string; onRead: () => void }) {
+  return (
+    <article className="sl-lesson mx-auto max-w-2xl p-6 sm:p-10">
+      <ModuleScene title={title} />
+      <div
+        className="prose mt-4 max-w-none text-foreground"
+        dangerouslySetInnerHTML={{ __html: sanitizeLessonHtml(html) }}
+      />
+      <Button className="mt-6" onClick={onRead}>
+        I have read this lesson
+      </Button>
+    </article>
+  );
+}
+
 interface DeckFile {
   id: string;
   fileName: string;
   fileUrl: string;
   fileSize: number;
+  lessonHtml?: string;
   toc?: TocEntry[];
   progress?: {
     status: 'pending' | 'completed';
@@ -243,6 +261,12 @@ export default function TeacherContentView() {
   useEffect(() => {
     const fetchViewUrl = async () => {
       if (!selectedFile) {
+        setViewUrl(null);
+        setDocumentLoadError(false);
+        return;
+      }
+
+      if (selectedFile.lessonHtml) {
         setViewUrl(null);
         setDocumentLoadError(false);
         return;
@@ -564,7 +588,15 @@ export default function TeacherContentView() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-hidden bg-muted/20 relative">
-          {isPdfFile ? (
+          {selectedFile?.lessonHtml ? (
+            <div className="h-full overflow-auto bg-background">
+              <LessonPage
+                title={selectedFile.fileName}
+                html={selectedFile.lessonHtml}
+                onRead={() => saveProgressMutation.mutate({ deckFileId: selectedFile.id, status: "completed", completedAt: new Date() })}
+              />
+            </div>
+          ) : isPdfFile ? (
             <div
               className="flex items-center justify-center w-full h-full overflow-auto"
               onTouchMove={handlePdfTouchMove}
@@ -1019,7 +1051,13 @@ export default function TeacherContentView() {
 
                 {/* Content Display - Takes remaining space with internal scroll */}
                 <div className="flex-1 overflow-y-auto bg-muted/20 flex flex-col min-h-0">
-                  {(selectedFile.fileName.toLowerCase().endsWith('.pdf') || 
+                  {selectedFile.lessonHtml ? (
+                    <LessonPage
+                      title={selectedFile.fileName}
+                      html={selectedFile.lessonHtml}
+                      onRead={() => saveProgressMutation.mutate({ deckFileId: selectedFile.id, status: "completed", completedAt: new Date() })}
+                    />
+                  ) : (selectedFile.fileName.toLowerCase().endsWith('.pdf') || 
                     selectedFile.fileName.toLowerCase().endsWith('.pptx') || 
                     selectedFile.fileName.toLowerCase().endsWith('.ppt')) ? (
                     <div className="flex flex-col items-center p-2 sm:p-8 pb-24 overflow-x-auto">
