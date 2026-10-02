@@ -90,6 +90,93 @@ async function notifyBatchTeachers(batchId: string, title: string, message: stri
   }
 }
 
+type TeacherLearningSummary = {
+  progress: number;
+  filesViewed: number;
+  courseCompletion: number;
+  lastActive?: string | Date | null;
+};
+
+function emptyTeacherSummary(): TeacherLearningSummary {
+  return { progress: 0, filesViewed: 0, courseCompletion: 0, lastActive: null };
+}
+
+function pct(part: number, whole: number) {
+  if (!whole || whole <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((part / whole) * 100)));
+}
+
+async function loadTeacherLearningSummaries(): Promise<Map<string, TeacherLearningSummary>> {
+  const summaries = new Map<string, TeacherLearningSummary>();
+  const ensure = (id: string) => {
+    if (!summaries.has(id)) summaries.set(id, emptyTeacherSummary());
+    return summaries.get(id)!;
+  };
+
+  try {
+    const cards = await db.select().from(teacherReportCards);
+    for (const card of cards) {
+      const row = ensure(card.teacherId);
+      row.progress = card.averageScore || 0;
+      row.filesViewed = card.totalQuizzesTaken || 0;
+      row.courseCompletion = Math.min(100, (card.totalQuizzesPassed || 0) * 10);
+    }
+  } catch (error) {
+    console.error("Teacher report cards unavailable:", error);
+  }
+
+  try {
+    const fileRows = await db.execute(sql`
+      SELECT
+        teacher_id,
+        COUNT(*) FILTER (
+          WHERE viewed_at IS NOT NULL
+             OR status IN ('in_progress', 'quiz_required', 'completed')
+        )::int AS files_viewed,
+        COUNT(*) FILTER (WHERE status = 'completed')::int AS files_completed,
+        COUNT(*)::int AS files_total,
+        MAX(COALESCE(completed_at, viewed_at)) AS last_active
+      FROM teacher_content_progress
+      GROUP BY teacher_id
+    `);
+    for (const raw of fileRows.rows as any[]) {
+      const row = ensure(String(raw.teacher_id));
+      row.filesViewed = Number(raw.files_viewed || 0);
+      if (Number(raw.files_total || 0) > 0) {
+        row.progress = pct(Number(raw.files_completed || 0), Number(raw.files_total || 0));
+      }
+      if (raw.last_active) row.lastActive = raw.last_active;
+    }
+  } catch (error) {
+    console.error("Teacher file progress unavailable:", error);
+  }
+
+  try {
+    const courseRows = await db.execute(sql`
+      SELECT
+        teacher_id,
+        COALESCE(SUM(completed_weeks), 0)::int AS completed_weeks,
+        COALESCE(SUM(total_weeks), 0)::int AS total_weeks,
+        COUNT(*) FILTER (WHERE status = 'completed')::int AS courses_done,
+        COUNT(*)::int AS courses_enrolled
+      FROM teacher_course_completion
+      GROUP BY teacher_id
+    `);
+    for (const raw of courseRows.rows as any[]) {
+      const row = ensure(String(raw.teacher_id));
+      if (Number(raw.total_weeks || 0) > 0) {
+        row.courseCompletion = pct(Number(raw.completed_weeks || 0), Number(raw.total_weeks || 0));
+      } else if (Number(raw.courses_enrolled || 0) > 0) {
+        row.courseCompletion = pct(Number(raw.courses_done || 0), Number(raw.courses_enrolled || 0));
+      }
+    }
+  } catch (error) {
+    console.error("Teacher course completion unavailable:", error);
+  }
+
+  return summaries;
+}
+
 // Middleware to allow both regular auth and teacher auth
 function isAuthenticatedAny(req: Request, res: Response, next: NextFunction) {
   const isRegularUser = req.isAuthenticated();
@@ -1751,7 +1838,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cachedQuiz && cachedQuiz.questions.length >= numQuestions) {
           const cacheTime = Date.now() - startTime;
           console.log(`[FILE-QUIZ] 🎯 CACHE HIT! Instant retrieval in ${cacheTime}ms for ${file.fileName}`);
-          return res.json({ questions: cachedQuiz.questions.slice(0, numQuestions), cached: true });
+          const slice = cachedQuiz.questions.slice(0, numQuestions);
+          const forLearner = !!(req.session as any)?.teacherId;
+          return res.json({
+            questions: forLearner ? shuffleQuestions(slice) : slice,
+            cached: true,
+          });
         }
       } else {
         console.log(`[FILE-QUIZ] 🔄 Force regenerating quiz for ${file.fileName} with ${numQuestions} questions`);
@@ -3052,6 +3144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const seenWeekIds = new Set<string>();
       
       for (const { course, batchId } of courseBatchPairs) {
+        if (course.publishStatus === "draft") continue;
         const courseWeeks = await storage.getWeeksForCourse(course.id);
         
         for (const week of courseWeeks) {
@@ -3575,13 +3668,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all teachers with progress
   app.get("/api/admin/teachers", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
+      const summaries = await loadTeacherLearningSummaries();
       const allTeachers = await db.select().from(teachers);
-      const cards = await db.select().from(teacherReportCards);
-      const enrollments = await db.select({ teacherId: batchTeachers.teacherId }).from(batchTeachers);
-      const cardByTeacher = new Map(cards.map((card) => [card.teacherId, card]));
-      const enrolledIds = new Set(enrollments.map((row) => row.teacherId));
       res.json(allTeachers.map((teacher) => {
-        const reportCard = cardByTeacher.get(teacher.id);
+        const summary = summaries.get(teacher.id) || emptyTeacherSummary();
         return {
           id: teacher.id,
           teacherId: teacher.teacherId,
@@ -3590,11 +3680,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: "teacher",
           approvalStatus: teacher.approvalStatus,
           createdAt: teacher.createdAt,
-          progress: reportCard?.averageScore || 0,
-          filesViewed: reportCard?.totalQuizzesTaken || 0,
-          courseCompletion: enrolledIds.has(teacher.id)
-            ? Math.min(100, (reportCard?.totalQuizzesPassed || 0) * 10)
-            : 0,
+          lastLogin: summary.lastActive,
+          progress: summary.progress,
+          filesViewed: summary.filesViewed,
+          courseCompletion: summary.courseCompletion,
         };
       }));
     } catch (error) {
@@ -3614,24 +3703,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { password, ...sanitized } = teacher;
+      const summaries = await loadTeacherLearningSummaries();
+      const summary = summaries.get(teacher.id) || emptyTeacherSummary();
       res.json({
         ...sanitized,
-        progress: Math.floor(Math.random() * 100),
-        filesViewed: Math.floor(Math.random() * 50),
-        courseCompletion: Math.floor(Math.random() * 100),
-        completedLessons: ["Week 1 Content", "Quiz 1 Passed"],
-        activityTimeline: [
-          {
-            action: "login",
-            timestamp: new Date().toISOString(),
-            details: "Logged in to system",
-          },
-          {
-            action: "complete",
-            timestamp: new Date(Date.now() - 7200000).toISOString(),
-            details: "Completed Week 1 content",
-          },
-        ],
+        progress: summary.progress,
+        filesViewed: summary.filesViewed,
+        courseCompletion: summary.courseCompletion,
+        lastLogin: summary.lastActive,
       });
     } catch (error) {
       console.error("Error getting teacher details:", error);
