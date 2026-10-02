@@ -53,7 +53,7 @@ export default function AdminTeachers() {
     password: "",
   });
 
-  const { data: teachers, isLoading } = useQuery<Teacher[]>({
+  const { data: teachers, isLoading, isError } = useQuery<Teacher[]>({
     queryKey: ["/api/admin/teachers"],
   });
 
@@ -216,6 +216,11 @@ export default function AdminTeachers() {
               <Card key={i} className="p-6 animate-pulse bg-muted h-24" />
             ))}
           </div>
+        ) : isError ? (
+          <Card className="p-8 text-center">
+            <p className="font-semibold">Could not load teachers</p>
+            <p className="text-muted-foreground mt-1">Open Cohorts → Batch 1, or refresh this page.</p>
+          </Card>
         ) : teachers && teachers.length > 0 ? (
           <div className="space-y-4">
             {teachers.map((teacher) => (

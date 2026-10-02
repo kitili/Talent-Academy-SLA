@@ -9,7 +9,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts } from "@shared/schema";
+import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards } from "@shared/schema";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
@@ -3576,9 +3576,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/teachers", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const allTeachers = await db.select().from(teachers);
-      const teachersData = await Promise.all(allTeachers.map(async (teacher: any) => {
-        const reportCard = await storage.refreshTeacherReportCard(teacher.id);
-        const enrolled = await storage.getBatchesForTeacher(teacher.id);
+      const cards = await db.select().from(teacherReportCards);
+      const enrollments = await db.select({ teacherId: batchTeachers.teacherId }).from(batchTeachers);
+      const cardByTeacher = new Map(cards.map((card) => [card.teacherId, card]));
+      const enrolledIds = new Set(enrollments.map((row) => row.teacherId));
+      res.json(allTeachers.map((teacher) => {
+        const reportCard = cardByTeacher.get(teacher.id);
         return {
           id: teacher.id,
           teacherId: teacher.teacherId,
@@ -3589,11 +3592,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           createdAt: teacher.createdAt,
           progress: reportCard?.averageScore || 0,
           filesViewed: reportCard?.totalQuizzesTaken || 0,
-          courseCompletion: enrolled.length > 0 ? Math.min(100, (reportCard?.totalQuizzesPassed || 0) * 10) : 0,
+          courseCompletion: enrolledIds.has(teacher.id)
+            ? Math.min(100, (reportCard?.totalQuizzesPassed || 0) * 10)
+            : 0,
         };
       }));
-      
-      res.json(teachersData);
     } catch (error) {
       console.error("Error getting teachers:", error);
       res.status(500).json({ error: "Internal server error" });
