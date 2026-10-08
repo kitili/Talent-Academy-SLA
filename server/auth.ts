@@ -159,8 +159,10 @@ export function setupAuth(app: Express) {
         });
       }
 
+      const requestedRole = String(req.body.role || "").trim().toLowerCase();
+
       // Collect all matching accounts across both tables
-      const matchingRoles: Array<{
+      let matchingRoles: Array<{
         id: string;
         role: 'admin' | 'trainer' | 'teacher';
         name: string;
@@ -226,6 +228,10 @@ export function setupAuth(app: Express) {
         } catch (e) {
           // Password comparison failed, skip this teacher
         }
+      }
+
+      if (requestedRole === "admin" || requestedRole === "trainer" || requestedRole === "teacher") {
+        matchingRoles = matchingRoles.filter((match) => match.role === requestedRole);
       }
 
       // No matching accounts found

@@ -57,9 +57,6 @@ export default function UnifiedAuth() {
   const [regPassword, setRegPassword] = useState("");
   const [regLoading, setRegLoading] = useState(false);
 
-  // Floating label states
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
   const [databaseReady, setDatabaseReady] = useState<boolean | null>(null);
   const [sso, setSso] = useState({ google: false, microsoft: false });
 
@@ -138,9 +135,10 @@ export default function UnifiedAuth() {
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          username: loginEmail, 
-          password: loginPassword 
+        body: JSON.stringify({
+          username: loginEmail,
+          password: loginPassword,
+          role: loginRole,
         }),
         credentials: "include",
         signal: AbortSignal.timeout(20000),
@@ -157,9 +155,18 @@ export default function UnifiedAuth() {
           return;
         }
         
+        const signedInRole = data.role as Role;
+        if (signedInRole !== loginRole) {
+          toast({
+            variant: "destructive",
+            title: "Incorrect password",
+            description: "Use the username and password for the role you selected.",
+          });
+          setLoginLoading(false);
+          return;
+        }
         persistSessionUser(data);
         queryClient.setQueryData(["/api/user"], data);
-        const signedInRole = (data.role || loginRole) as Role;
         if (signedInRole === "teacher") {
           queryClient.setQueryData(["/api/teacher/me"], data);
         }
@@ -173,8 +180,8 @@ export default function UnifiedAuth() {
       } else {
         toast({
           variant: "destructive",
-          title: "Login failed",
-          description: data.message || "Invalid email or password",
+          title: "Incorrect password",
+          description: data.message || "Invalid username or password",
         });
       }
     } catch (error) {
@@ -418,66 +425,40 @@ export default function UnifiedAuth() {
                         })}
                       </div>
 
-                      {/* Email/ID Input with floating label */}
-                      <div className="relative">
+                      <div className="space-y-2">
+                        <Label htmlFor="login-email">
+                          {loginRole === "teacher" ? "Teacher ID or email" : "Username or email"}
+                        </Label>
                         <div className="relative">
-                          <Mail className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground z-10" />
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                           <Input
                             id="login-email"
                             data-testid="input-login-email"
                             type="text"
-                            placeholder=" "
+                            autoComplete="username"
+                            placeholder={loginRole === "teacher" ? "teacher@test.com" : loginRole === "trainer" ? "trainer1" : "admin"}
                             value={loginEmail}
                             onChange={(e) => setLoginEmail(e.target.value)}
-                            onFocus={() => setEmailFocused(true)}
-                            onBlur={() => setEmailFocused(false)}
                             required
-                            className="pl-10 sm:pl-12 h-12 sm:h-14 text-sm sm:text-base peer bg-card border-2 transition-all duration-300 focus:border-primary"
+                            className="pl-10 h-12 text-sm sm:text-base bg-card border-2"
                           />
-                          <Label
-                            htmlFor="login-email"
-                            className={`
-                              absolute left-10 sm:left-12 transition-all duration-300 pointer-events-none
-                              ${emailFocused || loginEmail
-                                ? '-top-2.5 left-3 text-xs bg-card px-2 text-primary font-medium'
-                                : 'top-1/2 -translate-y-1/2 text-sm sm:text-base text-muted-foreground'
-                              }
-                            `}
-                          >
-                            {loginRole === "teacher" ? "Teacher ID or Email" : "Username or Email"}
-                          </Label>
                         </div>
-                        <div className={`h-0.5 bg-primary transition-all duration-300 ${emailFocused ? 'w-full' : 'w-0'}`} />
                       </div>
 
-                      {/* Password Input with floating label */}
-                      <div className="relative">
+                      <div className="space-y-2">
+                        <Label htmlFor="login-password">Password</Label>
                         <div className="relative">
                           <PasswordInput
                             id="login-password"
                             data-testid="input-login-password"
-                            placeholder=" "
+                            autoComplete="current-password"
+                            placeholder="Password"
                             value={loginPassword}
                             onChange={(e) => setLoginPassword(e.target.value)}
-                            onFocus={() => setPasswordFocused(true)}
-                            onBlur={() => setPasswordFocused(false)}
                             required
-                            className="h-12 sm:h-14 text-sm sm:text-base peer bg-card border-2 transition-all duration-300 focus:border-primary"
+                            className="h-12 text-sm sm:text-base bg-card border-2"
                           />
-                          <Label
-                            htmlFor="login-password"
-                            className={`
-                              absolute left-10 transition-all duration-300 pointer-events-none
-                              ${passwordFocused || loginPassword
-                                ? '-top-2.5 left-3 text-xs bg-card px-2 text-primary font-medium'
-                                : 'top-1/2 -translate-y-1/2 text-sm sm:text-base text-muted-foreground'
-                              }
-                            `}
-                          >
-                            Password
-                          </Label>
                         </div>
-                        <div className={`h-0.5 bg-primary transition-all duration-300 ${passwordFocused ? 'w-full' : 'w-0'}`} />
                       </div>
 
                       {/* Login Button */}

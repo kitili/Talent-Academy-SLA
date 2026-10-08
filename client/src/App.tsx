@@ -27,7 +27,6 @@ import AdminAnalytics from "@/pages/admin-analytics";
 import AdminCertificateApproval from "@/pages/admin-certificate-approval";
 import AdminCertificateView from "@/pages/admin-certificate-view";
 import AdminBatches from "@/pages/admin-batches";
-import AdminOpsCatalog from "@/pages/admin-ops-catalog";
 import TeacherCertificates from "@/pages/teacher-certificates";
 import TeacherCertificateView from "@/pages/teacher-certificate-view";
 import EmergencyReset from "@/pages/emergency-reset";
@@ -57,7 +56,6 @@ function Router() {
       <ProtectedRoute path="/admin/teachers/:id" component={AdminTeacherDetail} />
       <ProtectedRoute path="/admin/teachers" component={AdminTeachers} />
       <ProtectedRoute path="/admin/analytics" component={AdminAnalytics} />
-      <ProtectedRoute path="/admin/data-catalog" component={AdminOpsCatalog} />
       <ProtectedRoute path="/admin/batches" component={AdminBatches} />
       <ProtectedRoute path="/admin" component={AdminHome} />
       <Route path="/auth" component={UnifiedAuth} />

@@ -96,9 +96,29 @@ async function main() {
     `HTTP ${upload.status} ${upload.json?.error || upload.json?.uploadURL || "ok"}`,
   );
 
+  const trainerWithAdminPassword = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin123", role: "trainer" }),
+  });
+  record(
+    "Trainer desk rejects admin password",
+    trainerWithAdminPassword.status === 401,
+    `HTTP ${trainerWithAdminPassword.status}`,
+  );
+
+  const teacherWithAdminPassword = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ username: "admin", password: "admin123", role: "teacher" }),
+  });
+  record(
+    "Teacher desk rejects admin password",
+    teacherWithAdminPassword.status === 401,
+    `HTTP ${teacherWithAdminPassword.status}`,
+  );
+
   const trainerLogin = await request("/api/login", {
     method: "POST",
-    body: JSON.stringify({ username: "trainer1", password: "trainer123" }),
+    body: JSON.stringify({ username: "trainer1", password: "trainer123", role: "trainer" }),
   });
   record(
     "Trainer login",

@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Users, Award, BarChart3, ArrowRight, FileText, Layers, Database } from "lucide-react";
+import { Users, Award, BarChart3, ArrowRight, FileText, Layers } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
 import {
   Dialog,
@@ -211,7 +211,6 @@ export default function AdminHome() {
             { href: "/admin/batches", title: "Cohorts", text: "Rooms, quizzes, and certificates", icon: Layers, test: "button-go-batches" },
             { href: "/admin/analytics", title: "Analytics", text: "How the academy is moving", icon: BarChart3, test: "button-go-analytics" },
             { href: "/courses", title: "Courses", text: "Modules and lesson files", icon: FileText, test: "button-go-courses" },
-            { href: "/admin/data-catalog", title: "Data catalog", text: "Tables grouped by area", icon: Database, test: "button-go-data-catalog" },
           ].map((item) => {
             const Icon = item.icon;
             return (
