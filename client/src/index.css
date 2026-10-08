@@ -873,23 +873,54 @@ body {
 }
 
 .sl-page {
-  background-color: #f6efe4;
+  background-color: #102448;
   background-size: cover;
-  background-position: center;
+  background-position: center top;
   background-attachment: scroll;
   background-repeat: no-repeat;
+  transform: translateZ(0);
 }
 
-.sl-bg-room { background-image: url("/silverleaf-room.jpg"); }
-.sl-bg-library { background-image: url("/bg-library.jpg"); }
-.sl-bg-board { background-image: url("/bg-board.jpg"); }
-.sl-bg-garden { background-image: url("/bg-garden.jpg"); }
-.sl-bg-lamp { background-image: url("/bg-lamp.jpg"); }
-.sl-bg-hall { background-image: url("/bg-hall.jpg"); }
-.sl-bg-paper { background-image: url("/bg-paper.jpg"); }
+.sl-bg-room,
+.sl-bg-library,
+.sl-bg-board,
+.sl-bg-garden,
+.sl-bg-lamp,
+.sl-bg-hall,
+.sl-bg-paper {
+  background-image: none;
+}
+.sl-bg-room::before,
+.sl-bg-library::before,
+.sl-bg-board::before,
+.sl-bg-garden::before,
+.sl-bg-lamp::before,
+.sl-bg-hall::before,
+.sl-bg-paper::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.sl-page > * {
+  position: relative;
+  z-index: 1;
+}
+.sl-bg-room::before { background-image: url("/silverleaf-room.jpg"); }
+.sl-bg-library::before { background-image: url("/bg-library.jpg"); }
+.sl-bg-board::before { background-image: url("/bg-board.jpg"); }
+.sl-bg-garden::before { background-image: url("/bg-garden.jpg"); }
+.sl-bg-lamp::before { background-image: url("/bg-lamp.jpg"); }
+.sl-bg-hall::before { background-image: url("/bg-hall.jpg"); }
+.sl-bg-paper::before { background-image: url("/bg-paper.jpg"); }
 
 .sl-frame {
-  width: min(80vw, 88rem);
+  width: 80%;
+  max-width: 80%;
   margin-left: auto;
   margin-right: auto;
   padding-left: 1rem;
@@ -897,11 +928,12 @@ body {
 }
 
 .sl-sheet {
-  background: rgba(255, 250, 244, 0.94);
+  background: rgba(255, 250, 244, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: 1.5rem;
   box-shadow: 0 18px 50px rgba(16, 24, 40, 0.12);
   padding: 1.25rem;
+  min-height: 80vh;
 }
 @media (min-width: 640px) {
   .sl-sheet { padding: 1.75rem; }
@@ -910,7 +942,7 @@ body {
 .sl-stage {
   background:
     linear-gradient(180deg, rgba(255, 248, 236, 0.18), rgba(18, 36, 72, 0.22)),
-    url("/silverleaf-room.jpg") center / cover no-repeat fixed;
+    url("/silverleaf-room.jpg") center / cover no-repeat scroll;
 }
 
 .sl-orbit {
@@ -948,8 +980,7 @@ body {
 
 .sl-stat-card {
   border-left: 4px solid hsl(var(--primary));
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.96);
   color: hsl(var(--foreground));
   box-shadow: 0 10px 24px hsl(220 30% 10% / 0.08);
   transition: transform 200ms ease, box-shadow 200ms ease;
@@ -961,8 +992,7 @@ body {
 
 .sl-nav-card {
   border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.96);
   color: hsl(var(--foreground));
   box-shadow: 0 10px 30px hsl(220 30% 10% / 0.08);
   transition: transform 200ms ease, border-color 200ms ease;

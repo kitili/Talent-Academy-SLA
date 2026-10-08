@@ -338,7 +338,7 @@ export default function UnifiedAuth() {
 
   return (
     <div className="relative min-h-screen">
-      <img key={scene.src} src={scene.src} alt="" className="fixed inset-0 h-full w-full object-cover" />
+      <img key={scene.src} src={scene.src} alt="" className="pointer-events-none fixed inset-0 h-full w-full object-cover object-center" decoding="async" />
       <div className="fixed inset-0 bg-[#102448]/20" />
       {/* Multi-role picker dialog */}
       <Dialog open={showRolePicker} onOpenChange={setShowRolePicker}>

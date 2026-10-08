@@ -23,6 +23,8 @@ import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar } from "lucide-react";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { PageStrip, usePager } from "@/components/PageStrip";
+import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 export default function TrainerBatches() {
   const [, setLocation] = useLocation();
@@ -78,6 +80,7 @@ export default function TrainerBatches() {
   const { data: batches = [] } = useQuery<any[]>({
     queryKey: ["/api/batches"],
   });
+  const batchPager = usePager(batches, 8);
 
   const { data: weeks = [] } = useQuery<any[]>({
     queryKey: ["/api/training-weeks"],
@@ -520,9 +523,9 @@ export default function TrainerBatches() {
   };
 
   return (
-    <div className="sl-page sl-bg-hall min-h-screen">
+    <SceneBackdrop scene="hall">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+        <div className="sl-frame py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="h-12 w-12 sm:h-14 sm:w-14 flex items-center justify-center flex-shrink-0 bg-primary rounded-sm p-1">
               <img src={logoImage} alt="Silverleaf Academy Logo" className="w-full h-full object-contain" />
@@ -618,7 +621,7 @@ export default function TrainerBatches() {
                     No batches assigned to you yet
                   </div>
                 ) : (
-                  batches.map((batch: any) => (
+                  batchPager.slice.map((batch: any) => (
                     <button
                       key={batch.id}
                       onClick={() => {
@@ -639,6 +642,7 @@ export default function TrainerBatches() {
                     </button>
                   ))
                 )}
+                <PageStrip page={batchPager.page} pages={batchPager.pages} setPage={batchPager.setPage} />
               </div>
             </ScrollArea>
           </div>
@@ -1919,6 +1923,6 @@ export default function TrainerBatches() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </SceneBackdrop>
   );
 }

@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { PageStrip, usePager } from "@/components/PageStrip";
+import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 interface Trainer {
   id: string;
@@ -47,6 +49,7 @@ export default function AdminTrainers() {
   const { data: trainers, isLoading } = useQuery<Trainer[]>({
     queryKey: ["/api/admin/trainers"],
   });
+  const trainerPager = usePager(trainers ?? []);
 
   const createTrainerMutation = useMutation({
     mutationFn: async (data: { name: string; email: string; password: string }) => {
@@ -106,7 +109,8 @@ export default function AdminTrainers() {
   }
 
   return (
-    <div className="min-h-screen bg-[#243820] p-4 sm:p-6 md:p-8">
+    <SceneBackdrop scene="hall">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="sl-sheet sl-frame">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-4">
@@ -209,7 +213,7 @@ export default function AdminTrainers() {
           </div>
         ) : trainers && trainers.length > 0 ? (
           <div className="space-y-4">
-            {trainers.map((trainer) => (
+            {trainerPager.slice.map((trainer) => (
               <Card
                 key={trainer.id}
                 className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
@@ -274,6 +278,7 @@ export default function AdminTrainers() {
                 </div>
               </Card>
             ))}
+            <PageStrip page={trainerPager.page} pages={trainerPager.pages} setPage={trainerPager.setPage} />
           </div>
         ) : (
           <Card className="p-8 text-center">
@@ -282,5 +287,6 @@ export default function AdminTrainers() {
         )}
       </div>
     </div>
+    </SceneBackdrop>
   );
 }

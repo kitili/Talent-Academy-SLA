@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AcademyShell } from "@/components/AcademyShell";
+import { PageStrip, usePager } from "@/components/PageStrip";
 
 interface Batch {
   id: string;
@@ -47,6 +48,7 @@ export default function AdminBatches() {
     queryKey: ["/api/trainers"],
     enabled: user?.role === "admin",
   });
+  const batchPager = usePager(batches);
 
   const assignTrainerMutation = useMutation({
     mutationFn: async ({ batchId, trainerId }: { batchId: string; trainerId: string | null }) => {
@@ -123,7 +125,7 @@ export default function AdminBatches() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {batches.map((batch) => (
+            {batchPager.slice.map((batch) => (
               <Card
                 key={batch.id}
                 className="p-4 sm:p-6 sl-stat-card sl-rise"
@@ -216,6 +218,7 @@ export default function AdminBatches() {
                 </div>
               </Card>
             ))}
+            <PageStrip page={batchPager.page} pages={batchPager.pages} setPage={batchPager.setPage} />
           </div>
         )}
     </AcademyShell>

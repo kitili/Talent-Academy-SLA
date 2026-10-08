@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { LogOut } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { SceneBackdrop, type SceneName } from "@/components/SceneBackdrop";
 
 type AcademyShellProps = {
   title: string;
@@ -11,13 +12,13 @@ type AcademyShellProps = {
   userLabel?: string;
   onLogout?: () => void;
   actions?: ReactNode;
-  scene?: "room" | "library" | "board" | "garden" | "lamp" | "hall" | "paper";
+  scene?: SceneName;
   children: ReactNode;
 };
 
 export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, scene = "library", children }: AcademyShellProps) {
   return (
-    <div className={`sl-page sl-bg-${scene} min-h-screen`}>
+    <SceneBackdrop scene={scene}>
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="sl-frame py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -57,6 +58,6 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
           {children}
         </div>
       </div>
-    </div>
+    </SceneBackdrop>
   );
 }

@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { PageStrip, usePager } from "@/components/PageStrip";
+import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 interface Teacher {
   id: string;
@@ -48,6 +50,7 @@ export default function AdminTeachers() {
   const { data: teachers, isLoading, isError } = useQuery<Teacher[]>({
     queryKey: ["/api/admin/teachers"],
   });
+  const teacherPager = usePager(teachers ?? []);
 
   const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
 
@@ -133,7 +136,8 @@ export default function AdminTeachers() {
   }
 
   return (
-    <div className="min-h-screen bg-[#163028] p-4 sm:p-6 md:p-8">
+    <SceneBackdrop scene="garden">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="sl-sheet sl-frame">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-4">
@@ -239,7 +243,7 @@ export default function AdminTeachers() {
           </Card>
         ) : teachers && teachers.length > 0 ? (
           <div className="space-y-4">
-            {teachers.map((teacher) => (
+            {teacherPager.slice.map((teacher) => (
               <Card
                 key={teacher.id}
                 className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
@@ -336,6 +340,7 @@ export default function AdminTeachers() {
                 </div>
               </Card>
             ))}
+            <PageStrip page={teacherPager.page} pages={teacherPager.pages} setPage={teacherPager.setPage} />
           </div>
         ) : (
           <Card className="p-8 text-center">
@@ -384,5 +389,6 @@ export default function AdminTeachers() {
         </Dialog>
       </div>
     </div>
+    </SceneBackdrop>
   );
 }

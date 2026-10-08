@@ -20,6 +20,8 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import logoImage from "@assets/image_1760460046116.png";
 import type { Course, Batch } from "@shared/schema";
+import { PageStrip, usePager } from "@/components/PageStrip";
+import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 interface CourseWithAssignment extends Course {
   assignedAt?: Date;
@@ -162,11 +164,12 @@ export default function CoursesList() {
   };
 
   const sortedCourses = [...courses].sort((a, b) => a.orderIndex - b.orderIndex);
+  const coursePager = usePager(sortedCourses);
 
   return (
-    <div className="sl-page sl-bg-library min-h-screen">
+    <SceneBackdrop scene="library">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+        <div className="sl-frame py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="h-12 w-12 sm:h-14 sm:w-14 flex items-center justify-center flex-shrink-0 bg-primary rounded-sm p-1">
               <img src={logoImage} alt="Silverleaf Academy Logo" className="w-full h-full object-contain" />
@@ -433,7 +436,7 @@ export default function CoursesList() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {sortedCourses.map((course) => (
+            {coursePager.slice.map((course) => (
               <Card key={course.id} className="p-4 sm:p-6 hover-elevate cursor-pointer transition-all" data-testid={`card-course-${course.id}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div
@@ -539,6 +542,7 @@ export default function CoursesList() {
                 </div>
               </Card>
             ))}
+            <PageStrip page={coursePager.page} pages={coursePager.pages} setPage={coursePager.setPage} />
           </div>
         )}
       </main>
@@ -566,6 +570,6 @@ export default function CoursesList() {
           </Card>
         </div>
       )}
-    </div>
+    </SceneBackdrop>
   );
 }

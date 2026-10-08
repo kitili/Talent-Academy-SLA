@@ -21,7 +21,7 @@ export function setupTeacherAuth(app: Express) {
     try {
       if (!hasDatabaseUrl()) {
         return res.status(503).json({
-          message: "Registration is unavailable because the live site has no DATABASE_URL. Add SUPABASE_DATABASE_URL in Vercel, then redeploy.",
+          message: "Registration is unavailable because the live site has no database URL. Add NEON_DATABASE_URL or DATABASE_URL in Vercel, then redeploy.",
         });
       }
 
@@ -80,7 +80,7 @@ export function setupTeacherAuth(app: Express) {
 
       if (!hasDatabaseUrl()) {
         return res.status(503).json({
-          message: "Sign-in is unavailable because the live site has no DATABASE_URL. Add SUPABASE_DATABASE_URL in Vercel, then redeploy.",
+          message: "Sign-in is unavailable because the live site has no database URL. Add NEON_DATABASE_URL or DATABASE_URL in Vercel, then redeploy.",
         });
       }
       
