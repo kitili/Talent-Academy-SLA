@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ChevronRight, Plus, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Plus, Loader2, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import {
@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,13 +39,6 @@ export default function AdminTeachers() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  // Guard: only admins can access this page
-  if (user && user.role !== "admin") {
-    navigate("/");
-    return null;
-  }
-
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -55,6 +47,32 @@ export default function AdminTeachers() {
 
   const { data: teachers, isLoading, isError } = useQuery<Teacher[]>({
     queryKey: ["/api/admin/teachers"],
+  });
+
+  const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
+
+  const updateTeacherMutation = useMutation({
+    mutationFn: async (data: { id: string; name: string; email: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/teachers/${data.id}`, { name: data.name, email: data.email });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Teacher updated" });
+      setEditTeacher(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
+    },
+    onError: (error: Error) => toast({ title: "Update failed", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteTeacherMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/dismiss-teacher/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Teacher removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
+    },
+    onError: (error: Error) => toast({ title: "Remove failed", description: error.message, variant: "destructive" }),
   });
 
   const createTeacherMutation = useMutation({
@@ -116,8 +134,7 @@ export default function AdminTeachers() {
 
   return (
     <div className="min-h-screen bg-[#163028] p-4 sm:p-6 md:p-8">
-      <div className="sl-sheet max-w-7xl mx-auto">
-        <img src="/bg-board.jpg" alt="" className="mb-6 h-48 w-full rounded-2xl object-cover shadow-md" />
+      <div className="sl-sheet sl-frame">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-4">
             <Button
@@ -136,13 +153,11 @@ export default function AdminTeachers() {
             </div>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-add-teacher">
+            <Button type="button" data-testid="button-add-teacher" onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Teacher
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
+            </Button>
+            <DialogContent onCloseAutoFocus={(event) => event.preventDefault()}>
               <DialogHeader>
                 <DialogTitle>Add New Teacher</DialogTitle>
                 <DialogDescription>
@@ -293,7 +308,31 @@ export default function AdminTeachers() {
                     <Progress value={teacher.progress || 0} className="h-2" />
                   </div>
 
-                  <ChevronRight className="h-5 w-5 text-muted-foreground ml-4 flex-shrink-0 mt-1" />
+                  <div className="flex items-start gap-2 ml-4 flex-shrink-0 mt-1">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditTeacher(teacher);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Remove ${teacher.name}?`)) deleteTeacherMutation.mutate(teacher.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground mt-2" />
+                  </div>
                 </div>
               </Card>
             ))}
@@ -303,6 +342,46 @@ export default function AdminTeachers() {
             <p className="text-muted-foreground">No teachers found</p>
           </Card>
         )}
+        <Dialog open={Boolean(editTeacher)} onOpenChange={(open) => { if (!open) setEditTeacher(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit teacher</DialogTitle>
+              <DialogDescription>Update name and email. This is Moodle-style participant CRUD.</DialogDescription>
+            </DialogHeader>
+            {editTeacher && (
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  updateTeacherMutation.mutate({
+                    id: editTeacher.id,
+                    name: editTeacher.name,
+                    email: editTeacher.email,
+                  });
+                }}
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="edit-teacher-name">Name</Label>
+                  <Input
+                    id="edit-teacher-name"
+                    value={editTeacher.name}
+                    onChange={(e) => setEditTeacher({ ...editTeacher, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-teacher-email">Email</Label>
+                  <Input
+                    id="edit-teacher-email"
+                    type="email"
+                    value={editTeacher.email}
+                    onChange={(e) => setEditTeacher({ ...editTeacher, email: e.target.value })}
+                  />
+                </div>
+                <Button type="submit" disabled={updateTeacherMutation.isPending}>Save</Button>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -50,16 +50,16 @@ function Router() {
       <ProtectedRoute path="/trainer/batches" component={TrainerBatches} />
       <ProtectedRoute path="/trainer/teachers/:teacherId/weeks/:weekId/content-history" component={TrainerTeacherContentHistory} />
       <ProtectedRoute path="/approvals" component={Approvals} />
-      <ProtectedRoute path="/admin" component={AdminHome} />
-      <ProtectedRoute path="/admin/trainers" component={AdminTrainers} />
+      <ProtectedRoute path="/admin/certificates/:batchId/approve" component={AdminCertificateApproval} />
+      <ProtectedRoute path="/admin/certificates/batch/:batchId/view" component={AdminCertificateView} />
       <ProtectedRoute path="/admin/trainers/:id" component={AdminTrainerDetail} />
-      <ProtectedRoute path="/admin/teachers" component={AdminTeachers} />
+      <ProtectedRoute path="/admin/trainers" component={AdminTrainers} />
       <ProtectedRoute path="/admin/teachers/:id" component={AdminTeacherDetail} />
+      <ProtectedRoute path="/admin/teachers" component={AdminTeachers} />
       <ProtectedRoute path="/admin/analytics" component={AdminAnalytics} />
       <ProtectedRoute path="/admin/data-catalog" component={AdminOpsCatalog} />
       <ProtectedRoute path="/admin/batches" component={AdminBatches} />
-      <ProtectedRoute path="/admin/certificates/:batchId/approve" component={AdminCertificateApproval} />
-      <ProtectedRoute path="/admin/certificates/batch/:batchId/view" component={AdminCertificateView} />
+      <ProtectedRoute path="/admin" component={AdminHome} />
       <Route path="/auth" component={UnifiedAuth} />
       <Route path="/login" component={UnifiedAuth} />
       <Route path="/emergency-reset" component={EmergencyReset} />

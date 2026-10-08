@@ -254,7 +254,7 @@ export default function CohortWorkspace() {
         </div>
       </header>
 
-      <div className="sl-sheet container mx-auto my-4 sm:my-6 p-4 sm:p-8 space-y-6">
+      <div className="sl-sheet sl-frame my-4 sm:my-6 p-4 sm:p-8 space-y-6">
         <p className="text-muted-foreground sl-rise">
           {batch?.description || "People, quizzes, the register, performance, and graduates — in one classroom."}
         </p>
@@ -380,22 +380,36 @@ export default function CohortWorkspace() {
             </div>
             {progress.length === 0 ? (
               <Empty text="The gradebook fills in as teachers finish modules and quizzes." />
-            ) : progress.map((row: any) => (
-              <Card key={row.teacherId || row.id} className="sl-rise border-l-4 border-l-primary">
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">{row.name || row.teacherName}</CardTitle>
-                  <CardDescription>
-                    {row.overallPercentage ?? 0}% of the course
-                    {row.reportCard?.averageScore != null ? ` · quiz average ${row.reportCard.averageScore}%` : ""}
-                    {(() => {
-                      const status = learningStatus({ percentage: row.overallPercentage || 0 });
-                      const watch = staffWatchLabel(row.overallPercentage || 0, status);
-                      return ` · ${status}${watch ? ` · ${watch}` : ""}`;
-                    })()}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
+            ) : (
+              <div className="overflow-x-auto rounded-xl border bg-white">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground border-b">
+                      <th className="p-3 font-medium">Participant</th>
+                      <th className="p-3 font-medium">Course %</th>
+                      <th className="p-3 font-medium">Quiz avg</th>
+                      <th className="p-3 font-medium">Quizzes</th>
+                      <th className="p-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {progress.map((row: any) => {
+                      const pct = row.overallPercentage || 0;
+                      const status = learningStatus({ percentage: pct });
+                      return (
+                        <tr key={row.teacherId || row.id} className="border-b last:border-0">
+                          <td className="p-3 font-medium">{row.name || row.teacherName}</td>
+                          <td className="p-3">{pct}%</td>
+                          <td className="p-3">{row.reportCard?.averageScore ?? 0}%</td>
+                          <td className="p-3">{row.reportCard?.totalQuizzesTaken ?? 0}</td>
+                          <td className="p-3">{status}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="graduates" className="space-y-3 mt-4">

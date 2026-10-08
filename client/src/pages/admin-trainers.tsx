@@ -38,12 +38,6 @@ export default function AdminTrainers() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  // Guard: only admins can access this page
-  if (user && user.role !== "admin") {
-    navigate("/");
-    return null;
-  }
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -113,8 +107,7 @@ export default function AdminTrainers() {
 
   return (
     <div className="min-h-screen bg-[#243820] p-4 sm:p-6 md:p-8">
-      <div className="sl-sheet max-w-7xl mx-auto">
-        <img src="/bg-garden.jpg" alt="" className="mb-6 h-48 w-full rounded-2xl object-cover shadow-md" />
+      <div className="sl-sheet sl-frame">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-4">
             <Button

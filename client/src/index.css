@@ -876,7 +876,7 @@ body {
   background-color: #f6efe4;
   background-size: cover;
   background-position: center;
-  background-attachment: fixed;
+  background-attachment: scroll;
   background-repeat: no-repeat;
 }
 
@@ -887,6 +887,14 @@ body {
 .sl-bg-lamp { background-image: url("/bg-lamp.jpg"); }
 .sl-bg-hall { background-image: url("/bg-hall.jpg"); }
 .sl-bg-paper { background-image: url("/bg-paper.jpg"); }
+
+.sl-frame {
+  width: min(80vw, 88rem);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
 
 .sl-sheet {
   background: rgba(255, 250, 244, 0.94);

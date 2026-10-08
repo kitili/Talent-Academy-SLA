@@ -131,6 +131,79 @@ async function main() {
     `HTTP ${assignedWeeks.status} count=${Array.isArray(assignedWeeks.json) ? assignedWeeks.json.length : 0}`,
   );
 
+  const teacherMe = await request("/api/teacher/me", {}, teacherCookies);
+  record("Teacher session is not an admin session", teacherMe.status === 200 && teacherMe.json?.role !== "admin", `HTTP ${teacherMe.status}`);
+
+  const trainerCookies = cookieHeader(trainerLogin.setCookie);
+  const trainerBatches = await request("/api/batches", {}, trainerCookies);
+  record(
+    "Trainer can list cohorts",
+    trainerBatches.status === 200 && Array.isArray(trainerBatches.json),
+    `HTTP ${trainerBatches.status}`,
+  );
+  const trainerCreateTeacher = await request("/api/admin/users/create", {
+    method: "POST",
+    body: JSON.stringify({ name: "Nope", email: "nope@test.com", password: "secret12", role: "teacher" }),
+  }, trainerCookies);
+  record("Trainer cannot use admin create-user", trainerCreateTeacher.status === 403 || trainerCreateTeacher.status === 401, `HTTP ${trainerCreateTeacher.status}`);
+
+  const adminTeachers = await request("/api/admin/teachers", {}, cookies);
+  record("Admin teacher list", adminTeachers.status === 200 && Array.isArray(adminTeachers.json), `HTTP ${adminTeachers.status}`);
+  const youtubeReject = await request("/api/training-weeks/not-a-week/external-link", {
+    method: "POST",
+    body: JSON.stringify({ url: "https://example.com" }),
+  }, cookies);
+  record("YouTube link rejects non-YouTube URLs", youtubeReject.status >= 400, `HTTP ${youtubeReject.status}`);
+
+  const stamp = Date.now();
+  const createdTeacher = await request("/api/admin/users/create", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "Smoke Teacher",
+      email: `smoke.teacher.${stamp}@test.com`,
+      password: "smoke123",
+      role: "teacher",
+    }),
+  }, cookies);
+  record("Admin can create a teacher", createdTeacher.status === 201 && createdTeacher.json?.role === "teacher", `HTTP ${createdTeacher.status}`);
+  const teacherId = createdTeacher.json?.id;
+  if (teacherId) {
+    const patched = await request(`/api/admin/teachers/${teacherId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Smoke Teacher Updated", email: createdTeacher.json.email }),
+    }, cookies);
+    record("Admin can update a teacher", patched.status === 200, `HTTP ${patched.status} name=${patched.json?.name || "n/a"}`);
+    const removed = await request(`/api/admin/dismiss-teacher/${teacherId}`, { method: "DELETE" }, cookies);
+    record("Admin can delete a teacher", removed.status === 200, `HTTP ${removed.status}`);
+  } else {
+    record("Admin can update a teacher", false, "create did not return id");
+    record("Admin can delete a teacher", false, "create did not return id");
+  }
+
+  const createdTrainer = await request("/api/admin/users/create", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "Smoke Trainer",
+      email: `smoke.trainer.${stamp}@test.com`,
+      password: "smoke123",
+      role: "trainer",
+    }),
+  }, cookies);
+  record("Admin can create a trainer", createdTrainer.status === 201 && createdTrainer.json?.role === "trainer", `HTTP ${createdTrainer.status}`);
+  const trainerId = createdTrainer.json?.id;
+  if (trainerId) {
+    const patchedTrainer = await request(`/api/admin/trainers/${trainerId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Smoke Trainer Updated", email: createdTrainer.json.email }),
+    }, cookies);
+    record("Admin can update a trainer", patchedTrainer.status === 200, `HTTP ${patchedTrainer.status}`);
+    const removedTrainer = await request(`/api/admin/dismiss-user/${trainerId}`, { method: "DELETE" }, cookies);
+    record("Admin can delete a trainer", removedTrainer.status === 200, `HTTP ${removedTrainer.status}`);
+  } else {
+    record("Admin can update a trainer", false, "create did not return id");
+    record("Admin can delete a trainer", false, "create did not return id");
+  }
+
   const pipeline = await request("/api/admin/analytics/pipeline", {}, cookies);
   record(
     "Pipeline analytics",

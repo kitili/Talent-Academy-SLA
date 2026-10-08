@@ -155,6 +155,25 @@ function SortableWeekItem({
 }: SortableWeekItemProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const { toast } = useToast();
+  const addYoutube = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/training-weeks/${week.id}/external-link`, {
+        url: youtubeUrl,
+        title: "YouTube lesson",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      setYoutubeUrl("");
+      queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
+      toast({ title: "YouTube lesson added" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not add YouTube", description: error.message, variant: "destructive" });
+    },
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const {
@@ -367,6 +386,24 @@ function SortableWeekItem({
                 maxNumberOfFiles={10}
                 key={`uploader-${week.id}`}
               />
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                <input
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  placeholder="YouTube link for this module"
+                  className="flex-1 rounded-md border px-3 py-2 text-sm bg-background"
+                  data-testid={`input-youtube-${week.id}`}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!youtubeUrl.trim() || addYoutube.isPending}
+                  onClick={() => addYoutube.mutate()}
+                  data-testid={`button-youtube-${week.id}`}
+                >
+                  Add video
+                </Button>
+              </div>
               <label className="mt-2 inline-flex items-center text-xs text-muted-foreground cursor-pointer hover:text-foreground">
                 <input
                   type="file"
@@ -713,7 +750,7 @@ export default function CourseWeeks() {
           </div>
           <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
             <ProfileSettingsDialog
-              userType="admin"
+              userType={user?.role === "trainer" ? "trainer" : "admin"}
               currentEmail={user?.email || undefined}
             />
             <div className="text-white">
@@ -742,7 +779,7 @@ export default function CourseWeeks() {
         </div>
       </header>
 
-      <main className="sl-sheet container mx-auto my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
+      <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -766,7 +803,7 @@ export default function CourseWeeks() {
               Course → Module → Lesson → Activity → Assessment. Completing a lesson is not course mastery until every required quiz is passed.
             </p>
           </div>
-          {isAdmin && (
+          {isTrainer && (
             <Button
               onClick={() => createWeekMutation.mutate()}
               disabled={createWeekMutation.isPending}
@@ -782,9 +819,9 @@ export default function CourseWeeks() {
           <div className="text-center py-12 text-muted-foreground">Loading weeks...</div>
         ) : sortedWeeks.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            {isAdmin ? "No modules yet. Click Add module to get started." : "No modules in this course yet."}
+            {isTrainer ? "No modules yet. Click Add module to get started." : "No modules in this course yet."}
           </div>
-        ) : isAdmin ? (
+        ) : isTrainer ? (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -800,7 +837,7 @@ export default function CourseWeeks() {
                   <SortableWeekItem
                     key={week.id}
                     week={week}
-                    isAdmin={isAdmin}
+                    isAdmin={isTrainer}
                     courseId={courseId!}
                     navigate={navigate}
                     sensors={sensors}
@@ -839,7 +876,7 @@ export default function CourseWeeks() {
               <SortableWeekItem
                 key={week.id}
                 week={week}
-                isAdmin={isAdmin}
+                isAdmin={isTrainer}
                 courseId={courseId!}
                 navigate={navigate}
                 sensors={sensors}

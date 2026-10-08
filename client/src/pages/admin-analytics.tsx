@@ -823,7 +823,7 @@ export default function AdminAnalytics() {
         </div>
       </div>
 
-      <div className="sl-sheet max-w-7xl mx-auto my-6 px-4 sm:px-8 py-8">
+      <div className="sl-sheet sl-frame my-6 px-4 sm:px-8 py-8">
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="flex w-full overflow-x-auto mb-8 sm:grid sm:grid-cols-7">

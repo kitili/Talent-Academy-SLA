@@ -76,6 +76,7 @@ export const deckFileSchema = z.object({
   fileSize: z.number(),
   toc: z.array(tocEntrySchema).optional(),
   lessonHtml: z.string().optional(),
+  youtubeId: z.string().optional(),
 });
 
 export type DeckFile = z.infer<typeof deckFileSchema>;

@@ -163,7 +163,7 @@ export default function ApprovalsPage() {
 
   return (
     <div className="sl-page sl-bg-hall min-h-screen">
-    <div className="sl-sheet container mx-auto my-6 p-6 space-y-6">
+    <div className="sl-sheet sl-frame my-6 p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/">
           <Button variant="ghost" size="icon" data-testid="button-back">

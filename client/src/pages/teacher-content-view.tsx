@@ -27,6 +27,23 @@ import { sanitizeLessonHtml } from "@shared/htmlSanitize";
 import { DiscussionThread } from "@/components/DiscussionThread";
 import { saveLastLesson } from "@/lib/lastLessonCache";
 import type { TocEntry } from "@shared/schema";
+import { youtubeEmbedSrc } from "@shared/youtube";
+
+function YouTubeLesson({ id, title }: { id: string; title: string }) {
+  return (
+    <div className="w-full max-w-4xl mx-auto p-4">
+      <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ paddingTop: "56.25%" }}>
+        <iframe
+          src={youtubeEmbedSrc(id)}
+          title={title}
+          className="absolute inset-0 h-full w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  );
+}
 
 // DocumentViewer component for displaying DOCX files converted to HTML
 function DocumentViewer({ url }: { url: string }) {
@@ -577,7 +594,8 @@ export default function TeacherContentView() {
     selectedFile.fileName.toLowerCase().endsWith('.pptx') ||
     selectedFile.fileName.toLowerCase().endsWith('.ppt')
   );
-  const isVideoFile = selectedFile && (
+  const youtubeId = selectedFile?.youtubeId;
+  const isVideoFile = selectedFile && !youtubeId && (
     selectedFile.fileName.toLowerCase().endsWith('.mp4') ||
     selectedFile.fileName.toLowerCase().endsWith('.webm') ||
     selectedFile.fileName.toLowerCase().endsWith('.mov')
@@ -607,7 +625,9 @@ export default function TeacherContentView() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-hidden bg-muted/20 relative">
-          {selectedFile?.lessonHtml ? (
+          {youtubeId ? (
+            <YouTubeLesson id={youtubeId} title={selectedFile?.fileName || "Lesson"} />
+          ) : selectedFile?.lessonHtml ? (
             <div className="h-full overflow-auto bg-background">
               <LessonPage
                 title={selectedFile.fileName}
@@ -1079,7 +1099,9 @@ export default function TeacherContentView() {
 
                 {/* Content Display - Takes remaining space with internal scroll */}
                 <div className="flex-1 overflow-y-auto bg-muted/20 flex flex-col min-h-0">
-                  {selectedFile.lessonHtml ? (
+                  {youtubeId ? (
+                    <YouTubeLesson id={youtubeId} title={selectedFile.fileName} />
+                  ) : selectedFile.lessonHtml ? (
                     <LessonPage
                       title={selectedFile.fileName}
                       html={selectedFile.lessonHtml}

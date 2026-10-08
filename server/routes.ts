@@ -1229,6 +1229,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/training-weeks/:id/external-link", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const { youtubeVideoId } = await import("@shared/youtube");
+      const url = String(req.body?.url || "");
+      const title = String(req.body?.title || "YouTube lesson").trim() || "YouTube lesson";
+      const youtubeId = youtubeVideoId(url);
+      if (!youtubeId) {
+        return res.status(400).json({ error: "Paste a YouTube watch, share, or embed link." });
+      }
+      const week = await storage.getTrainingWeek(req.params.id);
+      if (!week) return res.status(404).json({ error: "Training week not found" });
+      const newFile = {
+        id: randomUUID(),
+        fileName: title,
+        fileUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}`,
+        fileSize: 0,
+        youtubeId,
+      };
+      const updatedWeek = await storage.updateTrainingWeek(req.params.id, {
+        deckFiles: [...(week.deckFiles || []), newFile],
+      });
+      res.status(201).json(updatedWeek);
+    } catch (error) {
+      console.error("YouTube lesson attach failed:", error);
+      res.status(400).json({ error: "Could not add YouTube lesson" });
+    }
+  });
+
   // Add deck files after upload (admin only) - supports multiple files
   app.post("/api/training-weeks/:id/deck", isAuthenticated, isTrainer, async (req, res) => {
     try {
@@ -4611,6 +4639,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error dismissing user:", error);
       res.status(500).json({ error: "Failed to remove trainer" });
+    }
+  });
+
+  app.patch("/api/admin/teachers/:teacherId", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      if (!name && !email) return res.status(400).json({ error: "Name or email is required" });
+      const teacher = await storage.updateTeacherProfile(req.params.teacherId, { name, email });
+      if (!teacher) return res.status(404).json({ error: "Teacher not found" });
+      const { password: _pw, ...safe } = teacher;
+      res.json(safe);
+    } catch (error) {
+      console.error("Error updating teacher:", error);
+      res.status(500).json({ error: "Failed to update teacher" });
+    }
+  });
+
+  app.patch("/api/admin/trainers/:userId", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      if (!name && !email) return res.status(400).json({ error: "Name or email is required" });
+      const trainer = await storage.updateUserProfile(req.params.userId, { name, email });
+      if (!trainer || trainer.role !== "trainer") return res.status(404).json({ error: "Trainer not found" });
+      const { password: _pw, ...safe } = trainer;
+      res.json(safe);
+    } catch (error) {
+      console.error("Error updating trainer:", error);
+      res.status(500).json({ error: "Failed to update trainer" });
     }
   });
 

@@ -8,6 +8,20 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-DNS-Prefetch-Control", "off");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "img-src 'self' data: blob: https:",
+      "media-src 'self' blob:",
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com",
+      "connect-src 'self' https:",
+      "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join("; "),
+  );
   next();
 }
 

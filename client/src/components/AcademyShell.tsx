@@ -19,7 +19,7 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
   return (
     <div className={`sl-page sl-bg-${scene} min-h-screen`}>
       <header className="sticky top-0 z-50 bg-primary shadow-md">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+        <div className="sl-frame py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-11 w-11 sm:h-12 sm:w-12 flex-shrink-0 rounded-md bg-white/10 p-1">
               <img src={logoImage} alt="Silverleaf Academy" className="h-full w-full object-contain" />
@@ -52,7 +52,7 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
           </div>
         </div>
       </header>
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="sl-frame py-6 sm:py-8">
         <div className="sl-sheet space-y-6">
           {children}
         </div>

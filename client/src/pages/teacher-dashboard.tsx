@@ -332,7 +332,7 @@ export default function TeacherDashboard() {
       </header>
 
       {/* Main Content */}
-      <div className="sl-sheet container mx-auto my-4 sm:my-6 p-4 sm:p-6 space-y-6 pb-20 sm:pb-6">
+      <div className="sl-sheet sl-frame my-4 sm:my-6 p-4 sm:p-6 space-y-6 pb-20 sm:pb-6">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold" data-testid="text-welcome">
             Welcome, {teacher?.name}

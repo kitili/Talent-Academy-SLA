@@ -200,6 +200,8 @@ export interface IStorage {
   getPendingTeachers(): Promise<Teacher[]>;
   approveTeacher(teacherId: string, approvedBy: string, approvedByRole: string): Promise<Teacher | undefined>;
   dismissTeacher(teacherId: string): Promise<boolean>;
+  updateTeacherProfile(teacherId: string, data: { name?: string; email?: string }): Promise<Teacher | undefined>;
+  updateUserProfile(userId: string, data: { name?: string; email?: string }): Promise<User | undefined>;
   
   // User dismiss operations
   dismissUser(userId: string): Promise<boolean>;
@@ -1127,6 +1129,28 @@ export class DatabaseStorage implements IStorage {
   async dismissTeacher(teacherId: string): Promise<boolean> {
     const result = await db.delete(teachers).where(eq(teachers.id, teacherId));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async updateTeacherProfile(teacherId: string, data: { name?: string; email?: string }): Promise<Teacher | undefined> {
+    const patch: Record<string, string> = {};
+    if (data.name?.trim()) patch.name = data.name.trim();
+    if (data.email?.trim()) patch.email = data.email.trim().toLowerCase();
+    if (Object.keys(patch).length === 0) return this.getTeacher(teacherId);
+    const [teacher] = await db.update(teachers).set(patch).where(eq(teachers.id, teacherId)).returning();
+    return teacher;
+  }
+
+  async updateUserProfile(userId: string, data: { name?: string; email?: string }): Promise<User | undefined> {
+    const patch: Record<string, string> = {};
+    if (data.email?.trim()) patch.email = data.email.trim().toLowerCase();
+    if (data.name?.trim()) {
+      const parts = data.name.trim().split(/\s+/);
+      patch.firstName = parts[0];
+      patch.lastName = parts.slice(1).join(" ");
+    }
+    if (Object.keys(patch).length === 0) return this.getUser(userId);
+    const [user] = await db.update(users).set(patch).where(eq(users.id, userId)).returning();
+    return user;
   }
 
   async dismissUser(userId: string): Promise<boolean> {

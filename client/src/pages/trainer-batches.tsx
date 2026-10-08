@@ -592,7 +592,7 @@ export default function TrainerBatches() {
         </div>
       </header>
 
-      <main className="sl-sheet container mx-auto my-4 sm:my-6 px-4 py-6">
+      <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 py-6">
         <div className="mb-6">
           <div className="flex justify-between items-center">
             <div>
