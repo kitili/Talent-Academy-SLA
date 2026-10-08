@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Users, Award, BarChart3, ArrowRight, FileText, Layers } from "lucide-react";
+import { Users, Award, BarChart3, ArrowRight, FileText, Layers, CheckCircle, Megaphone } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
 import {
   Dialog,
@@ -25,6 +25,8 @@ interface DashboardStats {
   totalTeachers: number;
   totalCourses: number;
   activeUsers: number;
+  pendingTrainers?: number;
+  pendingTeachers?: number;
 }
 
 export default function AdminHome() {
@@ -36,6 +38,9 @@ export default function AdminHome() {
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [resetUserIdentifier, setResetUserIdentifier] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeTitle, setNoticeTitle] = useState("");
+  const [noticeMessage, setNoticeMessage] = useState("");
 
   // Fetch dashboard stats
   const { data: stats, isLoading } = useQuery<DashboardStats>({
@@ -53,6 +58,20 @@ export default function AdminHome() {
       setResetUserIdentifier("");
       setResetNewPassword("");
     },
+  });
+
+  const announceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/announce", { title: noticeTitle, message: noticeMessage });
+      return res.json();
+    },
+    onSuccess: (data: { sent?: number }) => {
+      toast({ title: "Notice sent", description: `${data.sent || 0} people on the academy desks.` });
+      setNoticeOpen(false);
+      setNoticeTitle("");
+      setNoticeMessage("");
+    },
+    onError: (error: Error) => toast({ title: "Could not send notice", description: error.message, variant: "destructive" }),
   });
 
   if (user?.role !== "admin") {
@@ -79,6 +98,39 @@ export default function AdminHome() {
       userLabel={user?.username}
       onLogout={() => logoutMutation.mutate()}
       actions={
+        <>
+          <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
+            <DialogTrigger asChild>
+              <Button variant="secondary" className="bg-white/10 text-white border-white/20 hover:bg-white/20" data-testid="button-academy-notice">
+                <Megaphone className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Academy notice</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Send an academy notice</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="notice-title">Title</Label>
+                  <Input id="notice-title" value={noticeTitle} onChange={(e) => setNoticeTitle(e.target.value)} placeholder="Week 3 starts Monday" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notice-message">Message</Label>
+                  <Input id="notice-message" value={noticeMessage} onChange={(e) => setNoticeMessage(e.target.value)} placeholder="Trainers and teachers will see this on their desk." />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setNoticeOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => announceMutation.mutate()}
+                  disabled={announceMutation.isPending || !noticeTitle.trim() || !noticeMessage.trim()}
+                >
+                  Send
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
             <DialogTrigger asChild>
               <Button variant="secondary" className="bg-white/10 text-white border-white/20 hover:bg-white/20" data-testid="button-reset-password">
@@ -129,12 +181,27 @@ export default function AdminHome() {
               </DialogFooter>
             </DialogContent>
             </Dialog>
+        </>
       }
     >
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">Welcome back{user?.username ? `, ${user.username}` : ""}</h1>
           <p className="text-muted-foreground mt-1">Trainers, teachers, cohorts, and the gradebook.</p>
         </div>
+
+        {((stats?.pendingTrainers || 0) + (stats?.pendingTeachers || 0) > 0) && (
+          <button
+            type="button"
+            className="w-full rounded-2xl border border-primary/30 bg-white p-4 text-left sl-rise"
+            onClick={() => navigate("/approvals")}
+            data-testid="button-needs-attention"
+          >
+            <p className="font-semibold">Needs attention</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {(stats?.pendingTrainers || 0)} trainer{(stats?.pendingTrainers || 0) === 1 ? "" : "s"} and {(stats?.pendingTeachers || 0)} teacher{(stats?.pendingTeachers || 0) === 1 ? "" : "s"} waiting for approval.
+            </p>
+          </button>
+        )}
 
         {/* Stats Grid */}
         {isLoading ? (
@@ -206,6 +273,7 @@ export default function AdminHome() {
         {/* Quick Navigation */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
+            { href: "/approvals", title: "Approvals", text: "People waiting to come in", icon: CheckCircle, test: "button-go-approvals" },
             { href: "/admin/trainers", title: "Trainers", text: "Approvals and accounts", icon: Award, test: "button-go-trainers" },
             { href: "/admin/teachers", title: "Teachers", text: "Progress and files viewed", icon: Users, test: "button-go-teachers" },
             { href: "/admin/batches", title: "Cohorts", text: "Rooms, quizzes, and certificates", icon: Layers, test: "button-go-batches" },

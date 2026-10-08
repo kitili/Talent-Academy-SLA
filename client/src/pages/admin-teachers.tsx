@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { PageStrip, usePager } from "@/components/PageStrip";
+import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 interface Teacher {
@@ -50,7 +50,13 @@ export default function AdminTeachers() {
   const { data: teachers, isLoading, isError } = useQuery<Teacher[]>({
     queryKey: ["/api/admin/teachers"],
   });
-  const teacherPager = usePager(teachers ?? []);
+  const [listQuery, setListQuery] = useState("");
+  const filteredTeachers = filterByQuery(
+    teachers ?? [],
+    listQuery,
+    (teacher) => `${teacher.name} ${teacher.email} ${teacher.teacherId}`,
+  );
+  const teacherPager = usePager(filteredTeachers);
 
   const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
 
@@ -156,6 +162,7 @@ export default function AdminTeachers() {
               </p>
             </div>
           </div>
+          <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search teachers" />
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <Button type="button" data-testid="button-add-teacher" onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />

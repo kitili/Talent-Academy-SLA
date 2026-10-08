@@ -3776,6 +3776,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const approvedTrainers = await db.select().from(users).where(and(eq(users.role, "trainer"), eq(users.approvalStatus, "approved")));
       const approvedTeachers = await db.select().from(teachers).where(eq(teachers.approvalStatus, "approved"));
+      const pendingTrainers = await storage.getPendingTrainers();
+      const pendingTeachers = await storage.getPendingTeachers();
       const allCourses = await storage.getAllCourses();
 
       res.json({
@@ -3783,9 +3785,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalTeachers: approvedTeachers.length,
         totalCourses: allCourses.length,
         activeUsers: approvedTrainers.length + approvedTeachers.length,
+        pendingTrainers: pendingTrainers.length,
+        pendingTeachers: pendingTeachers.length,
       });
     } catch (error) {
       console.error("Error getting dashboard stats:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/announce", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const title = String(req.body?.title || "").trim();
+      const message = String(req.body?.message || "").trim();
+      if (!title || !message) {
+        return res.status(400).json({ error: "title and message are required" });
+      }
+      const approvedTeachers = await storage.getApprovedTeachers();
+      const approvedTrainers = await db.select().from(users).where(and(eq(users.role, "trainer"), eq(users.approvalStatus, "approved")));
+      let sent = 0;
+      for (const teacher of approvedTeachers) {
+        await storage.createNotification({
+          recipientId: teacher.id,
+          recipientType: "teacher",
+          type: "general",
+          title: title.slice(0, 120),
+          message,
+          metadata: { academy: true },
+        });
+        sent += 1;
+      }
+      for (const trainer of approvedTrainers) {
+        await storage.createNotification({
+          recipientId: trainer.id,
+          recipientType: "trainer",
+          type: "general",
+          title: title.slice(0, 120),
+          message,
+          metadata: { academy: true },
+        });
+        sent += 1;
+      }
+      res.json({ sent });
+    } catch (error) {
+      console.error("Error sending academy notice:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const PAGE_SIZE = 6;
 
@@ -12,6 +13,32 @@ export function usePager<T>(items: T[], pageSize = PAGE_SIZE) {
     [items, safePage, pageSize],
   );
   return { page: safePage, setPage, pages, slice, total: items.length };
+}
+
+export function filterByQuery<T>(items: T[], query: string, pick: (item: T) => string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+  return items.filter((item) => pick(item).toLowerCase().includes(q));
+}
+
+export function ListSearch({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <Input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="max-w-sm"
+      data-testid="input-list-search"
+    />
+  );
 }
 
 export function PageStrip({

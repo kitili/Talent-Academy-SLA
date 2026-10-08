@@ -87,7 +87,17 @@ async function main() {
   record("Pending trainers API", pending.status === 200 && Array.isArray(pending.json), `HTTP ${pending.status}`);
 
   const stats = await request("/api/admin/dashboard-stats", {}, cookies);
-  record("Dashboard stats API", stats.status === 200 && typeof stats.json?.totalCourses === "number", `HTTP ${stats.status}`);
+  record(
+    "Dashboard stats API",
+    stats.status === 200 && typeof stats.json?.totalCourses === "number" && typeof stats.json?.pendingTeachers === "number",
+    `HTTP ${stats.status}`,
+  );
+
+  const notice = await request("/api/admin/announce", {
+    method: "POST",
+    body: JSON.stringify({ title: "Smoke notice", message: "Desk check" }),
+  }, cookies);
+  record("Admin can send an academy notice", notice.status === 200 && typeof notice.json?.sent === "number", `HTTP ${notice.status}`);
 
   const upload = await request("/api/objects/upload", { method: "POST" }, cookies);
   record(

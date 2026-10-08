@@ -20,7 +20,7 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import logoImage from "@assets/image_1760460046116.png";
 import type { Course, Batch } from "@shared/schema";
-import { PageStrip, usePager } from "@/components/PageStrip";
+import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 interface CourseWithAssignment extends Course {
@@ -163,8 +163,10 @@ export default function CoursesList() {
     setEditDescription(course.description || "");
   };
 
+  const [listQuery, setListQuery] = useState("");
   const sortedCourses = [...courses].sort((a, b) => a.orderIndex - b.orderIndex);
-  const coursePager = usePager(sortedCourses);
+  const filteredCourses = filterByQuery(sortedCourses, listQuery, (course) => `${course.name} ${course.description || ""}`);
+  const coursePager = usePager(filteredCourses);
 
   return (
     <SceneBackdrop scene="library">
@@ -375,6 +377,8 @@ export default function CoursesList() {
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold">Training Courses</h2>
+          <div className="flex flex-wrap items-center gap-2">
+          <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search courses" />
           {isAdmin && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
@@ -426,11 +430,12 @@ export default function CoursesList() {
               </DialogContent>
             </Dialog>
           )}
+          </div>
         </div>
 
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading courses...</div>
-        ) : sortedCourses.length === 0 ? (
+        ) : filteredCourses.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             {isAdmin ? "No courses yet. Click 'Add Course' to get started!" : "No courses assigned to you yet."}
           </div>

@@ -40,6 +40,15 @@ export default function TeacherDashboard() {
     queryKey: ["/api/teacher/assigned-weeks"],
   });
 
+  const { data: deskNotices = [] } = useQuery<any[]>({
+    queryKey: ["/api/notifications"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications?limit=8");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const { toast } = useToast();
   const [reflectionWeekId, setReflectionWeekId] = useState("");
   const [reflectionBatchId, setReflectionBatchId] = useState("");
@@ -341,6 +350,23 @@ export default function TeacherDashboard() {
             Know what to learn, what to do next, and whether you have understood it.
           </p>
         </div>
+
+        {deskNotices.length > 0 && (
+          <Card className="sl-rise">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">From the academy</CardTitle>
+              <CardDescription>Notices from trainers and admin, so you do not miss a change of plan.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {deskNotices.slice(0, 4).map((note: any) => (
+                <div key={note.id} className="rounded-xl border bg-white px-3 py-2">
+                  <p className="font-medium">{note.title}</p>
+                  <p className="text-sm text-muted-foreground">{note.message}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {(() => {
           const openWork = myWork.filter((item: any) => !(item.my_response || item.myResponse));

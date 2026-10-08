@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { PageStrip, usePager } from "@/components/PageStrip";
+import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 interface Trainer {
@@ -49,7 +49,13 @@ export default function AdminTrainers() {
   const { data: trainers, isLoading } = useQuery<Trainer[]>({
     queryKey: ["/api/admin/trainers"],
   });
-  const trainerPager = usePager(trainers ?? []);
+  const [listQuery, setListQuery] = useState("");
+  const filteredTrainers = filterByQuery(
+    trainers ?? [],
+    listQuery,
+    (trainer) => `${trainer.username} ${trainer.email || ""}`,
+  );
+  const trainerPager = usePager(filteredTrainers);
 
   const createTrainerMutation = useMutation({
     mutationFn: async (data: { name: string; email: string; password: string }) => {
@@ -129,6 +135,7 @@ export default function AdminTrainers() {
               </p>
             </div>
           </div>
+          <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search trainers" />
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-trainer">
