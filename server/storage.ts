@@ -109,6 +109,7 @@ import {
   openEndedReviews,
   writtenAssignments,
   assignmentSubmissions,
+  discussionPosts,
   type OpenEndedReview,
   type InsertOpenEndedReview,
   type QuizQuestion,
@@ -3166,7 +3167,9 @@ export class DatabaseStorage implements IStorage {
   async getWrittenAssignmentsForTeacher(teacherId: string) {
     const result = await db.execute(sqlOp`
       SELECT wa.*,
-        (SELECT response FROM assignment_submissions s WHERE s.assignment_id = wa.id AND s.teacher_id = ${teacherId} LIMIT 1) as my_response
+        (SELECT response FROM assignment_submissions s WHERE s.assignment_id = wa.id AND s.teacher_id = ${teacherId} LIMIT 1) as my_response,
+        (SELECT trainer_score FROM assignment_submissions s WHERE s.assignment_id = wa.id AND s.teacher_id = ${teacherId} LIMIT 1) as trainer_score,
+        (SELECT trainer_comment FROM assignment_submissions s WHERE s.assignment_id = wa.id AND s.teacher_id = ${teacherId} LIMIT 1) as trainer_comment
       FROM written_assignments wa
       JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
       WHERE bt.teacher_id = ${teacherId}
@@ -3186,7 +3189,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssignmentSubmissions(assignmentId: string) {
-    return db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.assignmentId, assignmentId));
+    const result = await db.execute(sqlOp`
+      SELECT s.*, t.name as teacher_name, t.email as teacher_email
+      FROM assignment_submissions s
+      JOIN teachers t ON t.id = s.teacher_id
+      WHERE s.assignment_id = ${assignmentId}
+      ORDER BY s.submitted_at DESC
+    `);
+    return result.rows;
+  }
+
+  async listDiscussionPosts(weekId: string) {
+    return db.select().from(discussionPosts)
+      .where(eq(discussionPosts.weekId, weekId))
+      .orderBy(discussionPosts.createdAt);
+  }
+
+  async createDiscussionPost(data: {
+    weekId: string;
+    authorId: string;
+    authorRole: string;
+    authorName: string;
+    body: string;
+  }) {
+    const [row] = await db.insert(discussionPosts).values(data).returning();
+    return row;
+  }
+
+  async reviewAssignmentSubmission(
+    assignmentId: string,
+    teacherId: string,
+    trainerScore: number | null,
+    trainerComment: string | null,
+    rubric: unknown = null,
+  ) {
+    const [row] = await db.update(assignmentSubmissions)
+      .set({ trainerScore, trainerComment, rubric })
+      .where(and(
+        eq(assignmentSubmissions.assignmentId, assignmentId),
+        eq(assignmentSubmissions.teacherId, teacherId),
+      ))
+      .returning();
+    return row;
   }
 }
 

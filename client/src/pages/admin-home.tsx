@@ -79,6 +79,7 @@ export default function AdminHome() {
 
   return (
     <AcademyShell
+      scene="library"
       title="Silverleaf Academy"
       subtitle="Admin operations · trainers, cohorts, and the gradebook"
       userLabel={user?.username}
@@ -136,11 +137,9 @@ export default function AdminHome() {
             </Dialog>
       }
     >
-        <div className="mb-8 sl-rise">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Command board</h1>
-          <p className="text-muted-foreground mt-1">
-            People, cohorts, quizzes, and certificates — one navy desk.
-          </p>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">Welcome back{user?.username ? `, ${user.username}` : ""}</h1>
+          <p className="text-muted-foreground mt-1">Trainers, teachers, cohorts, and the gradebook.</p>
         </div>
 
         {/* Stats Grid */}
@@ -211,156 +210,35 @@ export default function AdminHome() {
         )}
 
         {/* Quick Navigation */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
-            onClick={() => navigate("/admin/trainers")}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Trainers</h3>
-                <p className="text-muted-foreground">
-                  Manage all trainers and their approvals
-                </p>
-              </div>
-              <Award className="h-12 w-12 text-primary/20" />
-            </div>
-            <Button 
-              variant="outline" 
-              className="mt-4 w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/admin/trainers");
-              }}
-              data-testid="button-go-trainers"
-            >
-              View Trainers
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Card>
-
-          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
-            onClick={() => navigate("/admin/teachers")}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Teachers</h3>
-                <p className="text-muted-foreground">
-                  Manage all teachers and view their progress
-                </p>
-              </div>
-              <Users className="h-12 w-12 text-primary/20" />
-            </div>
-            <Button 
-              variant="outline" 
-              className="mt-4 w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/admin/teachers");
-              }}
-              data-testid="button-go-teachers"
-            >
-              View Teachers
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Card>
-
-          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
-            onClick={() => navigate("/admin/batches")}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Cohorts</h3>
-                <p className="text-muted-foreground">
-                  Open a cohort room for people, quizzes, attendance, performance, and graduates
-                </p>
-              </div>
-              <Layers className="h-12 w-12 text-primary/20" />
-            </div>
-            <Button 
-              variant="outline" 
-              className="mt-4 w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/admin/batches");
-              }}
-              data-testid="button-go-batches"
-            >
-              Manage Batches
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Card>
-
-          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
-            onClick={() => navigate("/admin/analytics")}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Analytics</h3>
-                <p className="text-muted-foreground">
-                  View batch, course, and teacher statistics
-                </p>
-              </div>
-              <BarChart3 className="h-12 w-12 text-primary/20" />
-            </div>
-            <Button 
-              variant="outline" 
-              className="mt-4 w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/admin/analytics");
-              }}
-              data-testid="button-go-analytics"
-            >
-              View Analytics
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Card>
-
-          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
-            onClick={() => navigate("/admin/teachers")}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Certificates</h3>
-                <p className="text-muted-foreground">
-                  Approve templates and generate certificates
-                </p>
-              </div>
-              <FileText className="h-12 w-12 text-primary/20" />
-            </div>
-            <Button 
-              variant="outline" 
-              className="mt-4 w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/admin/teachers");
-              }}
-              data-testid="button-go-certificates"
-            >
-              Manage Certificates
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Card>
-
-          <Card className="p-8 sl-nav-card cursor-pointer sl-rise"
-            onClick={() => navigate("/admin/data-catalog")}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Data catalog</h3>
-                <p className="text-muted-foreground">
-                  Find every table by area: onboarding, marketing, learning, and the rest
-                </p>
-              </div>
-              <Database className="h-12 w-12 text-primary/20" />
-            </div>
-            <Button
-              variant="outline"
-              className="mt-4 w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate("/admin/data-catalog");
-              }}
-              data-testid="button-go-data-catalog"
-            >
-              Open catalog
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[
+            { href: "/admin/trainers", title: "Trainers", text: "Approvals and accounts", icon: Award, test: "button-go-trainers" },
+            { href: "/admin/teachers", title: "Teachers", text: "Progress and files viewed", icon: Users, test: "button-go-teachers" },
+            { href: "/admin/batches", title: "Cohorts", text: "Rooms, quizzes, and certificates", icon: Layers, test: "button-go-batches" },
+            { href: "/admin/analytics", title: "Analytics", text: "How the academy is moving", icon: BarChart3, test: "button-go-analytics" },
+            { href: "/courses", title: "Courses", text: "Modules and lesson files", icon: FileText, test: "button-go-courses" },
+            { href: "/admin/data-catalog", title: "Data catalog", text: "Tables grouped by area", icon: Database, test: "button-go-data-catalog" },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.href}
+                type="button"
+                data-testid={item.test}
+                onClick={() => navigate(item.href)}
+                className="sl-nav-card flex items-center gap-3 rounded-2xl p-4 text-left"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold">{item.title}</span>
+                  <span className="block text-sm text-muted-foreground">{item.text}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            );
+          })}
         </div>
     </AcademyShell>
   );

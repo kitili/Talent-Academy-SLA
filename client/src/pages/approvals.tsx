@@ -162,7 +162,8 @@ export default function ApprovalsPage() {
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="sl-page sl-bg-hall min-h-screen">
+    <div className="sl-sheet container mx-auto my-6 p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/">
           <Button variant="ghost" size="icon" data-testid="button-back">
@@ -373,6 +374,7 @@ export default function ApprovalsPage() {
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

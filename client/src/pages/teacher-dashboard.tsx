@@ -16,6 +16,9 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, ClipboardCheck, BookOpen } from "lucide-react";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
+import { ModuleScene } from "@/components/ModuleScene";
+import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
+import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 export default function TeacherDashboard() {
   const [, setLocation] = useLocation();
@@ -242,6 +245,16 @@ export default function TeacherDashboard() {
     },
   });
 
+  const { data: skills = [] } = useQuery<any[]>({
+    queryKey: ["/api/teacher/skills-map"],
+    queryFn: async () => {
+      const res = await fetch("/api/teacher/skills-map");
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
   const { data: myWork = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/assignments"],
     queryFn: async () => {
@@ -265,7 +278,7 @@ export default function TeacherDashboard() {
   });
 
   return (
-    <div className="sl-page min-h-screen">
+    <div className="sl-page sl-bg-garden min-h-screen">
       {/* Header matching Admin dashboard */}
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
@@ -319,8 +332,7 @@ export default function TeacherDashboard() {
       </header>
 
       {/* Main Content */}
-      <div className="container mx-auto p-4 sm:p-6 space-y-6 pb-20 sm:pb-6">
-        <ClassroomArt />
+      <div className="sl-sheet container mx-auto my-4 sm:my-6 p-4 sm:p-6 space-y-6 pb-20 sm:pb-6">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold" data-testid="text-welcome">
             Welcome, {teacher?.name}
@@ -329,6 +341,64 @@ export default function TeacherDashboard() {
             Know what to learn, what to do next, and whether you have understood it.
           </p>
         </div>
+
+        {(() => {
+          const openWork = myWork.filter((item: any) => !(item.my_response || item.myResponse));
+          const nextEvent = upcomingEvents[0];
+          const items = [
+            resumeWeek && {
+              key: "lesson",
+              title: resumeWeek.competencyFocus || `Module ${resumeWeek.weekNumber}`,
+              detail: "Continue the unlocked lesson",
+              href: `/teacher/week/${resumeWeek.id}/content`,
+            },
+            openWork[0] && {
+              key: "work",
+              title: openWork[0].title,
+              detail: "Written work still due",
+              href: "#my-work",
+            },
+            nextEvent && {
+              key: "event",
+              title: nextEvent.title || "Class",
+              detail: nextEvent.startDate
+                ? new Date(nextEvent.startDate).toLocaleString()
+                : "Upcoming session",
+              href: "#my-learning",
+            },
+          ].filter(Boolean) as Array<{ key: string; title: string; detail: string; href: string }>;
+          if (items.length === 0) return null;
+          return (
+            <Card className="sl-rise border-primary/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">To do</CardTitle>
+                <CardDescription>Next actions, the way Canvas and Moodle keep the desk short.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {items.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2 text-left hover:border-primary"
+                    onClick={() => {
+                      if (item.href.startsWith("#")) {
+                        document.querySelector(item.href)?.scrollIntoView({ behavior: "smooth" });
+                      } else {
+                        setLocation(item.href);
+                      }
+                    }}
+                  >
+                    <span>
+                      <span className="block font-medium">{item.title}</span>
+                      <span className="block text-sm text-muted-foreground">{item.detail}</span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         <Card className="sl-continue shadow-lg rounded-xl">
           <CardHeader>
@@ -432,7 +502,7 @@ export default function TeacherDashboard() {
               ))}
             </CardContent>
           </Card>
-          <Card className="sl-rise">
+          <Card id="my-work" className="sl-rise">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
@@ -454,7 +524,15 @@ export default function TeacherDashboard() {
                       <p className="text-xs text-muted-foreground">Due {new Date(item.due_date || item.dueDate).toLocaleString()}</p>
                     ) : null}
                     {submitted ? (
-                      <p className="text-sm">Submitted: {submitted}</p>
+                      <div className="space-y-1">
+                        <p className="text-sm">Submitted: {submitted}</p>
+                        {(item.trainer_score != null || item.trainerScore != null) && (
+                          <p className="text-sm font-medium">Mark: {item.trainer_score ?? item.trainerScore}</p>
+                        )}
+                        {(item.trainer_comment || item.trainerComment) && (
+                          <p className="text-sm text-muted-foreground">Trainer: {item.trainer_comment || item.trainerComment}</p>
+                        )}
+                      </div>
                     ) : (
                       <>
                         <Textarea
@@ -554,6 +632,29 @@ export default function TeacherDashboard() {
           </Card>
         </div>
 
+        {skills.length > 0 && (
+          <Card className="shadow-lg border-border/50 rounded-xl sl-rise">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Skills map
+              </CardTitle>
+              <CardDescription>Coverage from each module’s competency focus</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {skills.map((skill: any) => (
+                <div key={skill.competency} className="space-y-1">
+                  <div className="flex justify-between text-sm gap-3">
+                    <span className="font-medium">{skill.competency}</span>
+                    <span className="text-muted-foreground">{skill.completed}/{skill.modules} · {skill.coverage}%</span>
+                  </div>
+                  <Progress value={skill.coverage || 0} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -608,29 +709,28 @@ export default function TeacherDashboard() {
                           const isLocked = !!week.locked;
                           const moduleLabel = week.competencyFocus || `Module ${week.weekNumber || index + 1}`;
                           return (
-                            <Button
+                            <button
                               key={week.id}
-                              variant={week.progress?.percentage === 100 ? "outline" : "secondary"}
+                              type="button"
                               onClick={() => {
                                 if (isLocked) return;
                                 setLocation(`/teacher/week/${week.id}/content`);
                               }}
                               disabled={isLocked}
                               data-testid={`button-view-content-${week.id}`}
-                              className="w-full justify-between"
+                              className="w-full flex items-center gap-3 rounded-lg border border-border/70 bg-background p-2 text-left transition hover:-translate-y-0.5 hover:border-primary/40 disabled:opacity-60 disabled:hover:translate-y-0"
                             >
-                              <span className="truncate text-left">
-                                {moduleLabel}
-                                {week.progress?.total > 0 ? ` · ${week.progress.completed}/${week.progress.total}` : ""}
-                              </span>
-                              {isLocked ? (
-                                <span className="text-xs text-muted-foreground ml-2">Locked</span>
-                              ) : (
-                                <span className="text-xs ml-2">
-                                  {learningStatus({ percentage: week.progress?.percentage || 0 })}
+                              <ModuleScene title={moduleLabel} />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-medium">{moduleLabel}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                  {isLocked
+                                    ? "Locked until the previous module quiz is passed"
+                                    : learningStatus({ percentage: week.progress?.percentage || 0 })}
+                                  {week.progress?.total > 0 ? ` · ${week.progress.completed}/${week.progress.total} lessons` : ""}
                                 </span>
-                              )}
-                            </Button>
+                              </span>
+                            </button>
                           );
                         })}
                       </div>

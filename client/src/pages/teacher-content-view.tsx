@@ -13,6 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ChevronLeft, ChevronRight, ChevronDown, FileText, CheckCircle2, Circle, Maximize2, Minimize2, ZoomIn, ZoomOut, X, Award, List, PanelLeftClose, PanelLeftOpen, Menu, Lock } from "lucide-react";
 import { Document, Page, pdfjs } from 'react-pdf';
+import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -23,6 +24,9 @@ import { TableOfContents } from "@/components/TableOfContents";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 import { ModuleScene } from "@/components/ModuleScene";
 import { sanitizeLessonHtml } from "@shared/htmlSanitize";
+import { DiscussionThread } from "@/components/DiscussionThread";
+import { saveLastLesson } from "@/lib/lastLessonCache";
+import type { TocEntry } from "@shared/schema";
 
 // DocumentViewer component for displaying DOCX files converted to HTML
 function DocumentViewer({ url }: { url: string }) {
@@ -79,7 +83,7 @@ function DocumentViewer({ url }: { url: string }) {
 }
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 function LessonPage({ title, html, onRead }: { title: string; html: string; onRead: () => void }) {
   return (
@@ -247,6 +251,16 @@ export default function TeacherContentView() {
   // Get selected file
   const selectedFile = deckFiles.find(file => file.id === selectedFileId);
 
+  useEffect(() => {
+    if (selectedFile?.lessonHtml && weekId) {
+      saveLastLesson({
+        weekId,
+        title: selectedFile.fileName || currentWeek?.competencyFocus || "Lesson",
+        html: selectedFile.lessonHtml,
+      });
+    }
+  }, [selectedFile?.id, selectedFile?.lessonHtml, weekId, selectedFile?.fileName, currentWeek?.competencyFocus]);
+
   // Auto-select first file
   useEffect(() => {
     if (deckFiles.length > 0 && !selectedFileId) {
@@ -273,14 +287,19 @@ export default function TeacherContentView() {
       }
 
       try {
-        const isPptx = selectedFile.fileName.toLowerCase().endsWith('.pptx') || 
-                       selectedFile.fileName.toLowerCase().endsWith('.ppt');
-        const isDocx = selectedFile.fileName.toLowerCase().endsWith('.docx') || 
-                       selectedFile.fileName.toLowerCase().endsWith('.doc');
+        const fileName = (selectedFile.fileName || "").toLowerCase();
+        const isPptx = fileName.endsWith('.pptx') || fileName.endsWith('.ppt');
+        const isDocx = fileName.endsWith('.docx') || fileName.endsWith('.doc');
         
         if (isPptx) {
-          // For PowerPoint files, convert to PDF for HD viewing
           const convertUrl = `/api/files/convert-to-pdf?url=${encodeURIComponent(selectedFile.fileUrl)}`;
+          const probe = await fetch(convertUrl, { credentials: "include" });
+          const type = probe.headers.get("content-type") || "";
+          if (!probe.ok || !type.includes("pdf")) {
+            setDocumentLoadError(true);
+            setViewUrl(null);
+            return;
+          }
           setDocumentLoadError(false);
           setViewUrl(convertUrl);
         } else if (isDocx) {
@@ -571,7 +590,7 @@ export default function TeacherContentView() {
   // ── MOBILE LAYOUT ─────────────────────────────────────────────────────────
   if (isMobile || isTablet) {
     return (
-      <div className="h-[100dvh] bg-background flex flex-col">
+      <div className="sl-page sl-bg-board h-[100dvh] flex flex-col">
         {/* Fixed Top Bar */}
         <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-card border-b shadow-sm z-10">
           <Button variant="ghost" size="sm" onClick={() => navigate('/teacher/dashboard')} className="-ml-2">
@@ -619,7 +638,11 @@ export default function TeacherContentView() {
                   />
                 </Document>
               ) : (
-                <div className="p-8 text-muted-foreground text-sm">Loading document...</div>
+                <div className="p-8 text-muted-foreground text-sm text-center">
+                  {documentLoadError
+                    ? "This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again."
+                    : "Loading document..."}
+                </div>
               )}
               {documentLoadError && (
                 <div className="p-8 text-muted-foreground text-sm">Preview not available</div>
@@ -766,6 +789,11 @@ export default function TeacherContentView() {
           />
         )}
         <ScreenshotWarning visible={showWarning} onDismiss={dismissWarning} />
+        {weekId ? (
+          <div className="p-4 border-t bg-card">
+            <DiscussionThread weekId={weekId} />
+          </div>
+        ) : null}
         <TeacherLearnerNav />
       </div>
     );
@@ -773,7 +801,7 @@ export default function TeacherContentView() {
 
   // ── DESKTOP LAYOUT ────────────────────────────────────────────────────────
   return (
-    <div className="h-screen bg-background flex flex-col">
+    <div className="sl-page sl-bg-board h-screen flex flex-col">
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Sidebar Panel */}
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
@@ -1093,7 +1121,9 @@ export default function TeacherContentView() {
                           </>
                         ) : (
                           <div className="p-8 text-center text-muted-foreground">
-                            Loading document...
+                            {documentLoadError
+                              ? "This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again."
+                              : "Loading document..."}
                           </div>
                         )}
                       </div>
@@ -1271,7 +1301,9 @@ export default function TeacherContentView() {
                       </>
                     ) : (
                       <div className="p-8 text-center text-muted-foreground">
-                        Loading document...
+                        {documentLoadError
+                          ? "This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again."
+                          : "Loading document..."}
                       </div>
                     )}
                   </div>
@@ -1420,6 +1452,11 @@ export default function TeacherContentView() {
 
       {/* Screenshot Warning Overlay */}
       <ScreenshotWarning visible={showWarning} onDismiss={dismissWarning} />
+      {weekId ? (
+        <div className="border-t bg-card p-4">
+          <DiscussionThread weekId={weekId} />
+        </div>
+      ) : null}
       <TeacherLearnerNav />
     </div>
   );

@@ -134,7 +134,7 @@ export default function TeacherCertificateView() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="sl-page sl-bg-paper min-h-screen">
       <header className="sticky top-0 z-50 bg-primary shadow-md no-print">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <h1 className="text-xl sm:text-2xl font-bold text-white">Certificate</h1>

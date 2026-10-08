@@ -164,7 +164,7 @@ export default function CoursesList() {
   const sortedCourses = [...courses].sort((a, b) => a.orderIndex - b.orderIndex);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="sl-page sl-bg-library min-h-screen">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -369,7 +369,7 @@ export default function CoursesList() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
+      <main className="sl-sheet container mx-auto my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold">Training Courses</h2>
           {isAdmin && (

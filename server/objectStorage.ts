@@ -60,7 +60,7 @@ export class ObjectStorageService {
   }
 
   async getObjectEntityUploadURL(): Promise<string> {
-    if (usesLocalObjectStorage()) {
+    if (usesBlobStorage() || usesLocalObjectStorage()) {
       return `/api/local-objects/${randomUUID()}`;
     }
     const privateObjectDir = this.getPrivateObjectDir();

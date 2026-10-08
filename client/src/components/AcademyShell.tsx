@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { LogOut } from "lucide-react";
-import { ClassroomArt } from "@/components/ClassroomArt";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 type AcademyShellProps = {
@@ -12,12 +11,13 @@ type AcademyShellProps = {
   userLabel?: string;
   onLogout?: () => void;
   actions?: ReactNode;
+  scene?: "room" | "library" | "board" | "garden" | "lamp" | "hall" | "paper";
   children: ReactNode;
 };
 
-export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, children }: AcademyShellProps) {
+export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, scene = "library", children }: AcademyShellProps) {
   return (
-    <div className="sl-page min-h-screen">
+    <div className={`sl-page sl-bg-${scene} min-h-screen`}>
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -52,9 +52,10 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, ch
           </div>
         </div>
       </header>
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
-        <ClassroomArt />
-        {children}
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="sl-sheet space-y-6">
+          {children}
+        </div>
       </div>
     </div>
   );

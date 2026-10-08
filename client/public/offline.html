@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline — Silverleaf Academy</title>
+    <style>
+      body { font-family: Inter, system-ui, sans-serif; background: #eef2f8; color: #0f2a5c; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+      main { max-width: 28rem; }
+      h1 { font-size: 1.4rem; }
+      p { line-height: 1.5; }
+      a { color: #0f2a5c; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline</h1>
+      <p>Open the last lesson you viewed. If you already opened a module on this device, it is stored here.</p>
+      <p><a href="/teacher/dashboard">Try the dashboard again</a></p>
+      <div id="cached"></div>
+    </main>
+    <script>
+      try {
+        var raw = localStorage.getItem("sl-last-lesson");
+        if (raw) {
+          var lesson = JSON.parse(raw);
+          document.getElementById("cached").innerHTML =
+            "<h2>" + (lesson.title || "Last lesson") + "</h2>" +
+            "<div>" + (lesson.html || "") + "</div>";
+        }
+      } catch (e) {}
+    </script>
+  </body>
+</html>

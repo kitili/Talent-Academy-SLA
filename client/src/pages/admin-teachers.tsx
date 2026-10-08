@@ -115,8 +115,9 @@ export default function AdminTeachers() {
   }
 
   return (
-    <div className="sl-page min-h-screen p-4 sm:p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#163028] p-4 sm:p-6 md:p-8">
+      <div className="sl-sheet max-w-7xl mx-auto">
+        <img src="/bg-board.jpg" alt="" className="mb-6 h-48 w-full rounded-2xl object-cover shadow-md" />
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-4">
             <Button

@@ -667,7 +667,7 @@ export default function CourseView() {
   );
 
   return (
-    <div className="h-[100dvh] bg-background flex flex-col">
+    <div className="sl-page sl-bg-garden h-[100dvh] flex flex-col">
       {(isMobile || isTablet) ? (
         <>
           {/* Mobile: top bar */}

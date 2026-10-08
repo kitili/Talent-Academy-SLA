@@ -42,7 +42,10 @@ async function initializeDatabase() {
       assignment_id varchar NOT NULL REFERENCES written_assignments(id) ON DELETE CASCADE,
       teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
       response text NOT NULL,
-      submitted_at timestamp DEFAULT now()
+      submitted_at timestamp DEFAULT now(),
+      trainer_score integer,
+      trainer_comment text,
+      rubric jsonb
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_submission_unique
       ON assignment_submissions(assignment_id, teacher_id);

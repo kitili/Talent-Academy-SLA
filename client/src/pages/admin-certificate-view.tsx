@@ -32,7 +32,7 @@ export default function AdminCertificateView() {
   });
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 md:p-8">
+    <div className="sl-page sl-bg-paper min-h-screen p-4 sm:p-6 md:p-8">
       <Button onClick={() => navigate("/admin")} variant="outline" className="mb-4 sm:mb-6 md:mb-8">
         <ArrowLeft className="w-4 h-4 mr-2" /> Back
       </Button>

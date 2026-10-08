@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Layers, User, ArrowLeft, ChevronRight } from "lucide-react";
@@ -89,6 +90,7 @@ export default function AdminBatches() {
 
   return (
     <AcademyShell
+      scene="hall"
       title="Silverleaf Academy"
       subtitle="Cohorts"
       userLabel={user?.username}

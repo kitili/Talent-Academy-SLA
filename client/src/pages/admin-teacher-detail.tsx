@@ -85,7 +85,7 @@ export default function AdminTeacherDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-6 md:p-8">
+      <div className="sl-page sl-bg-board min-h-screen p-4 sm:p-6 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Button
             variant="outline"
@@ -107,7 +107,7 @@ export default function AdminTeacherDetail() {
 
   if (!teacher) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-6 md:p-8">
+      <div className="sl-page sl-bg-board min-h-screen p-4 sm:p-6 md:p-8">
         <div className="max-w-4xl mx-auto">
           <Button
             variant="outline"
@@ -126,8 +126,8 @@ export default function AdminTeacherDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 md:p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="sl-page sl-bg-board min-h-screen p-4 sm:p-6 md:p-8">
+      <div className="sl-sheet max-w-4xl mx-auto">
         {/* Back Button */}
         <Button
           variant="outline"

@@ -77,14 +77,29 @@ function questionsFromSlideText(
       correctAnswer: "True",
     });
   }
-  if (questions.length === 0 && competencyFocus) {
+  const topic = competencyFocus || "this lesson";
+  const stems = [
+    `This module focuses on ${topic}.`,
+    `Teachers should apply ideas from ${topic} in their classroom.`,
+    `${topic} is part of the intended learning for this file.`,
+    `A learner who finishes this file should be able to discuss ${topic}.`,
+    `The slides are meant to support practice of ${topic}.`,
+    `Reflection on ${topic} is expected after this lesson.`,
+    `Classroom examples should connect back to ${topic}.`,
+    `Checking understanding of ${topic} is the purpose of this quiz.`,
+    `This file is not unrelated to ${topic}.`,
+    `The competency for this file includes ${topic}.`,
+  ];
+  let extra = 0;
+  while (questions.length < numQuestions && extra < stems.length) {
     questions.push({
-      id: "q1",
+      id: `q${questions.length + 1}`,
       type: "true_false",
-      question: `This module focuses on ${competencyFocus}.`,
+      question: stems[extra],
       options: ["True", "False"],
       correctAnswer: "True",
     });
+    extra += 1;
   }
   return questions.slice(0, numQuestions);
 }
@@ -189,12 +204,9 @@ export async function generateQuizQuestions(options: GenerateQuizOptions): Promi
   }
 
   if (documentTexts.length === 0) {
-    const fallback = [competencyFocus, objective].filter(Boolean).join("\n");
-    if (!fallback.trim()) {
-      throw new Error("No text content could be extracted from the uploaded files. Create the quiz manually.");
-    }
-    console.log("[QUIZ-SERVICE] No slide text extracted; generating from competency/objectives");
-    documentTexts.push(`Training topic:\n${fallback}`);
+    const fallback = [competencyFocus, objective, ...fileUrls.map((file) => file.name)].filter(Boolean).join("\n");
+    console.log("[QUIZ-SERVICE] No slide text extracted; generating from topic fallback");
+    documentTexts.push(`Training topic:\n${fallback || "this lesson"}`);
   }
 
     const combinedText = documentTexts.join("\n\n---\n\n").substring(0, 15000);
@@ -244,12 +256,9 @@ export async function generateSingleFileQuiz(options: GenerateSingleFileQuizOpti
     }
 
     if (!text.trim()) {
-      const fallback = [competencyFocus, objective].filter(Boolean).join("\n");
-      if (!fallback.trim()) {
-        throw new Error("No text content could be extracted from the slides. Create the quiz manually.");
-      }
-      console.log("[QUIZ-SERVICE] No slide text; generating from competency/objectives for", fileName);
-      text = `File: ${fileName}\nTraining topic: ${competencyFocus}\nLearning objectives: ${objective}`;
+      const fallback = [competencyFocus, objective, fileName].filter(Boolean).join("\n");
+      console.log("[QUIZ-SERVICE] No slide text; generating from topic fallback for", fileName);
+      text = `File: ${fileName}\nTraining topic: ${competencyFocus || fileName}\nLearning objectives: ${objective || fallback}`;
     }
 
     try {

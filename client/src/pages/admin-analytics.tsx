@@ -758,7 +758,7 @@ export default function AdminAnalytics() {
 
   if (!isAdmin) {
     return (
-      <div className="sl-page min-h-screen p-4 sm:p-8">
+      <div className="sl-page sl-bg-lamp min-h-screen p-4 sm:p-8">
         <Button onClick={() => navigate("/")} variant="outline" className="mb-8" data-testid="button-back">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
@@ -807,7 +807,7 @@ export default function AdminAnalytics() {
   };
 
   return (
-    <div className="sl-page min-h-screen">
+    <div className="sl-page sl-bg-lamp min-h-screen">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-6">
@@ -823,7 +823,7 @@ export default function AdminAnalytics() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
+      <div className="sl-sheet max-w-7xl mx-auto my-6 px-4 sm:px-8 py-8">
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="flex w-full overflow-x-auto mb-8 sm:grid sm:grid-cols-7">

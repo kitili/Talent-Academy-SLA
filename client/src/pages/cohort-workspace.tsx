@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Users, ClipboardCheck, Award, BarChart3, GraduationCap, Megaphone, Calendar, FileText, Upload } from "lucide-react";
 import { learningStatus, staffWatchLabel } from "@shared/learningStatus";
+import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 export default function CohortWorkspace() {
   const params = useParams<{ batchId: string }>();
@@ -26,6 +27,8 @@ export default function CohortWorkspace() {
   const [workTitle, setWorkTitle] = useState("");
   const [workInstructions, setWorkInstructions] = useState("");
   const [workDue, setWorkDue] = useState("");
+  const [openWorkId, setOpenWorkId] = useState<string | null>(null);
+  const [markDrafts, setMarkDrafts] = useState<Record<string, { score: string; comment: string }>>({});
   const [eventTitle, setEventTitle] = useState("");
   const [eventType, setEventType] = useState("session");
   const [eventStart, setEventStart] = useState("");
@@ -90,6 +93,26 @@ export default function CohortWorkspace() {
     enabled: Boolean(batchId),
   });
 
+  const { data: announcements = [] } = useQuery<any[]>({
+    queryKey: ["/api/batches", batchId, "announcements"],
+    queryFn: async () => {
+      const res = await fetch(`/api/batches/${batchId}/announcements`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: Boolean(batchId),
+  });
+
+  const { data: submissions = [] } = useQuery<any[]>({
+    queryKey: ["/api/batches", batchId, "assignments", openWorkId, "submissions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/batches/${batchId}/assignments/${openWorkId}/submissions`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: Boolean(batchId && openWorkId),
+  });
+
   const teachers = Array.isArray(batch?.teachers) ? batch.teachers : [];
   const closeToGraduate = useMemo(
     () => progress.filter((row) => (row.overallPercentage || 0) >= 80 && (row.overallPercentage || 0) < 100),
@@ -140,6 +163,7 @@ export default function CohortWorkspace() {
       toast({ title: `Announcement sent to ${data.sent || 0} teachers` });
       setAnnounceTitle("");
       setAnnounceMessage("");
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "announcements"] });
     },
     onError: () => toast({ title: "Could not send announcement", variant: "destructive" }),
   });
@@ -193,8 +217,27 @@ export default function CohortWorkspace() {
     onError: () => toast({ title: "Could not add event", variant: "destructive" }),
   });
 
+  const markWork = useMutation({
+    mutationFn: async (payload: { teacherId: string; trainerScore: string; trainerComment: string }) => {
+      const res = await apiRequest(
+        "PATCH",
+        `/api/batches/${batchId}/assignments/${openWorkId}/submissions/${payload.teacherId}`,
+        {
+          trainerScore: payload.trainerScore === "" ? null : Number(payload.trainerScore),
+          trainerComment: payload.trainerComment,
+        },
+      );
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Feedback saved" });
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments", openWorkId, "submissions"] });
+    },
+    onError: () => toast({ title: "Could not save feedback", variant: "destructive" }),
+  });
+
   return (
-    <div className="sl-page min-h-screen">
+    <div className="sl-page sl-bg-lamp min-h-screen">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -211,7 +254,7 @@ export default function CohortWorkspace() {
         </div>
       </header>
 
-      <div className="container mx-auto p-4 sm:p-8 space-y-6">
+      <div className="sl-sheet container mx-auto my-4 sm:my-6 p-4 sm:p-8 space-y-6">
         <p className="text-muted-foreground sl-rise">
           {batch?.description || "People, quizzes, the register, performance, and graduates — in one classroom."}
         </p>
@@ -328,6 +371,13 @@ export default function CohortWorkspace() {
           </TabsContent>
 
           <TabsContent value="performance" className="space-y-3 mt-4">
+            <div className="flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <a href={`/api/batches/${batchId}/gradebook.csv`} download>
+                  Download gradebook CSV
+                </a>
+              </Button>
+            </div>
             {progress.length === 0 ? (
               <Empty text="The gradebook fills in as teachers finish modules and quizzes." />
             ) : progress.map((row: any) => (
@@ -436,7 +486,67 @@ export default function CohortWorkspace() {
                   <CardDescription>
                     {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}
                   </CardDescription>
+                  <Button
+                    size="sm"
+                    variant={openWorkId === item.id ? "default" : "outline"}
+                    onClick={() => setOpenWorkId(openWorkId === item.id ? null : item.id)}
+                  >
+                    {openWorkId === item.id ? "Hide submissions" : "Mark submissions"}
+                  </Button>
                 </CardHeader>
+                {openWorkId === item.id && (
+                  <CardContent className="space-y-4">
+                    {submissions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No submissions yet.</p>
+                    ) : submissions.map((row: any) => {
+                      const teacherId = row.teacher_id || row.teacherId;
+                      const draft = markDrafts[teacherId] || {
+                        score: row.trainer_score ?? row.trainerScore ?? "",
+                        comment: row.trainer_comment || row.trainerComment || "",
+                      };
+                      return (
+                        <div key={row.id} className="space-y-2 border-t pt-3">
+                          <p className="font-medium">{row.teacher_name || row.teacherName}</p>
+                          <p className="text-sm text-muted-foreground">{row.response}</p>
+                          <div className="flex flex-wrap gap-2">
+                            <Input
+                              className="w-24"
+                              type="number"
+                              min={0}
+                              max={100}
+                              placeholder="Score"
+                              value={draft.score}
+                              onChange={(e) => setMarkDrafts((current) => ({
+                                ...current,
+                                [teacherId]: { ...draft, score: e.target.value },
+                              }))}
+                            />
+                            <Input
+                              className="flex-1 min-w-[180px]"
+                              placeholder="Comment / rubric note"
+                              value={draft.comment}
+                              onChange={(e) => setMarkDrafts((current) => ({
+                                ...current,
+                                [teacherId]: { ...draft, comment: e.target.value },
+                              }))}
+                            />
+                            <Button
+                              size="sm"
+                              disabled={markWork.isPending}
+                              onClick={() => markWork.mutate({
+                                teacherId,
+                                trainerScore: String(draft.score),
+                                trainerComment: draft.comment,
+                              })}
+                            >
+                              Save mark
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                )}
               </Card>
             ))}
           </TabsContent>
@@ -460,7 +570,7 @@ export default function CohortWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle>Pin a note to this cohort</CardTitle>
-                <CardDescription>Every enrolled teacher gets it in their bell.</CardDescription>
+                <CardDescription>Every enrolled teacher gets it in their bell. Email is sent when RESEND_API_KEY is configured.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input placeholder="Title" value={announceTitle} onChange={(e) => setAnnounceTitle(e.target.value)} />
@@ -473,6 +583,21 @@ export default function CohortWorkspace() {
                 </Button>
               </CardContent>
             </Card>
+            {announcements.length === 0 ? (
+              <Empty text="No announcements sent yet." />
+            ) : announcements.map((item: any, index: number) => (
+              <Card key={`${item.title}-${index}`} className="sl-rise">
+                <CardHeader className="py-4">
+                  <CardTitle className="text-base">{item.title}</CardTitle>
+                  <CardDescription>
+                    {item.recipients || 0} teachers · {item.created_at ? new Date(item.created_at).toLocaleString() : ""}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm">{item.message}</p>
+                </CardContent>
+              </Card>
+            ))}
           </TabsContent>
         </Tabs>
       </div>

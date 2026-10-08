@@ -367,6 +367,32 @@ function SortableWeekItem({
                 maxNumberOfFiles={10}
                 key={`uploader-${week.id}`}
               />
+              <label className="mt-2 inline-flex items-center text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="sr-only"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!file) return;
+                    const form = new FormData();
+                    form.append("package", file);
+                    const res = await fetch(`/api/training-weeks/${week.id}/import-package`, {
+                      method: "POST",
+                      body: form,
+                      credentials: "include",
+                    });
+                    if (!res.ok) {
+                      const data = await res.json().catch(() => ({}));
+                      console.error(data.error || "Import failed");
+                      return;
+                    }
+                    queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
+                  }}
+                />
+                Import SCORM / HTML zip
+              </label>
               {week.deckFiles && week.deckFiles.length > 0 && (
                 <div className="mt-3">
                   {isAdmin ? (
@@ -669,7 +695,7 @@ export default function CourseWeeks() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="sl-page sl-bg-board min-h-screen">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -716,7 +742,7 @@ export default function CourseWeeks() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
+      <main className="sl-sheet container mx-auto my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"

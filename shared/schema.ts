@@ -75,6 +75,7 @@ export const deckFileSchema = z.object({
   fileUrl: z.string(),
   fileSize: z.number(),
   toc: z.array(tocEntrySchema).optional(),
+  lessonHtml: z.string().optional(),
 });
 
 export type DeckFile = z.infer<typeof deckFileSchema>;
@@ -897,6 +898,9 @@ export const assignmentSubmissions = pgTable("assignment_submissions", {
   teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
   response: text("response").notNull(),
   submittedAt: timestamp("submitted_at").defaultNow(),
+  trainerScore: integer("trainer_score"),
+  trainerComment: text("trainer_comment"),
+  rubric: jsonb("rubric"),
 }, (table) => [
   unique("idx_assignment_submission_unique").on(table.assignmentId, table.teacherId),
 ]);
@@ -908,3 +912,13 @@ export const insertAssignmentSubmissionSchema = createInsertSchema(assignmentSub
 
 export type InsertAssignmentSubmission = z.infer<typeof insertAssignmentSubmissionSchema>;
 export type AssignmentSubmission = typeof assignmentSubmissions.$inferSelect;
+
+export const discussionPosts = pgTable("discussion_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  weekId: varchar("week_id").notNull().references(() => trainingWeeks.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull(),
+  authorRole: varchar("author_role").notNull(),
+  authorName: varchar("author_name").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});

@@ -1,23 +1,25 @@
 import { Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { readSessionUser } from "@/lib/sessionUser";
 import UnifiedAuth from "@/pages/unified-auth";
 
 export default function RoleHome() {
-  const { user, isLoading } = useAuth();
+  const { user } = useAuth();
+  const sessionUser = user || readSessionUser();
 
-  if (isLoading || !user) {
+  if (!sessionUser) {
     return <UnifiedAuth />;
   }
 
-  if (user.role === "admin") {
+  if (sessionUser.role === "admin") {
     return <Redirect to="/admin" />;
   }
 
-  if (user.role === "trainer") {
+  if (sessionUser.role === "trainer") {
     return <Redirect to="/trainer/batches" />;
   }
 
-  if (user.role === "teacher") {
+  if (sessionUser.role === "teacher") {
     return <Redirect to="/teacher/dashboard" />;
   }
 

@@ -95,5 +95,17 @@ export async function ensureWrittenAssignmentTables() {
     ALTER TABLE courses ADD COLUMN IF NOT EXISTS objectives text;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS pass_mark integer NOT NULL DEFAULT 80;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS shuffle_questions varchar NOT NULL DEFAULT 'yes';
+    ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS trainer_score integer;
+    ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS trainer_comment text;
+    ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS rubric jsonb;
+    CREATE TABLE IF NOT EXISTS discussion_posts (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      week_id varchar NOT NULL REFERENCES training_weeks(id) ON DELETE CASCADE,
+      author_id varchar NOT NULL,
+      author_role varchar NOT NULL,
+      author_name varchar NOT NULL,
+      body text NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
   `);
 }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
+import { ArrowLeft, Award, Download } from "lucide-react";
 
 export default function TeacherCertificates() {
   const { user, logoutMutation } = useAuth();
@@ -26,7 +27,7 @@ export default function TeacherCertificates() {
   }
 
   return (
-    <div className="sl-page min-h-screen pb-20 sm:pb-0">
+    <div className="sl-page sl-bg-paper min-h-screen pb-20 sm:pb-0">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
@@ -55,7 +56,7 @@ export default function TeacherCertificates() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 sm:px-6 py-8">
+      <main className="sl-sheet container mx-auto my-4 sm:my-6 px-4 sm:px-6 py-8">
         {isLoading ? (
           <div className="text-center text-muted-foreground">Loading certificates...</div>
         ) : certificates.length === 0 ? (

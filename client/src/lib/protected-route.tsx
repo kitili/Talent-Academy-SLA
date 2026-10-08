@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { readSessionUser } from "@/lib/sessionUser";
 import { Redirect, Route } from "wouter";
 
 export function ProtectedRoute({
@@ -9,8 +10,9 @@ export function ProtectedRoute({
   component: () => React.JSX.Element;
 }) {
   const { user, isLoading } = useAuth();
+  const sessionUser = user || readSessionUser();
 
-  if (user) {
+  if (sessionUser) {
     return <Route path={path} component={Component} />;
   }
 

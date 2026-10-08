@@ -29,7 +29,7 @@ export default function AdminOpsCatalog() {
   }
 
   return (
-    <AcademyShell title="Data catalog">
+    <AcademyShell title="Data catalog" scene="paper">
       <p className="text-muted-foreground mb-6 max-w-3xl">
         {data?.howToFind ||
           "Each Supabase table is tagged with an ops area so onboarding, marketing, and the rest stay separate."}

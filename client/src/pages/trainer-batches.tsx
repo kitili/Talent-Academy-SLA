@@ -22,6 +22,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar } from "lucide-react";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
+import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 export default function TrainerBatches() {
   const [, setLocation] = useLocation();
@@ -519,7 +520,7 @@ export default function TrainerBatches() {
   };
 
   return (
-    <div className="sl-page min-h-screen">
+    <div className="sl-page sl-bg-hall min-h-screen">
       <header className="sticky top-0 z-50 bg-primary shadow-md">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -591,7 +592,7 @@ export default function TrainerBatches() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="sl-sheet container mx-auto my-4 sm:my-6 px-4 py-6">
         <div className="mb-6">
           <div className="flex justify-between items-center">
             <div>

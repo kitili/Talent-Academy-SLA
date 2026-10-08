@@ -7,12 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import { homeForRole, persistSessionUser } from "@/lib/sessionUser";
-import { Shield, GraduationCap, Users, Mail, Sparkles } from "lucide-react";
+import { homeForRole, persistSessionUser, readSessionUser } from "@/lib/sessionUser";
+import { Shield, GraduationCap, Users, Mail } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
-import { ClassroomArt } from "@/components/ClassroomArt";
 
 type Role = "admin" | "trainer" | "teacher";
 type AccountType = "teacher" | "trainer";
@@ -29,6 +29,7 @@ const SilverleafLogo = ({ className = "w-12 h-12" }: { className?: string }) => 
 
 export default function UnifiedAuth() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   
   // Login state
@@ -41,6 +42,13 @@ export default function UnifiedAuth() {
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<MultiRoleOption[]>([]);
   const [selectingRole, setSelectingRole] = useState(false);
+
+  useEffect(() => {
+    const signedIn = user || readSessionUser();
+    if (signedIn?.role && !showRolePicker) {
+      setLocation(homeForRole(signedIn.role));
+    }
+  }, [user, showRolePicker, setLocation]);
   
   // Registration state
   const [accountType, setAccountType] = useState<AccountType | null>(null);
@@ -53,6 +61,14 @@ export default function UnifiedAuth() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [databaseReady, setDatabaseReady] = useState<boolean | null>(null);
+  const [sso, setSso] = useState({ google: false, microsoft: false });
+
+  useEffect(() => {
+    fetch("/api/auth/sso/status")
+      .then((res) => res.json())
+      .then((data) => setSso({ google: Boolean(data?.google), microsoft: Boolean(data?.microsoft) }))
+      .catch(() => setSso({ google: false, microsoft: false }));
+  }, []);
 
   useEffect(() => {
     fetch("/api/health")
@@ -143,16 +159,17 @@ export default function UnifiedAuth() {
         
         persistSessionUser(data);
         queryClient.setQueryData(["/api/user"], data);
-        if (userRole === "teacher") {
+        const signedInRole = (data.role || loginRole) as Role;
+        if (signedInRole === "teacher") {
           queryClient.setQueryData(["/api/teacher/me"], data);
         }
 
         toast({
           title: "Welcome!",
-          description: `Successfully logged in as ${userRole}`,
+          description: `Successfully logged in as ${signedInRole}`,
         });
         setLoginLoading(false);
-        setLocation(homeForRole(userRole));
+        setLocation(homeForRole(signedInRole));
       } else {
         toast({
           variant: "destructive",
@@ -305,18 +322,17 @@ export default function UnifiedAuth() {
     }
   };
 
-  const motivationalQuotes = [
-    "Education is the passport to the future.",
-    "Learning never exhausts the mind.",
-    "The beautiful thing about learning is that nobody can take it away from you.",
-    "Education is not preparation for life; education is life itself.",
-    "The capacity to learn is a gift; the ability to learn is a skill."
-  ];
-
-  const randomQuote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+  const scenes: Record<Role, { src: string; line: string }> = {
+    admin: { src: "/bg-library.jpg", line: "The library is open" },
+    trainer: { src: "/bg-hall.jpg", line: "The hall is open" },
+    teacher: { src: "/bg-garden.jpg", line: "The garden is open" },
+  };
+  const scene = scenes[loginRole];
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-primary/5 via-primary/10 to-primary/15 dark:from-gray-900 dark:via-primary/20 dark:to-primary/30 relative overflow-hidden">
+    <div className="relative min-h-screen">
+      <img key={scene.src} src={scene.src} alt="" className="fixed inset-0 h-full w-full object-cover" />
+      <div className="fixed inset-0 bg-[#102448]/20" />
       {/* Multi-role picker dialog */}
       <Dialog open={showRolePicker} onOpenChange={setShowRolePicker}>
         <DialogContent className="sm:max-w-md">
@@ -357,72 +373,19 @@ export default function UnifiedAuth() {
         </DialogContent>
       </Dialog>
 
-      {/* Decorative background shapes */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-48 sm:w-72 h-48 sm:h-72 bg-primary/20 dark:bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-64 sm:w-96 h-64 sm:h-96 bg-primary/20 dark:bg-primary/10 rounded-full blur-3xl hidden sm:block" />
-        <div className="absolute top-1/2 left-1/3 w-48 sm:w-64 h-48 sm:h-64 bg-primary/20 dark:bg-primary/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="flex-1 flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8 relative z-10">
-        <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 lg:gap-12 items-center">
-          {databaseReady === false && (
-            <div className="w-full lg:absolute lg:top-4 lg:left-1/2 lg:-translate-x-1/2 lg:max-w-xl rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground z-20">
-              Trainer and teacher sign-in cannot open yet: this Vercel site has no database. Add a Neon <code>DATABASE_URL</code> in the Vercel project, then redeploy.
-            </div>
-          )}
-          {/* Left side - Welcome section (hidden on mobile in login, shown in register) */}
-          <div className="hidden lg:flex flex-1 flex-col justify-center space-y-4 lg:space-y-6 text-center lg:text-left">
-            <ClassroomArt className="max-w-xl" />
-            <div className="flex items-center justify-center lg:justify-start gap-4 mb-4">
-              <SilverleafLogo className="w-16 h-16" />
-              <div>
-                <h1 className="text-4xl font-bold text-foreground">Silverleaf Academy</h1>
-                <p className="text-sm text-muted-foreground mt-1">Training Program Planner</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <h2 className="text-3xl font-bold text-foreground leading-tight">
-                The classroom, in one navy desk
-              </h2>
-              <p className="text-lg text-muted-foreground">
-                Cohorts, the register, module quizzes, written work, and the calendar — for Silverleaf trainers and teachers.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 pt-6">
-              <div className="flex items-start gap-3 p-4 bg-card rounded-lg border-l-4 border-l-primary">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Sparkles className="w-5 h-5 text-primary" />
+      <div className="relative z-10 flex min-h-screen items-end justify-center px-4 py-6 sm:items-center">
+        <div className="w-full max-w-md">
+          <Card className="w-full rounded-[1.75rem] border-0 bg-white/95 text-center shadow-2xl backdrop-blur">
+              <CardHeader className="pb-2 pt-6 text-center">
+                <div className="mb-3 flex items-center justify-center gap-3">
+                  <SilverleafLogo className="h-12 w-12" />
+                  <div className="text-left">
+                    <p className="text-lg font-bold text-[#102448]">Silverleaf Academy</p>
+                    <p className="text-sm text-muted-foreground">{scene.line}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Continue the week</h3>
-                  <p className="text-sm text-muted-foreground">Modules, slide quizzes, and written assignments in one place</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-card rounded-lg border-l-4 border-l-primary">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Shield className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground">Your role stays yours</h3>
-                  <p className="text-sm text-muted-foreground">Admin, trainer, or teacher — sign in with the account you already have</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right side - Auth form */}
-          <div className="w-full max-w-md lg:w-auto lg:min-w-[480px] lg:max-w-[520px]">
-            <Card className="backdrop-blur-sm bg-card/95 shadow-2xl border-border/50">
-              <CardHeader className="text-center space-y-2 pb-4 sm:pb-6 px-4 sm:px-6">
-                <div className="flex justify-center lg:hidden mb-3">
-                  <SilverleafLogo className="w-12 h-12 sm:w-14 sm:h-14" />
-                </div>
-                <CardTitle className="text-2xl sm:text-3xl font-bold">Welcome Back</CardTitle>
-                <CardDescription className="text-sm sm:text-base">Sign in with your existing Silverleaf account, or create a trainer or teacher account</CardDescription>
+                <CardTitle className="text-2xl font-bold">Come in</CardTitle>
+                <CardDescription>Admin, trainer, or teacher.</CardDescription>
               </CardHeader>
               
               <CardContent className="px-4 sm:px-6">
@@ -436,57 +399,23 @@ export default function UnifiedAuth() {
                   <TabsContent value="login" className="space-y-4 sm:space-y-6">
                     <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
                       {/* Role Selection Cards */}
-                      <div className="space-y-2 sm:space-y-3">
-                        <Label className="text-sm sm:text-base font-semibold">Select Your Role</Label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                          {roleCards.map((role) => {
-                            const Icon = role.icon;
-                            const isSelected = loginRole === role.value;
-                            return (
-                              <button
-                                key={role.value}
-                                type="button"
-                                onClick={() => setLoginRole(role.value as Role)}
-                                data-testid={`radio-${role.value}`}
-                                className={`
-                                  relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-300
-                                  hover-elevate active-elevate-2
-                                  ${isSelected 
-                                    ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' 
-                                    : 'border-border bg-card hover:border-primary/50'
-                                  }
-                                `}
-                              >
-                                <div className="flex flex-col sm:flex-col items-center gap-2 text-center">
-                                  <div className={`
-                                    p-2 sm:p-3 rounded-lg transition-all duration-300
-                                    ${isSelected 
-                                      ? `bg-gradient-to-br ${role.gradient} text-white` 
-                                      : 'bg-muted text-muted-foreground'
-                                    }
-                                  `}>
-                                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
-                                  </div>
-                                  <div>
-                                    <p className={`font-semibold text-sm ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-                                      {role.title}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                      {role.description}
-                                    </p>
-                                  </div>
-                                </div>
-                                {isSelected && (
-                                  <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                                    <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
+                      <div className="grid grid-cols-3 gap-1 rounded-full bg-[#f4eadc] p-1">
+                        {roleCards.map((role) => {
+                          const isSelected = loginRole === role.value;
+                          return (
+                            <button
+                              key={role.value}
+                              type="button"
+                              onClick={() => setLoginRole(role.value as Role)}
+                              data-testid={`radio-${role.value}`}
+                              className={`rounded-full px-2 py-2 text-sm font-semibold transition ${
+                                isSelected ? "bg-[#102448] text-white shadow" : "text-[#102448] hover:bg-white"
+                              }`}
+                            >
+                              {role.title}
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {/* Email/ID Input with floating label */}
@@ -569,6 +498,21 @@ export default function UnifiedAuth() {
                         )}
                       </Button>
 
+                      {loginRole === "teacher" && (sso.google || sso.microsoft) && (
+                        <div className="grid gap-2">
+                          {sso.google && (
+                            <Button type="button" variant="outline" asChild>
+                              <a href="/api/auth/sso/google">Continue with Google</a>
+                            </Button>
+                          )}
+                          {sso.microsoft && (
+                            <Button type="button" variant="outline" asChild>
+                              <a href="/api/auth/sso/microsoft">Continue with Microsoft</a>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
                       {/* Forgot Password Link */}
                       <div className="text-center">
                         <a 
@@ -578,16 +522,6 @@ export default function UnifiedAuth() {
                         >
                           Forgot password?
                         </a>
-                      </div>
-
-                      {/* Motivational Quote */}
-                      <div className="pt-3 sm:pt-4 border-t border-border">
-                        <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-primary/5 rounded-lg">
-                          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
-                          <p className="text-xs sm:text-sm text-muted-foreground italic">
-                            "{randomQuote}"
-                          </p>
-                        </div>
                       </div>
                     </form>
                   </TabsContent>
@@ -694,7 +628,6 @@ export default function UnifiedAuth() {
                 </Tabs>
               </CardContent>
             </Card>
-          </div>
         </div>
       </div>
     </div>

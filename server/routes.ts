@@ -22,6 +22,15 @@ import { recordAudit } from "./audit";
 import { sanitizeLessonHtml } from "./htmlSanitize";
 import { signFileGrant, verifyFileGrant } from "./fileGrant";
 import { passMarkOf, shuffleQuestions } from "./quizDelivery";
+import { sendTransactionalEmail } from "./mailer";
+import { setupSso, ssoStatus } from "./sso";
+import { lessonFromPackage } from "./scormImport";
+import multer from "multer";
+
+const packageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
 
 const execAsync = promisify(exec);
 
@@ -81,6 +90,12 @@ async function notifyTeacher(teacherId: string, title: string, message: string, 
     message,
     metadata,
   });
+  try {
+    const teacher = await storage.getTeacher(teacherId);
+    await sendTransactionalEmail(teacher?.email, title, message);
+  } catch (error) {
+    console.error("Email notice failed:", error);
+  }
 }
 
 async function notifyBatchTeachers(batchId: string, title: string, message: string, type = "general") {
@@ -223,6 +238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       databaseHost,
       sessionSecret,
       blob,
+      sso: ssoStatus(),
+      mail: Boolean(process.env.RESEND_API_KEY),
       week: 1,
       backup: "Use the Supabase project point-in-time restore. Do not keep a second app database.",
     });
@@ -241,6 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   setupTeacherAuth(app);
+  setupSso(app);
   // Note: /api/register, /api/login, /api/logout, /api/user are now in auth.ts
   // Note: /api/teacher/* routes are in teacherAuth.ts
 
@@ -1186,6 +1204,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/training-weeks/:id/import-package", isAuthenticated, isTrainer, packageUpload.single("package"), async (req, res) => {
+    try {
+      const week = await storage.getTrainingWeek(req.params.id);
+      if (!week) return res.status(404).json({ error: "Week not found" });
+      const file = (req as any).file as { buffer?: Buffer; originalname?: string } | undefined;
+      if (!file?.buffer) return res.status(400).json({ error: "Upload a .zip package" });
+      const imported = lessonFromPackage(file.buffer, file.originalname || "package.zip");
+      const newFile = {
+        id: randomUUID(),
+        fileName: imported.fileName,
+        fileUrl: `lesson://${randomUUID()}`,
+        fileSize: imported.fileSize,
+        lessonHtml: imported.lessonHtml,
+      };
+      const updatedWeek = await storage.updateTrainingWeek({
+        id: week.id,
+        deckFiles: [...(week.deckFiles || []), newFile],
+      });
+      res.status(201).json(updatedWeek);
+    } catch (error) {
+      console.error("Package import failed:", error);
+      res.status(400).json({ error: error instanceof Error ? error.message : "Could not import package" });
+    }
+  });
+
   // Add deck files after upload (admin only) - supports multiple files
   app.post("/api/training-weeks/:id/deck", isAuthenticated, isTrainer, async (req, res) => {
     try {
@@ -1494,6 +1537,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pdfPath = join(outputDir, produced);
           tempFiles.push(pdfPath);
         }
+      }
+
+      if (!existsSync(pdfPath)) {
+        return res.status(422).json({ error: "This presentation could not be converted. Upload the PowerPoint file again." });
       }
 
       const pdfBuffer = await readFile(pdfPath);
@@ -2891,6 +2938,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         averageScore: avgScore,
       });
 
+      if (passed === "no") {
+        const failCount = existingAttempts.filter((a) => a.passed === "no").length + 1;
+        if (failCount >= 2) {
+          notifyTeacher(
+            req.teacherId!,
+            "Quiz needs another try",
+            `You have missed this quiz ${failCount} times. Open the module again before the last attempt.`,
+            "general",
+            { quizId: req.params.quizId },
+          ).catch((error) => console.error("Fail-streak notice failed:", error));
+        }
+      }
+
       res.json({
         score,
         totalQuestions,
@@ -3077,6 +3137,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/batches/:batchId/gradebook.csv", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      if (!staffCanAccessBatch(req.user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const teachers = await storage.getTeachersInBatch(req.params.batchId);
+      const assignedCourses = await storage.getCoursesForBatch(req.params.batchId);
+      const attendance = await storage.getBatchAttendanceSummary(req.params.batchId);
+      const attendanceById = Object.fromEntries(
+        (attendance || []).map((row: any) => [row.teacher_id || row.teacherId, row.attendance_rate ?? row.attendanceRate ?? 0]),
+      );
+      const header = [
+        "name",
+        "email",
+        "teacher_id",
+        "course_percent",
+        "quiz_average",
+        "quizzes_taken",
+        "quizzes_passed",
+        "attendance_percent",
+        "courses_completed",
+        "courses_assigned",
+      ];
+      const lines = [header.join(",")];
+      for (const teacher of teachers) {
+        const reportCard = await storage.refreshTeacherReportCard(teacher.id);
+        const completions = await db
+          .select()
+          .from(teacherCourseCompletion)
+          .where(and(eq(teacherCourseCompletion.teacherId, teacher.id), eq(teacherCourseCompletion.batchId, req.params.batchId)));
+        const completedCount = completions.filter((c) => c.status === "completed").length;
+        const overall = assignedCourses.length > 0
+          ? Math.round((completedCount / assignedCourses.length) * 100)
+          : 0;
+        const csvEscape = (value: string | number | null | undefined) =>
+          `"${String(value ?? "").replace(/"/g, '""')}"`;
+        lines.push([
+          csvEscape(teacher.name),
+          csvEscape(teacher.email),
+          csvEscape(teacher.teacherId),
+          overall,
+          reportCard?.averageScore ?? 0,
+          reportCard?.totalQuizzesTaken ?? 0,
+          reportCard?.totalQuizzesPassed ?? 0,
+          attendanceById[teacher.id] ?? 0,
+          completedCount,
+          assignedCourses.length,
+        ].join(","));
+      }
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="gradebook-${req.params.batchId}.csv"`);
+      res.send(lines.join("\n"));
+    } catch (error) {
+      console.error("Error exporting gradebook:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Get teacher quiz attempts for trainer to review
   app.get("/api/batches/:batchId/teachers/:teacherId/quiz-attempts", isAuthenticated, isTrainer, async (req, res) => {
     try {
@@ -3188,6 +3306,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json([...byBatch.values()].flatMap(list => applyModuleLocks(list)));
     } catch (error) {
       console.error("Error fetching assigned weeks:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/teacher/skills-map", isTeacherAuthenticated, async (req, res) => {
+    try {
+      const courseBatchPairs = await db
+        .select({ course: courses, batchId: batchTeachers.batchId })
+        .from(batchTeachers)
+        .innerJoin(batchCourses, eq(batchTeachers.batchId, batchCourses.batchId))
+        .innerJoin(courses, eq(batchCourses.courseId, courses.id))
+        .where(eq(batchTeachers.teacherId, req.teacherId!));
+      const skills = new Map<string, { competency: string; modules: number; completed: number }>();
+      for (const { course } of courseBatchPairs) {
+        if (course.publishStatus === "draft") continue;
+        const courseWeeks = await storage.getWeeksForCourse(course.id);
+        for (const week of courseWeeks) {
+          const key = (week.competencyFocus || "General practice").trim();
+          const row = skills.get(key) || { competency: key, modules: 0, completed: 0 };
+          row.modules += 1;
+          const progressRecords = await storage.getAllTeacherContentProgressForWeek(req.teacherId!, week.id);
+          const totalFiles = week.deckFiles?.length || 0;
+          const completedFiles = progressRecords.filter((p) => p.status === "completed").length;
+          if (totalFiles > 0 && completedFiles >= totalFiles) row.completed += 1;
+          skills.set(key, row);
+        }
+      }
+      res.json([...skills.values()].map((row) => ({
+        ...row,
+        coverage: row.modules > 0 ? Math.round((row.completed / row.modules) * 100) : 0,
+      })));
+    } catch (error) {
+      console.error("Error building skills map:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -4975,6 +5126,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/batches/:batchId/announcements", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      if (!staffCanAccessBatch(req.user)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const result = await db.execute(sql`
+        SELECT title, message, MIN(created_at) as created_at, COUNT(*)::int as recipients
+        FROM notifications
+        WHERE metadata->>'batchId' = ${req.params.batchId}
+        GROUP BY title, message
+        ORDER BY MIN(created_at) DESC
+        LIMIT 30
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error listing announcements:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Get own attendance (teacher auth)
   app.get("/api/teacher/attendance", isTeacherAuthenticated, async (req, res) => {
     try {
@@ -5353,6 +5524,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error listing submissions:", error);
       res.status(500).json({ error: "Failed to list submissions" });
+    }
+  });
+
+  app.patch("/api/batches/:batchId/assignments/:assignmentId/submissions/:teacherId", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      const score = req.body?.trainerScore == null || req.body?.trainerScore === ""
+        ? null
+        : Number(req.body.trainerScore);
+      if (score != null && (Number.isNaN(score) || score < 0 || score > 100)) {
+        return res.status(400).json({ error: "trainerScore must be 0–100" });
+      }
+      const comment = req.body?.trainerComment != null ? String(req.body.trainerComment) : null;
+      const row = await storage.reviewAssignmentSubmission(
+        req.params.assignmentId,
+        req.params.teacherId,
+        score,
+        comment,
+        req.body?.rubric ?? null,
+      );
+      if (!row) return res.status(404).json({ error: "Submission not found" });
+      notifyTeacher(
+        req.params.teacherId,
+        "Written work marked",
+        comment ? `Score ${score ?? "—"}. ${comment}` : `Your written work was marked${score != null ? `: ${score}` : ""}.`,
+        "general",
+        { batchId: req.params.batchId, assignmentId: req.params.assignmentId },
+      ).catch((error) => console.error("Mark notice failed:", error));
+      res.json(row);
+    } catch (error) {
+      console.error("Error reviewing submission:", error);
+      res.status(500).json({ error: "Failed to review submission" });
+    }
+  });
+
+  app.get("/api/weeks/:weekId/discussions", isAuthenticatedAny, async (req, res) => {
+    try {
+      res.json(await storage.listDiscussionPosts(req.params.weekId));
+    } catch (error) {
+      console.error("Error listing discussion:", error);
+      res.status(500).json({ error: "Failed to list discussion" });
+    }
+  });
+
+  app.post("/api/weeks/:weekId/discussions", isAuthenticatedAny, async (req, res) => {
+    try {
+      const body = String(req.body?.body || "").trim();
+      if (!body) return res.status(400).json({ error: "body is required" });
+      let authorId = req.teacherId || req.user?.id || "";
+      let authorRole = req.teacherId ? "teacher" : (req.user?.role || "trainer");
+      let authorName = req.user?.username || "Staff";
+      if (req.teacherId) {
+        const teacher = await storage.getTeacher(req.teacherId);
+        authorName = teacher?.name || "Teacher";
+      } else if (req.user) {
+        authorName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.username || "Staff";
+      }
+      if (!authorId) return res.status(401).json({ error: "Unauthorized" });
+      const row = await storage.createDiscussionPost({
+        weekId: req.params.weekId,
+        authorId,
+        authorRole,
+        authorName,
+        body,
+      });
+      res.status(201).json(row);
+    } catch (error) {
+      console.error("Error posting discussion:", error);
+      res.status(500).json({ error: "Failed to post" });
     }
   });
 

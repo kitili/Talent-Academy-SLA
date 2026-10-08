@@ -41,8 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (user) persistSessionUser(user);
-    else if (!isLoading) clearSessionUser();
-  }, [user, isLoading]);
+  }, [user]);
 
   // Identify user in PostHog when user data is available
   useEffect(() => {
