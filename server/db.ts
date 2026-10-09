@@ -107,5 +107,15 @@ export async function ensureWrittenAssignmentTables() {
       body text NOT NULL,
       created_at timestamp DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS desk_messages (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      from_id varchar NOT NULL,
+      from_role varchar NOT NULL,
+      from_name varchar NOT NULL,
+      to_id varchar NOT NULL,
+      to_role varchar NOT NULL,
+      body text NOT NULL,
+      created_at timestamp DEFAULT now()
+    );
   `);
 }

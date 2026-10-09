@@ -23,7 +23,8 @@ import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar } from "lucide-react";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
-import { PageStrip, usePager } from "@/components/PageStrip";
+import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
+import { DeskMail } from "@/components/DeskMail";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 
 export default function TrainerBatches() {
@@ -76,11 +77,14 @@ export default function TrainerBatches() {
   const [newEventStart, setNewEventStart] = useState("");
   const [newEventEnd, setNewEventEnd] = useState("");
   const [newEventDesc, setNewEventDesc] = useState("");
+  const [listQuery, setListQuery] = useState("");
+  const [passMark, setPassMark] = useState("80");
 
   const { data: batches = [] } = useQuery<any[]>({
     queryKey: ["/api/batches"],
   });
-  const batchPager = usePager(batches, 8);
+  const filteredBatches = filterByQuery(batches, listQuery, (batch) => `${batch.name || ""}`);
+  const batchPager = usePager(filteredBatches, 8);
 
   const { data: weeks = [] } = useQuery<any[]>({
     queryKey: ["/api/training-weeks"],
@@ -343,12 +347,14 @@ export default function TrainerBatches() {
       title: string;
       description: string;
       numQuestions: number;
+      passMark: number;
     }) => {
       const response = await apiRequest("POST", `/api/batches/${data.batchId}/assign-quiz`, {
         weekId: data.weekId,
         title: data.title,
         description: data.description,
         numQuestions: data.numQuestions,
+        passMark: data.passMark,
       });
       return response.json();
     },
@@ -379,6 +385,7 @@ export default function TrainerBatches() {
       title: string;
       description: string;
       numQuestions: number;
+      passMark: number;
     }) => {
       const response = await apiRequest("POST", `/api/batches/${data.batchId}/assign-file-quiz`, {
         weekId: data.weekId,
@@ -386,6 +393,7 @@ export default function TrainerBatches() {
         title: data.title,
         description: data.description,
         numQuestions: data.numQuestions,
+        passMark: data.passMark,
       });
       return response.json();
     },
@@ -499,6 +507,7 @@ export default function TrainerBatches() {
         title: quizTitle,
         description: quizDescription,
         numQuestions: parseInt(numQuestions),
+        passMark: parseInt(passMark, 10) || 80,
       });
     }
   };
@@ -512,6 +521,7 @@ export default function TrainerBatches() {
         title: quizTitle,
         description: quizDescription,
         numQuestions: parseInt(numQuestions),
+        passMark: parseInt(passMark, 10) || 80,
       });
     }
   };
@@ -609,9 +619,10 @@ export default function TrainerBatches() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
           {/* Left Sidebar - Batch List */}
           <div className="lg:col-span-1 border rounded-lg bg-card overflow-hidden flex flex-col">
-            <div className="p-4 border-b">
+            <div className="p-4 border-b space-y-2">
               <h3 className="font-semibold">Your Batches</h3>
-              <p className="text-xs text-muted-foreground mt-1">{batches.length} total</p>
+              <p className="text-xs text-muted-foreground mt-1">{filteredBatches.length} total</p>
+              <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search cohorts" />
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-2">
@@ -823,7 +834,7 @@ export default function TrainerBatches() {
                   ) : (
                     <div className="space-y-2">
                       {batchDetails?.teachers?.map((teacher: any) => (
-                        <Card key={teacher.id}>
+                        <Card key={teacher.id} className={expandedTeacherId === teacher.id ? "border-primary" : ""} onClick={() => setExpandedTeacherId(teacher.id)}>
                           <CardContent className="flex items-center justify-between gap-2 py-4">
                             <div>
                               <p className="font-semibold">{teacher.name}</p>
@@ -878,6 +889,19 @@ export default function TrainerBatches() {
                       ))}
                     </div>
                   )}
+                  <DeskMail
+                    peer={
+                      (batchDetails?.teachers || []).find((teacher: any) => teacher.id === expandedTeacherId) ||
+                      batchDetails?.teachers?.[0]
+                        ? {
+                            id: ((batchDetails?.teachers || []).find((teacher: any) => teacher.id === expandedTeacherId) || batchDetails?.teachers?.[0]).id,
+                            name: ((batchDetails?.teachers || []).find((teacher: any) => teacher.id === expandedTeacherId) || batchDetails?.teachers?.[0]).name,
+                            role: "teacher",
+                          }
+                        : null
+                    }
+                    selfLabel={user?.username || "Trainer"}
+                  />
                 </TabsContent>
 
                 {/* Quizzes Tab */}
@@ -943,6 +967,17 @@ export default function TrainerBatches() {
                                 max="20"
                                 value={numQuestions}
                                 onChange={(e) => setNumQuestions(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="pass-mark">Pass mark (%)</Label>
+                              <Input
+                                id="pass-mark"
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={passMark}
+                                onChange={(e) => setPassMark(e.target.value)}
                               />
                             </div>
                             <Button

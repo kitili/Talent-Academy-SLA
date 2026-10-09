@@ -110,6 +110,7 @@ import {
   writtenAssignments,
   assignmentSubmissions,
   discussionPosts,
+  deskMessages,
   type OpenEndedReview,
   type InsertOpenEndedReview,
   type QuizQuestion,
@@ -367,6 +368,15 @@ export interface IStorage {
   markNotificationRead(id: string): Promise<void>;
   markAllNotificationsRead(recipientId: string, recipientType: string): Promise<void>;
   getUnreadNotificationCount(recipientId: string, recipientType: string): Promise<number>;
+  createDeskMessage(message: {
+    fromId: string;
+    fromRole: string;
+    fromName: string;
+    toId: string;
+    toRole: string;
+    body: string;
+  }): Promise<any>;
+  getDeskThread(aId: string, bId: string): Promise<any[]>;
 
   // Alert rule operations
   createAlertRule(rule: InsertAlertRule): Promise<AlertRule>;
@@ -3255,6 +3265,31 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return row;
+  }
+
+  async createDeskMessage(message: {
+    fromId: string;
+    fromRole: string;
+    fromName: string;
+    toId: string;
+    toRole: string;
+    body: string;
+  }) {
+    const [row] = await db.insert(deskMessages).values(message).returning();
+    return row;
+  }
+
+  async getDeskThread(aId: string, bId: string) {
+    return db
+      .select()
+      .from(deskMessages)
+      .where(
+        or(
+          and(eq(deskMessages.fromId, aId), eq(deskMessages.toId, bId)),
+          and(eq(deskMessages.fromId, bId), eq(deskMessages.toId, aId)),
+        ),
+      )
+      .orderBy(deskMessages.createdAt);
   }
 }
 

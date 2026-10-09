@@ -10,9 +10,11 @@ export default function TeacherCertificates() {
   const { user, logoutMutation } = useAuth();
   const [, navigate] = useLocation();
 
+  const { data: me } = useQuery<any>({ queryKey: ["/api/teacher/me"] });
+  const teacherId = user?.id || me?.id;
   const { data: certificates = [], isLoading } = useQuery({
-    queryKey: ["/api/teacher", user?.id, "certificates"],
-    enabled: !!user?.id,
+    queryKey: ["/api/teacher", teacherId, "certificates"],
+    enabled: Boolean(teacherId),
   });
 
   if (!user || user.role !== "teacher") {

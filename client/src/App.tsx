@@ -19,6 +19,7 @@ import TrainerBatches from "@/pages/trainer-batches";
 import TrainerTeacherContentHistory from "@/pages/trainer-teacher-content-history";
 import Approvals from "@/pages/approvals";
 import AdminHome from "@/pages/admin-home";
+import AdminHandover from "@/pages/admin-handover";
 import AdminTrainers from "@/pages/admin-trainers";
 import AdminTrainerDetail from "@/pages/admin-trainer-detail";
 import AdminTeachers from "@/pages/admin-teachers";
@@ -57,6 +58,7 @@ function Router() {
       <ProtectedRoute path="/admin/teachers" component={AdminTeachers} />
       <ProtectedRoute path="/admin/analytics" component={AdminAnalytics} />
       <ProtectedRoute path="/admin/batches" component={AdminBatches} />
+      <ProtectedRoute path="/admin/handover" component={AdminHandover} />
       <ProtectedRoute path="/admin" component={AdminHome} />
       <Route path="/auth" component={UnifiedAuth} />
       <Route path="/login" component={UnifiedAuth} />

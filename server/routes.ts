@@ -214,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/health", async (_req, res) => {
     const database = Boolean(getDatabaseUrl());
     const sessionSecret = Boolean(process.env.SESSION_SECRET);
-    const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+    const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
     let databaseReachable = false;
     if (database) {
       try {
@@ -238,10 +238,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       databaseHost,
       sessionSecret,
       blob,
+      blobStore: Boolean(process.env.BLOB_STORE_ID),
       sso: ssoStatus(),
       mail: Boolean(process.env.RESEND_API_KEY),
-      week: 1,
-      backup: "Use the Supabase project point-in-time restore. Do not keep a second app database.",
+      week: 3,
+      backup: "Neon point-in-time restore. Keep one academy database.",
     });
   });
 
@@ -2563,6 +2564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title,
         description,
         numQuestions,
+        passMark: passMarkOf(req.body?.passMark),
         questions,
         assignedBy: req.user!.id,
       });
@@ -2634,6 +2636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title,
         description,
         numQuestions,
+        passMark: passMarkOf(req.body?.passMark),
         questions,
         assignedBy: req.user!.id,
       });
@@ -3268,6 +3271,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Teacher content viewing endpoints (with quiz gating)
   
   // Get teacher's assigned weeks (from their batches and batch courses)
+  app.get("/api/teacher/desk-peers", isTeacherAuthenticated, async (req, res) => {
+    try {
+      const batchesForTeacher = await storage.getBatchesForTeacher(req.teacherId!);
+      const peers: Array<{ id: string; name: string; role: string }> = [];
+      for (const batch of batchesForTeacher) {
+        const trainerId = batch.trainerId || batch.createdBy;
+        if (!trainerId || peers.some((peer) => peer.id === trainerId)) continue;
+        const trainer = await storage.getUser(trainerId);
+        if (trainer) {
+          peers.push({
+            id: trainer.id,
+            name: trainer.username,
+            role: trainer.role,
+          });
+        }
+      }
+      res.json(peers);
+    } catch (error) {
+      console.error("Error listing desk peers:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/teacher/assigned-weeks", isTeacherAuthenticated, async (req, res) => {
     try {
       const teacherId = req.teacherId!;
@@ -5276,6 +5302,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ══════════════════════════════════════════════════════════════
 
   // Get own notifications (any authenticated user)
+  app.get("/api/desk-messages", isAuthenticatedAny, async (req, res) => {
+    try {
+      const withId = String(req.query.withId || "");
+      if (!withId) return res.status(400).json({ error: "withId is required" });
+      const meId = req.teacherId || (req.user as any)?.id;
+      if (!meId) return res.status(401).json({ error: "Not authenticated" });
+      const thread = await storage.getDeskThread(meId, withId);
+      res.json(thread);
+    } catch (error) {
+      console.error("Error listing desk messages:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/desk-messages", isAuthenticatedAny, async (req, res) => {
+    try {
+      const body = String(req.body?.body || "").trim();
+      const toId = String(req.body?.toId || "").trim();
+      const toRole = String(req.body?.toRole || "").trim();
+      if (!body || !toId || !toRole) {
+        return res.status(400).json({ error: "toId, toRole, and body are required" });
+      }
+      const fromId = req.teacherId || (req.user as any)?.id;
+      const fromRole = req.teacherId ? "teacher" : (req.user as any)?.role;
+      const fromName = req.teacherId
+        ? String((req as any).teacherName || "Teacher")
+        : `${(req.user as any)?.firstName || ""} ${(req.user as any)?.lastName || ""}`.trim() || (req.user as any)?.username || "Staff";
+      if (!fromId || !fromRole) return res.status(401).json({ error: "Not authenticated" });
+      const row = await storage.createDeskMessage({ fromId, fromRole, fromName, toId, toRole, body: body.slice(0, 2000) });
+      await storage.createNotification({
+        recipientId: toId,
+        recipientType: toRole,
+        type: "general",
+        title: "New desk message",
+        message: body.slice(0, 160),
+        metadata: { fromId, fromRole },
+      });
+      res.status(201).json(row);
+    } catch (error) {
+      console.error("Error sending desk message:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/notifications", isAuthenticatedAny, async (req, res) => {
     try {
       const user = req.user as any;

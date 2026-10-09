@@ -93,6 +93,13 @@ async function main() {
     `HTTP ${stats.status}`,
   );
 
+  const health = await request("/api/health");
+  record(
+    "Health reports Neon backup copy",
+    (health.status === 200 || health.status === 503) && typeof health.json?.blob === "boolean",
+    `HTTP ${health.status} blob=${health.json?.blob}`,
+  );
+
   const notice = await request("/api/admin/announce", {
     method: "POST",
     body: JSON.stringify({ title: "Smoke notice", message: "Desk check" }),
@@ -130,6 +137,7 @@ async function main() {
     method: "POST",
     body: JSON.stringify({ username: "trainer1", password: "trainer123", role: "trainer" }),
   });
+  const trainerCookies = cookieHeader(trainerLogin.setCookie);
   record(
     "Trainer login",
     trainerLogin.status === 200 && trainerLogin.json?.role === "trainer",
@@ -145,6 +153,24 @@ async function main() {
     "Teacher login",
     teacherLogin.status === 200 && teacherLogin.json?.role === "teacher",
     `HTTP ${teacherLogin.status} role=${teacherLogin.json?.role || "none"}`,
+  );
+
+  const deskNote = await request(
+    "/api/desk-messages",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        toId: teacherLogin.json?.id,
+        toRole: "teacher",
+        body: "Smoke desk mail",
+      }),
+    },
+    trainerCookies,
+  );
+  record(
+    "Trainer can send desk mail",
+    deskNote.status === 201 && typeof deskNote.json?.id === "string",
+    `HTTP ${deskNote.status}`,
   );
 
   const teacherProfile = await request("/api/teacher/profile/details", {}, teacherCookies);
@@ -164,7 +190,6 @@ async function main() {
   const teacherMe = await request("/api/teacher/me", {}, teacherCookies);
   record("Teacher session is not an admin session", teacherMe.status === 200 && teacherMe.json?.role !== "admin", `HTTP ${teacherMe.status}`);
 
-  const trainerCookies = cookieHeader(trainerLogin.setCookie);
   const trainerBatches = await request("/api/batches", {}, trainerCookies);
   record(
     "Trainer can list cohorts",

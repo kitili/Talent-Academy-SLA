@@ -16,6 +16,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, ClipboardCheck, BookOpen } from "lucide-react";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
+import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
@@ -38,6 +39,9 @@ export default function TeacherDashboard() {
 
   const { data: assignedWeeks = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/assigned-weeks"],
+  });
+  const { data: deskPeers = [] } = useQuery<any[]>({
+    queryKey: ["/api/teacher/desk-peers"],
   });
 
   const { data: deskNotices = [] } = useQuery<any[]>({
@@ -350,6 +354,13 @@ export default function TeacherDashboard() {
             Know what to learn, what to do next, and whether you have understood it.
           </p>
         </div>
+
+        {deskPeers[0] && (
+          <DeskMail
+            peer={{ id: deskPeers[0].id, name: deskPeers[0].name, role: deskPeers[0].role || "trainer" }}
+            selfLabel={teacher?.name || "Teacher"}
+          />
+        )}
 
         {deskNotices.length > 0 && (
           <Card className="sl-rise">

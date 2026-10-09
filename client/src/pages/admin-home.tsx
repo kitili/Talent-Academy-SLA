@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Users, Award, BarChart3, ArrowRight, FileText, Layers, CheckCircle, Megaphone } from "lucide-react";
+import { Users, Award, BarChart3, ArrowRight, FileText, Layers, CheckCircle, Megaphone, ClipboardList } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
 import {
   Dialog,
@@ -45,6 +45,13 @@ export default function AdminHome() {
   // Fetch dashboard stats
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/admin/dashboard-stats"],
+  });
+  const { data: health } = useQuery<any>({
+    queryKey: ["/api/health"],
+    queryFn: async () => {
+      const res = await fetch("/api/health");
+      return res.json();
+    },
   });
 
   // Reset password mutation
@@ -189,6 +196,15 @@ export default function AdminHome() {
           <p className="text-muted-foreground mt-1">Trainers, teachers, cohorts, and the gradebook.</p>
         </div>
 
+        {health && !health.blob && (
+          <Card className="p-4 border-primary/30">
+            <p className="font-semibold">Lesson files</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              This server has no Vercel Blob yet. Uploads stay on this machine until Blob is connected.
+            </p>
+          </Card>
+        )}
+
         {((stats?.pendingTrainers || 0) + (stats?.pendingTeachers || 0) > 0) && (
           <button
             type="button"
@@ -273,6 +289,7 @@ export default function AdminHome() {
         {/* Quick Navigation */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
+            { href: "/admin/handover", title: "Handover", text: "Three weeks for Silverleaf staff", icon: ClipboardList, test: "button-go-handover" },
             { href: "/approvals", title: "Approvals", text: "People waiting to come in", icon: CheckCircle, test: "button-go-approvals" },
             { href: "/admin/trainers", title: "Trainers", text: "Approvals and accounts", icon: Award, test: "button-go-trainers" },
             { href: "/admin/teachers", title: "Teachers", text: "Progress and files viewed", icon: Users, test: "button-go-teachers" },

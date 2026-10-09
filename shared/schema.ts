@@ -914,6 +914,25 @@ export const insertAssignmentSubmissionSchema = createInsertSchema(assignmentSub
 export type InsertAssignmentSubmission = z.infer<typeof insertAssignmentSubmissionSchema>;
 export type AssignmentSubmission = typeof assignmentSubmissions.$inferSelect;
 
+export const deskMessages = pgTable("desk_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromId: varchar("from_id").notNull(),
+  fromRole: varchar("from_role").notNull(),
+  fromName: varchar("from_name").notNull(),
+  toId: varchar("to_id").notNull(),
+  toRole: varchar("to_role").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDeskMessageSchema = createInsertSchema(deskMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDeskMessage = z.infer<typeof insertDeskMessageSchema>;
+export type DeskMessage = typeof deskMessages.$inferSelect;
+
 export const discussionPosts = pgTable("discussion_posts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   weekId: varchar("week_id").notNull().references(() => trainingWeeks.id, { onDelete: "cascade" }),
