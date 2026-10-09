@@ -12,6 +12,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ProfileSettingsDialog } from "@/components/ProfileSettingsDialog";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, ClipboardCheck, BookOpen } from "lucide-react";
@@ -62,19 +63,7 @@ export default function TeacherDashboard() {
   const [satisfactionCourseId, setSatisfactionCourseId] = useState("");
   const [workDrafts, setWorkDrafts] = useState<Record<string, string>>({});
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/teacher/logout", {
-        method: "POST",
-      });
-      if (!response.ok) {
-        throw new Error("Logout failed");
-      }
-    },
-    onSuccess: () => {
-      setLocation("/auth");
-    },
-  });
+  const { logoutMutation } = useAuth();
 
   // Fetch own reflections
   const { data: reflections = [] } = useQuery<any[]>({

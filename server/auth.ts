@@ -1,7 +1,7 @@
 // Username/Password Authentication - based on blueprint:javascript_auth_all_persistance
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -32,6 +32,41 @@ declare module 'express-session' {
 }
 
 const scryptAsync = promisify(scrypt);
+
+function sessionCookieClearOptions() {
+  return {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL),
+  };
+}
+
+export function endSession(req: Request, res: Response) {
+  if ((req.session as any)?.teacherId) {
+    delete (req.session as any).teacherId;
+  }
+  const done = () => {
+    res.clearCookie("connect.sid", sessionCookieClearOptions());
+    if (!res.headersSent) res.sendStatus(200);
+  };
+  const timer = setTimeout(done, 1500);
+  const finish = () => {
+    clearTimeout(timer);
+    done();
+  };
+  try {
+    if (typeof req.logout === "function") {
+      req.logout(() => {
+        req.session.destroy(() => finish());
+      });
+      return;
+    }
+    req.session.destroy(() => finish());
+  } catch {
+    finish();
+  }
+}
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -383,26 +418,8 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/logout", (req, res, next) => {
-    if ((req.session as any).teacherId) {
-      delete (req.session as any).teacherId;
-    }
-
-    const finish = () => {
-      req.session.destroy(() => {
-        res.clearCookie("connect.sid", { path: "/", httpOnly: true, sameSite: "lax" });
-        res.sendStatus(200);
-      });
-    };
-
-    if (typeof req.logout === "function") {
-      req.logout((err) => {
-        if (err) return next(err);
-        finish();
-      });
-    } else {
-      finish();
-    }
+  app.post("/api/logout", (req, res) => {
+    endSession(req, res);
   });
 
   app.get("/api/user", async (req, res) => {

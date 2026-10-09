@@ -3,7 +3,7 @@ import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { loginRateLimit } from "./security";
 import { hasDatabaseUrl } from "./db";
-import { hashPassword, comparePasswords } from "./auth";
+import { hashPassword, comparePasswords, endSession } from "./auth";
 import { Teacher as SelectTeacher } from "@shared/schema";
 
 // Extend Express Request type to include teacherId
@@ -133,13 +133,8 @@ export function setupTeacherAuth(app: Express) {
     }
   });
 
-  // Teacher logout
   app.post("/api/teacher/logout", (req, res) => {
-    (req.session as any).teacherId = undefined;
-    req.session.destroy(() => {
-      res.clearCookie("connect.sid", { path: "/", httpOnly: true, sameSite: "lax" });
-      res.sendStatus(200);
-    });
+    endSession(req, res);
   });
 
   // Get current teacher

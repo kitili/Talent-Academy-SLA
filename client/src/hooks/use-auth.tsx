@@ -114,21 +114,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      await Promise.allSettled([
+        fetch("/api/logout", { method: "POST", credentials: "include", signal: AbortSignal.timeout(4000) }),
+        fetch("/api/teacher/logout", { method: "POST", credentials: "include", signal: AbortSignal.timeout(4000) }),
+      ]);
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.setQueryData(["/api/user"], null);
+      queryClient.setQueryData(["/api/teacher/me"], null);
+      queryClient.removeQueries({ queryKey: ["/api/user"] });
       clearSessionUser();
       posthog.capture("user_logout");
       posthog.reset();
-      window.location.href = "/auth";
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      window.location.replace("/auth");
     },
   });
 
