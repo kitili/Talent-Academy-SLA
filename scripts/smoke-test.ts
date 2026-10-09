@@ -190,6 +190,13 @@ async function main() {
   const teacherMe = await request("/api/teacher/me", {}, teacherCookies);
   record("Teacher session is not an admin session", teacherMe.status === 200 && teacherMe.json?.role !== "admin", `HTTP ${teacherMe.status}`);
 
+  const deskPeers = await request("/api/teacher/desk-peers", {}, teacherCookies);
+  record(
+    "Teacher desk peers",
+    deskPeers.status === 200 && Array.isArray(deskPeers.json),
+    `HTTP ${deskPeers.status}`,
+  );
+
   const trainerBatches = await request("/api/batches", {}, trainerCookies);
   record(
     "Trainer can list cohorts",

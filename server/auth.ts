@@ -56,13 +56,18 @@ export function endSession(req: Request, res: Response) {
     done();
   };
   try {
-    if (typeof req.logout === "function") {
-      req.logout(() => {
+    const afterLogout = () => {
+      if (req.session && typeof req.session.destroy === "function") {
         req.session.destroy(() => finish());
-      });
+        return;
+      }
+      finish();
+    };
+    if (typeof req.logout === "function") {
+      req.logout(() => afterLogout());
       return;
     }
-    req.session.destroy(() => finish());
+    afterLogout();
   } catch {
     finish();
   }
@@ -344,7 +349,11 @@ export function setupAuth(app: Express) {
 
     } catch (error: any) {
       console.error('[AUTH] Multi-role login error:', error);
-      res.status(500).json({ message: error.message || "Login failed" });
+      const code = String(error?.code || error?.cause?.code || "");
+      if (code === "ETIMEDOUT" || code === "ECONNREFUSED" || code === "ENOTFOUND" || error?.name === "AggregateError") {
+        return res.status(503).json({ message: "Database is unreachable. Check Neon or the local Postgres URL." });
+      }
+      res.status(500).json({ message: "Login failed" });
     }
   });
 
