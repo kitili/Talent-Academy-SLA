@@ -1192,6 +1192,8 @@ export class DatabaseStorage implements IStorage {
         id: batches.id,
         name: batches.name,
         description: batches.description,
+        stage: batches.stage,
+        track: batches.track,
         createdBy: batches.createdBy,
         trainerId: batches.trainerId,
         createdAt: batches.createdAt,

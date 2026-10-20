@@ -1,8 +1,9 @@
-import { eq, sql } from "drizzle-orm";
-import { db } from "../server/db";
+import { and, eq, sql } from "drizzle-orm";
+import { db, ensureWrittenAssignmentTables } from "../server/db";
 import { hashPassword } from "../server/auth";
-import { users, teachers, batches, batchTeachers, teacherReportCards } from "@shared/schema";
+import { users, teachers, batches, batchTeachers, teacherReportCards, courses, trainingWeeks, batchCourses } from "@shared/schema";
 import { TEST_COHORTS, TEST_TEACHERS } from "./test-cohorts";
+import { LEARNING_STAGES, LESSON_STAGES } from "../shared/tanzaniaPath";
 
 /** Create a staff user only when missing. Never overwrite an existing hash. */
 async function ensureUser(opts: {
@@ -36,22 +37,71 @@ async function ensureUser(opts: {
 
 async function ensureCohort(adminId: string, trainerId: string, cohort: (typeof TEST_COHORTS)[number]) {
   const existing = await db.select().from(batches).where(eq(batches.id, cohort.id)).limit(1);
+  const values = {
+    name: cohort.name,
+    description: cohort.description,
+    stage: cohort.stage,
+    track: cohort.track,
+    createdBy: adminId,
+    trainerId,
+  };
   if (!existing[0]) {
-    await db.insert(batches).values({
-      id: cohort.id,
-      name: cohort.name,
-      description: cohort.description,
-      createdBy: adminId,
-      trainerId,
-    });
+    await db.insert(batches).values({ id: cohort.id, ...values });
     console.log(`created ${cohort.name} for ${cohort.trainerUsername}`);
     return;
   }
-  await db
-    .update(batches)
-    .set({ name: cohort.name, description: cohort.description, trainerId })
-    .where(eq(batches.id, cohort.id));
+  await db.update(batches).set(values).where(eq(batches.id, cohort.id));
   console.log(`kept ${cohort.name} with ${cohort.trainerUsername}`);
+}
+
+async function ensureStageCourse(stage: (typeof LEARNING_STAGES)[number], orderIndex: number) {
+  const objectives = `Government lesson: ${LESSON_STAGES.join(", ")}.`;
+  const values = {
+    name: stage.course,
+    description: stage.summary,
+    objectives,
+    stage: stage.id,
+    track: stage.track,
+    publishStatus: "published",
+    orderIndex,
+  };
+  const byId = await db.select().from(courses).where(eq(courses.id, stage.courseId)).limit(1);
+  const byName = byId[0]
+    ? byId
+    : await db.select().from(courses).where(eq(courses.name, stage.course)).limit(1);
+  let courseId = byName[0]?.id;
+  if (!courseId) {
+    const [created] = await db.insert(courses).values({ id: stage.courseId, ...values }).returning();
+    courseId = created.id;
+    console.log(`created course ${stage.course}`);
+  } else {
+    await db.update(courses).set(values).where(eq(courses.id, courseId));
+    console.log(`kept course ${stage.course}`);
+  }
+
+  const existingWeeks = await db.select().from(trainingWeeks).where(eq(trainingWeeks.courseId, courseId));
+  for (let index = 0; index < stage.modules.length; index += 1) {
+    const weekNumber = index + 1;
+    const module = stage.modules[index];
+    const found = existingWeeks.find((week) => week.weekNumber === weekNumber);
+    if (!found) {
+      await db.insert(trainingWeeks).values({
+        courseId,
+        weekNumber,
+        competencyFocus: module.focus,
+        objective: module.objective,
+      });
+      continue;
+    }
+    const hasFiles = Array.isArray(found.deckFiles) && found.deckFiles.length > 0;
+    if (!hasFiles) {
+      await db.update(trainingWeeks).set({
+        competencyFocus: module.focus,
+        objective: module.objective,
+      }).where(eq(trainingWeeks.id, found.id));
+    }
+  }
+  return courseId;
 }
 
 async function ensureTeacher(email: string, name: string) {
@@ -94,6 +144,7 @@ async function ensureTeacher(email: string, name: string) {
 }
 
 async function main() {
+  await ensureWrittenAssignmentTables();
   const adminId = await ensureUser({
     username: "admin",
     email: "admin@silverleaf.com",
@@ -143,6 +194,11 @@ async function main() {
     teacherIds.set(teacher.email.toLowerCase(), await ensureTeacher(teacher.email, teacher.name));
   }
 
+  const courseIdByStage = new Map<string, string>();
+  for (const [index, stage] of LEARNING_STAGES.entries()) {
+    courseIdByStage.set(stage.id, await ensureStageCourse(stage, index));
+  }
+
   for (const cohort of TEST_COHORTS) {
     const trainerId = trainerIds.get(cohort.trainerUsername);
     if (!trainerId) throw new Error(`Missing trainer ${cohort.trainerUsername}`);
@@ -159,6 +215,17 @@ async function main() {
         await db.insert(batchTeachers).values({ batchId: cohort.id, teacherId });
         console.log(`enrolled ${email} in ${cohort.name}`);
       }
+    }
+    const courseId = courseIdByStage.get(cohort.stage);
+    if (!courseId) throw new Error(`Missing course for ${cohort.stage}`);
+    const assigned = await db
+      .select()
+      .from(batchCourses)
+      .where(and(eq(batchCourses.batchId, cohort.id), eq(batchCourses.courseId, courseId)))
+      .limit(1);
+    if (!assigned[0]) {
+      await db.insert(batchCourses).values({ batchId: cohort.id, courseId, assignedBy: adminId });
+      console.log(`assigned ${cohort.name} its course`);
     }
   }
   console.log("test accounts and batches ready; existing hashes were not overwritten");

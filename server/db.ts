@@ -92,6 +92,10 @@ export async function ensureWrittenAssignmentTables() {
       created_at timestamp DEFAULT now()
     );
     ALTER TABLE courses ADD COLUMN IF NOT EXISTS publish_status varchar NOT NULL DEFAULT 'published';
+    ALTER TABLE courses ADD COLUMN IF NOT EXISTS stage varchar;
+    ALTER TABLE courses ADD COLUMN IF NOT EXISTS track varchar;
+    ALTER TABLE batches ADD COLUMN IF NOT EXISTS stage varchar;
+    ALTER TABLE batches ADD COLUMN IF NOT EXISTS track varchar;
     ALTER TABLE courses ADD COLUMN IF NOT EXISTS objectives text;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS pass_mark integer NOT NULL DEFAULT 80;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS shuffle_questions varchar NOT NULL DEFAULT 'yes';

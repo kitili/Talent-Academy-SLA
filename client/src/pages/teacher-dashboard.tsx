@@ -19,6 +19,7 @@ import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, 
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
+import { LearningPath, activeStagesFromNames } from "@/components/LearningPath";
 import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
@@ -354,9 +355,10 @@ export default function TeacherDashboard() {
         <PlaceBanner
           place="garden"
           title={`Welcome, ${teacher?.name || "teacher"}`}
-          subtitle="You are an adult teacher in training. The classrooms in these pictures are the young pupils you are preparing to teach."
+          subtitle="Adult teacher. The pictures are the pupils you will teach."
           titleTestId="text-welcome"
         />
+        <LearningPath activeStageIds={activeStagesFromNames(assignedWeeks.map((week: any) => week.courseName))} />
 
         {deskPeers[0] && (
           <DeskMail

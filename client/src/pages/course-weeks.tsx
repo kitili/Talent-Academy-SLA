@@ -799,6 +799,9 @@ export default function CourseWeeks() {
             title={isLoadingCourse ? "Course" : course?.name || "Course"}
             subtitle={course?.description || "Course, then module, then lesson. A lesson is finished when every required quiz is passed."}
           />
+          <p className="text-xs text-muted-foreground" data-testid="lesson-stages">
+            Plan each module as Introduction, Competence development, Design, then Realisation.
+          </p>
           {isTrainer && (
             <Button
               onClick={() => createWeekMutation.mutate()}

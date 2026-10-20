@@ -22,6 +22,8 @@ interface Batch {
   id: string;
   name: string;
   description: string | null;
+  stage?: string | null;
+  track?: string | null;
   createdBy: string;
   trainerId: string | null;
   createdAt: string;
@@ -136,6 +138,9 @@ export default function AdminBatches() {
                     <div className="flex items-center gap-2 mb-2">
                       <Layers className="h-5 w-5 text-muted-foreground" />
                       <h3 className="text-lg font-semibold" data-testid={`text-batch-name-${batch.id}`}>{batch.name}</h3>
+                      {batch.track && (
+                        <Badge variant="secondary">{batch.track === "secondary" ? "Secondary" : "Primary"}</Badge>
+                      )}
                     </div>
                     {batch.description && (
                       <p className="text-sm text-muted-foreground mb-3">

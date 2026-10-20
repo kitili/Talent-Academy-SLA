@@ -8,6 +8,7 @@ import { Users, Award, BarChart3, ArrowRight, FileText, Layers, CheckCircle, Meg
 import { AcademyShell } from "@/components/AcademyShell";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceBanner, PlaceCover, type PlaceName } from "@/components/PlaceArt";
+import { LearningPath } from "@/components/LearningPath";
 import { ADMIN_TOUR } from "@shared/guidedTour";
 import {
   Dialog,
@@ -220,8 +221,9 @@ export default function AdminHome() {
         <PlaceBanner
           place="library"
           title={`Welcome back${user?.username ? `, ${user.username}` : ""}`}
-          subtitle="Batches of adult teachers who will teach young pupils."
+          subtitle="Primary trainers through Standard 7. Secondary trainers for Form I."
         />
+        <LearningPath />
 
         {health && !health.blob && (
           <Card className="p-4 border-primary/30">

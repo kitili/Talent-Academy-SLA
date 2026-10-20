@@ -2292,6 +2292,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batch = await storage.createBatch({
         name: req.body.name,
         description: req.body.description,
+        stage: req.body.stage || null,
+        track: req.body.track === "secondary" ? "secondary" : req.body.track === "primary" ? "primary" : null,
         createdBy: req.user!.id,
       });
       res.status(201).json(batch);
@@ -2336,6 +2338,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting batch:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/batches/:batchId", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const existing = await storage.getBatch(req.params.batchId);
+      if (!existing) return res.status(404).json({ error: "Batch not found" });
+      const [updated] = await db.update(batches).set({
+        name: req.body.name ? String(req.body.name) : existing.name,
+        description: req.body.description !== undefined ? req.body.description : existing.description,
+        stage: req.body.stage !== undefined ? req.body.stage : existing.stage,
+        track: req.body.track !== undefined ? req.body.track : existing.track,
+      }).where(eq(batches.id, existing.id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating batch:", error);
+      res.status(500).json({ error: "Failed to update batch" });
     }
   });
 
@@ -4128,11 +4147,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create course (admin only)
   app.post("/api/courses", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const { name, description, orderIndex, objectives, publishStatus } = req.body;
+      const { name, description, orderIndex, objectives, publishStatus, stage, track } = req.body;
       const course = await storage.createCourse({
         name,
         description,
         objectives,
+        stage: stage || null,
+        track: track === "secondary" ? "secondary" : track === "primary" ? "primary" : null,
         publishStatus: publishStatus === "draft" ? "draft" : "published",
         orderIndex: orderIndex || 0,
       });
