@@ -1057,3 +1057,12 @@ body {
 .sl-lesson {
   animation: sl-rise 0.4s ease-out;
 }
+
+.sla-tour-target {
+  position: relative;
+  z-index: 81;
+  outline: 3px solid white;
+  outline-offset: 4px;
+  border-radius: 16px;
+  box-shadow: 0 0 0 6px hsl(var(--primary));
+}

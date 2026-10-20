@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Users, Award, BarChart3, ArrowRight, FileText, Layers, CheckCircle, Megaphone, ClipboardList } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
+import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
+import { ADMIN_TOUR } from "@shared/guidedTour";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { clearSessionUser } from "@/lib/sessionUser";
 
 interface DashboardStats {
   totalTrainers: number;
@@ -41,6 +44,9 @@ export default function AdminHome() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState("");
   const [noticeMessage, setNoticeMessage] = useState("");
+  const [freshOpen, setFreshOpen] = useState(false);
+  const [freshPhrase, setFreshPhrase] = useState("");
+  const tour = useGuidedTour("sla-tour-admin-v1");
 
   // Fetch dashboard stats
   const { data: stats, isLoading } = useQuery<DashboardStats>({
@@ -81,6 +87,24 @@ export default function AdminHome() {
     onError: (error: Error) => toast({ title: "Could not send notice", description: error.message, variant: "destructive" }),
   });
 
+  const freshStartMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/fresh-start", { confirm: freshPhrase.trim() });
+      return res.json();
+    },
+    onSuccess: (data: { removedRows?: number }) => {
+      toast({
+        title: "Academy activity cleared",
+        description: `${data.removedRows || 0} rows removed. Sign in again with the same account. The password is unchanged.`,
+      });
+      setFreshOpen(false);
+      setFreshPhrase("");
+      clearSessionUser();
+      window.setTimeout(() => window.location.assign("/auth"), 900);
+    },
+    onError: (error: Error) => toast({ title: "Could not clear activity", description: error.message, variant: "destructive" }),
+  });
+
   if (user?.role !== "admin") {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -106,6 +130,7 @@ export default function AdminHome() {
       onLogout={() => logoutMutation.mutate()}
       actions={
         <>
+          <TourButton onClick={tour.replay} testId="button-admin-tour" />
           <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
             <DialogTrigger asChild>
               <Button variant="secondary" className="bg-white/10 text-white border-white/20 hover:bg-white/20" data-testid="button-academy-notice">
@@ -221,13 +246,13 @@ export default function AdminHome() {
 
         {/* Stats Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" data-tour="admin-stats">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i} className="p-6 animate-pulse bg-muted h-32" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" data-tour="admin-stats">
             <Card className="p-6 sl-stat-card sl-rise">
               <div className="flex items-center justify-between">
                 <div>
@@ -287,7 +312,7 @@ export default function AdminHome() {
         )}
 
         {/* Quick Navigation */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-tour="admin-nav">
           {[
             { href: "/admin/handover", title: "Handover", text: "Three weeks for Silverleaf staff", icon: ClipboardList, test: "button-go-handover" },
             { href: "/approvals", title: "Approvals", text: "People waiting to come in", icon: CheckCircle, test: "button-go-approvals" },
@@ -318,6 +343,61 @@ export default function AdminHome() {
             );
           })}
         </div>
+
+        <Card className="p-4 border-destructive/30" data-tour="admin-fresh">
+          <p className="font-semibold">Start fresh</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Clears courses, cohorts, progress, quizzes, certificates, notices, and messages.
+            Admin, trainer, and teacher logins stay. Passwords are not shown or changed.
+          </p>
+          <Dialog open={freshOpen} onOpenChange={setFreshOpen}>
+            <DialogTrigger asChild>
+              <Button variant="destructive" className="mt-3" data-testid="button-fresh-start">
+                Clear previous activity
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clear previous activity</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <p className="text-sm text-muted-foreground">
+                  This removes what people have done in the academy so you can import again.
+                  Accounts remain. Everyone is signed out and uses the same password to come back.
+                  Type CLEAR ACTIVITY to confirm.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="fresh-phrase">Confirmation</Label>
+                  <Input
+                    id="fresh-phrase"
+                    value={freshPhrase}
+                    onChange={(e) => setFreshPhrase(e.target.value)}
+                    placeholder="CLEAR ACTIVITY"
+                    data-testid="input-fresh-phrase"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setFreshOpen(false)}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  data-testid="button-confirm-fresh-start"
+                  disabled={freshStartMutation.isPending || freshPhrase.trim() !== "CLEAR ACTIVITY"}
+                  onClick={() => freshStartMutation.mutate()}
+                >
+                  Clear activity
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </Card>
+        <GuidedTour
+          open={tour.open}
+          steps={ADMIN_TOUR}
+          index={tour.index}
+          onIndex={tour.setIndex}
+          onClose={tour.close}
+        />
     </AcademyShell>
   );
 }

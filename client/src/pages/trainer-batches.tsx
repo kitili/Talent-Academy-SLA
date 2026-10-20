@@ -21,6 +21,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar } from "lucide-react";
+import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
+import { TRAINER_TOUR } from "@shared/guidedTour";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
@@ -31,6 +33,7 @@ export default function TrainerBatches() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, logoutMutation } = useAuth();
+  const tour = useGuidedTour("sla-tour-trainer-v1");
   const [addTeacherOpen, setAddTeacherOpen] = useState(false);
   const [assignCheckpointQuizOpen, setAssignCheckpointQuizOpen] = useState(false);
   const [assignFileQuizOpen, setAssignFileQuizOpen] = useState(false);
@@ -553,6 +556,32 @@ export default function TrainerBatches() {
             <div className="text-xs sm:text-sm text-white/90 hidden md:block truncate max-w-[200px]" data-testid="text-user-info">
               {user?.username}
             </div>
+            <TourButton onClick={tour.replay} testId="button-trainer-tour" />
+            <Button
+              variant="secondary"
+              size="sm"
+              asChild
+              data-testid="button-trainer-courses"
+              data-tour="trainer-courses"
+              className="hidden sm:flex bg-white/10 hover:bg-white/20 text-white border-white/20"
+            >
+              <Link href="/courses">
+                <BookOpen className="mr-2 h-4 w-4" />
+                Courses
+              </Link>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              asChild
+              data-testid="button-trainer-approvals"
+              className="hidden md:flex bg-white/10 hover:bg-white/20 text-white border-white/20"
+            >
+              <Link href="/approvals">
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approvals
+              </Link>
+            </Button>
             <Button
               variant="secondary"
               size="sm"
@@ -618,7 +647,7 @@ export default function TrainerBatches() {
         {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
           {/* Left Sidebar - Batch List */}
-          <div className="lg:col-span-1 border rounded-lg bg-card overflow-hidden flex flex-col">
+          <div className="lg:col-span-1 border rounded-lg bg-card overflow-hidden flex flex-col" data-tour="trainer-batches">
             <div className="p-4 border-b space-y-2">
               <h3 className="font-semibold">Your Batches</h3>
               <p className="text-xs text-muted-foreground mt-1">{filteredBatches.length} total</p>
@@ -695,7 +724,7 @@ export default function TrainerBatches() {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
-                <TabsList className="grid w-full grid-cols-6 flex-shrink-0 rounded-none border-b">
+                <TabsList className="grid w-full grid-cols-6 flex-shrink-0 rounded-none border-b" data-tour="trainer-tools">
                   <TabsTrigger value="teachers" data-testid="tab-teachers">
                     <Users className="mr-1 h-4 w-4" />
                     <span className="hidden sm:inline">Teachers</span>
@@ -1958,6 +1987,13 @@ export default function TrainerBatches() {
           </div>
         </DialogContent>
       </Dialog>
+      <GuidedTour
+        open={tour.open}
+        steps={TRAINER_TOUR}
+        index={tour.index}
+        onIndex={tour.setIndex}
+        onClose={tour.close}
+      />
     </SceneBackdrop>
   );
 }

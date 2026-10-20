@@ -304,6 +304,52 @@ async function main() {
     );
   }
 
+  const roleBlocked = async (name: string, path: string, jar: string, method = "GET", body?: unknown) => {
+    const res = await request(path, {
+      method,
+      body: body ? JSON.stringify(body) : undefined,
+    }, jar);
+    record(name, res.status === 401 || res.status === 403, `HTTP ${res.status}`);
+  };
+  await roleBlocked("Teacher cannot open cohorts", "/api/batches", teacherCookies);
+  await roleBlocked("Teacher cannot open the staff lesson list", "/api/training-weeks", teacherCookies);
+  await roleBlocked("Teacher cannot open admin stats", "/api/admin/dashboard-stats", teacherCookies);
+  await roleBlocked("Teacher cannot clear the academy", "/api/admin/fresh-start", teacherCookies, "POST", { confirm: "CLEAR ACTIVITY" });
+  await roleBlocked("Trainer cannot open admin stats", "/api/admin/dashboard-stats", trainerCookies);
+  await roleBlocked("Trainer cannot clear the academy", "/api/admin/fresh-start", trainerCookies, "POST", { confirm: "CLEAR ACTIVITY" });
+  await roleBlocked("Trainer cannot assign a trainer to a class", "/api/batches/not-a-batch/trainer", trainerCookies, "PUT", { trainerId: "someone" });
+
+  const openCourses = await request("/api/courses");
+  record("Course catalog requires a login", openCourses.status === 401, `HTTP ${openCourses.status}`);
+  record(
+    "Login responses hide passwords",
+    !("password" in (login.json || {})) && !("password" in (trainerLogin.json || {})) && !("password" in (teacherLogin.json || {})),
+    "password field absent",
+  );
+
+  const hidden = await request("/api/batches", {
+    method: "POST",
+    body: JSON.stringify({ name: `Hidden cohort ${stamp}`, description: "not assigned to trainer1" }),
+  }, cookies);
+  record("Admin can create a cohort", hidden.status === 201 && typeof hidden.json?.id === "string", `HTTP ${hidden.status}`);
+  if (hidden.json?.id) {
+    const trainerView = await request("/api/batches", {}, trainerCookies);
+    const ids = Array.isArray(trainerView.json) ? trainerView.json.map((batch: any) => batch.id) : [];
+    record(
+      "Trainer does not see an unassigned cohort",
+      trainerView.status === 200 && !ids.includes(hidden.json.id),
+      `visible=${ids.length}`,
+    );
+    const peek = await request(`/api/batches/${hidden.json.id}`, {}, trainerCookies);
+    record("Trainer cannot open an unassigned cohort", peek.status === 403 || peek.status === 404, `HTTP ${peek.status}`);
+    const removedHidden = await request(`/api/batches/${hidden.json.id}`, { method: "DELETE" }, cookies);
+    record("Admin can remove the test cohort", removedHidden.status === 204 || removedHidden.status === 200, `HTTP ${removedHidden.status}`);
+  } else {
+    record("Trainer does not see an unassigned cohort", false, "cohort was not created");
+    record("Trainer cannot open an unassigned cohort", false, "cohort was not created");
+    record("Admin can remove the test cohort", false, "cohort was not created");
+  }
+
   const reset = await request("/api/emergency-admin-reset", {
     method: "POST",
     body: JSON.stringify({ masterKey: "x", username: "admin", newPassword: "admin123" }),
