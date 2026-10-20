@@ -1,6 +1,6 @@
 # Teacher (learner) guide
 
-Sign in with your email and password on the Teacher tab.
+Sign in with your email and password on the Teacher tab. The first visit opens a short tour. **Tour** in the header replays it.
 
 1. **My learning** lists each course, the percent finished, and a status: Not Started, In Progress, Completed, Passed, Failed, or Locked.
 2. Open the next unlocked module. Read the lesson, then press **I have read this lesson**.

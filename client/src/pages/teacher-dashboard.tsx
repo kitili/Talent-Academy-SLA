@@ -17,6 +17,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, ClipboardCheck, BookOpen } from "lucide-react";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
+import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
+import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
@@ -64,6 +66,7 @@ export default function TeacherDashboard() {
   const [workDrafts, setWorkDrafts] = useState<Record<string, string>>({});
 
   const { logoutMutation } = useAuth();
+  const tour = useGuidedTour("sla-tour-teacher-v1");
 
   // Fetch own reflections
   const { data: reflections = [] } = useQuery<any[]>({
@@ -301,6 +304,18 @@ export default function TeacherDashboard() {
             <div className="text-xs sm:text-sm text-white/90 hidden md:block truncate max-w-[200px]" data-testid="text-user-info">
               {teacher?.name} (Teacher ID: {teacher?.teacherId})
             </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setLocation("/teacher/certificates")}
+              data-testid="button-teacher-certificates"
+              data-tour="teacher-certificates"
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+            >
+              <GraduationCap className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Certificates</span>
+            </Button>
+            <TourButton onClick={tour.replay} testId="button-teacher-tour" />
             <ProfileSettingsDialog
               userType="teacher"
               currentEmail={teacher?.email}
@@ -426,7 +441,7 @@ export default function TeacherDashboard() {
           );
         })()}
 
-        <Card className="sl-continue shadow-lg rounded-xl">
+        <Card className="sl-continue shadow-lg rounded-xl" data-tour="teacher-continue">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
@@ -464,7 +479,7 @@ export default function TeacherDashboard() {
           </CardContent>
         </Card>
 
-        <Card id="my-learning" className="sl-rise sl-stat-card">
+        <Card id="my-learning" className="sl-rise sl-stat-card" data-tour="teacher-learning">
           <CardHeader>
             <CardTitle>My learning</CardTitle>
             <CardDescription>
@@ -582,7 +597,7 @@ export default function TeacherDashboard() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4" data-tour="teacher-progress">
           <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-medium">Level</CardTitle>
@@ -1159,6 +1174,13 @@ export default function TeacherDashboard() {
         </Card>
 
         <TeacherLearnerNav />
+        <GuidedTour
+          open={tour.open}
+          steps={TEACHER_TOUR}
+          index={tour.index}
+          onIndex={tour.setIndex}
+          onClose={tour.close}
+        />
       </div>
     </div>
   );

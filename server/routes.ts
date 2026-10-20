@@ -14,7 +14,8 @@ import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
 import * as mammoth from "mammoth";
-import { db, getDatabaseUrl } from "./db";
+import { db, getDatabaseUrl, pool } from "./db";
+import { clearAcademyActivity, FRESH_START_PHRASE } from "./freshStart";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
@@ -3855,6 +3856,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ sent });
     } catch (error) {
       console.error("Error sending academy notice:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/fresh-start", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      if (String(req.body?.confirm || "") !== FRESH_START_PHRASE) {
+        return res.status(400).json({ error: "Type CLEAR ACTIVITY to confirm" });
+      }
+      const summary = await clearAcademyActivity(pool);
+      await recordAudit({
+        actorId: req.user?.id,
+        actorRole: req.user?.role,
+        action: "fresh_start",
+        targetType: "academy",
+        metadata: { removedRows: summary.removedRows },
+      });
+      res.json({
+        ok: true,
+        removedRows: summary.removedRows,
+        kept: summary.kept,
+      });
+    } catch (error) {
+      console.error("Error clearing academy activity:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
