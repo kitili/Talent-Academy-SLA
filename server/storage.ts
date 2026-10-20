@@ -3032,7 +3032,6 @@ export class DatabaseStorage implements IStorage {
       SELECT
         ar.teacher_id,
         t.name as teacher_name,
-        t.cnic,
         COUNT(*) as total_days,
         COUNT(*) FILTER (WHERE ar.status = 'present') as present_days,
         COUNT(*) FILTER (WHERE ar.status = 'absent') as absent_days,
@@ -3045,7 +3044,7 @@ export class DatabaseStorage implements IStorage {
       FROM attendance_records ar
       JOIN teachers t ON ar.teacher_id = t.id
       WHERE ar.batch_id = ${batchId}
-      GROUP BY ar.teacher_id, t.name, t.cnic
+      GROUP BY ar.teacher_id, t.name
       ORDER BY attendance_rate DESC
     `);
 

@@ -1,4 +1,4 @@
-const CACHE = "silverleaf-shell-v1";
+const CACHE = "silverleaf-shell-v2";
 const SHELL = ["/", "/offline.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -6,7 +6,11 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
@@ -18,13 +22,31 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+        }
         return response;
       })
       .catch(async () => {
         const cached = await caches.match(request);
-        return cached || caches.match("/offline.html");
+        if (cached) return cached;
+        if (request.mode === "navigate") {
+          const lastLesson = await caches.match("/offline-lesson");
+          if (lastLesson) return lastLesson;
+        }
+        return caches.match("/offline.html");
       }),
+  );
+});
+
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  if (data.type !== "cache-lesson" || typeof data.html !== "string") return;
+  const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${String(data.title || "Last lesson")}</title></head><body>${data.html}</body></html>`;
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.put("/offline-lesson", new Response(page, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    }))),
   );
 });

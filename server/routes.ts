@@ -24,6 +24,7 @@ import { recordAudit } from "./audit";
 import { sanitizeLessonHtml } from "./htmlSanitize";
 import { signFileGrant, verifyFileGrant } from "./fileGrant";
 import { passMarkOf, shuffleQuestions } from "./quizDelivery";
+import { normalizeManualQuestions } from "./quizService";
 import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
@@ -85,6 +86,19 @@ function fileRequestAllowed(req: Request) {
 function publishedOnly<T extends { publishStatus?: string | null }>(rows: T[], req: Request) {
   if (isAcademyStaff(req.user)) return rows;
   return rows.filter((row) => row.publishStatus !== "draft");
+}
+
+async function teacherRecordAllowed(req: Request, teacherId: string) {
+  const sessionTeacherId = (req.session as any)?.teacherId as string | undefined;
+  if (sessionTeacherId && sessionTeacherId === teacherId) return true;
+  if (req.user?.role === "admin") return true;
+  if (req.user?.role !== "trainer" || !req.user.id) return false;
+  const owned = await storage.getAllBatches(req.user.id);
+  for (const batch of owned) {
+    const enrolled = await storage.getTeachersInBatch(batch.id);
+    if (enrolled.some((teacher) => teacher.id === teacherId)) return true;
+  }
+  return false;
 }
 
 async function notifyTeacher(teacherId: string, title: string, message: string, type = "general", metadata: Record<string, unknown> = {}) {
@@ -2427,6 +2441,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Provide teacherId, teacherEmail, or teacherName" });
       }
 
+      const already = await storage.getTeachersInBatch(req.params.batchId);
+      if (already.some((row) => row.id === teacher.id)) {
+        return res.status(200).json({ message: "Teacher already in batch", teacher: { id: teacher.teacherId, name: teacher.name } });
+      }
+
       await storage.addTeacherToBatch({
         batchId: req.params.batchId,
         teacherId: teacher.id,
@@ -2543,25 +2562,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Training week not found" });
       }
 
-      if (!week.deckFiles || week.deckFiles.length === 0) {
+      const manualQuestions = Array.isArray(req.body?.questions)
+        ? normalizeManualQuestions(req.body.questions)
+        : null;
+      if (manualQuestions && manualQuestions.length === 0) {
+        return res.status(400).json({ error: "Add at least one valid question. Each choice needs options and a correct answer." });
+      }
+      if (!manualQuestions && (!week.deckFiles || week.deckFiles.length === 0)) {
         return res.status(400).json({ error: "No files available for quiz generation" });
       }
 
-      // Generate quiz using the quiz service
-      const { generateQuizQuestions } = await import('./quizService');
-
-      const fileUrls = week.deckFiles.map(file => ({
-        url: file.fileUrl,
-        name: file.fileName,
-      }));
-
-      const questions = await generateQuizQuestions({
-        fileUrls,
-        competencyFocus: week.competencyFocus,
-        objective: week.objective,
-        numQuestions,
-        openEndedCount,
-      });
+      let questions = manualQuestions;
+      if (!questions) {
+        const { generateQuizQuestions } = await import('./quizService');
+        const fileUrls = (week.deckFiles || []).map(file => ({
+          url: file.fileUrl,
+          name: file.fileName,
+        }));
+        questions = await generateQuizQuestions({
+          fileUrls,
+          competencyFocus: week.competencyFocus,
+          objective: week.objective,
+          numQuestions,
+          openEndedCount,
+        });
+      }
 
       // Create assigned quiz
       const assignedQuiz = await storage.createAssignedQuiz({
@@ -2569,7 +2594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         weekId,
         title,
         description,
-        numQuestions,
+        numQuestions: questions.length,
         passMark: passMarkOf(req.body?.passMark),
         questions,
         assignedBy: req.user!.id,
@@ -2607,33 +2632,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Training week not found" });
       }
 
-      if (!week.deckFiles || week.deckFiles.length === 0) {
+      const manualQuestions = Array.isArray(req.body?.questions)
+        ? normalizeManualQuestions(req.body.questions)
+        : null;
+      if (manualQuestions && manualQuestions.length === 0) {
+        return res.status(400).json({ error: "Add at least one valid question. Each choice needs options and a correct answer." });
+      }
+      if (!manualQuestions && (!week.deckFiles || week.deckFiles.length === 0)) {
         return res.status(400).json({ error: "No files available for quiz generation" });
       }
 
-      // Find the specific file
-      const selectedFile = week.deckFiles.find(file => file.id === fileId);
+      const selectedFile = manualQuestions
+        ? (week.deckFiles || []).find(file => file.id === fileId) || { id: fileId, fileName: title || "Lesson" }
+        : (week.deckFiles || []).find(file => file.id === fileId);
       if (!selectedFile) {
         return res.status(404).json({ error: "File not found in this training week" });
       }
 
-      // Generate quiz using the quiz service
-      const { generateQuizQuestions } = await import('./quizService');
+      let questions = manualQuestions;
+      if (!questions) {
+        const { generateQuizQuestions } = await import('./quizService');
+        const fileUrls = [{
+          url: selectedFile.fileUrl,
+          name: selectedFile.fileName,
+        }];
+        questions = await generateQuizQuestions({
+          fileUrls,
+          competencyFocus: week.competencyFocus,
+          objective: week.objective,
+          numQuestions,
+        });
+      }
 
-      // Use only the selected file for quiz generation
-      const fileUrls = [{
-        url: selectedFile.fileUrl,
-        name: selectedFile.fileName,
-      }];
-
-      const questions = await generateQuizQuestions({
-        fileUrls,
-        competencyFocus: week.competencyFocus,
-        objective: week.objective,
-        numQuestions,
-      });
-
-      // Create assigned quiz with file information
       const assignedQuiz = await storage.createAssignedQuiz({
         batchId: req.params.batchId,
         weekId,
@@ -2641,7 +2671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileName: selectedFile.fileName,
         title,
         description,
-        numQuestions,
+        numQuestions: questions.length,
         passMark: passMarkOf(req.body?.passMark),
         questions,
         assignedBy: req.user!.id,
@@ -3620,6 +3650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If passed, unlock next content and mark this as completed
       let generatedCertificate = null;
+      const week = await storage.getTrainingWeek(weekId);
       if (graded.passed) {
         await storage.upsertTeacherContentProgress({
           teacherId,
@@ -3628,9 +3659,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: "completed",
           completedAt: new Date(),
         });
-        
-        // Unlock next content file
-        const week = await storage.getTrainingWeek(weekId);
+
+        let unlockedLesson = "";
         if (week && week.deckFiles) {
           const currentIndex = week.deckFiles.findIndex(f => f.id === deckFileId);
           if (currentIndex >= 0 && currentIndex < week.deckFiles.length - 1) {
@@ -3641,9 +3671,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
               deckFileId: nextFile.id,
               status: "available",
             });
+            unlockedLesson = nextFile.fileName || "the next lesson";
           }
         }
-        
+        if (unlockedLesson) {
+          notifyTeacher(
+            teacherId,
+            "Next lesson is open",
+            `You passed the quiz. ${unlockedLesson} is ready.`,
+            "general",
+            { weekId },
+          ).catch((error) => console.error("Unlock notice failed:", error));
+        } else if (week?.courseId) {
+          const siblings = await storage.getWeeksForCourse(week.courseId);
+          const nextWeek = siblings.find((item) => (item.weekNumber || 0) > (week.weekNumber || 0));
+          if (nextWeek) {
+            notifyTeacher(
+              teacherId,
+              "Next module is open",
+              `Module ${nextWeek.weekNumber}${nextWeek.competencyFocus ? `: ${nextWeek.competencyFocus}` : ""} is ready.`,
+              "general",
+              { weekId: nextWeek.id },
+            ).catch((error) => console.error("Unlock notice failed:", error));
+          }
+        }
+
         // Try to auto-generate certificate if teacher has >= 90% course completion
         if (week && week.courseId) {
           try {
@@ -3660,6 +3712,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get current attempt count for this quiz generation
       const attempts = await storage.getTeacherContentQuizAttempts(teacherId, weekId, deckFileId, quizGenerationId);
       const canRegenerate = attempts.length >= 3 && !graded.passed;
+      if (!graded.passed) {
+        const failCount = attempts.filter((attempt) => attempt.passed === "no").length;
+        if (failCount >= 2) {
+          notifyTeacher(
+            teacherId,
+            "Quiz needs another try",
+            `You have missed this quiz ${failCount} times. Open the lesson again before the last attempt.`,
+            "general",
+            { weekId, deckFileId },
+          ).catch((error) => console.error("Fail-streak notice failed:", error));
+        }
+      }
 
       if (teacherId) {
         await storage.refreshTeacherReportCard(teacherId);
@@ -4211,8 +4275,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get courses for batch
-  app.get("/api/batches/:batchId/courses", async (req, res) => {
+  app.get("/api/batches/:batchId/courses", isAuthenticatedAny, async (req, res) => {
     try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      const sessionTeacherId = (req.session as any)?.teacherId as string | undefined;
+      let allowed = staffCanAccessBatch(req.user, batch);
+      if (!allowed && sessionTeacherId) {
+        const enrolled = await storage.getTeachersInBatch(batch.id);
+        allowed = enrolled.some((teacher) => teacher.id === sessionTeacherId);
+      }
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
       const courses = await storage.getCoursesForBatch(req.params.batchId);
       res.json(courses);
     } catch (error) {
@@ -4234,8 +4307,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get courses for teacher (assigned to their batches)
-  app.get("/api/teacher/:teacherId/courses", async (req, res) => {
+  app.get("/api/teacher/:teacherId/courses", isAuthenticatedAny, async (req, res) => {
     try {
+      if (!(await teacherRecordAllowed(req, req.params.teacherId))) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const courses = await storage.getCoursesForTeacher(req.params.teacherId);
       res.json(courses);
     } catch (error) {
@@ -4322,8 +4398,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get teacher certificate
-  app.get("/api/teacher/:teacherId/certificates/:batchId/:courseId", async (req, res) => {
+  app.get("/api/teacher/:teacherId/certificates/:batchId/:courseId", isAuthenticatedAny, async (req, res) => {
     try {
+      if (!(await teacherRecordAllowed(req, req.params.teacherId))) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const cert = await storage.getTeacherCertificate(req.params.teacherId, req.params.batchId, req.params.courseId);
       res.json(cert || null);
     } catch (error) {
@@ -4333,8 +4412,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all certificates for teacher
-  app.get("/api/teacher/:teacherId/certificates", async (req, res) => {
+  app.get("/api/teacher/:teacherId/certificates", isAuthenticatedAny, async (req, res) => {
     try {
+      if (!(await teacherRecordAllowed(req, req.params.teacherId))) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const courses = await storage.getCoursesForTeacher(req.params.teacherId);
       for (const course of courses) {
         try {
@@ -5023,11 +5105,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Satisfaction Score Endpoints
 
   // Submit a satisfaction score (any authenticated role)
-  app.post("/api/satisfaction-scores", async (req, res) => {
+  app.post("/api/satisfaction-scores", isAuthenticatedAny, async (req, res) => {
     try {
-      const { type, raterId, raterRole, targetId, targetType, batchId, weekId, score, comment } = req.body;
+      const { type, targetId, targetType, batchId, weekId, score, comment } = req.body;
+      const sessionTeacherId = (req.session as any)?.teacherId as string | undefined;
+      const raterId = sessionTeacherId || req.user?.id;
+      const raterRole = sessionTeacherId ? "teacher" : req.user?.role;
       if (!type || !raterId || !raterRole || !targetId || !targetType || !score) {
-        return res.status(400).json({ error: "type, raterId, raterRole, targetId, targetType, and score are required" });
+        return res.status(400).json({ error: "type, targetId, targetType, and score are required" });
       }
       if (score < 1 || score > 5) {
         return res.status(400).json({ error: "Score must be between 1 and 5" });

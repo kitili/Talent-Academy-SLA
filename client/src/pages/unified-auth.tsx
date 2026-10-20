@@ -302,14 +302,14 @@ export default function UnifiedAuth() {
       value: "trainer",
       icon: Users,
       title: "Trainer",
-      description: "Managing batches",
+      description: "Coaching adult teachers",
       gradient: "from-primary to-primary"
     },
     {
       value: "teacher",
       icon: GraduationCap,
       title: "Teacher",
-      description: "Taking courses",
+      description: "Adult teacher in training",
       gradient: "from-primary to-primary"
     }
   ];
@@ -325,15 +325,15 @@ export default function UnifiedAuth() {
   const getRoleDescription = (role: Role) => {
     switch (role) {
       case 'admin': return 'Full system access and user management';
-      case 'trainer': return 'Manage batches and teacher progress';
-      case 'teacher': return 'Take courses and complete quizzes';
+      case 'trainer': return 'Coach batches of adult teachers';
+      case 'teacher': return 'Prepare to teach young pupils';
     }
   };
 
   const scenes: Record<Role, { src: string; line: string; place: PlaceName }> = {
     admin: { src: "/bg-library.jpg", line: "The library is open", place: "library" },
     trainer: { src: "/bg-hall.jpg", line: "The hall is open", place: "hall" },
-    teacher: { src: "/bg-garden.jpg", line: "The garden is open", place: "garden" },
+    teacher: { src: "/bg-garden.jpg", line: "For adult teachers", place: "garden" },
   };
   const scene = scenes[loginRole];
 
@@ -422,8 +422,9 @@ export default function UnifiedAuth() {
                               }`}
                             >
                               <img src={PLACES[place]} alt="" className="h-16 w-full object-cover sm:h-20" />
-                              <span className={`block px-2 py-1.5 text-center text-sm font-semibold ${isSelected ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`}>
-                                {role.title}
+                              <span className={`block px-2 py-1.5 text-center ${isSelected ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`}>
+                                <span className="block text-sm font-semibold">{role.title}</span>
+                                <span className="mt-0.5 block text-[10px] leading-tight opacity-80">{role.description}</span>
                               </span>
                             </button>
                           );

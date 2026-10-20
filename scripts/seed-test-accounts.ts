@@ -2,8 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../server/db";
 import { hashPassword } from "../server/auth";
 import { users, teachers, batches, batchTeachers, teacherReportCards } from "@shared/schema";
-
-const BATCH_ID = "49c90cb7-04d6-4402-b5b8-93a3ae5b6db9";
+import { TEST_COHORTS, TEST_TEACHERS } from "./test-cohorts";
 
 /** Create a staff user only when missing. Never overwrite an existing hash. */
 async function ensureUser(opts: {
@@ -35,23 +34,24 @@ async function ensureUser(opts: {
   return created.id;
 }
 
-async function ensurePracticeBatch(adminId: string, trainerId: string) {
-  const existing = await db.select().from(batches).where(eq(batches.id, BATCH_ID)).limit(1);
+async function ensureCohort(adminId: string, trainerId: string, cohort: (typeof TEST_COHORTS)[number]) {
+  const existing = await db.select().from(batches).where(eq(batches.id, cohort.id)).limit(1);
   if (!existing[0]) {
     await db.insert(batches).values({
-      id: BATCH_ID,
-      name: "Batch 1",
-      description: "Test cohort for trainer1",
+      id: cohort.id,
+      name: cohort.name,
+      description: cohort.description,
       createdBy: adminId,
       trainerId,
     });
-    console.log("created Batch 1 and assigned trainer1");
+    console.log(`created ${cohort.name} for ${cohort.trainerUsername}`);
     return;
   }
-  if (existing[0].trainerId !== trainerId) {
-    await db.update(batches).set({ trainerId }).where(eq(batches.id, BATCH_ID));
-    console.log("assigned trainer1 to Batch 1");
-  }
+  await db
+    .update(batches)
+    .set({ name: cohort.name, description: cohort.description, trainerId })
+    .where(eq(batches.id, cohort.id));
+  console.log(`kept ${cohort.name} with ${cohort.trainerUsername}`);
 }
 
 async function ensureTeacher(email: string, name: string) {
@@ -80,16 +80,6 @@ async function ensureTeacher(email: string, name: string) {
     console.log(`created ${email}`);
   }
 
-  const enrolled = await db
-    .select()
-    .from(batchTeachers)
-    .where(sql`${batchTeachers.batchId} = ${BATCH_ID} AND ${batchTeachers.teacherId} = ${teacher.id}`)
-    .limit(1);
-  if (!enrolled[0]) {
-    await db.insert(batchTeachers).values({ batchId: BATCH_ID, teacherId: teacher.id });
-    console.log("enrolled teacher in Batch 1");
-  }
-
   const card = await db.select().from(teacherReportCards).where(eq(teacherReportCards.teacherId, teacher.id)).limit(1);
   if (!card[0]) {
     await db.insert(teacherReportCards).values({
@@ -100,6 +90,7 @@ async function ensureTeacher(email: string, name: string) {
       averageScore: 0,
     });
   }
+  return teacher.id;
 }
 
 async function main() {
@@ -119,36 +110,58 @@ async function main() {
     firstName: "Test",
     lastName: "Admin",
   });
-  const trainer1 = await ensureUser({
+  const trainerIds = new Map<string, string>();
+  trainerIds.set("trainer1", await ensureUser({
     username: "trainer1",
     email: "trainer@test.com",
     role: "trainer",
     password: "trainer123",
     firstName: "Test",
     lastName: "Trainer",
-  });
-  await ensureUser({
+  }));
+  trainerIds.set("test.trainer", await ensureUser({
     username: "test.trainer",
     email: "test.trainer@silverleaf.academy",
     role: "trainer",
     password: "trainer123",
     firstName: "Test",
     lastName: "Trainer",
-  });
+  }));
   for (const number of [2, 3, 4, 5, 6]) {
-    await ensureUser({
+    trainerIds.set(`trainer${number}`, await ensureUser({
       username: `trainer${number}`,
       email: `trainer${number}@test.com`,
       role: "trainer",
       password: "trainer123",
       firstName: "Test",
       lastName: `Trainer ${number}`,
-    });
+    }));
   }
-  await ensurePracticeBatch(adminId, trainer1);
-  await ensureTeacher("teacher@test.com", "Test Teacher");
-  await ensureTeacher("qa.teacher@silverleaf.academy", "QA Teacher");
-  console.log("test accounts ready; existing hashes were not overwritten");
+
+  const teacherIds = new Map<string, string>();
+  for (const teacher of TEST_TEACHERS) {
+    teacherIds.set(teacher.email.toLowerCase(), await ensureTeacher(teacher.email, teacher.name));
+  }
+
+  for (const cohort of TEST_COHORTS) {
+    const trainerId = trainerIds.get(cohort.trainerUsername);
+    if (!trainerId) throw new Error(`Missing trainer ${cohort.trainerUsername}`);
+    await ensureCohort(adminId, trainerId, cohort);
+    for (const email of cohort.teacherEmails) {
+      const teacherId = teacherIds.get(email.toLowerCase());
+      if (!teacherId) throw new Error(`Missing teacher ${email}`);
+      const enrolled = await db
+        .select()
+        .from(batchTeachers)
+        .where(sql`${batchTeachers.batchId} = ${cohort.id} AND ${batchTeachers.teacherId} = ${teacherId}`)
+        .limit(1);
+      if (!enrolled[0]) {
+        await db.insert(batchTeachers).values({ batchId: cohort.id, teacherId });
+        console.log(`enrolled ${email} in ${cohort.name}`);
+      }
+    }
+  }
+  console.log("test accounts and batches ready; existing hashes were not overwritten");
 }
 
 main().catch((error) => {

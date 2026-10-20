@@ -13,6 +13,8 @@ export function saveLastLesson(lesson: Omit<CachedLesson, "savedAt">) {
   } catch {
     // Quota or private mode — ignore
   }
+  const worker = navigator.serviceWorker?.controller;
+  worker?.postMessage({ type: "cache-lesson", title: lesson.title, html: lesson.html });
 }
 
 export function loadLastLesson(): CachedLesson | null {
