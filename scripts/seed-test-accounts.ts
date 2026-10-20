@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../server/db";
 import { hashPassword } from "../server/auth";
-import { users, teachers, batchTeachers, teacherReportCards } from "@shared/schema";
+import { users, teachers, batches, batchTeachers, teacherReportCards } from "@shared/schema";
 
 const BATCH_ID = "49c90cb7-04d6-4402-b5b8-93a3ae5b6db9";
 
@@ -33,6 +33,25 @@ async function ensureUser(opts: {
     .returning();
   console.log(`created ${opts.role} ${opts.username}`);
   return created.id;
+}
+
+async function ensurePracticeBatch(adminId: string, trainerId: string) {
+  const existing = await db.select().from(batches).where(eq(batches.id, BATCH_ID)).limit(1);
+  if (!existing[0]) {
+    await db.insert(batches).values({
+      id: BATCH_ID,
+      name: "Batch 1",
+      description: "Test cohort for trainer1",
+      createdBy: adminId,
+      trainerId,
+    });
+    console.log("created Batch 1 and assigned trainer1");
+    return;
+  }
+  if (existing[0].trainerId !== trainerId) {
+    await db.update(batches).set({ trainerId }).where(eq(batches.id, BATCH_ID));
+    console.log("assigned trainer1 to Batch 1");
+  }
 }
 
 async function ensureTeacher(email: string, name: string) {
@@ -84,7 +103,7 @@ async function ensureTeacher(email: string, name: string) {
 }
 
 async function main() {
-  await ensureUser({
+  const adminId = await ensureUser({
     username: "admin",
     email: "admin@silverleaf.com",
     role: "admin",
@@ -100,7 +119,7 @@ async function main() {
     firstName: "Test",
     lastName: "Admin",
   });
-  await ensureUser({
+  const trainer1 = await ensureUser({
     username: "trainer1",
     email: "trainer@test.com",
     role: "trainer",
@@ -116,6 +135,17 @@ async function main() {
     firstName: "Test",
     lastName: "Trainer",
   });
+  for (const number of [2, 3, 4, 5, 6]) {
+    await ensureUser({
+      username: `trainer${number}`,
+      email: `trainer${number}@test.com`,
+      role: "trainer",
+      password: "trainer123",
+      firstName: "Test",
+      lastName: `Trainer ${number}`,
+    });
+  }
+  await ensurePracticeBatch(adminId, trainer1);
   await ensureTeacher("teacher@test.com", "Test Teacher");
   await ensureTeacher("qa.teacher@silverleaf.academy", "QA Teacher");
   console.log("test accounts ready; existing hashes were not overwritten");

@@ -31,6 +31,27 @@ export const ADMIN_TOUR: TourStep[] = [
   },
 ];
 
+export const TRAINER_TOUR: TourStep[] = [
+  {
+    title: "Trainer desk",
+    body: "This is your cohort home after you sign in on the Trainer tab. You see the classes an admin assigned to you, plus any class you created.",
+  },
+  {
+    title: "Your cohorts",
+    body: "Pick a cohort on the left. Another trainer's class stays off this list. Open it to enrol teachers and follow their progress.",
+    target: "trainer-batches",
+  },
+  {
+    title: "Teachers, work, and documents",
+    body: "Inside a cohort: Teachers, Quizzes, Progress, Attendance, Schedule, and Certificates. Add teachers, assign a quiz, and set written work. Courses in the header is where modules and lesson documents live.",
+    target: "trainer-tools",
+  },
+  {
+    title: "What stays with admin",
+    body: "You can approve a new teacher and reset that teacher's password. You cannot create an admin, clear the academy, or open another trainer's cohort.",
+  },
+];
+
 export const TEACHER_TOUR: TourStep[] = [
   {
     title: "Teacher desk",

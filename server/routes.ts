@@ -16,6 +16,7 @@ import { z } from "zod";
 import * as mammoth from "mammoth";
 import { db, getDatabaseUrl, pool } from "./db";
 import { clearAcademyActivity, FRESH_START_PHRASE } from "./freshStart";
+import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
@@ -67,8 +68,12 @@ function isStrictAdmin(req: Request, res: Response, next: NextFunction) {
   res.status(403).json({ message: "Forbidden: Admin-only access required" });
 }
 
-function staffCanAccessBatch(user?: Express.User) {
-  return Boolean(user && (user.role === "admin" || user.role === "trainer"));
+function staffCanAccessBatch(
+  user?: Express.User,
+  batch?: { trainerId?: string | null; createdBy?: string | null } | null,
+) {
+  if (batch === undefined) return isAcademyStaff(user);
+  return trainerOwnsBatch(user, batch);
 }
 
 function fileRequestAllowed(req: Request) {
@@ -78,7 +83,7 @@ function fileRequestAllowed(req: Request) {
 }
 
 function publishedOnly<T extends { publishStatus?: string | null }>(rows: T[], req: Request) {
-  if (staffCanAccessBatch(req.user)) return rows;
+  if (isAcademyStaff(req.user)) return rows;
   return rows.filter((row) => row.publishStatus !== "draft");
 }
 
@@ -1066,7 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all training weeks (authenticated users only)
-  app.get("/api/training-weeks", isAuthenticated, async (req, res) => {
+  app.get("/api/training-weeks", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const weeks = await storage.getAllTrainingWeeks();
       res.json(weeks);
@@ -2259,7 +2264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all batches (optionally filter by creator)
   app.get("/api/batches", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const batchesList = await storage.getAllBatches();
+      const batchesList = await storage.getAllBatches(req.user?.role === "trainer" ? req.user.id : undefined);
       res.json(batchesList);
     } catch (error) {
       console.error("Error fetching batches:", error);
@@ -2290,7 +2295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership - only admins can access any batch, trainers only their own
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
@@ -2309,7 +2314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership - only admins can delete any batch, trainers only their own
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const deleted = await storage.deleteBatch(req.params.batchId);
@@ -2399,7 +2404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2447,7 +2452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!batch) return res.status(404).json({ error: "Batch not found" });
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2495,7 +2500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const deleted = await storage.removeTeacherFromBatch(
@@ -2524,7 +2529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2591,7 +2596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -2664,7 +2669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const quizzes = await storage.getAssignedQuizzesForBatch(req.params.batchId);
@@ -2682,7 +2687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!batch) {
         return res.status(404).json({ error: "Batch not found" });
       }
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const quizzes = await storage.getFileQuizzesForBatch(req.params.batchId);
@@ -2702,7 +2707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Verify ownership through batch
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && !staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(quiz);
@@ -2721,7 +2726,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Verify ownership through batch
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && !staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const deleted = await storage.deleteAssignedQuiz(req.params.quizId);
@@ -2738,7 +2743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       if (!quiz) return res.status(404).json({ error: "Quiz not found" });
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && !staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       await storage.resetTeacherQuizAttempts(req.params.quizId, req.params.teacherId);
@@ -2759,7 +2764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       if (!quiz) return res.status(404).json({ error: "Quiz not found" });
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && !staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const updated = await storage.updateAssignedQuizQuestions(req.params.quizId, questions);
@@ -3005,7 +3010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       if (!quiz) return res.status(404).json({ error: "Quiz not found" });
       const batch = await storage.getBatch(quiz.batchId);
-      if (batch && !staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const batchTeachersData = await storage.getTeachersInBatch(quiz.batchId);
@@ -3111,7 +3116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
@@ -3171,7 +3176,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/batches/:batchId/gradebook.csv", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      if (!staffCanAccessBatch(req.user)) {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
@@ -3235,7 +3241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Batch not found" });
       }
       // Verify ownership
-      if (!staffCanAccessBatch(req.user)) {
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -3993,9 +3999,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== COURSE MANAGEMENT (ADMIN ONLY) ====================
   // Get all courses
-  app.get("/api/courses", async (req, res) => {
+  app.get("/api/courses", isAuthenticated, async (req, res) => {
     try {
-      const courses = await storage.getAllCourses();
+      const courses = publishedOnly(await storage.getAllCourses(), req);
       res.json(courses);
     } catch (error) {
       console.error("Error getting courses:", error);
@@ -4004,10 +4010,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get course with weeks
-  app.get("/api/courses/:id", async (req, res) => {
+  app.get("/api/courses/:id", isAuthenticated, async (req, res) => {
     try {
       const course = await storage.getCourse(req.params.id);
       if (!course) return res.status(404).json({ error: "Course not found" });
+      if (course.publishStatus === "draft" && !isAcademyStaff(req.user)) {
+        return res.status(404).json({ error: "Course not found" });
+      }
       const weeks = await storage.getWeeksForCourse(course.id);
       res.json({ ...course, weeks });
     } catch (error) {
@@ -4017,7 +4026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get weeks for a course
-  app.get("/api/courses/:courseId/weeks", async (req, res) => {
+  app.get("/api/courses/:courseId/weeks", isAuthenticated, async (req, res) => {
     try {
       const weeks = await storage.getWeeksForCourse(req.params.courseId);
       res.json(weeks);
@@ -5280,7 +5289,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/batches/:batchId/announcements", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      if (!staffCanAccessBatch(req.user)) {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const result = await db.execute(sql`
@@ -5592,7 +5602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!batch) return res.status(404).json({ error: "Batch not found" });
-      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
 
       const csv = String(req.body?.csv || "");
       const lines = csv.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -5678,7 +5688,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/batches/:batchId/assignments", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       res.json(await storage.getWrittenAssignments(req.params.batchId));
     } catch (error) {
       console.error("Error listing assignments:", error);
@@ -5690,7 +5701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!batch) return res.status(404).json({ error: "Batch not found" });
-      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const { title, instructions, dueDate } = req.body;
       if (!title || !instructions) return res.status(400).json({ error: "title and instructions are required" });
       const assignment = await storage.createWrittenAssignment({
@@ -5715,7 +5726,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/batches/:batchId/assignments/:assignmentId/submissions", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       res.json(await storage.getAssignmentSubmissions(req.params.assignmentId));
     } catch (error) {
       console.error("Error listing submissions:", error);
@@ -5725,7 +5737,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/batches/:batchId/assignments/:assignmentId/submissions/:teacherId", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      if (!staffCanAccessBatch(req.user)) return res.status(403).json({ error: "Access denied" });
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const score = req.body?.trainerScore == null || req.body?.trainerScore === ""
         ? null
         : Number(req.body.trainerScore);
@@ -6013,7 +6026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reports/batches/:batchId.csv", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
-      if (!batch || !staffCanAccessBatch(req.user)) {
+      if (!batch || !staffCanAccessBatch(req.user, batch)) {
         return res.status(404).json({ error: "Batch not found" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
