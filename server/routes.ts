@@ -2441,6 +2441,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Provide teacherId, teacherEmail, or teacherName" });
       }
 
+      const already = await storage.getTeachersInBatch(req.params.batchId);
+      if (already.some((row) => row.id === teacher.id)) {
+        return res.status(200).json({ message: "Teacher already in batch", teacher: { id: teacher.teacherId, name: teacher.name } });
+      }
+
       await storage.addTeacherToBatch({
         batchId: req.params.batchId,
         teacherId: teacher.id,

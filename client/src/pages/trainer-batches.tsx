@@ -653,7 +653,7 @@ export default function TrainerBatches() {
         <PlaceBanner
           place="hall"
           title="Training batches"
-          subtitle="The classes assigned to you. Enrol teachers, open lessons, and follow progress."
+          subtitle="Your batches of adult teachers. They are preparing to teach young pupils."
         />
 
         {/* Two-Column Layout */}

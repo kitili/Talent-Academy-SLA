@@ -220,7 +220,7 @@ export default function AdminHome() {
         <PlaceBanner
           place="library"
           title={`Welcome back${user?.username ? `, ${user.username}` : ""}`}
-          subtitle="Trainers, teachers, cohorts, and the gradebook."
+          subtitle="Batches of adult teachers who will teach young pupils."
         />
 
         {health && !health.blob && (
