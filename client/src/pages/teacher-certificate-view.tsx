@@ -11,6 +11,7 @@ import { Download, ArrowLeft, LogOut, Edit2, Save, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/image_1760460046116.png";
+import { TalentCertificate } from "@/components/TalentCertificate";
 
 interface Certificate {
   id: string;
@@ -18,6 +19,8 @@ interface Certificate {
   teacherName: string;
   courseName: string;
   appreciationText: string;
+  kind?: string;
+  outstandingAreas?: string | null;
   adminName1?: string;
   adminName2?: string;
   completionPercentage: number;
@@ -212,7 +215,20 @@ export default function TeacherCertificateView() {
       </header>
 
       <main className="container mx-auto px-4 py-8 flex justify-center">
-        {/* Certificate Card with decorative border */}
+        {!isEditing ? (
+          <div className="w-full max-w-5xl print:shadow-none">
+            <TalentCertificate
+              teacherName={certificate.teacherName}
+              courseName={certificate.courseName}
+              appreciationText={certificate.appreciationText}
+              kind={certificate.kind}
+              outstandingAreas={certificate.outstandingAreas}
+              adminName1={certificate.adminName1}
+              adminName2={certificate.adminName2}
+              generatedAt={certificate.generatedAt}
+            />
+          </div>
+        ) : (
         <Card className="w-full max-w-4xl bg-white text-black print:shadow-none relative overflow-hidden">
           {/* Decorative corner ornaments */}
           <div className="absolute top-0 left-0 w-24 h-24 border-l-4 border-t-4 border-primary" />
@@ -390,6 +406,7 @@ export default function TeacherCertificateView() {
             </div>
           </div>
         </Card>
+        )}
       </main>
 
       <style>{`

@@ -588,7 +588,9 @@ export const teacherCertificates = pgTable("teacher_certificates", {
   teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
   batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
   courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
-  templateId: varchar("template_id").notNull().references(() => batchCertificateTemplates.id, { onDelete: "cascade" }),
+  templateId: varchar("template_id").references(() => batchCertificateTemplates.id, { onDelete: "set null" }),
+  kind: varchar("kind").notNull().default("graduation"),
+  outstandingAreas: text("outstanding_areas"),
   teacherName: varchar("teacher_name").notNull(),
   courseName: varchar("course_name").notNull(),
   appreciationText: text("appreciation_text").notNull(),
@@ -597,7 +599,7 @@ export const teacherCertificates = pgTable("teacher_certificates", {
   completionPercentage: integer("completion_percentage").notNull().default(100),
   generatedAt: timestamp("generated_at").defaultNow(),
 }, (table) => [
-  uniqueIndex("idx_teacher_certificate_unique").on(table.teacherId, table.batchId, table.courseId),
+  uniqueIndex("idx_teacher_certificate_kind").on(table.teacherId, table.batchId, table.courseId, table.kind),
 ]);
 
 export const insertTeacherCertificateSchema = createInsertSchema(teacherCertificates).omit({

@@ -107,6 +107,12 @@ export async function ensureWrittenAssignmentTables() {
       body text NOT NULL,
       created_at timestamp DEFAULT now()
     );
+    ALTER TABLE teacher_certificates ADD COLUMN IF NOT EXISTS kind varchar NOT NULL DEFAULT 'graduation';
+    ALTER TABLE teacher_certificates ADD COLUMN IF NOT EXISTS outstanding_areas text;
+    ALTER TABLE teacher_certificates ALTER COLUMN template_id DROP NOT NULL;
+    DROP INDEX IF EXISTS idx_teacher_certificate_unique;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_certificate_kind
+      ON teacher_certificates(teacher_id, batch_id, course_id, kind);
     CREATE TABLE IF NOT EXISTS desk_messages (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       from_id varchar NOT NULL,

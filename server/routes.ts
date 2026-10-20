@@ -4335,6 +4335,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all certificates for teacher
   app.get("/api/teacher/:teacherId/certificates", async (req, res) => {
     try {
+      const courses = await storage.getCoursesForTeacher(req.params.teacherId);
+      for (const course of courses) {
+        try {
+          await storage.tryAutoGenerateCertificate(req.params.teacherId, course.id);
+        } catch (error) {
+          console.error("Auto certificate skipped:", error);
+        }
+      }
       const certs = await storage.getTeacherCertificates(req.params.teacherId);
       res.json(certs);
     } catch (error) {

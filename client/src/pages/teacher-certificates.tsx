@@ -81,6 +81,9 @@ export default function TeacherCertificates() {
                     </span>
                   </div>
                   <CardTitle className="mt-2">{cert.courseName}</CardTitle>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                    {cert.kind === "distinction" ? "Distinction — highest qualification" : "Graduation — attended and completed"}
+                  </p>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
                   <p className="text-sm text-muted-foreground mb-4 flex-1">

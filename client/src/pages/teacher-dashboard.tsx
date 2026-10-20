@@ -470,6 +470,9 @@ export default function TeacherDashboard() {
                 </p>
               )}
             </div>
+            {!resumeWeek && assignedWeeks.length > 0 && (
+              <Button onClick={() => setLocation("/teacher/certificates")}>Open certificates</Button>
+            )}
             {resumeWeek && (
               <Button onClick={() => setLocation(`/teacher/week/${resumeWeek.id}/content`)}>
                 Resume
