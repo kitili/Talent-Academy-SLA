@@ -112,7 +112,12 @@ async function ensureTeacher(email: string, name: string) {
     .limit(1);
   let teacher = existing[0];
   if (teacher) {
-    console.log(`keep existing ${email} (password unchanged)`);
+    if (teacher.name !== name && /fellow/i.test(teacher.name || "")) {
+      await db.update(teachers).set({ name }).where(eq(teachers.id, teacher.id));
+      console.log(`renamed ${email} to ${name}`);
+    } else {
+      console.log(`keep existing ${email} (password unchanged)`);
+    }
   } else {
     const [maxRow] = await db.select({ maxId: sql<number>`COALESCE(MAX(${teachers.teacherId}), 7099)` }).from(teachers);
     const nextId = Number(maxRow?.maxId || 7099) + 1;

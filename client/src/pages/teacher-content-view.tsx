@@ -939,10 +939,10 @@ export default function TeacherContentView() {
                       <div className="text-center py-8">
                         <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
                         <p className="text-sm font-medium text-muted-foreground mb-1">
-                          No content available yet
+                          No lesson file yet
                         </p>
                         <p className="text-xs text-muted-foreground/70">
-                          An administrator needs to add files to this training week.
+                          Plan it as Introduction, Competence development, Design, then Realisation.
                         </p>
                       </div>
                     ) : (
@@ -1262,7 +1262,7 @@ export default function TeacherContentView() {
                   <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground/40" />
                   <h3 className="text-xl font-semibold mb-2">No Content Available</h3>
                   <p className="text-muted-foreground">
-                    This training week doesn't have any files yet. Please check back later or contact an administrator.
+                    No lesson file yet. Use the objective beside this page, and plan the lesson as Introduction, Competence development, Design, then Realisation.
                   </p>
                 </div>
               </div>

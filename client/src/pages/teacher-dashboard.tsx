@@ -237,10 +237,14 @@ export default function TeacherDashboard() {
 
   const nextLesson = [...assignedWeeks]
     .sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0))
-    .find((week: any) => !week.locked && (week.progress?.percentage || 0) < 100);
+    .find((week: any) => !week.locked && (week.progress?.total || 0) > 0 && (week.progress?.percentage || 0) < 100);
   const lastWeekId = typeof window !== "undefined" ? sessionStorage.getItem("sl-last-week") : null;
+  const shelfIsEmpty = assignedWeeks.length > 0 && assignedWeeks.every((week: any) => (week.progress?.total || 0) === 0);
+  const firstModule = [...assignedWeeks]
+    .sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0))
+    .find((week: any) => !week.locked);
   const resumeWeek =
-    assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson;
+    assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson || (shelfIsEmpty ? firstModule : undefined);
 
   const { data: upcomingEvents = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/events"],
@@ -449,7 +453,9 @@ export default function TeacherDashboard() {
               Continue learning
             </CardTitle>
             <CardDescription>
-              {resumeWeek
+              {shelfIsEmpty
+                ? "Your modules are ready. Lesson files can be added as the course is built."
+                : resumeWeek
                 ? "Jump back into the next unlocked module. Finish it to open the one after."
                 : assignedWeeks.length === 0
                   ? "Your trainer has not assigned modules yet. You are in the right place when they do."
@@ -476,7 +482,7 @@ export default function TeacherDashboard() {
             )}
             {resumeWeek && (
               <Button onClick={() => setLocation(`/teacher/week/${resumeWeek.id}/content`)}>
-                Resume
+                {shelfIsEmpty ? "Open" : "Resume"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
@@ -775,7 +781,9 @@ export default function TeacherDashboard() {
                                 <span className="block text-xs text-muted-foreground">
                                   {isLocked
                                     ? "Locked until the previous module quiz is passed"
-                                    : learningStatus({ percentage: week.progress?.percentage || 0 })}
+                                    : (week.progress?.total || 0) === 0
+                                      ? "Open the module"
+                                      : learningStatus({ percentage: week.progress?.percentage || 0 })}
                                   {week.progress?.total > 0 ? ` · ${week.progress.completed}/${week.progress.total} lessons` : ""}
                                 </span>
                               </span>
