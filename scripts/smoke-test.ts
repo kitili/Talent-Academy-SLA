@@ -350,6 +350,181 @@ async function main() {
     record("Admin can remove the test cohort", false, "cohort was not created");
   }
 
+  const place = await request("/places/place-library.jpg");
+  record("School scene image is served", place.status === 200 && place.text.length > 1000, `HTTP ${place.status}`);
+
+  const gapCourse = await request("/api/courses", {
+    method: "POST",
+    body: JSON.stringify({ name: `Smoke course ${stamp}`, description: "gap check" }),
+  }, cookies);
+  const gapCourseId = gapCourse.json?.id;
+  const gapWeek = gapCourseId
+    ? await request("/api/training-weeks", {
+      method: "POST",
+      body: JSON.stringify({
+        courseId: gapCourseId,
+        weekNumber: 1,
+        competencyFocus: "Classroom practice",
+        objective: "Apply one idea",
+      }),
+    }, cookies)
+    : { status: 0, json: null as any };
+  const gapWeekId = gapWeek.json?.id;
+  record(
+    "Admin can add a module without a file",
+    gapCourse.status === 200 && gapWeek.status === 200 && typeof gapWeekId === "string",
+    `course=${gapCourse.status} week=${gapWeek.status}`,
+  );
+
+  const gapCohort = await request("/api/batches", {
+    method: "POST",
+    body: JSON.stringify({ name: `Smoke cohort ${stamp}`, description: "gap check" }),
+  }, cookies);
+  const gapCohortId = gapCohort.json?.id;
+  const assignedTrainer = gapCohortId && trainerLogin.json?.id
+    ? await request(`/api/batches/${gapCohortId}/trainer`, {
+      method: "PUT",
+      body: JSON.stringify({ trainerId: trainerLogin.json.id }),
+    }, cookies)
+    : { status: 0, json: null as any };
+  record(
+    "Admin can assign trainer1 to a cohort",
+    assignedTrainer.status === 200 && assignedTrainer.json?.trainerId === trainerLogin.json?.id,
+    `HTTP ${assignedTrainer.status}`,
+  );
+
+  const openBatchCourses = gapCohortId ? await request(`/api/batches/${gapCohortId}/courses`) : { status: 0 };
+  record("Cohort courses require a login", openBatchCourses.status === 401, `HTTP ${openBatchCourses.status}`);
+  const teacherPeek = gapCohortId
+    ? await request(`/api/batches/${gapCohortId}/courses`, {}, teacherCookies)
+    : { status: 0 };
+  record("Teacher cannot open another cohort's courses", teacherPeek.status === 403, `HTTP ${teacherPeek.status}`);
+
+  const strangerCourses = await request("/api/teacher/00000000-0000-0000-0000-000000000000/courses");
+  record("Another teacher's courses require a login", strangerCourses.status === 401, `HTTP ${strangerCourses.status}`);
+  const ownCourses = teacherLogin.json?.id
+    ? await request(`/api/teacher/${teacherLogin.json.id}/courses`, {}, teacherCookies)
+    : { status: 0, json: null as any };
+  record("Teacher can open their own courses", ownCourses.status === 200 && Array.isArray(ownCourses.json), `HTTP ${ownCourses.status}`);
+  const otherCerts = teacherLogin.json?.id
+    ? await request("/api/teacher/00000000-0000-0000-0000-000000000000/certificates", {}, teacherCookies)
+    : { status: 0 };
+  record("Teacher cannot open another teacher's certificates", otherCerts.status === 403, `HTTP ${otherCerts.status}`);
+  const ownCerts = teacherLogin.json?.id
+    ? await request(`/api/teacher/${teacherLogin.json.id}/certificates`, {}, teacherCookies)
+    : { status: 0, json: null as any };
+  record("Teacher can open their own certificates", ownCerts.status === 200 && Array.isArray(ownCerts.json), `HTTP ${ownCerts.status}`);
+
+  const openRating = await request("/api/satisfaction-scores", {
+    method: "POST",
+    body: JSON.stringify({ type: "course", targetId: "x", targetType: "course", score: 5 }),
+  });
+  record("Ratings require a login", openRating.status === 401, `HTTP ${openRating.status}`);
+
+  const badQuiz = gapCohortId && gapWeekId
+    ? await request(`/api/batches/${gapCohortId}/assign-quiz`, {
+      method: "POST",
+      body: JSON.stringify({ weekId: gapWeekId, title: "Bad", questions: [{ question: "nope" }] }),
+    }, trainerCookies)
+    : { status: 0 };
+  record("A broken manual question is rejected", badQuiz.status === 400, `HTTP ${badQuiz.status}`);
+
+  const manualQuiz = gapCohortId && gapWeekId
+    ? await request(`/api/batches/${gapCohortId}/assign-quiz`, {
+      method: "POST",
+      body: JSON.stringify({
+        weekId: gapWeekId,
+        title: "Written quiz",
+        questions: [{
+          id: "q1",
+          type: "true_false",
+          question: "Practice comes before the quiz.",
+          options: ["True", "False"],
+          correctAnswer: "True",
+        }],
+      }),
+    }, trainerCookies)
+    : { status: 0, json: null as any };
+  record(
+    "Trainer can assign a quiz with no AI",
+    manualQuiz.status === 201 && manualQuiz.json?.questions?.[0]?.question === "Practice comes before the quiz.",
+    `HTTP ${manualQuiz.status}`,
+  );
+
+  const csv = gapCohortId
+    ? await request(`/api/batches/${gapCohortId}/gradebook.csv`, {}, trainerCookies)
+    : { status: 0, text: "" };
+  record(
+    "Trainer can export the gradebook",
+    csv.status === 200 && csv.text.includes("quiz_average") && csv.text.includes("attendance_percent"),
+    `HTTP ${csv.status}`,
+  );
+
+  const enrolled = gapCohortId
+    ? await request(`/api/batches/${gapCohortId}/teachers`, {
+      method: "POST",
+      body: JSON.stringify({ teacherEmail: "teacher@test.com" }),
+    }, trainerCookies)
+    : { status: 0 };
+  record("Trainer can add the test teacher", enrolled.status === 201, `HTTP ${enrolled.status}`);
+
+  const assignment = gapCohortId
+    ? await request(`/api/batches/${gapCohortId}/assignments`, {
+      method: "POST",
+      body: JSON.stringify({ title: "Smoke work", instructions: "Write one sentence." }),
+    }, trainerCookies)
+    : { status: 0, json: null as any };
+  const assignmentId = assignment.json?.id;
+  const submitted = assignmentId
+    ? await request(`/api/teacher/assignments/${assignmentId}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ response: "I will greet the class." }),
+    }, teacherCookies)
+    : { status: 0 };
+  const marked = assignmentId && teacherLogin.json?.id
+    ? await request(`/api/batches/${gapCohortId}/assignments/${assignmentId}/submissions/${teacherLogin.json.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ trainerScore: 90, trainerComment: "Clear opening.", rubric: { opening: 5 } }),
+    }, trainerCookies)
+    : { status: 0, json: null as any };
+  const seen = await request("/api/teacher/assignments", {}, teacherCookies);
+  const found = Array.isArray(seen.json)
+    ? seen.json.find((row: any) => row.id === assignmentId)
+    : null;
+  record(
+    "Trainer mark and comment reach the teacher",
+    submitted.status === 200 && marked.status === 200 && (found?.trainer_comment === "Clear opening." || found?.trainerComment === "Clear opening."),
+    `submit=${submitted.status} mark=${marked.status} comment=${found?.trainer_comment || found?.trainerComment || "missing"}`,
+  );
+
+  const posted = gapWeekId
+    ? await request(`/api/weeks/${gapWeekId}/discussions`, {
+      method: "POST",
+      body: JSON.stringify({ body: "Smoke thread" }),
+    }, teacherCookies)
+    : { status: 0 };
+  const thread = gapWeekId
+    ? await request(`/api/weeks/${gapWeekId}/discussions`, {}, trainerCookies)
+    : { status: 0, json: null as any };
+  const threadHit = Array.isArray(thread.json) && thread.json.some((row: any) => row.body === "Smoke thread");
+  const trainerReply = gapWeekId
+    ? await request(`/api/weeks/${gapWeekId}/discussions`, {
+      method: "POST",
+      body: JSON.stringify({ body: "Trainer reply" }),
+    }, trainerCookies)
+    : { status: 0 };
+  record(
+    "Teacher and trainer share a module thread",
+    posted.status === 201 && trainerReply.status === 201 && threadHit,
+    `teacher=${posted.status} trainer=${trainerReply.status}`,
+  );
+
+  if (manualQuiz.json?.id) {
+    await request(`/api/assigned-quizzes/${manualQuiz.json.id}`, { method: "DELETE" }, trainerCookies);
+  }
+  if (gapCohortId) await request(`/api/batches/${gapCohortId}`, { method: "DELETE" }, cookies);
+  if (gapCourseId) await request(`/api/courses/${gapCourseId}`, { method: "DELETE" }, cookies);
+
   const reset = await request("/api/emergency-admin-reset", {
     method: "POST",
     body: JSON.stringify({ masterKey: "x", username: "admin", newPassword: "admin123" }),

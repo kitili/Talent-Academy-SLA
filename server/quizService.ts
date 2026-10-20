@@ -188,6 +188,17 @@ async function generateQuestionsFromText(
   return validQuestions.slice(0, numQuestions);
 }
 
+/** Trainer-written questions. Does not call a model. */
+export function normalizeManualQuestions(raw: unknown): QuizQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  const valid: QuizQuestion[] = [];
+  raw.forEach((question, index) => {
+    const normalized = validateQuestion(question, index);
+    if (normalized) valid.push(normalized);
+  });
+  return valid;
+}
+
 export async function generateQuizQuestions(options: GenerateQuizOptions): Promise<QuizQuestion[]> {
   const { fileUrls, competencyFocus, objective, numQuestions = 10, openEndedCount = 2 } = options;
 

@@ -154,6 +154,7 @@ export default function AdminAnalytics() {
   const [selectedWeek, setSelectedWeek] = useState("");
   const [selectedFileId, setSelectedFileId] = useState("");
   const [numQuestions, setNumQuestions] = useState("5");
+  const [ownQuestion, setOwnQuestion] = useState("");
   const [appreciationText, setAppreciationText] = useState("");
   const [adminName1, setAdminName1] = useState("");
   const [adminName2, setAdminName2] = useState("");
@@ -687,9 +688,9 @@ export default function AdminAnalytics() {
   });
 
   const assignCheckpointQuizMutation = useMutation({
-    mutationFn: async (data: { batchId: string; weekId: string; title: string; description: string; numQuestions: number }) => {
+    mutationFn: async (data: { batchId: string; weekId: string; title: string; description: string; numQuestions: number; questions?: unknown[] }) => {
       const response = await apiRequest("POST", `/api/batches/${data.batchId}/assign-quiz`, {
-        weekId: data.weekId, title: data.title, description: data.description, numQuestions: data.numQuestions,
+        weekId: data.weekId, title: data.title, description: data.description, numQuestions: data.numQuestions, questions: data.questions,
       });
       return response.json();
     },
@@ -697,7 +698,7 @@ export default function AdminAnalytics() {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", expandedBatchId, "quizzes"] });
       toast({ title: "Success", description: "Checkpoint quiz assigned." });
       setAssignCheckpointQuizOpen(false);
-      setQuizTitle(""); setQuizDescription(""); setSelectedWeek(""); setNumQuestions("5");
+      setQuizTitle(""); setQuizDescription(""); setSelectedWeek(""); setNumQuestions("5"); setOwnQuestion("");
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -3115,16 +3116,29 @@ export default function AdminAnalytics() {
               <Label>Number of Questions</Label>
               <Input type="number" value={numQuestions} onChange={(e) => setNumQuestions(e.target.value)} data-testid="input-num-questions" />
             </div>
+            <div>
+              <Label>Your own question</Label>
+              <Textarea
+                value={ownQuestion}
+                onChange={(e) => setOwnQuestion(e.target.value)}
+                placeholder="Leave blank to build from the lesson. A true/false statement here is assigned with no AI."
+                data-testid="input-own-question"
+              />
+            </div>
             <Button
               disabled={!quizTitle || !selectedWeek || assignCheckpointQuizMutation.isPending}
               onClick={() => {
                 if (expandedBatchId) {
+                  const written = ownQuestion.trim();
                   assignCheckpointQuizMutation.mutate({
                     batchId: expandedBatchId,
                     weekId: selectedWeek,
                     title: quizTitle,
                     description: quizDescription,
                     numQuestions: parseInt(numQuestions),
+                    questions: written
+                      ? [{ id: "q1", type: "true_false", question: written, options: ["True", "False"], correctAnswer: "True" }]
+                      : undefined,
                   });
                 }
               }}

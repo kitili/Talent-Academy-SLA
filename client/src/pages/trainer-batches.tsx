@@ -59,6 +59,7 @@ export default function TrainerBatches() {
   const [selectedWeek, setSelectedWeek] = useState("");
   const [selectedFileId, setSelectedFileId] = useState("");
   const [numQuestions, setNumQuestions] = useState("5");
+  const [ownQuestion, setOwnQuestion] = useState("");
   const [appreciationText, setAppreciationText] = useState("");
   const [adminName1, setAdminName1] = useState("");
   const [adminName2, setAdminName2] = useState("");
@@ -352,6 +353,7 @@ export default function TrainerBatches() {
       description: string;
       numQuestions: number;
       passMark: number;
+      questions?: Array<{ id: string; type: string; question: string; options: string[]; correctAnswer: string }>;
     }) => {
       const response = await apiRequest("POST", `/api/batches/${data.batchId}/assign-quiz`, {
         weekId: data.weekId,
@@ -359,18 +361,20 @@ export default function TrainerBatches() {
         description: data.description,
         numQuestions: data.numQuestions,
         passMark: data.passMark,
+        questions: data.questions,
       });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "quizzes"] });
-      toast({ title: "Success", description: "Checkpoint quiz generated and assigned successfully" });
+      toast({ title: "Success", description: "Module quiz assigned" });
       posthog.capture("quiz_assigned", { batchId: selectedBatch?.id, quizTitle, weekId: selectedWeek, type: "checkpoint_quiz" });
       setAssignCheckpointQuizOpen(false);
       setQuizTitle("");
       setQuizDescription("");
       setSelectedWeek("");
       setNumQuestions("5");
+      setOwnQuestion("");
     },
     onError: (error: Error) => {
       toast({
@@ -505,6 +509,7 @@ export default function TrainerBatches() {
 
   const handleAssignCheckpointQuiz = () => {
     if (selectedBatch && selectedWeek && quizTitle) {
+      const written = ownQuestion.trim();
       assignQuizMutation.mutate({
         batchId: selectedBatch.id,
         weekId: selectedWeek,
@@ -512,6 +517,15 @@ export default function TrainerBatches() {
         description: quizDescription,
         numQuestions: parseInt(numQuestions),
         passMark: parseInt(passMark, 10) || 80,
+        questions: written
+          ? [{
+              id: "q1",
+              type: "true_false",
+              question: written,
+              options: ["True", "False"],
+              correctAnswer: "True",
+            }]
+          : undefined,
       });
     }
   };
@@ -1008,6 +1022,17 @@ export default function TrainerBatches() {
                                 value={passMark}
                                 onChange={(e) => setPassMark(e.target.value)}
                               />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="own-question">Your own question</Label>
+                              <Textarea
+                                id="own-question"
+                                data-testid="input-own-question"
+                                placeholder="Leave blank to build the quiz from the lesson. A true/false statement here is assigned with no AI."
+                                value={ownQuestion}
+                                onChange={(e) => setOwnQuestion(e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground">Correct answer is True. Works even when no model key is set.</p>
                             </div>
                             <Button
                               onClick={handleAssignCheckpointQuiz}

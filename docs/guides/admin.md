@@ -11,4 +11,4 @@ Sign in on the Admin tab.
 7. **Start fresh** clears courses, cohorts, progress, quizzes, certificates, and messages. Login accounts stay. Passwords are hashed and are not shown. Type `CLEAR ACTIVITY` to confirm.
 8. Environment: set `NEON_DATABASE_URL` or `DATABASE_URL` to the one Postgres project, plus `SESSION_SECRET`. Do not commit those values.
 
-Phase 2, not in this release: SSO, SMS, offline downloads, and AI course authoring.
+SSO and SMS wait for school keys. Email sends when `RESEND_API_KEY` is set; otherwise the same notice stays in the app. A quiz can be written by hand when no AI key is set. The last lesson opened on this device stays available if the network drops.
