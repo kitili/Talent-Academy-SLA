@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import { Users, Award, BarChart3, ArrowRight, FileText, Layers, CheckCircle, Megaphone, ClipboardList } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
+import { PlaceBanner, PlaceCover, type PlaceName } from "@/components/PlaceArt";
 import { ADMIN_TOUR } from "@shared/guidedTour";
 import {
   Dialog,
@@ -216,10 +217,11 @@ export default function AdminHome() {
         </>
       }
     >
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Welcome back{user?.username ? `, ${user.username}` : ""}</h1>
-          <p className="text-muted-foreground mt-1">Trainers, teachers, cohorts, and the gradebook.</p>
-        </div>
+        <PlaceBanner
+          place="library"
+          title={`Welcome back${user?.username ? `, ${user.username}` : ""}`}
+          subtitle="Trainers, teachers, cohorts, and the gradebook."
+        />
 
         {health && !health.blob && (
           <Card className="p-4 border-primary/30">
@@ -314,34 +316,33 @@ export default function AdminHome() {
         {/* Quick Navigation */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-tour="admin-nav">
           {[
-            { href: "/admin/handover", title: "Handover", text: "Three weeks for Silverleaf staff", icon: ClipboardList, test: "button-go-handover" },
-            { href: "/approvals", title: "Approvals", text: "People waiting to come in", icon: CheckCircle, test: "button-go-approvals" },
-            { href: "/admin/trainers", title: "Trainers", text: "Approvals and accounts", icon: Award, test: "button-go-trainers" },
-            { href: "/admin/teachers", title: "Teachers", text: "Progress and files viewed", icon: Users, test: "button-go-teachers" },
-            { href: "/admin/batches", title: "Cohorts", text: "Rooms, quizzes, and certificates", icon: Layers, test: "button-go-batches" },
-            { href: "/admin/analytics", title: "Analytics", text: "How the academy is moving", icon: BarChart3, test: "button-go-analytics" },
-            { href: "/courses", title: "Courses", text: "Modules and lesson files", icon: FileText, test: "button-go-courses" },
-          ].map((item) => {
-            const Icon = item.icon;
-            return (
+            { href: "/admin/handover", title: "Handover", text: "Three weeks for Silverleaf staff", icon: ClipboardList, test: "button-go-handover", place: "library" as PlaceName },
+            { href: "/approvals", title: "Approvals", text: "People waiting to come in", icon: CheckCircle, test: "button-go-approvals", place: "classroom" as PlaceName },
+            { href: "/admin/trainers", title: "Trainers", text: "Approvals and accounts", icon: Award, test: "button-go-trainers", place: "hall" as PlaceName },
+            { href: "/admin/teachers", title: "Teachers", text: "Progress and files viewed", icon: Users, test: "button-go-teachers", place: "garden" as PlaceName },
+            { href: "/admin/batches", title: "Cohorts", text: "Rooms, quizzes, and certificates", icon: Layers, test: "button-go-batches", place: "classroom" as PlaceName },
+            { href: "/admin/analytics", title: "Analytics", text: "How the academy is moving", icon: BarChart3, test: "button-go-analytics", place: "library" as PlaceName },
+            { href: "/courses", title: "Courses", text: "Modules and lesson files", icon: FileText, test: "button-go-courses", place: "lessons" as PlaceName },
+          ].map((item) => (
               <button
                 key={item.href}
                 type="button"
                 data-testid={item.test}
                 onClick={() => navigate(item.href)}
-                className="sl-nav-card flex items-center gap-3 rounded-2xl p-4 text-left"
+                className="sl-nav-card overflow-hidden rounded-2xl text-left"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white">
-                  <Icon className="h-5 w-5" />
+                <span className="sl-place-tile block">
+                  <PlaceCover place={item.place} className="h-[7.5rem]" />
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold">{item.title}</span>
-                  <span className="block text-sm text-muted-foreground">{item.text}</span>
+                <span className="flex items-center gap-3 p-4">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">{item.title}</span>
+                    <span className="block text-sm text-muted-foreground">{item.text}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
                 </span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </button>
-            );
-          })}
+          ))}
         </div>
 
         <Card className="p-4 border-destructive/30" data-tour="admin-fresh">

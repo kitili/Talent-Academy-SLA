@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
+import { PlaceCover } from "@/components/PlaceArt";
 import { ArrowLeft, Award, Download } from "lucide-react";
 
 export default function TeacherCertificates() {
@@ -62,17 +63,20 @@ export default function TeacherCertificates() {
         {isLoading ? (
           <div className="text-center text-muted-foreground">Loading certificates...</div>
         ) : certificates.length === 0 ? (
-          <div className="text-center py-12">
-            <Award className="h-16 w-16 mx-auto mb-4 text-muted-foreground/40" />
-            <h2 className="text-xl font-semibold mb-2">No Certificates Yet</h2>
-            <p className="text-muted-foreground">
-              Complete all weeks and quizzes in your courses to earn certificates.
-            </p>
+          <div className="overflow-hidden rounded-2xl border bg-white text-center">
+            <PlaceCover place="certificate" className="h-52" />
+            <div className="py-8 px-4">
+              <h2 className="text-xl font-semibold mb-2">No certificates yet</h2>
+              <p className="text-muted-foreground">
+                Complete the modules and quizzes in your courses to earn one.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {certificates.map((cert) => (
-              <Card key={cert.id} className="flex flex-col hover-elevate">
+              <Card key={cert.id} className="flex flex-col hover-elevate overflow-hidden">
+                <PlaceCover place="certificate" className="h-32" />
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <Award className="h-8 w-8 text-primary flex-shrink-0" />

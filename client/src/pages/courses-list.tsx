@@ -22,6 +22,7 @@ import logoImage from "@assets/image_1760460046116.png";
 import type { Course, Batch } from "@shared/schema";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
+import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
 
 interface CourseWithAssignment extends Course {
   assignedAt?: Date;
@@ -436,14 +437,18 @@ export default function CoursesList() {
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading courses...</div>
         ) : filteredCourses.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            {isAdmin ? "No courses yet. Click 'Add Course' to get started!" : "No courses assigned to you yet."}
+          <div className="overflow-hidden rounded-2xl border bg-white text-center">
+            <PlaceCover place="lessons" className="h-48" />
+            <p className="py-8 text-muted-foreground">
+              {isAdmin ? "No courses yet. Click 'Add Course' to get started!" : "No courses assigned to you yet."}
+            </p>
           </div>
         ) : (
           <div className="grid gap-4">
-            {coursePager.slice.map((course) => (
-              <Card key={course.id} className="p-4 sm:p-6 hover-elevate cursor-pointer transition-all" data-testid={`card-course-${course.id}`}>
-                <div className="flex items-start justify-between gap-4">
+            {coursePager.slice.map((course, index) => (
+              <Card key={course.id} className="overflow-hidden hover-elevate cursor-pointer transition-all" data-testid={`card-course-${course.id}`}>
+                <PlaceCover place={placeForLabel(course.name, index)} className="h-36" />
+                <div className="flex items-start justify-between gap-4 p-4 sm:p-6">
                   <div
                     className="flex-1 cursor-pointer"
                     onClick={() => navigate(`/courses/${course.id}`)}

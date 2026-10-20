@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { homeForRole, persistSessionUser, readSessionUser } from "@/lib/sessionUser";
 import { Shield, GraduationCap, Users, Mail } from "lucide-react";
+import { PLACES, type PlaceName } from "@/components/PlaceArt";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 type Role = "admin" | "trainer" | "teacher";
@@ -329,10 +330,10 @@ export default function UnifiedAuth() {
     }
   };
 
-  const scenes: Record<Role, { src: string; line: string }> = {
-    admin: { src: "/bg-library.jpg", line: "The library is open" },
-    trainer: { src: "/bg-hall.jpg", line: "The hall is open" },
-    teacher: { src: "/bg-garden.jpg", line: "The garden is open" },
+  const scenes: Record<Role, { src: string; line: string; place: PlaceName }> = {
+    admin: { src: "/bg-library.jpg", line: "The library is open", place: "library" },
+    trainer: { src: "/bg-hall.jpg", line: "The hall is open", place: "hall" },
+    teacher: { src: "/bg-garden.jpg", line: "The garden is open", place: "garden" },
   };
   const scene = scenes[loginRole];
 
@@ -406,20 +407,24 @@ export default function UnifiedAuth() {
                   <TabsContent value="login" className="space-y-4 sm:space-y-6">
                     <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
                       {/* Role Selection Cards */}
-                      <div className="grid grid-cols-3 gap-1 rounded-full bg-[#f4eadc] p-1">
+                      <div className="grid grid-cols-3 gap-2">
                         {roleCards.map((role) => {
                           const isSelected = loginRole === role.value;
+                          const place = scenes[role.value as Role].place;
                           return (
                             <button
                               key={role.value}
                               type="button"
                               onClick={() => setLoginRole(role.value as Role)}
                               data-testid={`radio-${role.value}`}
-                              className={`rounded-full px-2 py-2 text-sm font-semibold transition ${
-                                isSelected ? "bg-[#102448] text-white shadow" : "text-[#102448] hover:bg-white"
+                              className={`overflow-hidden rounded-2xl border text-left transition ${
+                                isSelected ? "border-[#102448] ring-2 ring-[#102448]" : "border-transparent hover:border-[#102448]/30"
                               }`}
                             >
-                              {role.title}
+                              <img src={PLACES[place]} alt="" className="h-16 w-full object-cover sm:h-20" />
+                              <span className={`block px-2 py-1.5 text-center text-sm font-semibold ${isSelected ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`}>
+                                {role.title}
+                              </span>
                             </button>
                           );
                         })}
