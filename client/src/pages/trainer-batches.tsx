@@ -28,6 +28,7 @@ import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { DeskMail } from "@/components/DeskMail";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
+import { PlaceBanner, PlaceCover } from "@/components/PlaceArt";
 
 export default function TrainerBatches() {
   const [, setLocation] = useLocation();
@@ -635,14 +636,11 @@ export default function TrainerBatches() {
       </header>
 
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 py-6">
-        <div className="mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-3xl font-bold">Training Batches</h2>
-              <p className="text-muted-foreground mt-1">Manage your assigned batches, quizzes, and track progress</p>
-            </div>
-          </div>
-        </div>
+        <PlaceBanner
+          place="hall"
+          title="Training batches"
+          subtitle="The classes assigned to you. Enrol teachers, open lessons, and follow progress."
+        />
 
         {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
@@ -656,7 +654,8 @@ export default function TrainerBatches() {
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-2">
                 {batches.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
+                  <div className="text-center py-6 text-muted-foreground text-sm">
+                    <PlaceCover place="hall" className="mb-3 h-28 rounded-xl" />
                     <Users className="mx-auto h-8 w-8 mb-2 opacity-50" />
                     No batches assigned to you yet
                   </div>
@@ -675,6 +674,7 @@ export default function TrainerBatches() {
                       }`}
                       data-testid={`button-batch-${batch.id}`}
                     >
+                      <PlaceCover place="hall" className="mb-2 h-16 rounded-lg" />
                       <p className="font-semibold text-sm truncate">{batch.name}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {batch.teacherCount || 0} teachers

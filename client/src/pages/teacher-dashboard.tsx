@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, ClipboardCheck, BookOpen } from "lucide-react";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
+import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
 import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
@@ -350,14 +351,12 @@ export default function TeacherDashboard() {
 
       {/* Main Content */}
       <div className="sl-sheet sl-frame my-4 sm:my-6 p-4 sm:p-6 space-y-6 pb-20 sm:pb-6">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold" data-testid="text-welcome">
-            Welcome, {teacher?.name}
-          </h2>
-          <p className="text-muted-foreground">
-            Know what to learn, what to do next, and whether you have understood it.
-          </p>
-        </div>
+        <PlaceBanner
+          place="garden"
+          title={`Welcome, ${teacher?.name || "teacher"}`}
+          subtitle="Know what to learn, what to do next, and whether you have understood it."
+          titleTestId="text-welcome"
+        />
 
         {deskPeers[0] && (
           <DeskMail
@@ -711,15 +710,19 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             {uniqueCourses.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No training weeks assigned yet
-              </p>
+              <div className="overflow-hidden rounded-xl border bg-white">
+                <PlaceCover place="classroom" className="h-40" />
+                <p className="text-muted-foreground text-center py-6 px-4">
+                  No training weeks assigned yet. Your trainer will place a course here.
+                </p>
+              </div>
             ) : (
               <div className="space-y-4">
                 {uniqueCourses.map((course: any) => {
                   const status = learningStatus({ percentage: course.aggregateProgress.percentage });
                   return (
-                  <Card key={course.courseId || course.courseName} data-testid={`card-course-${course.courseName}`} className="shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-border/50 rounded-lg sl-stat-card">
+                  <Card key={course.courseId || course.courseName} data-testid={`card-course-${course.courseName}`} className="overflow-hidden shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-border/50 rounded-lg sl-stat-card">
+                    <PlaceCover place={placeForLabel(course.courseName || "course")} className="h-32" />
                     <CardHeader>
                       <div className="flex items-center justify-between gap-3">
                         <div>

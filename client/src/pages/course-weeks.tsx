@@ -16,6 +16,7 @@ import logoImage from "@assets/image_1760460046116.png";
 import type { Course, TrainingWeek } from "@shared/schema";
 import type { UploadResult } from "@uppy/core";
 import { FilePreview } from "@/components/FilePreview";
+import { PlaceBanner } from "@/components/PlaceArt";
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -792,17 +793,12 @@ export default function CourseWeeks() {
           </Button>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Course</p>
-            <h2 className="text-2xl sm:text-3xl font-bold">{isLoadingCourse ? "…" : course?.name || "Course"}</h2>
-            {course?.description && (
-              <p className="text-muted-foreground mt-2 max-w-3xl">{course.description}</p>
-            )}
-            <p className="text-sm text-muted-foreground mt-3">
-              Course → Module → Lesson → Activity → Assessment. Completing a lesson is not course mastery until every required quiz is passed.
-            </p>
-          </div>
+        <div className="mb-6 space-y-4">
+          <PlaceBanner
+            place="lessons"
+            title={isLoadingCourse ? "Course" : course?.name || "Course"}
+            subtitle={course?.description || "Course, then module, then lesson. A lesson is finished when every required quiz is passed."}
+          />
           {isTrainer && (
             <Button
               onClick={() => createWeekMutation.mutate()}
