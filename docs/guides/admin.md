@@ -6,9 +6,7 @@ Sign in on the Admin tab. The first visit starts a short tour. **Tour** in the h
 
 ## A. The desk
 
-You land on the admin home. The strip shows both tracks: primary trainers from playgroup through Standard 7, and secondary trainers for Form I.
-
-Four counts sit under that: trainers, teachers, courses, and active people. If someone is waiting, **Needs attention** opens Approvals.
+You land on the admin home. A short line shows trainers, teachers, and courses. If someone is waiting, **Needs attention** opens Approvals. The pictures below open the rest of the academy.
 
 ## B. The header
 
@@ -18,12 +16,13 @@ Four counts sit under that: trainers, teachers, courses, and active people. If s
 | Reset User Password | Set a new password for any account. The old password is stored hashed, so you cannot read it. |
 | Tour | Replay the short tour. |
 
-## C. The seven cards
+## C. The navbar and the cards
+
+The navbar stays on the admin pages: Desk, Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses.
 
 | Card | What you do |
 | --- | --- |
-| Handover | The three-week staff plan, plus live health: whether the database answers and whether lesson files are on Blob or only on this machine. |
-| Approvals | Let a waiting trainer or teacher in, or turn them away. |
+| Approvals | Let a waiting trainer or teacher in, or turn them away. The saved approval history is not listed here. |
 | Trainers | Create a trainer account. A trainer you create here is approved at once. Open a trainer to see that account. |
 | Teachers | Create a teacher account, already approved. Open a teacher to see progress and files viewed. |
 | Cohorts | Every batch, not only one trainer’s. Each card says Primary or Secondary. Assign the trainer who will coach that batch, or clear the assignment. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
@@ -38,7 +37,9 @@ You can also create trainer accounts. A trainer cannot create another trainer or
 
 ## E. Start fresh
 
-**Start fresh** removes courses, cohorts, progress, quizzes, certificates, notices, and messages so you can import again. Login accounts stay, and their passwords stay. Type `CLEAR ACTIVITY` only when you mean it. Everyone is signed out and comes back with the same password.
+**Clear previous activity** removes only the areas you tick: cohorts, progress, quizzes, certificates, or notices. Tick the trainers or teachers it applies to. It does not clear the whole academy, and it does not remove courses or login accounts. Type `CLEAR ACTIVITY` only when you mean it. You stay signed in.
+
+On Cohorts, each batch has an **Approval history** dropdown. It stays closed until you select it, then it pages the rows already saved in the database. **Export** downloads that batch as a CSV file.
 
 ## F. A normal week
 

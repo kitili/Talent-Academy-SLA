@@ -22,6 +22,7 @@ import logoImage from "@assets/image_1760460046116.png";
 import type { Course, Batch } from "@shared/schema";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
+import { AdminNav } from "@/components/AdminNav";
 import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
 
 interface CourseWithAssignment extends Course {
@@ -373,6 +374,7 @@ export default function CoursesList() {
             </MobileMenu>
           </div>
         </div>
+        {isAdmin && <AdminNav embedded />}
       </header>
 
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">

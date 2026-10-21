@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
+import { AdminNav } from "@/components/AdminNav";
 
 interface BatchAnalytics {
   batch: { id: string; name: string };
@@ -811,6 +812,7 @@ export default function AdminAnalytics() {
     <div className="sl-page sl-bg-lamp min-h-screen">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
+        <AdminNav flow />
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-6">
           <div className="flex items-center justify-between">
             <div>

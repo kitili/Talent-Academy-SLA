@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
+import { AdminNav } from "@/components/AdminNav";
 
 interface Teacher {
   id: string;
@@ -143,6 +144,7 @@ export default function AdminTeachers() {
 
   return (
     <SceneBackdrop scene="garden">
+    <AdminNav />
     <div className="p-4 sm:p-6 md:p-8">
       <div className="sl-sheet sl-frame">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">

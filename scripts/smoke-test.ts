@@ -100,6 +100,35 @@ async function main() {
     `HTTP ${health.status} blob=${health.json?.blob}`,
   );
 
+  const wholeAcademy = await request("/api/admin/fresh-start", {
+    method: "POST",
+    body: JSON.stringify({ confirm: "CLEAR ACTIVITY" }),
+  }, cookies);
+  record(
+    "Clear activity refuses the whole academy",
+    wholeAcademy.status === 400,
+    `HTTP ${wholeAcademy.status} ${wholeAcademy.json?.error || ""}`,
+  );
+
+  const batchRows = await request("/api/batches", {}, cookies);
+  const firstBatch = Array.isArray(batchRows.json) ? batchRows.json[0] : null;
+  if (firstBatch?.id) {
+    const history = await request(`/api/batches/${firstBatch.id}/approval-history?page=1`, {}, cookies);
+    record(
+      "Batch approval history is paged",
+      history.status === 200 && Array.isArray(history.json?.items) && typeof history.json?.total === "number",
+      `HTTP ${history.status} total=${history.json?.total}`,
+    );
+    const historyCsv = await request(`/api/batches/${firstBatch.id}/approval-history?format=csv`, {}, cookies);
+    record(
+      "Batch approval history exports",
+      historyCsv.status === 200 && historyCsv.text.startsWith("created_at,"),
+      `HTTP ${historyCsv.status}`,
+    );
+  } else {
+    record("Batch approval history is paged", batchRows.status === 200, "no batches yet");
+  }
+
   const notice = await request("/api/admin/announce", {
     method: "POST",
     body: JSON.stringify({ title: "Smoke notice", message: "Desk check" }),

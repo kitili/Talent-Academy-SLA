@@ -15,7 +15,14 @@ import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
 import * as mammoth from "mammoth";
 import { db, getDatabaseUrl, pool } from "./db";
-import { clearAcademyActivity, FRESH_START_PHRASE } from "./freshStart";
+import { clearSelectedActivity, parseActivityScope } from "./freshStart";
+import {
+  approvalHistoryPage,
+  approvalHistoryToCsv,
+  batchApprovalHistoryCountSql,
+  batchApprovalHistorySelectSql,
+  mapApprovalHistoryRow,
+} from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
@@ -3902,24 +3909,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/fresh-start", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
-      if (String(req.body?.confirm || "") !== FRESH_START_PHRASE) {
-        return res.status(400).json({ error: "Type CLEAR ACTIVITY to confirm" });
+      const scope = parseActivityScope(req.body);
+      if ("error" in scope) {
+        return res.status(400).json({ error: scope.error });
       }
-      const summary = await clearAcademyActivity(pool);
+      const summary = await clearSelectedActivity(pool, scope);
       await recordAudit({
         actorId: req.user?.id,
         actorRole: req.user?.role,
         action: "fresh_start",
         targetType: "academy",
-        metadata: { removedRows: summary.removedRows },
+        metadata: {
+          removedRows: summary.removedRows,
+          areas: summary.areas,
+          people: summary.people,
+        },
       });
       res.json({
         ok: true,
         removedRows: summary.removedRows,
+        areas: summary.areas,
+        people: summary.people,
         kept: summary.kept,
       });
     } catch (error) {
       console.error("Error clearing academy activity:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/batches/:id/approval-history", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.id);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      const format = String(req.query.format || "");
+      if (format === "csv") {
+        const result = await pool.query(batchApprovalHistorySelectSql(false), [req.params.id]);
+        const csv = approvalHistoryToCsv(result.rows);
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="batch-${req.params.id}-approval-history.csv"`);
+        return res.send(csv);
+      }
+      const paging = approvalHistoryPage(req.query.page);
+      const [countResult, pageResult] = await Promise.all([
+        pool.query(batchApprovalHistoryCountSql(), [req.params.id]),
+        pool.query(batchApprovalHistorySelectSql(true), [req.params.id, paging.pageSize, paging.offset]),
+      ]);
+      const total = Number(countResult.rows[0]?.total || 0);
+      res.json({
+        items: pageResult.rows.map((row) => mapApprovalHistoryRow(row)),
+        page: paging.page,
+        pageSize: paging.pageSize,
+        pages: paging.pages(total),
+        total,
+      });
+    } catch (error) {
+      console.error("Error reading batch approval history:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

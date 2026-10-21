@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AcademyShell } from "@/components/AcademyShell";
+import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
 import { PageStrip, usePager } from "@/components/PageStrip";
 
 interface Batch {
@@ -98,6 +99,7 @@ export default function AdminBatches() {
       title="Silverleaf Academy"
       subtitle="Cohorts"
       userLabel={user?.username}
+      showAdminNav
     >
         <div className="mb-6">
           <Button
@@ -221,6 +223,7 @@ export default function AdminBatches() {
                     )}
                   </div>
                 </div>
+                <BatchApprovalHistory batchId={batch.id} />
               </Card>
             ))}
             <PageStrip page={batchPager.page} pages={batchPager.pages} setPage={batchPager.setPage} />
