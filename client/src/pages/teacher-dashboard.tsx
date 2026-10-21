@@ -19,12 +19,61 @@ import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, 
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
-import { LearningPath, activeStagesFromNames } from "@/components/LearningPath";
 import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+
+function TeacherPathCard() {
+  const { data: path } = useQuery<any>({
+    queryKey: ["/api/teacher/academy-path"],
+  });
+  if (!path) return null;
+  return (
+    <Card data-testid="card-teacher-path">
+      <CardHeader>
+        <CardTitle className="text-lg">Cohorts to finish</CardTitle>
+        <CardDescription>
+          {path.done
+            ? `You have finished the ${path.cohortsRequired} cohorts this academy asks for.`
+            : `Finish ${path.cohortsRequired} cohorts. You have completed ${path.cohortsCompleted}. ${path.remaining} still to go.`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {(path.cohorts || []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">You are not in a cohort yet. An admin places you in one.</p>
+        ) : (path.cohorts || []).map((cohort: any) => (
+          <div key={cohort.id} className="rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium">{cohort.name}</p>
+              <Badge variant="outline">
+                {cohort.batches?.length || 0} {(cohort.batches?.length || 0) === 1 ? "batch" : "batches"}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              This cohort has its own batches. Another cohort can have a different number.
+            </p>
+            {(cohort.batches || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground mt-2">No batches in this cohort yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-1 text-sm">
+                {cohort.batches.map((batch: any, index: number) => (
+                  <li key={batch.id} className="flex items-center justify-between gap-2">
+                    <span>Batch {index + 1}: {batch.name}</span>
+                    <span className="text-muted-foreground">
+                      {(batch.courses || []).filter((course: any) => course.completed).length}/{(batch.courses || []).length} courses
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function TeacherDashboard() {
   const [, setLocation] = useLocation();
@@ -362,7 +411,7 @@ export default function TeacherDashboard() {
           subtitle="Adult teacher. The pictures are the pupils you will teach."
           titleTestId="text-welcome"
         />
-        <LearningPath activeStageIds={activeStagesFromNames(assignedWeeks.map((week: any) => week.courseName))} />
+        <TeacherPathCard />
 
         {deskPeers[0] && (
           <DeskMail

@@ -5,8 +5,8 @@ All LMS data lives in **one Supabase Postgres project**. App tables stay in `pub
 | Area | What it covers | Tables |
 |---|---|---|
 | identity | Trainers, admins, sessions, profiles, approval history | `sessions`, `users`, `user_profiles`, `approval_history` |
-| onboarding | Teacher (fellow) accounts, batches, enrollments | `teachers`, `teacher_profiles`, `batches`, `batch_teachers`, `batch_courses` |
-| learning | Courses, weeks, materials, progress, quizzes | `courses`, `training_weeks`, `content_items`, `user_content_progress`, `deck_file_progress`, `quiz_attempts`, `quiz_cache`, `assigned_quizzes`, `teacher_quiz_attempts`, `teacher_content_progress`, `teacher_content_quiz_attempts`, `teacher_quiz_regenerations`, `open_ended_reviews`, `teacher_course_completion`, `course_repetitions` |
+| onboarding | Teacher accounts, cohorts, batches inside a cohort, enrollments | `teachers`, `teacher_profiles`, `batches`, `academy_settings`, `cohort_batches`, `batch_teachers`, `batch_courses` |
+| learning | Courses, weeks, materials, progress, quizzes | `courses`, `cohort_batch_courses`, `training_weeks`, `content_items`, `user_content_progress`, `deck_file_progress`, `quiz_attempts`, `quiz_cache`, `assigned_quizzes`, `teacher_quiz_attempts`, `teacher_content_progress`, `teacher_content_quiz_attempts`, `teacher_quiz_regenerations`, `open_ended_reviews`, `teacher_course_completion`, `course_repetitions` |
 | classroom | Attendance, events, written work, certificates | `attendance_records`, `scheduled_events`, `written_assignments`, `assignment_submissions`, `batch_certificate_templates`, `teacher_certificates`, `teacher_report_cards` |
 | communications | In-app notices and alerts | `notifications`, `alert_rules` |
 | marketing | Satisfaction, comments, goals, reflections | `satisfaction_scores`, `trainer_comments`, `teacher_goals`, `fellow_reflections`, `fellow_disqualifications` |

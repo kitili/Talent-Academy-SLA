@@ -1,6 +1,6 @@
 # Trainer walkthrough
 
-You train adult teachers. The pictures of children are the pupils those teachers will teach. You only see the batches an admin assigned to you.
+You train adult teachers. The pictures of children are the pupils those teachers will teach. You only see the cohorts an admin assigned to you. You can add courses. An admin adds cohorts and the batches inside them.
 
 Primary trainers cover playgroup through Standard 7. Secondary trainers cover Form I.
 
@@ -10,9 +10,7 @@ Open the Trainer tab and sign in. The first visit starts a short tour. **Tour** 
 
 ## B. Your desk
 
-You land on Training batches.
-
-The strip at the top is the whole ladder: Playgroup, Pre-primary, Standard 1–2, Standard 3–6, Standard 7, and Secondary. Your own stage is highlighted. Another trainer’s batch is not in the list on the left.
+You land on Your cohorts. Another trainer’s cohort is not in the list on the left.
 
 ## C. Open a batch
 
@@ -33,7 +31,7 @@ Six tabs sit on the batch:
 
 ## D. Build the course
 
-**Courses** in the header is the curriculum.
+**Courses** in the header is the curriculum. Add a course there. An admin places that course on a batch inside a cohort.
 
 A course is one stage. A module inside it is one focus, such as Practical life or Kiswahili. A lesson file sits inside the module. The course page reminds you to plan each module as Introduction, Competence development, Design, then Realisation. Playgroup uses the five Montessori areas instead of that subject list.
 

@@ -29,7 +29,6 @@ import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/Pag
 import { DeskMail } from "@/components/DeskMail";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 import { PlaceBanner, PlaceCover } from "@/components/PlaceArt";
-import { LearningPath } from "@/components/LearningPath";
 
 export default function TrainerBatches() {
   const [, setLocation] = useLocation();
@@ -653,19 +652,16 @@ export default function TrainerBatches() {
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 py-6">
         <PlaceBanner
           place="hall"
-          title="Training batches"
+          title="Your cohorts"
           subtitle={
-            batches.some((batch: any) => batch.track === "secondary") && !batches.some((batch: any) => batch.track === "primary")
+            (batches.some((batch: any) => batch.track === "secondary") && !batches.some((batch: any) => batch.track === "primary")
               ? "Secondary trainers. These teachers will teach Form I."
               : batches.some((batch: any) => batch.track === "primary") && !batches.some((batch: any) => batch.track === "secondary")
                 ? "Primary trainers. Playgroup through Standard 7."
-                : "Adult teachers, grouped by the class they will teach."
+                : "Adult teachers, grouped by the class they will teach.")
+            + " You add courses. An admin adds the batches inside a cohort."
           }
         />
-        <div className="mb-4">
-          <LearningPath activeStageIds={batches.map((batch: any) => batch.stage).filter(Boolean)} />
-        </div>
-
         {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
           {/* Left Sidebar - Batch List */}

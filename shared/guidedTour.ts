@@ -17,7 +17,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Where to go next",
-    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses. Approvals lets people in. Cohorts is where you add a batch, assign a trainer, and open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
+    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses. Approvals lets people in. Cohorts is one place to add cohorts, the batches inside them, and courses, and to open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
     target: "admin-nav",
   },
   {
@@ -48,7 +48,7 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "What stays with admin",
-    body: "You can approve a new teacher and reset that teacher's password. You cannot create an admin, clear the academy, or open another trainer's cohort.",
+    body: "You can add a course, approve a new teacher, and reset that teacher's password. You cannot add a cohort or a batch, create an admin, clear the academy, or open another trainer's cohort.",
   },
 ];
 
