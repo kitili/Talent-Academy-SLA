@@ -77,14 +77,14 @@ function TrainerKpis({
   onSelectCohort: (cohortId: string) => void;
 }) {
   const stats = [
-    { id: "cohorts", label: "Cohorts", value: desk?.cohortCount ?? 0, tab: "teachers" },
-    { id: "teachers", label: "Teachers", value: desk?.teacherCount ?? 0, tab: "teachers" },
-    { id: "progress", label: "Progress", value: desk?.progressPercent == null ? "—" : `${desk.progressPercent}%`, tab: "progress" },
-    { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "quizzes" },
-    { id: "papers", label: "Paper exams", value: desk?.paperExams ?? 0, tab: "quizzes" },
-    { id: "attendance", label: "Attendance", value: desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`, tab: "attendance" },
-    { id: "certificates", label: "Certificates", value: desk?.certificateCount ?? 0, tab: "certificates" },
-    { id: "schedule", label: "Upcoming", value: desk?.upcomingEvents ?? 0, tab: "schedule" },
+    { id: "cohorts", label: "Cohorts", value: desk?.cohortCount ?? 0, tab: "teachers", wash: "bg-[#1d4e89] text-white" },
+    { id: "teachers", label: "Teachers", value: desk?.teacherCount ?? 0, tab: "teachers", wash: "bg-[#0f7a6c] text-white" },
+    { id: "progress", label: "Progress", value: desk?.progressPercent == null ? "—" : `${desk.progressPercent}%`, tab: "progress", wash: "bg-[#9b3d55] text-white" },
+    { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "quizzes", wash: "bg-[#c47b2b] text-white" },
+    { id: "papers", label: "Paper exams", value: desk?.paperExams ?? 0, tab: "quizzes", wash: "bg-[#5b3d8a] text-white" },
+    { id: "attendance", label: "Attendance", value: desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`, tab: "attendance", wash: "bg-[#3d6b2f] text-white" },
+    { id: "certificates", label: "Certificates", value: desk?.certificateCount ?? 0, tab: "certificates", wash: "bg-[#b8860b] text-[#102448]" },
+    { id: "schedule", label: "Upcoming", value: desk?.upcomingEvents ?? 0, tab: "schedule", wash: "bg-[#102448] text-white" },
   ];
   return (
     <div className="mb-4 space-y-3" data-testid="trainer-kpis">
@@ -94,7 +94,7 @@ function TrainerKpis({
             key={stat.id}
             type="button"
             onClick={() => onOpen(stat.tab)}
-            className="rounded-xl border bg-white px-3 py-2 text-left text-[#17233c] dark:bg-[#162033] dark:text-[#f6f1e8]"
+            className={`rounded-2xl px-3 py-3 text-left shadow-sm transition hover:-translate-y-0.5 ${stat.wash}`}
             data-testid={`trainer-kpi-${stat.id}`}
           >
             <span className="block text-xs uppercase tracking-wide opacity-70">{stat.label}</span>
@@ -104,12 +104,12 @@ function TrainerKpis({
       </div>
       {(desk?.cohorts || []).length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2">
-          {(desk.cohorts as any[]).map((cohort) => (
+          {(desk.cohorts as any[]).map((cohort, index) => (
             <button
               key={cohort.id}
               type="button"
               onClick={() => onSelectCohort(cohort.id)}
-              className="rounded-xl border bg-white px-3 py-2 text-left text-[#17233c] dark:bg-[#162033] dark:text-[#f6f1e8]"
+              className={`rounded-2xl border-l-8 bg-white px-3 py-3 text-left text-[#17233c] shadow-sm transition hover:-translate-y-0.5 dark:bg-[#162033] dark:text-[#f6f1e8] ${["border-[#1d4e89]", "border-[#0f7a6c]", "border-[#c47b2b]", "border-[#9b3d55]", "border-[#5b3d8a]"][index % 5]}`}
               data-testid={`trainer-cohort-${cohort.id}`}
             >
               <span className="block font-medium">{cohort.name}</span>
@@ -795,18 +795,18 @@ export default function TrainerBatches() {
 
   return (
     <SceneBackdrop scene="hall">
-      <header className="sticky top-0 z-50 bg-primary shadow-md">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#102448] via-[#1d4e89] to-[#0f7a6c] shadow-md">
         <div className="sl-frame py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="h-12 w-12 sm:h-14 sm:w-14 flex items-center justify-center flex-shrink-0 bg-primary rounded-sm p-1">
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white p-1 shadow-md ring-2 ring-[#f0c14a] sm:h-14 sm:w-14">
               <img src={logoImage} alt="Silverleaf Academy Logo" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-white truncate" data-testid="text-app-title">
                 Silverleaf Academy
               </h1>
-              <p className="text-xs sm:text-sm text-white/80 hidden sm:block">
-                Trainer Portal
+              <p className="hidden text-xs text-[#f0c14a] sm:block sm:text-sm">
+                Trainer hall
               </p>
             </div>
           </div>
@@ -905,6 +905,25 @@ export default function TrainerBatches() {
             + " You add courses. An admin adds the batches inside a cohort."
           }
         />
+        <section className="mb-4 overflow-hidden rounded-2xl shadow-md" data-testid="trainer-welcome">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-[#9b3d55] via-[#c47b2b] to-[#0f7a6c] px-4 py-4 text-white">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">Today in the hall</p>
+              <p className="text-xl font-semibold">Hello{user?.username ? `, ${user.username}` : ""}</p>
+            </div>
+            <p className="max-w-md text-sm text-white/90">
+              Cohorts, teachers, quizzes, and attendance are laid out in colour so the busy parts are easy to spot.
+            </p>
+          </div>
+          <div className="flex h-2">
+            <span className="flex-1 bg-[#1d4e89]" />
+            <span className="flex-1 bg-[#0f7a6c]" />
+            <span className="flex-1 bg-[#c47b2b]" />
+            <span className="flex-1 bg-[#9b3d55]" />
+            <span className="flex-1 bg-[#5b3d8a]" />
+            <span className="flex-1 bg-[#b8860b]" />
+          </div>
+        </section>
         <TrainerKpis
           desk={desk}
           onOpen={(tab) => {
@@ -922,10 +941,12 @@ export default function TrainerBatches() {
         {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
           {/* Left Sidebar - Batch List */}
-          <div className="lg:col-span-1 border rounded-lg bg-card overflow-hidden flex flex-col" data-tour="trainer-batches">
-            <div className="p-4 border-b space-y-2">
+          <div className="flex flex-col overflow-hidden rounded-2xl border border-[#1d4e89]/20 bg-white shadow-md dark:bg-[#162033] lg:col-span-1" data-tour="trainer-batches">
+            <div className="bg-gradient-to-r from-[#102448] to-[#1d4e89] px-4 py-3 text-white">
               <h3 className="font-semibold">Your Batches</h3>
-              <p className="text-xs text-muted-foreground mt-1">{filteredBatches.length} total</p>
+              <p className="text-xs text-white/75">{filteredBatches.length} on your desk</p>
+            </div>
+            <div className="border-b bg-[#f4eadc]/80 p-3 dark:bg-[#1a2740]">
               <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search cohorts" />
             </div>
             <ScrollArea className="flex-1">
@@ -944,21 +965,23 @@ export default function TrainerBatches() {
                         setSelectedBatch(batch);
                         setActiveTab("teachers");
                       }}
-                      className={`w-full text-left p-3 rounded-lg transition-colors border ${
+                      className={`w-full text-left p-3 rounded-2xl transition border-l-8 ${
+                        ["border-[#1d4e89]", "border-[#0f7a6c]", "border-[#c47b2b]", "border-[#9b3d55]", "border-[#5b3d8a]"][batchPager.slice.indexOf(batch) % 5]
+                      } ${
                         selectedBatch?.id === batch.id
-                          ? "bg-primary/10 border-primary text-foreground"
-                          : "bg-muted/30 border-transparent hover:bg-muted/50 text-foreground"
+                          ? "bg-[#1d4e89] text-white shadow-md"
+                          : "bg-white text-[#17233c] hover:-translate-y-0.5 hover:shadow-sm dark:bg-[#162033] dark:text-[#f6f1e8]"
                       }`}
                       data-testid={`button-batch-${batch.id}`}
                     >
                       <PlaceCover place="hall" className="mb-2 h-16 rounded-lg" />
                       <p className="font-semibold text-sm truncate">{batch.name}</p>
                       {batch.track && (
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
+                        <p className={`text-[11px] font-medium uppercase tracking-wide ${selectedBatch?.id === batch.id ? "text-white/80" : "text-[#1d4e89]"}`}>
                           {batch.track === "secondary" ? "Secondary" : "Primary"}
                         </p>
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className={`text-xs mt-1 ${selectedBatch?.id === batch.id ? "text-white/80" : "text-muted-foreground"}`}>
                         {batch.teacherCount || 0} teachers
                       </p>
                     </button>
@@ -971,13 +994,13 @@ export default function TrainerBatches() {
 
           {/* Right Panel - Batch Details */}
           {selectedBatch ? (
-            <div className="lg:col-span-3 border rounded-lg bg-card overflow-hidden flex flex-col">
-              {/* Header */}
-              <div className="p-4 border-b flex justify-between items-start">
+            <div className="flex flex-col overflow-hidden rounded-2xl border border-[#0f7a6c]/25 bg-white shadow-md dark:bg-[#162033] lg:col-span-3">
+              <div className="flex items-start justify-between gap-3 border-b bg-gradient-to-r from-[#fff7ec] via-white to-[#e7f6f3] p-4 dark:from-[#1a2740] dark:via-[#162033] dark:to-[#14352f]">
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold">{selectedBatch.name}</h2>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#c47b2b]">Open cohort</p>
+                  <h2 className="text-2xl font-bold text-[#102448] dark:text-white">{selectedBatch.name}</h2>
                   {selectedBatch.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{selectedBatch.description}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{selectedBatch.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -1006,28 +1029,28 @@ export default function TrainerBatches() {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
-                <TabsList className="grid w-full grid-cols-6 flex-shrink-0 rounded-none border-b" data-tour="trainer-tools">
-                  <TabsTrigger value="teachers" data-testid="tab-teachers">
+                <TabsList className="grid w-full grid-cols-6 flex-shrink-0 rounded-none border-b bg-[#f4eadc] p-1 dark:bg-[#1a2740]" data-tour="trainer-tools">
+                  <TabsTrigger value="teachers" className="data-[state=active]:bg-[#1d4e89] data-[state=active]:text-white" data-testid="tab-teachers">
                     <Users className="mr-1 h-4 w-4" />
                     <span className="hidden sm:inline">Teachers</span>
                   </TabsTrigger>
-                  <TabsTrigger value="quizzes" data-testid="tab-quizzes">
+                  <TabsTrigger value="quizzes" className="data-[state=active]:bg-[#c47b2b] data-[state=active]:text-white" data-testid="tab-quizzes">
                     <Award className="mr-1 h-4 w-4" />
                     <span className="hidden sm:inline">Quizzes</span>
                   </TabsTrigger>
-                  <TabsTrigger value="progress" data-testid="tab-progress">
+                  <TabsTrigger value="progress" className="data-[state=active]:bg-[#9b3d55] data-[state=active]:text-white" data-testid="tab-progress">
                     <TrendingUp className="mr-1 h-4 w-4" />
                     <span className="hidden sm:inline">Progress</span>
                   </TabsTrigger>
-                  <TabsTrigger value="attendance" data-testid="tab-attendance">
+                  <TabsTrigger value="attendance" className="data-[state=active]:bg-[#3d6b2f] data-[state=active]:text-white" data-testid="tab-attendance">
                     <ClipboardCheck className="mr-1 h-4 w-4" />
                     <span className="hidden sm:inline">Attendance</span>
                   </TabsTrigger>
-                  <TabsTrigger value="schedule" data-testid="tab-schedule">
+                  <TabsTrigger value="schedule" className="data-[state=active]:bg-[#0f7a6c] data-[state=active]:text-white" data-testid="tab-schedule">
                     <Calendar className="mr-1 h-4 w-4" />
                     <span className="hidden sm:inline">Schedule</span>
                   </TabsTrigger>
-                  <TabsTrigger value="certificates" data-testid="tab-certificates">
+                  <TabsTrigger value="certificates" className="data-[state=active]:bg-[#b8860b] data-[state=active]:text-[#102448]" data-testid="tab-certificates">
                     <FileText className="mr-1 h-4 w-4" />
                     <span className="hidden sm:inline">Certs</span>
                   </TabsTrigger>
@@ -2146,10 +2169,11 @@ export default function TrainerBatches() {
               </Tabs>
             </div>
           ) : (
-            <div className="lg:col-span-3 border rounded-lg bg-card flex items-center justify-center">
-              <div className="text-center">
-                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">Select a batch to view details</p>
+            <div className="flex items-center justify-center overflow-hidden rounded-2xl border border-[#c47b2b]/30 bg-gradient-to-br from-[#fff7ec] via-white to-[#e7f6f3] shadow-md dark:from-[#1a2740] dark:via-[#162033] dark:to-[#14352f] lg:col-span-3">
+              <div className="px-6 py-10 text-center">
+                <PlaceCover place="hall" className="mx-auto mb-4 h-28 w-48 rounded-2xl shadow" />
+                <p className="text-lg font-semibold text-[#102448] dark:text-white">Pick a cohort</p>
+                <p className="mt-1 text-sm text-muted-foreground">The coloured cards on the left open teachers, quizzes, and attendance.</p>
               </div>
             </div>
           )}

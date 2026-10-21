@@ -16,6 +16,8 @@ import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 type Role = "admin" | "trainer" | "teacher";
 
+const DESK_REQUEST_KEY = "sl-desk-request";
+
 interface MultiRoleOption {
   id: string;
   role: Role;
@@ -37,6 +39,7 @@ export default function UnifiedAuth() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [mode, setMode] = useState<"sign-in" | "request" | "password">("sign-in");
+  const [passwordReady, setPasswordReady] = useState(false);
   const [requestName, setRequestName] = useState("");
   const [requestUsername, setRequestUsername] = useState("");
   const [requestEmail, setRequestEmail] = useState("");
@@ -53,6 +56,43 @@ export default function UnifiedAuth() {
       setLocation(homeForRole(signedIn.role));
     }
   }, [user, showRolePicker, setLocation]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(DESK_REQUEST_KEY);
+    if (!raw) return;
+    let saved: { username?: string; role?: string } = {};
+    try {
+      saved = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const role = saved.role === "teacher" || saved.role === "trainer" ? saved.role : null;
+    const username = (saved.username || "").trim();
+    if (!role || username.length < 3) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/access-requests/status?identifier=${encodeURIComponent(username)}&role=${role}`,
+        );
+        const data = await response.json().catch(() => ({}));
+        if (cancelled) return;
+        if (data.code === "needs_password") {
+          setPasswordReady(true);
+          setLoginRole(role);
+          setLoginEmail(username);
+          setMode("password");
+          return;
+        }
+        if (data.code === "approved") localStorage.removeItem(DESK_REQUEST_KEY);
+      } catch {
+        // Stay on sign-in until the next refresh can reach the academy.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Handle role selection when multiple roles are available
   const handleRoleSelection = async (selectedRole: MultiRoleOption) => {
@@ -164,8 +204,11 @@ export default function UnifiedAuth() {
         setLocation(homeForRole(signedInRole));
       } else {
         if (data.code === "needs_password") {
+          const role = loginRole === "teacher" ? "teacher" : "trainer";
+          setPasswordReady(true);
+          setLoginRole(role);
+          localStorage.setItem(DESK_REQUEST_KEY, JSON.stringify({ username: loginEmail.trim(), role }));
           setMode("password");
-          if (loginRole === "admin") setLoginRole("trainer");
         }
         toast({
           variant: "destructive",
@@ -205,17 +248,23 @@ export default function UnifiedAuth() {
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok && response.status !== 200) {
-        toast({ variant: "destructive", title: "Request not saved", description: data.message || "Try again" });
-        return;
-      }
+      const role = loginRole === "teacher" ? "teacher" : "trainer";
       if (data.code === "needs_password") {
+        localStorage.setItem(DESK_REQUEST_KEY, JSON.stringify({ username: requestUsername.trim(), role }));
+        setPasswordReady(true);
+        setLoginEmail(requestUsername.trim());
+        setLoginRole(role);
         openMode("password");
         toast({ title: "Already signed in", description: data.message });
         return;
       }
+      if (!response.ok) {
+        toast({ variant: "destructive", title: "Request not saved", description: data.message || "Try again" });
+        return;
+      }
+      localStorage.setItem(DESK_REQUEST_KEY, JSON.stringify({ username: requestUsername.trim(), role }));
       setRequestSent(true);
-      toast({ title: "Request sent", description: "An admin will sign you in. Then come back and create your password." });
+      toast({ title: "Request sent", description: "Refresh this page after an admin signs you in. Create your password will appear then." });
     } catch {
       toast({ variant: "destructive", title: "Request not saved", description: "Try again in a moment." });
     } finally {
@@ -242,6 +291,8 @@ export default function UnifiedAuth() {
         return;
       }
       setLoginPassword("");
+      localStorage.removeItem(DESK_REQUEST_KEY);
+      setPasswordReady(false);
       openMode("sign-in");
       toast({ title: "Password saved", description: "Sign in with it." });
     } catch {
@@ -354,14 +405,20 @@ export default function UnifiedAuth() {
                   </div>
                 </div>
                 <CardTitle className="text-2xl font-bold">Come in</CardTitle>
-                <CardDescription>Sign in, ask for a desk, or create your password after an admin signs you in.</CardDescription>
+                <CardDescription>
+                  {passwordReady
+                    ? "An admin signed you in. Create your password, then sign in."
+                    : "Sign in, or ask for a trainer or teacher desk."}
+                </CardDescription>
               </CardHeader>
               
               <CardContent className="px-4 sm:px-6">
-                    <div className="mb-4 grid grid-cols-3 gap-2 text-[11px] font-semibold leading-tight">
+                    <div className={`mb-4 grid gap-2 text-[11px] font-semibold leading-tight ${passwordReady ? "grid-cols-3" : "grid-cols-2"}`}>
                       <button type="button" className={`rounded-full px-2 py-2 ${mode === "sign-in" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("sign-in")} data-testid="button-mode-signin">Sign in</button>
                       <button type="button" className={`rounded-full px-2 py-2 ${mode === "request" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("request")} data-testid="button-mode-request">Request a desk</button>
-                      <button type="button" className={`rounded-full px-2 py-2 ${mode === "password" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("password")} data-testid="button-mode-password">Create your password</button>
+                      {passwordReady && (
+                        <button type="button" className={`rounded-full px-2 py-2 ${mode === "password" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("password")} data-testid="button-mode-password">Create your password</button>
+                      )}
                     </div>
                     <form onSubmit={mode === "request" ? handleRequest : mode === "password" ? handleCreatePassword : handleLogin} className="space-y-4 sm:space-y-6">
                       {/* Role Selection Cards */}
@@ -460,9 +517,12 @@ export default function UnifiedAuth() {
                         )}
                       </Button>
 
+                      {mode === "request" && (
+                        <p className="text-left text-xs text-[#3a4a60]">Trainer and teacher desks. An admin signs you in from Approvals.</p>
+                      )}
                       {requestSent && mode === "request" && (
                         <p className="text-left text-sm text-[#17233c]" data-testid="text-request-sent">
-                          Request sent. An admin signs you in from Approvals. Then come back here and create your password.
+                          Request sent. Refresh this page after an admin signs you in. Create your password will appear then.
                         </p>
                       )}
                       {mode === "password" && (

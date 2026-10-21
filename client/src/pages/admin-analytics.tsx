@@ -21,6 +21,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import { AdminNav } from "@/components/AdminNav";
+import { AttendanceBoard } from "@/components/AttendanceBoard";
 
 interface BatchAnalytics {
   batch: { id: string; name: string };
@@ -904,6 +905,10 @@ export default function AdminAnalytics() {
                   <KPICard label="Course rating" value={academySnapshot?.averageRating != null ? `${academySnapshot.averageRating}/5` : "—"} icon={Star} subtitle="Average of submitted ratings" />
                 </div>
               )}
+            </div>
+
+            <div className="mb-8">
+              <AttendanceBoard />
             </div>
 
             {/* Pipeline KPIs */}

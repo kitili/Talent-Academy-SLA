@@ -8,6 +8,7 @@ import { Megaphone } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceCover, type PlaceName } from "@/components/PlaceArt";
+import { AttendanceBoard } from "@/components/AttendanceBoard";
 import { ADMIN_TOUR } from "@shared/guidedTour";
 import {
   Dialog,
@@ -219,6 +220,8 @@ export default function AdminHome() {
             </button>
           ))}
         </div>
+
+        <AttendanceBoard />
 
         <div className="flex flex-wrap items-center gap-3">
           <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>

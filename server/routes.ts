@@ -41,6 +41,7 @@ import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
+import { loadAttendanceLists } from "./attendanceBoard";
 import multer from "multer";
 
 const packageUpload = multer({
@@ -4233,6 +4234,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error getting dashboard stats:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/attendance", isAuthenticated, isStrictAdmin, async (_req, res) => {
+    try {
+      res.json(await loadAttendanceLists());
+    } catch (error) {
+      console.error("Error loading attendance lists:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
