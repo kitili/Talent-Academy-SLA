@@ -7,26 +7,103 @@ export type TourStep = {
 
 export const ADMIN_TOUR: TourStep[] = [
   {
-    title: "Admin desk",
-    body: "This short tour shows where to move. You land here after signing in on the Admin tab. A short count line sits under the greeting. The pictures below open the rest of the academy.",
+    title: "The top bar",
+    body: "This bar stays on every admin page. The next steps name each control, then each name in the navbar under it.",
+    target: "admin-header",
   },
   {
-    title: "Counts",
-    body: "Trainers, teachers, and courses. If someone is waiting, a Needs attention row appears and opens Approvals.",
-    target: "admin-stats",
+    title: "Academy mark",
+    body: "Silverleaf Academy is the mark. The line under the name says this is the admin desk.",
+    target: "admin-brand",
   },
   {
-    title: "Where to go next",
-    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses. Approvals lets people in. Cohorts is one place to add cohorts, the batches inside them, and courses, and to open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
+    title: "Signed-in account",
+    body: "This is the admin account you signed in with. It stays in the bar so you can see which desk is open.",
+    target: "admin-account",
+  },
+  {
+    title: "Tour",
+    body: "Tour starts this walk again from the first step. Use it any time you want the bar and the navbar explained.",
+    target: "admin-tour",
+  },
+  {
+    title: "Bell",
+    body: "Opens notices sent to you. A red number means unread notes. An academy notice you send also arrives here.",
+    target: "admin-bell",
+  },
+  {
+    title: "Light and dark",
+    body: "Switches the desk between a light page and a dark page. The choice stays on this browser.",
+    target: "admin-theme",
+  },
+  {
+    title: "Logout",
+    body: "Signs this admin account out and returns you to the sign-in page.",
+    target: "admin-logout",
+  },
+  {
+    title: "The navbar",
+    body: "These names stay under the bar on every admin page. Each one opens a different part of the academy. The next steps say what each name does.",
     target: "admin-nav",
   },
   {
-    title: "Passwords stay hidden",
-    body: "Use Reset password on this desk when someone needs a new password. The academy stores passwords hashed, so it cannot show the current one. You set a new password; you do not read the old one.",
+    title: "Desk",
+    body: "Desk brings you back to this home: the counts, the pictures, the academy notice, reset password, and start fresh.",
+    target: "admin-nav-desk",
+  },
+  {
+    title: "Approvals",
+    body: "People waiting to come in. Let a trainer or a teacher in, or turn them away. If someone is waiting, Needs attention on this desk opens the same page.",
+    target: "admin-nav-approvals",
+  },
+  {
+    title: "Trainers",
+    body: "Create a trainer account. A trainer you create here is approved at once. Open a name to see that account. A trainer cannot create another trainer.",
+    target: "admin-nav-trainers",
+  },
+  {
+    title: "Teachers",
+    body: "Create a teacher account, already approved. Open a teacher to see progress and the files they have viewed.",
+    target: "admin-nav-teachers",
+  },
+  {
+    title: "Cohorts",
+    body: "A cohort is the group of teachers. A batch is a step inside that cohort, and each cohort can have a different number. A course is the lessons on a batch. You set how many cohorts a teacher finishes, add the batches, place the courses, assign the trainer, and open or close the cohort and its quizzes. A trainer can add courses only.",
+    target: "admin-nav-cohorts",
+  },
+  {
+    title: "Analytics",
+    body: "The gradebook for the whole academy: teachers, open cohorts, completion, attendance, quizzes, reflections, course ratings, and who is at risk.",
+    target: "admin-nav-analytics",
+  },
+  {
+    title: "Courses",
+    body: "The curriculum trainers use. Keep a course on draft while you edit it. Publish it when teachers should see it. Add modules and lesson files here.",
+    target: "admin-nav-courses",
+  },
+  {
+    title: "Counts",
+    body: "Trainers, teachers, and courses on the academy right now. Needs attention appears here when someone is waiting, and it opens Approvals.",
+    target: "admin-stats",
+  },
+  {
+    title: "Pictures",
+    body: "Each picture opens the same place as its name in the navbar: Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses.",
+    target: "admin-pictures",
+  },
+  {
+    title: "Academy notice",
+    body: "Sends one note to every approved trainer and every approved teacher. It lands in their bell. They do not reply inside the note.",
+    target: "admin-notice",
+  },
+  {
+    title: "Reset password",
+    body: "Type a username or email and a new password for that account. Passwords are stored hashed, so the old one cannot be shown. You set a new one.",
+    target: "admin-password",
   },
   {
     title: "Start fresh",
-    body: "Start fresh clears only the areas you tick: cohorts, progress, quizzes, certificates, or notices. Pick the people it applies to. It does not clear the whole academy, and login accounts stay. Type CLEAR ACTIVITY only when you mean it.",
+    body: "Clears only the areas you tick: cohorts, progress, quizzes, certificates, or notices. Pick the trainers or teachers it applies to. Courses and login accounts stay. Type CLEAR ACTIVITY only when you mean it.",
     target: "admin-fresh",
   },
 ];

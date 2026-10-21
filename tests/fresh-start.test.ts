@@ -100,15 +100,35 @@ describe("in-app tours", () => {
     assert.ok(text.includes("Cohorts"));
     assert.ok(text.includes("CLEAR ACTIVITY"));
     assert.equal(text.includes("Handover"), false);
-    assert.equal(ADMIN_TOUR.some((step) => step.target === "admin-nav"), true);
+    for (const target of [
+      "admin-header",
+      "admin-tour",
+      "admin-bell",
+      "admin-logout",
+      "admin-nav",
+      "admin-nav-desk",
+      "admin-nav-approvals",
+      "admin-nav-trainers",
+      "admin-nav-teachers",
+      "admin-nav-cohorts",
+      "admin-nav-analytics",
+      "admin-nav-courses",
+      "admin-notice",
+      "admin-password",
+      "admin-fresh",
+    ]) {
+      assert.equal(ADMIN_TOUR.some((step) => step.target === target), true, target);
+    }
   });
 
-  it("keeps the tour card above the highlighted fresh-start card", () => {
+  it("leaves the highlighted control readable", () => {
     const tour = readFileSync(join(root, "client/src/components/GuidedTour.tsx"), "utf8");
     const css = readFileSync(join(root, "client/src/index.css"), "utf8");
-    assert.match(tour, /z-\[90\]/);
-    assert.match(css, /\.sla-tour-target[\s\S]*z-index:\s*81/);
-    assert.match(css, /\.sla-tour-target[\s\S]*pointer-events:\s*none/);
+    assert.equal(tour.includes("bg-slate-950/55"), false);
+    assert.match(tour, /rgba\(16, 36, 72, 0\.14\)/);
+    assert.match(tour, /pointer-events-none/);
+    assert.match(tour, /pointer-events-auto/);
+    assert.equal(css.includes("z-index: 81"), false);
   });
 
   it("walks a teacher from continue learning to certificates", () => {

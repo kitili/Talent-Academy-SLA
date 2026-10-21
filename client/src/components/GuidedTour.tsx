@@ -5,13 +5,27 @@ import type { TourStep } from "@shared/guidedTour";
 
 const TARGET_CLASS = "sla-tour-target";
 
-function markTarget(target?: string) {
-  document.querySelectorAll(`.${TARGET_CLASS}`).forEach((node) => node.classList.remove(TARGET_CLASS));
-  if (!target) return;
+type Spot = { top: number; left: number; width: number; height: number };
+
+function findTarget(target?: string) {
+  if (!target) return null;
   const element = document.querySelector(`[data-tour="${target}"]`);
-  if (!element) return;
-  element.classList.add(TARGET_CLASS);
-  element.scrollIntoView({ block: "center", behavior: "smooth" });
+  if (!(element instanceof HTMLElement)) return null;
+  return element;
+}
+
+function spotFor(element: HTMLElement): Spot | null {
+  const rect = element.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2) return null;
+  const pad = 8;
+  const top = Math.max(8, rect.top - pad);
+  const left = Math.max(8, rect.left - pad);
+  return {
+    top,
+    left,
+    width: Math.min(rect.width + pad * 2, window.innerWidth - left - 8),
+    height: Math.min(rect.height + pad * 2, window.innerHeight - top - 8),
+  };
 }
 
 export function useGuidedTour(storageKey: string) {
@@ -44,7 +58,7 @@ export function useGuidedTour(storageKey: string) {
   return { open, index, setIndex, close, replay };
 }
 
-export function TourButton({ onClick, testId, tone = "dark" }: { onClick: () => void; testId: string; tone?: "dark" | "light" }) {
+export function TourButton({ onClick, testId, tone = "dark", tourId }: { onClick: () => void; testId: string; tone?: "dark" | "light"; tourId?: string }) {
   return (
     <Button
       type="button"
@@ -52,6 +66,7 @@ export function TourButton({ onClick, testId, tone = "dark" }: { onClick: () => 
       size="sm"
       onClick={onClick}
       data-testid={testId}
+      data-tour={tourId}
       className={tone === "light"
         ? "bg-transparent text-[#102448] border-[#102448]/15 hover:bg-[#102448]/5"
         : "bg-white/10 text-white border-white/20 hover:bg-white/20"}
@@ -76,29 +91,60 @@ export function GuidedTour({
   onClose: () => void;
 }) {
   const step = steps[index];
+  const [spot, setSpot] = useState<Spot | null>(null);
 
   useEffect(() => {
     if (!open || !step) return;
-    markTarget(step.target);
+    document.querySelectorAll(`.${TARGET_CLASS}`).forEach((node) => node.classList.remove(TARGET_CLASS));
+    const element = findTarget(step.target);
+    if (!element) {
+      setSpot(null);
+      return;
+    }
+    element.classList.add(TARGET_CLASS);
+    const rect = element.getBoundingClientRect();
+    const clearTop = 88;
+    const clearBottom = window.innerHeight - 240;
+    const hidden = rect.top < clearTop || rect.bottom > clearBottom;
+    if (hidden) {
+      const low = rect.top + rect.height / 2 > window.innerHeight * 0.55;
+      element.scrollIntoView({ block: low ? "end" : "start", behavior: "smooth" });
+    }
+    const update = () => setSpot(spotFor(element));
+    update();
+    const timer = window.setTimeout(update, 380);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
     return () => {
-      document.querySelectorAll(`.${TARGET_CLASS}`).forEach((node) => node.classList.remove(TARGET_CLASS));
+      element.classList.remove(TARGET_CLASS);
+      window.clearTimeout(timer);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
     };
   }, [open, step]);
 
   if (!open || !step) return null;
 
   const last = index === steps.length - 1;
+  const cardOnTop = !!spot && spot.top + spot.height / 2 > window.innerHeight * 0.55;
 
   return (
-    <>
-      <div className="fixed inset-0 z-[80] bg-slate-950/55" />
-      <div className="fixed inset-x-0 bottom-0 z-[90] p-4 sm:p-6 flex justify-center pointer-events-none">
+    <div className="fixed inset-0 z-[80] pointer-events-none" role="dialog" aria-modal="true" aria-labelledby="guided-tour-title">
+      {spot && (
         <div
-          className="pointer-events-auto w-full max-w-lg rounded-2xl bg-white text-slate-900 shadow-2xl border p-5 space-y-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="guided-tour-title"
-        >
+          aria-hidden
+          className="fixed rounded-2xl border-2 border-white"
+          style={{
+            top: spot.top,
+            left: spot.left,
+            width: spot.width,
+            height: spot.height,
+            boxShadow: "0 0 0 3px #c4842a, 0 0 0 9999px rgba(16, 36, 72, 0.14)",
+          }}
+        />
+      )}
+      <div className={`absolute inset-x-0 ${cardOnTop ? "top-0" : "bottom-0"} p-4 sm:p-6 flex justify-center`}>
+        <div className="pointer-events-auto w-full max-w-lg rounded-2xl bg-white text-slate-900 shadow-2xl border p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-medium uppercase tracking-wide text-primary">
               Step {index + 1} of {steps.length}
@@ -133,6 +179,6 @@ export function GuidedTour({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

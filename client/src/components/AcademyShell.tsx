@@ -24,9 +24,12 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
   const frame = showAdminNav ? adminFrame : "sl-frame";
   return (
     <SceneBackdrop scene={scene} veil={showAdminNav ? "light" : "photo"}>
-      <header className={`sticky top-0 z-50 shadow-sm ${showAdminNav ? "bg-[#fffaf4] text-[#102448] border-b border-[#102448]/10" : "bg-primary text-white"}`}>
+      <header
+        className={`sticky top-0 z-50 shadow-sm ${showAdminNav ? "bg-[#fffaf4] text-[#102448] border-b border-[#102448]/10" : "bg-primary text-white"}`}
+        data-tour={showAdminNav ? "admin-header" : undefined}
+      >
         <div className={`${frame} py-3 sm:py-4 flex items-center justify-between gap-3`}>
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0" data-tour={showAdminNav ? "admin-brand" : undefined}>
             <div className={`h-11 w-11 sm:h-12 sm:w-12 flex-shrink-0 rounded-md p-1 ${showAdminNav ? "bg-white" : "bg-white/10"}`}>
               <img src={logoImage} alt="Silverleaf Academy" className="h-full w-full object-contain" />
             </div>
@@ -37,11 +40,18 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {userLabel && (
-              <span className={`hidden lg:inline text-xs max-w-[140px] truncate ${showAdminNav ? "text-[#4a5b73]" : "text-white/90"}`}>{userLabel}</span>
+              <span
+                className={`text-xs max-w-[5.5rem] sm:max-w-[140px] truncate ${showAdminNav ? "inline text-[#4a5b73]" : "hidden lg:inline text-white/90"}`}
+                data-tour={showAdminNav ? "admin-account" : undefined}
+              >
+                {userLabel}
+              </span>
             )}
             {actions}
-            <NotificationBell tone={showAdminNav ? "light" : "dark"} />
-            <div className={showAdminNav ? "text-[#102448]" : "text-white"}>
+            <span className="inline-flex" data-tour={showAdminNav ? "admin-bell" : undefined}>
+              <NotificationBell tone={showAdminNav ? "light" : "dark"} />
+            </span>
+            <div className={showAdminNav ? "text-[#102448]" : "text-white"} data-tour={showAdminNav ? "admin-theme" : undefined}>
               <ThemeToggle />
             </div>
             {onLogout && (
@@ -49,6 +59,7 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
                 variant="secondary"
                 size="sm"
                 onClick={onLogout}
+                data-tour={showAdminNav ? "admin-logout" : undefined}
                 className={showAdminNav
                   ? "bg-transparent hover:bg-[#102448]/5 text-[#102448] border-[#102448]/15"
                   : "bg-white/10 hover:bg-white/20 text-white border-white/20"}
