@@ -22,7 +22,7 @@ The navbar stays on the admin pages: Desk, Approvals, Trainers, Teachers, Cohort
 
 | Card | What you do |
 | --- | --- |
-| Approvals | Let a waiting trainer or teacher in, or turn them away. **Export history** downloads every saved approval as a CSV file. |
+| Approvals | People ask for a desk from the sign-in page. Sign them in here, or turn them away. They create their own password after you approve. **Export history** downloads every saved approval as a CSV file. |
 | Trainers | Create a trainer account. A trainer you create here is approved at once. Open a trainer to see that account. |
 | Teachers | Create a teacher account, already approved. Open a teacher to see progress and files viewed. |
 | Cohorts | One place for three different things. A **cohort** is the group, and it can have more than one trainer. A **batch** is a step inside that cohort, and each batch can hold more than one teacher. A **course** is the lessons on a batch. Set how many cohorts a teacher finishes. You add cohorts, batches, and courses here. Open or close the cohort and its quizzes. A trainer can add courses only. |

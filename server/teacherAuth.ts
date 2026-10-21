@@ -6,6 +6,7 @@ import { hasDatabaseUrl } from "./db";
 import { endSession } from "./auth";
 import { findApprovedAccount } from "./auth";
 import { matchTestLogin, TEACHER_PASSWORD } from "./testLogins";
+import { signInBlock } from "./accessRequests";
 
 // Extend Express Request type to include teacherId
 declare global {
@@ -42,6 +43,8 @@ export function setupTeacherAuth(app: Express) {
           res.status(200).json(teacherWithoutPassword);
           return;
         }
+        const block = await signInBlock(identifier, "teacher");
+        if (block) return res.status(block.status).json({ message: block.message, code: block.code });
       }
       if (!testLogin && hasDatabaseUrl() && /^\d+$/.test(identifier) && password === TEACHER_PASSWORD) {
         const byId = await storage.getTeacherByTeacherId(parseInt(identifier, 10));

@@ -14,6 +14,8 @@ type User = {
   id: string;
   username: string;
   email?: string;
+  firstName?: string;
+  lastName?: string;
   role: string;
   approvalStatus: string;
   createdAt: string;
@@ -23,6 +25,7 @@ type Teacher = {
   id: string;
   teacherId: number;
   name: string;
+  username?: string;
   email: string;
   approvalStatus: string;
   createdAt: string;
@@ -176,7 +179,7 @@ export default function ApprovalsPage() {
               Pending Trainers
             </CardTitle>
             <CardDescription>
-              Trainer accounts waiting for approval
+              Trainer requests from the sign-in page. Sign them in, then they create their own password.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -198,15 +201,13 @@ export default function ApprovalsPage() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-lg">{admin.username}</h3>
+                        <h3 className="font-semibold text-lg">{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || admin.username}</h3>
                         <Badge variant="secondary" className="gap-1">
                           <Clock className="w-3 h-3" />
                           Pending
                         </Badge>
                       </div>
-                      {admin.email && (
-                        <p className="text-sm text-muted-foreground">{admin.email}</p>
-                      )}
+                      <p className="text-sm text-muted-foreground">{admin.username}{admin.email ? ` · ${admin.email}` : ""}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Requested {formatDistanceToNow(new Date(admin.createdAt))} ago
                       </p>
@@ -219,7 +220,7 @@ export default function ApprovalsPage() {
                         data-testid={`button-approve-admin-${admin.id}`}
                       >
                         <CheckCircle className="w-4 h-4" />
-                        Approve
+                        Sign them in
                       </Button>
                       <Button
                         variant="destructive"
@@ -247,7 +248,7 @@ export default function ApprovalsPage() {
             Pending Teachers
           </CardTitle>
           <CardDescription>
-            Teacher accounts waiting for {isAdmin ? "admin" : "trainer"} approval
+            Teacher requests from the sign-in page. Sign them in, then they create their own password.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -278,7 +279,7 @@ export default function ApprovalsPage() {
                         Pending
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">{teacher.email}</p>
+                    <p className="text-sm text-muted-foreground">{teacher.username ? `${teacher.username} · ` : ""}{teacher.email}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Requested {formatDistanceToNow(new Date(teacher.createdAt))} ago
                     </p>
@@ -291,7 +292,7 @@ export default function ApprovalsPage() {
                       data-testid={`button-approve-teacher-${teacher.id}`}
                     >
                       <CheckCircle className="w-4 h-4" />
-                      Approve
+                      Sign them in
                     </Button>
                     <Button
                       variant="destructive"

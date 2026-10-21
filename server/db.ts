@@ -155,6 +155,10 @@ export async function ensureWrittenAssignmentTables() {
       teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
       PRIMARY KEY (cohort_batch_id, teacher_id)
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set varchar NOT NULL DEFAULT 'yes';
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS username varchar;
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password_set varchar NOT NULL DEFAULT 'yes';
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_teachers_username_lower ON teachers (LOWER(username));
     DO $$
     BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'assigned_quizzes') THEN
