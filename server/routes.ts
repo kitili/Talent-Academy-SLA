@@ -4239,7 +4239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/attendance", isAuthenticated, isStrictAdmin, async (_req, res) => {
+  app.get("/api/admin/attendance-summary", isAuthenticated, isStrictAdmin, async (_req, res) => {
     try {
       res.json(await loadAttendanceLists());
     } catch (error) {

@@ -39,7 +39,7 @@ describe("admin attendance lists", () => {
     const board = read("server/attendanceBoard.ts");
     const routes = read("server/routes.ts");
     const list = read("client/src/components/AttendanceBoard.tsx");
-    assert.match(routes, /\/api\/admin\/attendance/);
+    assert.match(routes, /\/api\/admin\/attendance-summary/);
     assert.match(routes, /isStrictAdmin/);
     assert.match(board, /attendance_records/);
     assert.match(board, /approval_status = 'approved'/);

@@ -167,11 +167,12 @@ export async function loadAttendanceLists(): Promise<{
     });
   }
 
-  for (const trainer of trainers.values()) {
+  const trainerList = Array.from(trainers.values());
+  for (const trainer of trainerList) {
     const rollup = rollupTrainer(trainer.cohorts);
     trainer.marked = rollup.marked;
     trainer.rate = rollup.rate;
   }
 
-  return { teachers, trainers: [...trainers.values()] };
+  return { teachers, trainers: trainerList };
 }

@@ -174,7 +174,7 @@ export default function UnifiedAuth() {
       if (response.ok) {
         // Check if multiple roles are available
         if (data.multiRole) {
-          setAvailableRoles(data.roles);
+          setAvailableRoles(data.roles || []);
           setShowRolePicker(true);
           setLoginLoading(false);
           return;

@@ -62,7 +62,7 @@ function PersonList({
 
 export function AttendanceBoard() {
   const { data, isLoading, isError } = useQuery<{ teachers: TeacherRow[]; trainers: TrainerRow[] }>({
-    queryKey: ["/api/admin/attendance"],
+    queryKey: ["/api/admin/attendance-summary"],
   });
 
   if (isLoading) {
