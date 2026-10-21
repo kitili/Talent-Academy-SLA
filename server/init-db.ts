@@ -1,17 +1,8 @@
-import { scrypt, randomBytes } from "crypto";
-import { promisify } from "util";
 import { db, pool } from "./db";
 import { resolveDatabaseUrl } from "./databaseUrl";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
-
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
+import { ensureAllTestLogins } from "./ensureTestLogins";
 
 async function initializeDatabase() {
   console.log("🔧 Initializing database...");
@@ -53,56 +44,19 @@ async function initializeDatabase() {
   console.log("✅ Written assignment tables are present");
   
   try {
-    // Check if admin user exists
     const adminEmail = "admin@silverleaf.com";
-    const existingAdmin = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, adminEmail))
-      .limit(1);
-    
-    if (existingAdmin.length > 0) {
-      console.log("✅ Admin user already exists — leaving password unchanged");
-      console.log(`   Email: ${adminEmail}`);
-      console.log(`   Username: ${existingAdmin[0].username}`);
-      console.log(`   Role: ${existingAdmin[0].role}`);
-    } else {
-      // Create admin user
-      console.log("📝 Creating admin user...");
-      const hashedPassword = await hashPassword("admin123");
-      
-      await db.insert(users).values({
-        username: "admin",
-        email: adminEmail,
-        password: hashedPassword,
-        role: "admin",
-        approvalStatus: "approved",
-        firstName: "Admin",
-        lastName: "User",
-      });
-      
-      console.log("✅ Admin user created successfully!");
-      console.log(`   Username: admin`);
-      console.log(`   Email: ${adminEmail}`);
-      console.log(`   Password: admin123`);
-      console.log(`   Role: admin`);
-    }
-    
-    // Verify admin user
+    await ensureAllTestLogins();
     const verifyAdmin = await db
       .select()
       .from(users)
       .where(eq(users.email, adminEmail))
       .limit(1);
-    
-    if (verifyAdmin.length > 0 && verifyAdmin[0].role === "admin") {
+
+    if (verifyAdmin.length > 0 && verifyAdmin[0].role === "admin" && verifyAdmin[0].username === "admin") {
       console.log("✅ Database initialization complete!");
-      console.log("\n📌 Admin credentials:");
-      console.log("   Username: admin");
-      console.log("   Email: admin@silverleaf.com");
-      console.log("   Password: admin123");
+      console.log("Test logins: admin / admin123, trainer1 / trainer123, teacher@test.com / teacher123");
     } else {
-      throw new Error("Admin user verification failed!");
+      throw new Error("Admin test login was not created");
     }
   } catch (error) {
     console.error("❌ Database initialization failed:", error);

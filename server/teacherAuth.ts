@@ -3,8 +3,8 @@ import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { loginRateLimit } from "./security";
 import { hasDatabaseUrl } from "./db";
-import { hashPassword, comparePasswords, endSession } from "./auth";
-import { Teacher as SelectTeacher } from "@shared/schema";
+import { endSession } from "./auth";
+import { matchTestLogin, TEACHER_PASSWORD } from "./testLogins";
 
 // Extend Express Request type to include teacherId
 declare global {
@@ -16,66 +16,26 @@ declare global {
 }
 
 export function setupTeacherAuth(app: Express) {
-  // Teacher registration (public)
-  app.post("/api/teacher/register", async (req, res) => {
-    try {
-      if (!hasDatabaseUrl()) {
-        return res.status(503).json({
-          message: "Registration is unavailable because the live site has no database URL. Add NEON_DATABASE_URL or DATABASE_URL in Vercel, then redeploy.",
-        });
-      }
-
-      const name = String(req.body.name || "").trim();
-      const email = String(req.body.email || "").trim().toLowerCase();
-      const password = String(req.body.password || "");
-
-      if (!name || !email || !password) {
-        return res.status(400).json({ message: "Name, email, and password are required" });
-      }
-
-      const existingTeacher = await storage.getTeacherByEmail(email);
-      if (existingTeacher) {
-        return res.status(400).json({ message: "Email already registered" });
-      }
-
-      const teacher = await storage.createTeacher({
-        name,
-        email,
-        password: await hashPassword(password),
-        approvalStatus: "approved",
-        approvedAt: new Date(),
-        approvedByRole: "system",
-      });
-
-      // Create initial report card
-      await storage.upsertTeacherReportCard({
-        teacherId: teacher.id,
-        level: "Beginner",
-        totalQuizzesTaken: 0,
-        totalQuizzesPassed: 0,
-        averageScore: 0,
-      });
-
-      // Don't auto-login - user needs approval first from admin or trainer
-      const { password: _, ...teacherWithoutPassword } = teacher;
-      res.status(201).json({
-        ...teacherWithoutPassword,
-        message: "Account created successfully. You can sign in with your email and password."
-      });
-    } catch (error: any) {
-      console.error("Teacher registration error:", error);
-      res.status(500).json({ message: error.message || "Registration failed" });
-    }
+  app.post("/api/teacher/register", async (_req, res) => {
+    res.status(403).json({ message: "This academy only accepts the test logins." });
   });
 
-  // Teacher login
-  // UPDATED: Accept either teacherId (numeric ID) or email for login
   app.post("/api/teacher/login", loginRateLimit, async (req, res) => {
     try {
-      const { identifier, password } = req.body;
-      
+      const identifier = String(req.body.identifier || "").trim();
+      const password = String(req.body.password || "").trim();
+
       if (!identifier || !password) {
         return res.status(400).json({ message: "Identifier and password are required" });
+      }
+
+      let testLogin = matchTestLogin(identifier, password, "teacher");
+      if (!testLogin && hasDatabaseUrl() && /^\d+$/.test(identifier) && password === TEACHER_PASSWORD) {
+        const byId = await storage.getTeacherByTeacherId(parseInt(identifier, 10));
+        if (byId) testLogin = matchTestLogin(byId.email, TEACHER_PASSWORD, "teacher");
+      }
+      if (!testLogin) {
+        return res.status(401).json({ message: "Invalid credentials" });
       }
 
       if (!hasDatabaseUrl()) {
@@ -83,49 +43,19 @@ export function setupTeacherAuth(app: Express) {
           message: "Sign-in is unavailable because the live site has no database URL. Add NEON_DATABASE_URL or DATABASE_URL in Vercel, then redeploy.",
         });
       }
-      
-      // Determine if identifier is a Teacher ID (numeric) or email (contains @)
-      let teacher;
-      if (/^\d+$/.test(identifier.trim())) {
-        // It's a numeric Teacher ID
-        teacher = await storage.getTeacherByTeacherId(parseInt(identifier.trim()));
-      } else if (identifier.includes('@')) {
-        // It's an email address
-        teacher = await storage.getTeacherByEmail(identifier.trim());
-      } else {
-        return res.status(401).json({ message: "Invalid Teacher ID or email format" });
-      }
-      
-      if (!teacher) {
+
+      const { ensureTestLogin } = await import("./ensureTestLogins");
+      const ready = await ensureTestLogin(testLogin);
+      if (!ready.teacher) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const passwordMatch = await comparePasswords(password, teacher.password);
-      if (!passwordMatch) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      // Check if account is approved
-      if (teacher.approvalStatus === "pending") {
-        return res.status(403).json({ 
-          message: "Your account is pending approval. Please wait for admin or trainer approval.",
-          approvalStatus: "pending"
-        });
-      }
-      
-      if (teacher.approvalStatus === "rejected") {
-        return res.status(403).json({ 
-          message: "Your account has been rejected. Please contact support.",
-          approvalStatus: "rejected"
-        });
-      }
-
-      (req.session as any).teacherId = teacher.id;
+      (req.session as any).teacherId = ready.teacher.id;
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => (err ? reject(err) : resolve()));
       });
 
-      const { password: _, ...teacherWithoutPassword } = teacher;
+      const { password: _, ...teacherWithoutPassword } = ready.teacher;
       res.status(200).json(teacherWithoutPassword);
     } catch (error: any) {
       console.error("Teacher login error:", error);

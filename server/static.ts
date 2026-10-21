@@ -13,6 +13,7 @@ export function log(message: string, source = "express") {
 }
 
 export function serveStatic(app: Express) {
+  if (process.env.VERCEL) return;
   const candidates = [
     path.resolve(import.meta.dirname, "public"),
     path.resolve(import.meta.dirname, "..", "dist", "public"),

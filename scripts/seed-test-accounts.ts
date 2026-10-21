@@ -5,7 +5,7 @@ import { users, teachers, batches, batchTeachers, teacherReportCards, courses, t
 import { TEST_COHORTS, TEST_TEACHERS } from "./test-cohorts";
 import { LEARNING_STAGES, LESSON_STAGES } from "../shared/tanzaniaPath";
 
-/** Create a staff user only when missing. Never overwrite an existing hash. */
+/** Create a test desk, and set its documented password when the row already exists. */
 async function ensureUser(opts: {
   username: string;
   email: string;
@@ -16,7 +16,18 @@ async function ensureUser(opts: {
 }) {
   const existing = await db.select().from(users).where(eq(users.username, opts.username)).limit(1);
   if (existing[0]) {
-    console.log(`keep existing ${opts.role} ${opts.username} (password unchanged)`);
+    await db
+      .update(users)
+      .set({
+        email: opts.email,
+        password: await hashPassword(opts.password),
+        role: opts.role,
+        approvalStatus: "approved",
+        firstName: opts.firstName,
+        lastName: opts.lastName,
+      })
+      .where(eq(users.id, existing[0].id));
+    console.log(`reset test login ${opts.username}`);
     return existing[0].id;
   }
   const [created] = await db
@@ -112,12 +123,12 @@ async function ensureTeacher(email: string, name: string) {
     .limit(1);
   let teacher = existing[0];
   if (teacher) {
-    if (teacher.name !== name && /fellow/i.test(teacher.name || "")) {
-      await db.update(teachers).set({ name }).where(eq(teachers.id, teacher.id));
-      console.log(`renamed ${email} to ${name}`);
-    } else {
-      console.log(`keep existing ${email} (password unchanged)`);
-    }
+    await db.update(teachers).set({
+      name,
+      password: await hashPassword("teacher123"),
+      approvalStatus: "approved",
+    }).where(eq(teachers.id, teacher.id));
+    console.log(`reset test login ${email}`);
   } else {
     const [maxRow] = await db.select({ maxId: sql<number>`COALESCE(MAX(${teachers.teacherId}), 7099)` }).from(teachers);
     const nextId = Number(maxRow?.maxId || 7099) + 1;
@@ -233,7 +244,7 @@ async function main() {
       console.log(`assigned ${cohort.name} its course`);
     }
   }
-  console.log("test accounts and batches ready; existing hashes were not overwritten");
+  console.log("test accounts ready with the documented test passwords");
 }
 
 main().catch((error) => {

@@ -283,57 +283,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Note: /api/register, /api/login, /api/logout, /api/user are now in auth.ts
   // Note: /api/teacher/* routes are in teacherAuth.ts
 
-  // Emergency admin password reset (no login required - uses secret key)
-  const emergencyResetSchema = z.object({
-    masterKey: z.string().min(1, "Master key required"),
-    username: z.string().trim().min(1, "Username required"),
-    newPassword: z.string().trim().min(6, "Password must be at least 6 characters"),
-  });
-
-  app.post("/api/emergency-admin-reset", async (req, res) => {
-    try {
-      const masterKey = process.env.ADMIN_RESET_KEY;
-      
-      if (!masterKey) {
-        return res.status(503).json({ error: "Emergency reset not configured. Set ADMIN_RESET_KEY environment variable." });
-      }
-      
-      const { masterKey: providedKey, username, newPassword } = emergencyResetSchema.parse(req.body);
-      
-      if (providedKey !== masterKey) {
-        return res.status(403).json({ error: "Invalid master key" });
-      }
-      
-      // Find the user
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      // Hash and update password
-      const hashedPassword = await hashPassword(newPassword);
-      const updatedUser = await storage.updateUserPassword(user.id, hashedPassword);
-
-      if (!updatedUser) {
-        return res.status(500).json({ error: "Failed to update password" });
-      }
-
-      // Sync password to linked teacher accounts with the same email
-      if (updatedUser.email) {
-        await storage.syncPasswordByEmail(updatedUser.email, hashedPassword, 'users');
-      }
-
-      res.json({
-        success: true,
-        message: `Password reset successful for: ${updatedUser.username}`
-      });
-    } catch (error) {
-      console.error("Error in emergency password reset:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors[0].message });
-      }
-      res.status(500).json({ error: "Internal server error" });
-    }
+  app.post("/api/emergency-admin-reset", async (_req, res) => {
+    res.status(403).json({ error: "This academy only accepts the test logins." });
   });
 
   // Admin password reset endpoint

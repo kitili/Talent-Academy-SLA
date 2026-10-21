@@ -529,7 +529,7 @@ async function main() {
     method: "POST",
     body: JSON.stringify({ masterKey: "x", username: "admin", newPassword: "admin123" }),
   });
-  record("Emergency reset is unconfigured locally", reset.status === 503, `HTTP ${reset.status}`);
+  record("Emergency reset is closed", reset.status === 403, `HTTP ${reset.status}`);
 
   printSummary(checks);
   if (checks.some((check) => !check.ok)) process.exit(1);

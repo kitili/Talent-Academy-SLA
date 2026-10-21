@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -16,7 +15,6 @@ import { PLACES, type PlaceName } from "@/components/PlaceArt";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 type Role = "admin" | "trainer" | "teacher";
-type AccountType = "teacher" | "trainer";
 
 interface MultiRoleOption {
   id: string;
@@ -38,7 +36,7 @@ export default function UnifiedAuth() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-  
+
   // Multi-role selection state
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<MultiRoleOption[]>([]);
@@ -50,30 +48,6 @@ export default function UnifiedAuth() {
       setLocation(homeForRole(signedIn.role));
     }
   }, [user, showRolePicker, setLocation]);
-  
-  // Registration state
-  const [accountType, setAccountType] = useState<AccountType | null>(null);
-  const [regName, setRegName] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regLoading, setRegLoading] = useState(false);
-
-  const [databaseReady, setDatabaseReady] = useState<boolean | null>(null);
-  const [sso, setSso] = useState({ google: false, microsoft: false });
-
-  useEffect(() => {
-    fetch("/api/auth/sso/status")
-      .then((res) => res.json())
-      .then((data) => setSso({ google: Boolean(data?.google), microsoft: Boolean(data?.microsoft) }))
-      .catch(() => setSso({ google: false, microsoft: false }));
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/health")
-      .then((res) => res.json())
-      .then((data) => setDatabaseReady(Boolean(data?.ok && data?.databaseReachable)))
-      .catch(() => setDatabaseReady(false));
-  }, []);
 
   // Handle role selection when multiple roles are available
   const handleRoleSelection = async (selectedRole: MultiRoleOption) => {
@@ -196,100 +170,6 @@ export default function UnifiedAuth() {
     }
   };
 
-  // Handle registration for Teacher or Trainer
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!accountType) return;
-    
-    setRegLoading(true);
-
-    try {
-      if (accountType === "teacher") {
-        // Create Teacher account
-        const response = await fetch("/api/teacher/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: regName,
-            email: regEmail,
-            password: regPassword,
-          }),
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          toast({
-            title: "Account created!",
-            description: `Your Teacher ID is: ${data.teacherId}. You can sign in now with this email and password.`,
-            duration: 8000,
-          });
-
-          // Reset form - don't switch to login since they can't log in yet
-          setRegName("");
-          setRegEmail("");
-          setRegPassword("");
-          setAccountType(null);
-        } else {
-          let description = "Could not create account";
-          try {
-            const data = await response.json();
-            description = data.message || description;
-          } catch {
-            /* ignore non-JSON body */
-          }
-          toast({
-            variant: "destructive",
-            title: "Registration failed",
-            description,
-          });
-        }
-      } else if (accountType === "trainer") {
-        // Create Trainer account
-        const response = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: regEmail,
-            email: regEmail,
-            firstName: regName.split(" ")[0] || regName,
-            lastName: regName.split(" ").slice(1).join(" ") || "",
-            password: regPassword,
-          }),
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          toast({
-            title: "Account created!",
-            description: "Your trainer account is ready. You can sign in now.",
-            duration: 8000,
-          });
-
-          setRegName("");
-          setRegEmail("");
-          setRegPassword("");
-          setAccountType(null);
-        } else {
-          const data = await response.json();
-          toast({
-            variant: "destructive",
-            title: "Registration failed",
-            description: data.message || "Could not create account",
-          });
-        }
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An error occurred during registration",
-      });
-    } finally {
-      setRegLoading(false);
-    }
-  };
-
   const roleCards = [
     {
       value: "admin",
@@ -393,18 +273,10 @@ export default function UnifiedAuth() {
                   </div>
                 </div>
                 <CardTitle className="text-2xl font-bold">Come in</CardTitle>
-                <CardDescription>Admin, trainer, or teacher.</CardDescription>
+                <CardDescription>Test desks only. This academy has no other sign-in.</CardDescription>
               </CardHeader>
               
               <CardContent className="px-4 sm:px-6">
-                <Tabs defaultValue="login" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-6">
-                    <TabsTrigger value="login" data-testid="tab-login" className="text-sm sm:text-base">Login</TabsTrigger>
-                    <TabsTrigger value="register" data-testid="tab-register" className="text-sm sm:text-base">Create Account</TabsTrigger>
-                  </TabsList>
-
-                  {/* LOGIN TAB */}
-                  <TabsContent value="login" className="space-y-4 sm:space-y-6">
                     <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
                       {/* Role Selection Cards */}
                       <div className="grid grid-cols-3 gap-2">
@@ -485,134 +357,13 @@ export default function UnifiedAuth() {
                         )}
                       </Button>
 
-                      {loginRole === "teacher" && (sso.google || sso.microsoft) && (
-                        <div className="grid gap-2">
-                          {sso.google && (
-                            <Button type="button" variant="outline" asChild>
-                              <a href="/api/auth/sso/google">Continue with Google</a>
-                            </Button>
-                          )}
-                          {sso.microsoft && (
-                            <Button type="button" variant="outline" asChild>
-                              <a href="/api/auth/sso/microsoft">Continue with Microsoft</a>
-                            </Button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Forgot Password Link */}
-                      <div className="text-center">
-                        <a 
-                          href="/emergency-reset" 
-                          className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
-                          data-testid="link-forgot-password"
-                        >
-                          Forgot password?
-                        </a>
+                      <div className="space-y-0.5 text-left text-xs text-muted-foreground" data-testid="text-test-logins">
+                        <p>Select the matching desk.</p>
+                        <p>admin / admin123</p>
+                        <p>trainer1 / trainer123</p>
+                        <p>teacher@test.com / teacher123</p>
                       </div>
                     </form>
-                  </TabsContent>
-
-                  {/* REGISTER TAB */}
-                  <TabsContent value="register" className="space-y-3 sm:space-y-4">
-                    {!accountType ? (
-                      <div className="space-y-3 sm:space-y-4">
-                        <Label className="text-sm sm:text-base">Choose Account Type:</Label>
-                        <div className="grid grid-cols-1 gap-2 sm:gap-3">
-                          <Button
-                            variant="outline"
-                            className="h-16 sm:h-20 text-sm sm:text-base"
-                            onClick={() => setAccountType("trainer")}
-                            data-testid="button-create-trainer"
-                          >
-                            <div className="text-center">
-                              <div className="font-semibold">Create Trainer Account</div>
-                              <div className="text-xs text-muted-foreground">For trainers managing batches and teachers</div>
-                            </div>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="h-16 sm:h-20 text-sm sm:text-base"
-                            onClick={() => setAccountType("teacher")}
-                            data-testid="button-create-teacher"
-                          >
-                            <div className="text-center">
-                              <div className="font-semibold">Create Teacher Account</div>
-                              <div className="text-xs text-muted-foreground">For teachers taking training courses</div>
-                            </div>
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <form onSubmit={handleRegister} className="space-y-3 sm:space-y-4">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-base font-semibold">
-                            Create {accountType === "trainer" ? "Trainer" : "Teacher"} Account
-                          </Label>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setAccountType(null)}
-                            data-testid="button-back"
-                          >
-                            ← Back
-                          </Button>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="reg-name">Full Name</Label>
-                          <Input
-                            id="reg-name"
-                            data-testid="input-reg-name"
-                            value={regName}
-                            onChange={(e) => setRegName(e.target.value)}
-                            placeholder="Enter your full name"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="reg-email">Email</Label>
-                          <Input
-                            id="reg-email"
-                            data-testid="input-reg-email"
-                            type="email"
-                            value={regEmail}
-                            onChange={(e) => setRegEmail(e.target.value)}
-                            placeholder="Enter your email"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="reg-password">Password</Label>
-                          <PasswordInput
-                            id="reg-password"
-                            data-testid="input-reg-password"
-                            value={regPassword}
-                            onChange={(e) => setRegPassword(e.target.value)}
-                            placeholder="Create a password (min. 6 characters)"
-                            required
-                          />
-                        </div>
-
-                        <Button
-                          type="submit"
-                          className="w-full"
-                          disabled={regLoading}
-                          data-testid="button-register"
-                        >
-                          {regLoading ? "Creating account..." : "Create Account"}
-                        </Button>
-
-                        <p className="text-xs text-muted-foreground text-center">
-                          After you create the account you can sign in immediately with the same email and password.
-                        </p>
-                      </form>
-                    )}
-                  </TabsContent>
-                </Tabs>
               </CardContent>
             </Card>
         </div>

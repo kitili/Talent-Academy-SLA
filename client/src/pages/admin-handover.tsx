@@ -28,7 +28,7 @@ export default function AdminHandover() {
     {
       title: "Week 1 — Come in",
       items: [
-        "Admin, trainer, and teacher desks each use their own password.",
+        "Only the test desks can sign in. Each desk uses its own password.",
         "Approvals sit on the admin home when people are waiting.",
         "Test logins (not for fellows): admin / admin123, trainer1 / trainer123, teacher@test.com / teacher123.",
       ],
