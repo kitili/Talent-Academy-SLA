@@ -554,7 +554,7 @@ export default function TeacherDashboard() {
         <PlaceBanner
           place="garden"
           title={`Welcome, ${teacher?.name || "teacher"}`}
-          subtitle="Adult teacher. The pictures are the pupils you will teach."
+          subtitle="Goals are on this page. Lessons, assignments, and quizzes each have their own page."
           titleTestId="text-welcome"
         />
         )}
