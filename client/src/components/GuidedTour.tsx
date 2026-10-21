@@ -53,7 +53,7 @@ export function TourButton({ onClick, testId, tone = "dark" }: { onClick: () => 
       onClick={onClick}
       data-testid={testId}
       className={tone === "light"
-        ? "bg-transparent text-[#102448] border-[#102448]/15 hover:bg-[#102448]/5"
+        ? "bg-transparent text-[#17233c] border-[#102448]/15 hover:bg-[#102448]/5 dark:text-[#f6f1e8] dark:border-white/20 dark:hover:bg-white/10"
         : "bg-white/10 text-white border-white/20 hover:bg-white/20"}
     >
       <CircleHelp className="h-4 w-4 sm:mr-2" />

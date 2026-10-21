@@ -5,10 +5,14 @@ import { storage } from "./storage";
 import {
   academySettings,
   batches,
+  batchTeachers,
   cohortBatchCourses,
+  cohortBatchTeachers,
   cohortBatches,
+  cohortTrainers,
   courses,
   teacherCourseCompletion,
+  teachers,
   users,
 } from "@shared/schema";
 import { ACADEMY_TERMS, normalizeCohortsRequired, pathSummary } from "@shared/academyPath";
@@ -41,6 +45,18 @@ async function stepsForCohort(cohortId: string) {
     .innerJoin(courses, eq(cohortBatchCourses.courseId, courses.id))
     .where(inArray(cohortBatchCourses.cohortBatchId, steps.map((step) => step.id)))
     .orderBy(asc(cohortBatchCourses.orderIndex));
+  const teacherLinks = steps.length === 0
+    ? []
+    : await db
+        .select({
+          cohortBatchId: cohortBatchTeachers.cohortBatchId,
+          id: teachers.id,
+          name: teachers.name,
+          email: teachers.email,
+        })
+        .from(cohortBatchTeachers)
+        .innerJoin(teachers, eq(cohortBatchTeachers.teacherId, teachers.id))
+        .where(inArray(cohortBatchTeachers.cohortBatchId, steps.map((step) => step.id)));
   return steps.map((step) => ({
     id: step.id,
     name: step.name,
@@ -49,15 +65,19 @@ async function stepsForCohort(cohortId: string) {
     courses: links
       .filter((link) => link.cohortBatchId === step.id)
       .map((link) => ({ id: link.courseId, name: link.courseName })),
+    teachers: teacherLinks
+      .filter((link) => link.cohortBatchId === step.id)
+      .map((link) => ({ id: link.id, name: link.name, email: link.email })),
   }));
 }
 
 async function loadTree() {
   const cohortRows = await db.select().from(batches).orderBy(asc(batches.createdAt));
-  const trainerRows = await db
-    .select({ id: users.id, username: users.username, email: users.email })
+  const trainerRows = (await db
+    .select({ id: users.id, username: users.username, email: users.email, approvalStatus: users.approvalStatus })
     .from(users)
-    .where(eq(users.role, "trainer"));
+    .where(eq(users.role, "trainer")))
+    .filter((trainer) => trainer.approvalStatus !== "inactive");
   const courseRows = await db
     .select({
       id: courses.id,
@@ -67,8 +87,17 @@ async function loadTree() {
     })
     .from(courses)
     .orderBy(asc(courses.orderIndex), asc(courses.name));
+  const trainerLinks = await db.select().from(cohortTrainers);
+  const teacherRows = await db
+    .select({ id: teachers.id, name: teachers.name, email: teachers.email, approvalStatus: teachers.approvalStatus })
+    .from(teachers)
+    .orderBy(asc(teachers.name));
   const cohorts = [];
   for (const cohort of cohortRows) {
+    const trainerIds = trainerLinks
+      .filter((link) => link.cohortId === cohort.id)
+      .map((link) => link.trainerId);
+    if (cohort.trainerId && !trainerIds.includes(cohort.trainerId)) trainerIds.unshift(cohort.trainerId);
     cohorts.push({
       id: cohort.id,
       name: cohort.name,
@@ -76,6 +105,7 @@ async function loadTree() {
       track: cohort.track,
       stage: cohort.stage,
       trainerId: cohort.trainerId,
+      trainerIds,
       status: cohort.status,
       quizzesStatus: cohort.quizzesStatus,
       batches: await stepsForCohort(cohort.id),
@@ -90,6 +120,7 @@ async function loadTree() {
     cohorts,
     courses: courseRows,
     trainers: trainerRows,
+    teachers: teacherRows.filter((teacher) => teacher.approvalStatus !== "inactive"),
   };
 }
 
@@ -255,6 +286,66 @@ export function registerAcademyPathRoutes(
     } catch (error) {
       console.error("Error removing course from batch:", error);
       res.status(500).json({ error: "Failed to remove the course" });
+    }
+  });
+
+  app.put("/api/admin/academy-path/cohorts/:cohortId/trainers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const cohort = await storage.getBatch(req.params.cohortId);
+      if (!cohort) return res.status(404).json({ error: "Cohort not found" });
+      const trainerIds = [...new Set((Array.isArray(req.body?.trainerIds) ? req.body.trainerIds : []).map((id: unknown) => String(id)))];
+      if (trainerIds.length > 0) {
+        const known = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(inArray(users.id, trainerIds), eq(users.role, "trainer")));
+        if (known.length !== trainerIds.length) {
+          return res.status(400).json({ error: "Choose trainers from the trainer list" });
+        }
+      }
+      await db.delete(cohortTrainers).where(eq(cohortTrainers.cohortId, cohort.id));
+      if (trainerIds.length > 0) {
+        await db.insert(cohortTrainers).values(trainerIds.map((trainerId) => ({ cohortId: cohort.id, trainerId })));
+      }
+      await db.update(batches).set({ trainerId: trainerIds[0] || null }).where(eq(batches.id, cohort.id));
+      res.json({ trainerIds });
+    } catch (error) {
+      console.error("Error saving cohort trainers:", error);
+      res.status(500).json({ error: "Failed to save trainers" });
+    }
+  });
+
+  app.put("/api/admin/academy-path/batches/:batchId/teachers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const [step] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
+      if (!step) return res.status(404).json({ error: "Batch not found" });
+      const teacherIds = [...new Set((Array.isArray(req.body?.teacherIds) ? req.body.teacherIds : []).map((id: unknown) => String(id)))];
+      if (teacherIds.length > 0) {
+        const known = await db.select({ id: teachers.id }).from(teachers).where(inArray(teachers.id, teacherIds));
+        if (known.length !== teacherIds.length) {
+          return res.status(400).json({ error: "Choose teachers from the teacher list" });
+        }
+      }
+      await db.delete(cohortBatchTeachers).where(eq(cohortBatchTeachers.cohortBatchId, step.id));
+      if (teacherIds.length > 0) {
+        await db.insert(cohortBatchTeachers).values(teacherIds.map((teacherId) => ({ cohortBatchId: step.id, teacherId })));
+      }
+      const siblingSteps = await db.select({ id: cohortBatches.id }).from(cohortBatches).where(eq(cohortBatches.cohortId, step.cohortId));
+      const enrolled = siblingSteps.length === 0
+        ? []
+        : await db
+            .select({ teacherId: cohortBatchTeachers.teacherId })
+            .from(cohortBatchTeachers)
+            .where(inArray(cohortBatchTeachers.cohortBatchId, siblingSteps.map((row) => row.id)));
+      const cohortTeacherIds = [...new Set(enrolled.map((row) => row.teacherId))];
+      await db.delete(batchTeachers).where(eq(batchTeachers.batchId, step.cohortId));
+      if (cohortTeacherIds.length > 0) {
+        await db.insert(batchTeachers).values(cohortTeacherIds.map((teacherId) => ({ batchId: step.cohortId, teacherId })));
+      }
+      res.json({ teacherIds });
+    } catch (error) {
+      console.error("Error saving batch teachers:", error);
+      res.status(500).json({ error: "Failed to save teachers" });
     }
   });
 

@@ -20,6 +20,7 @@ describe("role boundaries", () => {
     assert.equal(trainerOwnsBatch(trainer, created), true);
     assert.equal(trainerOwnsBatch(trainer, other), false);
     assert.equal(trainerOwnsBatch(trainer, null), false);
+    assert.equal(trainerOwnsBatch(trainer, { trainerId: "t2", createdBy: "admin", trainerIds: ["t1"] }), true);
   });
 
   it("lets an admin open any cohort and hides cohorts from teachers", () => {

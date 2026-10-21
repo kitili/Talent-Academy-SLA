@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, jsonb, index, uniqueIndex, unique, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, jsonb, index, uniqueIndex, unique, boolean, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -333,6 +333,13 @@ export const cohortBatches = pgTable("cohort_batches", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const cohortTrainers = pgTable("cohort_trainers", {
+  cohortId: varchar("cohort_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
+  trainerId: varchar("trainer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+}, (table) => [
+  primaryKey({ columns: [table.cohortId, table.trainerId] }),
+]);
+
 export const cohortBatchCourses = pgTable("cohort_batch_courses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   cohortBatchId: varchar("cohort_batch_id").notNull().references(() => cohortBatches.id, { onDelete: "cascade" }),
@@ -340,6 +347,14 @@ export const cohortBatchCourses = pgTable("cohort_batch_courses", {
   orderIndex: integer("order_index").notNull().default(0),
 }, (table) => [
   uniqueIndex("idx_cohort_batch_course").on(table.cohortBatchId, table.courseId),
+]);
+
+/** Teachers placed on one batch. A batch can hold more than one. */
+export const cohortBatchTeachers = pgTable("cohort_batch_teachers", {
+  cohortBatchId: varchar("cohort_batch_id").notNull().references(() => cohortBatches.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
+}, (table) => [
+  primaryKey({ columns: [table.cohortBatchId, table.teacherId] }),
 ]);
 
 // Batch teachers junction table (many-to-many)

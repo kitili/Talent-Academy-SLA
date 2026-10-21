@@ -14,7 +14,7 @@ export type SceneName = keyof typeof SCENE_PHOTOS;
 
 export function SceneBackdrop({ scene, veil = "photo", children }: { scene: SceneName; veil?: "photo" | "light"; children: ReactNode }) {
   return (
-    <div className={`relative min-h-screen ${veil === "light" ? "bg-[#f4efe6]" : "bg-[#102448]"}`}>
+    <div className={`relative min-h-screen ${veil === "light" ? "bg-[#f4efe6] dark:bg-[#10182a]" : "bg-[#102448]"}`}>
       <img
         src={SCENE_PHOTOS[scene]}
         alt=""
@@ -22,7 +22,7 @@ export function SceneBackdrop({ scene, veil = "photo", children }: { scene: Scen
         decoding="async"
       />
       {veil === "light" && (
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[#f7f3ea]/80" />
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[#f7f3ea]/80 dark:bg-[#10182a]/90" />
       )}
       {children}
     </div>

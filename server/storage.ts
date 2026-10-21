@@ -111,6 +111,7 @@ import {
   assignmentSubmissions,
   discussionPosts,
   deskMessages,
+  cohortTrainers,
   type OpenEndedReview,
   type InsertOpenEndedReview,
   type QuizQuestion,
@@ -1209,7 +1210,11 @@ export class DatabaseStorage implements IStorage {
     
     if (trainerId) {
       return await query.where(
-        or(eq(batches.trainerId, trainerId), eq(batches.createdBy, trainerId)),
+        or(
+          eq(batches.trainerId, trainerId),
+          eq(batches.createdBy, trainerId),
+          sqlOp`exists (select 1 from cohort_trainers where cohort_id = ${batches.id} and trainer_id = ${trainerId})`,
+        ),
       );
     }
     return await query;
@@ -1217,7 +1222,9 @@ export class DatabaseStorage implements IStorage {
 
   async getBatch(id: string): Promise<Batch | undefined> {
     const [batch] = await db.select().from(batches).where(eq(batches.id, id));
-    return batch;
+    if (!batch) return undefined;
+    const links = await db.select().from(cohortTrainers).where(eq(cohortTrainers.cohortId, id));
+    return { ...batch, trainerIds: links.map((row) => row.trainerId) } as Batch & { trainerIds: string[] };
   }
 
   async createBatch(batchData: InsertBatch): Promise<Batch> {

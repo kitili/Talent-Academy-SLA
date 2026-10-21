@@ -7,11 +7,11 @@
 export const ACADEMY_TERMS = {
   cohort: {
     title: "Cohort",
-    body: "A group of teachers with one trainer. A teacher is done after the number of cohorts you set here. Cohorts do not have to look the same.",
+    body: "A group of teachers. It can have more than one trainer. A teacher is done after the number of cohorts you set here. Cohorts do not have to look the same.",
   },
   batch: {
     title: "Batch",
-    body: "One step inside a cohort. Each cohort has its own list, so one cohort can have two batches and another can have five.",
+    body: "One step inside a cohort. Each cohort has its own list, so one cohort can have two batches and another can have five. A batch can hold more than one teacher.",
   },
   course: {
     title: "Course",

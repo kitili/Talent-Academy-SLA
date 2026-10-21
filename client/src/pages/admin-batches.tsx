@@ -26,18 +26,21 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AcademyShell } from "@/components/AcademyShell";
 import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
 import { ACADEMY_TERMS } from "@shared/academyPath";
 
 type CourseRow = { id: string; name: string; description?: string | null; publishStatus?: string };
-type StepRow = { id: string; name: string; description?: string | null; courses: CourseRow[] };
+type PersonRow = { id: string; name: string; email?: string | null };
+type StepRow = { id: string; name: string; description?: string | null; courses: CourseRow[]; teachers?: PersonRow[] };
 type CohortRow = {
   id: string;
   name: string;
   description?: string | null;
   track?: string | null;
   trainerId?: string | null;
+  trainerIds?: string[];
   status?: string | null;
   quizzesStatus?: string | null;
   batches: StepRow[];
@@ -49,6 +52,7 @@ type PathPayload = {
   cohorts: CohortRow[];
   courses: CourseRow[];
   trainers: TrainerRow[];
+  teachers?: PersonRow[];
 };
 
 export default function AdminBatches() {
@@ -147,15 +151,26 @@ export default function AdminBatches() {
     onError: (error: Error) => fail(error, "Could not remove the cohort"),
   });
 
-  const assignTrainer = useMutation({
-    mutationFn: async ({ cohortId, trainerId }: { cohortId: string; trainerId: string | null }) => {
-      await apiRequest("PUT", `/api/batches/${cohortId}/trainer`, { trainerId });
+  const saveTrainers = useMutation({
+    mutationFn: async ({ cohortId, trainerIds }: { cohortId: string; trainerIds: string[] }) => {
+      await apiRequest("PUT", `/api/admin/academy-path/cohorts/${cohortId}/trainers`, { trainerIds });
     },
     onSuccess: () => {
-      toast({ title: "Trainer updated" });
+      toast({ title: "Trainers updated" });
       refresh();
     },
-    onError: (error: Error) => fail(error, "Could not assign the trainer"),
+    onError: (error: Error) => fail(error, "Could not save the trainers"),
+  });
+
+  const saveBatchTeachers = useMutation({
+    mutationFn: async ({ batchId, teacherIds }: { batchId: string; teacherIds: string[] }) => {
+      await apiRequest("PUT", `/api/admin/academy-path/batches/${batchId}/teachers`, { teacherIds });
+    },
+    onSuccess: () => {
+      toast({ title: "Teachers updated" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not save the teachers"),
   });
 
   const accessMutation = useMutation({
@@ -444,27 +459,35 @@ export default function AdminBatches() {
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <Select
-                      value={cohort.trainerId || "none"}
-                      onValueChange={(value) => assignTrainer.mutate({
-                        cohortId: cohort.id,
-                        trainerId: value === "none" ? null : value,
+                  <div className="pt-2" data-testid={`trainers-${cohort.id}`}>
+                    <p className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      Trainers on this cohort
+                    </p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                      {(data?.trainers || []).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No active trainers yet.</p>
+                      ) : (data?.trainers || []).map((trainer) => {
+                        const selected = (cohort.trainerIds || []).includes(trainer.id);
+                        return (
+                          <label key={trainer.id} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={selected}
+                              disabled={saveTrainers.isPending}
+                              onCheckedChange={(checked) => {
+                                const current = cohort.trainerIds || [];
+                                const trainerIds = checked
+                                  ? [...current, trainer.id]
+                                  : current.filter((id) => id !== trainer.id);
+                                saveTrainers.mutate({ cohortId: cohort.id, trainerIds });
+                              }}
+                              data-testid={`check-trainer-${cohort.id}-${trainer.id}`}
+                            />
+                            {trainer.username}
+                          </label>
+                        );
                       })}
-                    >
-                      <SelectTrigger className="w-[240px]" data-testid={`select-trainer-${cohort.id}`}>
-                        <SelectValue placeholder="Assign a trainer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No trainer</SelectItem>
-                        {(data?.trainers || []).map((trainer) => (
-                          <SelectItem key={trainer.id} value={trainer.id}>
-                            {trainer.username}{trainer.email ? ` (${trainer.email})` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -526,6 +549,33 @@ export default function AdminBatches() {
                           </Select>
                         );
                       })()}
+                      <div className="pt-1" data-testid={`teachers-${batch.id}`}>
+                        <p className="mb-2 text-sm font-medium">Teachers in this batch</p>
+                        <div className="flex max-h-36 flex-wrap gap-x-4 gap-y-2 overflow-y-auto">
+                          {(data?.teachers || []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No active teachers yet.</p>
+                          ) : (data?.teachers || []).map((teacher) => {
+                            const selected = (batch.teachers || []).some((row) => row.id === teacher.id);
+                            return (
+                              <label key={teacher.id} className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={selected}
+                                  disabled={saveBatchTeachers.isPending}
+                                  onCheckedChange={(checked) => {
+                                    const current = (batch.teachers || []).map((row) => row.id);
+                                    const teacherIds = checked
+                                      ? [...current, teacher.id]
+                                      : current.filter((id) => id !== teacher.id);
+                                    saveBatchTeachers.mutate({ batchId: batch.id, teacherIds });
+                                  }}
+                                  data-testid={`check-teacher-${batch.id}-${teacher.id}`}
+                                />
+                                {teacher.name}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   ))}
                   <div className="flex gap-2">
@@ -585,7 +635,7 @@ export default function AdminBatches() {
                 Courses
               </CardTitle>
               <CardDescription>
-                Add a course here, then place it on a batch. Trainers can also add courses from the Courses page.
+                Add a course here, then place it on a batch. A batch can hold more than one teacher.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

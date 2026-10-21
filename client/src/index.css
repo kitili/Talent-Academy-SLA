@@ -919,21 +919,39 @@ body {
 .sl-bg-paper::before { background-image: url("/bg-paper.jpg"); }
 
 .sl-frame {
-  width: 80%;
-  max-width: 80%;
+  width: calc(100% - 1rem);
+  max-width: calc(100% - 1rem);
   margin-left: auto;
   margin-right: auto;
   padding-left: 1rem;
   padding-right: 1rem;
 }
+@media (min-width: 640px) {
+  .sl-frame {
+    width: 80%;
+    max-width: 80%;
+  }
+}
 
 .sl-sheet {
   background: rgba(255, 250, 244, 0.97);
+  color: #17233c;
   border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: 1.5rem;
   box-shadow: 0 18px 50px rgba(16, 24, 40, 0.12);
   padding: 1.25rem;
   min-height: 80vh;
+}
+.sl-sheet .text-muted-foreground {
+  color: #3a4a60;
+}
+.dark .sl-sheet {
+  background: rgba(16, 24, 42, 0.96);
+  color: #f6f1e8;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.dark .sl-sheet .text-muted-foreground {
+  color: #d7deea;
 }
 @media (min-width: 640px) {
   .sl-sheet { padding: 1.75rem; }
@@ -981,9 +999,14 @@ body {
 .sl-stat-card {
   border-left: 4px solid hsl(var(--primary));
   background: rgba(255, 255, 255, 0.96);
-  color: hsl(var(--foreground));
+  color: #17233c;
   box-shadow: 0 10px 24px hsl(220 30% 10% / 0.08);
   transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.dark .sl-stat-card {
+  background: rgba(22, 32, 54, 0.96);
+  color: #f6f1e8;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .sl-stat-card:hover {
@@ -993,9 +1016,14 @@ body {
 .sl-nav-card {
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.96);
-  color: hsl(var(--foreground));
+  color: #17233c;
   box-shadow: 0 10px 30px hsl(220 30% 10% / 0.08);
   transition: transform 200ms ease, border-color 200ms ease;
+}
+.dark .sl-nav-card {
+  background: rgba(22, 32, 54, 0.96);
+  color: #f6f1e8;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .sl-nav-card:hover {

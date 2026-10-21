@@ -5,7 +5,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { LogOut } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { SceneBackdrop, type SceneName } from "@/components/SceneBackdrop";
-import { AdminNav } from "@/components/AdminNav";
+import { AdminNav, adminFrame } from "@/components/AdminNav";
 
 type AcademyShellProps = {
   title: string;
@@ -18,30 +18,28 @@ type AcademyShellProps = {
   children: ReactNode;
 };
 
-const adminFrame = "mx-auto w-[min(1120px,calc(100%-1.25rem))]";
-
 export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, scene = "library", showAdminNav = false, children }: AcademyShellProps) {
   const frame = showAdminNav ? adminFrame : "sl-frame";
   return (
     <SceneBackdrop scene={scene} veil={showAdminNav ? "light" : "photo"}>
-      <header className={`sticky top-0 z-50 shadow-sm ${showAdminNav ? "bg-[#fffaf4] text-[#102448] border-b border-[#102448]/10" : "bg-primary text-white"}`}>
+      <header className={`sticky top-0 z-50 shadow-sm ${showAdminNav ? "bg-[#fffaf4] text-[#17233c] border-b border-[#102448]/10 dark:bg-[#162033] dark:text-[#f6f1e8] dark:border-white/10" : "bg-primary text-white"}`}>
         <div className={`${frame} py-3 sm:py-4 flex items-center justify-between gap-3`}>
           <div className="flex items-center gap-3 min-w-0">
             <div className={`h-11 w-11 sm:h-12 sm:w-12 flex-shrink-0 rounded-md p-1 ${showAdminNav ? "bg-white" : "bg-white/10"}`}>
               <img src={logoImage} alt="Silverleaf Academy" className="h-full w-full object-contain" />
             </div>
             <div className="min-w-0">
-              <p className={`font-semibold text-lg sm:text-xl truncate ${showAdminNav ? "text-[#102448]" : "text-white"}`}>{title}</p>
-              {subtitle && <p className={`text-xs sm:text-sm truncate ${showAdminNav ? "text-[#4a5b73]" : "text-white/80"}`}>{subtitle}</p>}
+              <p className={`font-semibold text-lg sm:text-xl truncate ${showAdminNav ? "text-[#17233c] dark:text-[#f6f1e8]" : "text-white"}`}>{title}</p>
+              {subtitle && <p className={`text-xs sm:text-sm truncate ${showAdminNav ? "text-[#243044] dark:text-[#d7deea]" : "text-white/80"}`}>{subtitle}</p>}
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {userLabel && (
-              <span className={`hidden lg:inline text-xs max-w-[140px] truncate ${showAdminNav ? "text-[#4a5b73]" : "text-white/90"}`}>{userLabel}</span>
+              <span className={`hidden lg:inline text-xs max-w-[140px] truncate ${showAdminNav ? "text-[#243044] dark:text-[#d7deea]" : "text-white/90"}`}>{userLabel}</span>
             )}
             {actions}
             <NotificationBell tone={showAdminNav ? "light" : "dark"} />
-            <div className={showAdminNav ? "text-[#102448]" : "text-white"}>
+            <div className={showAdminNav ? "text-[#17233c] dark:text-[#f6f1e8]" : "text-white"}>
               <ThemeToggle />
             </div>
             {onLogout && (
@@ -50,7 +48,7 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
                 size="sm"
                 onClick={onLogout}
                 className={showAdminNav
-                  ? "bg-transparent hover:bg-[#102448]/5 text-[#102448] border-[#102448]/15"
+                  ? "bg-transparent hover:bg-[#102448]/5 text-[#17233c] border-[#102448]/15 dark:text-[#f6f1e8] dark:border-white/20 dark:hover:bg-white/10"
                   : "bg-white/10 hover:bg-white/20 text-white border-white/20"}
               >
                 <LogOut className="h-4 w-4 sm:mr-2" />

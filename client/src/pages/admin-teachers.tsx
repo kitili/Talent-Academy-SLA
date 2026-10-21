@@ -57,7 +57,9 @@ export default function AdminTeachers() {
     listQuery,
     (teacher) => `${teacher.name} ${teacher.email} ${teacher.teacherId}`,
   );
-  const teacherPager = usePager(filteredTeachers);
+  const activeTeachers = filteredTeachers.filter((teacher) => teacher.approvalStatus !== "inactive");
+  const inactiveTeachers = filteredTeachers.filter((teacher) => teacher.approvalStatus === "inactive");
+  const teacherPager = usePager(activeTeachers);
 
   const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
 
@@ -160,7 +162,7 @@ export default function AdminTeachers() {
             <div>
               <h1 className="text-3xl font-bold">Teachers</h1>
               <p className="text-muted-foreground">
-                Manage all teachers and view their progress
+                Active teachers are listed here. Inactive desks stay folded below.
               </p>
             </div>
           </div>
@@ -350,6 +352,16 @@ export default function AdminTeachers() {
               </Card>
             ))}
             <PageStrip page={teacherPager.page} pages={teacherPager.pages} setPage={teacherPager.setPage} />
+            {inactiveTeachers.length > 0 && (
+              <details className="rounded-xl border p-4" data-testid="inactive-teachers">
+                <summary className="cursor-pointer font-medium">Inactive ({inactiveTeachers.length})</summary>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {inactiveTeachers.map((teacher) => (
+                    <li key={teacher.id}>{teacher.name} · {teacher.email}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         ) : (
           <Card className="p-8 text-center">

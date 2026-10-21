@@ -18,6 +18,7 @@ import { db, getDatabaseUrl, pool } from "./db";
 import { clearSelectedActivity, parseActivityScope } from "./freshStart";
 import {
   approvalHistoryPage,
+  allApprovalHistorySelectSql,
   approvalHistoryToCsv,
   batchApprovalHistoryCountSql,
   batchApprovalHistorySelectSql,
@@ -3996,6 +3997,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error clearing academy activity:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/approval-history", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const format = String(req.query.format || "");
+      if (format === "csv") {
+        const result = await pool.query(allApprovalHistorySelectSql(false));
+        const csv = approvalHistoryToCsv(result.rows);
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", "attachment; filename=\"approval-history.csv\"");
+        return res.send(csv);
+      }
+      const paging = approvalHistoryPage(req.query.page);
+      const [countResult, pageResult] = await Promise.all([
+        pool.query("SELECT COUNT(*)::int AS total FROM approval_history"),
+        pool.query(allApprovalHistorySelectSql(true), [paging.pageSize, paging.offset]),
+      ]);
+      const total = Number(countResult.rows[0]?.total || 0);
+      res.json({
+        items: pageResult.rows.map((row) => mapApprovalHistoryRow(row)),
+        page: paging.page,
+        pageSize: paging.pageSize,
+        pages: paging.pages(total),
+        total,
+      });
+    } catch (error) {
+      console.error("Error reading approval history:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

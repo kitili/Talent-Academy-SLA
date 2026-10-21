@@ -18,16 +18,15 @@ You land on the admin home. A short line shows trainers, teachers, and courses. 
 
 ## C. The navbar and the cards
 
-The navbar stays on the admin pages: Desk, Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses.
+The navbar stays on the admin pages: Desk, Approvals, Trainers, Teachers, Cohorts, and Analytics. Courses are added inside a batch, so there is no Courses tab.
 
 | Card | What you do |
 | --- | --- |
-| Approvals | Let a waiting trainer or teacher in, or turn them away. The saved approval history is not listed here. |
+| Approvals | Let a waiting trainer or teacher in, or turn them away. **Export history** downloads every saved approval as a CSV file. |
 | Trainers | Create a trainer account. A trainer you create here is approved at once. Open a trainer to see that account. |
 | Teachers | Create a teacher account, already approved. Open a teacher to see progress and files viewed. |
-| Cohorts | One place for three different things. A **cohort** is the group of teachers. A **batch** is a step inside that cohort, and each cohort can have a different number. A **course** is the lessons on a batch. Set how many cohorts a teacher finishes. You add cohorts, batches, and courses here. Assign the trainer, then open or close the cohort and its quizzes. A trainer can add courses only. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
+| Cohorts | One place for three different things. A **cohort** is the group, and it can have more than one trainer. A **batch** is a step inside that cohort, and each batch can hold more than one teacher. A **course** is the lessons on a batch. Set how many cohorts a teacher finishes. You add cohorts, batches, and courses here. Open or close the cohort and its quizzes. A trainer can add courses only. |
 | Analytics | The gradebook for the whole academy: teachers, open cohorts, completion, attendance, quizzes, reflections, course ratings, and who is at risk. |
-| Courses | The same curriculum the trainers use. Keep a course on draft while you edit it. Publish it when teachers should see it. Add modules and lesson files. Plan each module as Introduction, Competence development, Design, then Realisation. |
 
 ## D. The job only you do
 

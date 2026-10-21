@@ -897,7 +897,7 @@ export default function AdminAnalytics() {
                   <KPICard label="Teachers" value={academySnapshot?.teachers ?? totalTeachers} icon={Users} subtitle={`${academySnapshot?.trainers ?? totalTrainers} trainers`} onClick={() => navigate("/admin/teachers")} />
                   <KPICard label="Open cohorts" value={academySnapshot?.openCohorts ?? 0} icon={Layers} subtitle={`${academySnapshot?.closedCohorts ?? 0} closed · ${academySnapshot?.batches ?? 0} total`} onClick={() => navigate("/admin/batches")} />
                   <KPICard label="Avg completion" value={`${academySnapshot?.averageCompletion ?? 0}%`} icon={TrendingUp} subtitle={`${academySnapshot?.atRiskBatches ?? 0} cohorts at risk`} />
-                  <KPICard label="Courses" value={academySnapshot?.courses ?? 0} icon={BookOpen} subtitle={`${academySnapshot?.overdueAssignments ?? 0} overdue written tasks`} onClick={() => navigate("/courses")} />
+                  <KPICard label="Courses" value={academySnapshot?.courses ?? 0} icon={BookOpen} subtitle={`${academySnapshot?.overdueAssignments ?? 0} overdue written tasks`} onClick={() => navigate("/admin/batches")} />
                   <KPICard label="Quizzes" value={academySnapshot?.openQuizzes ?? 0} icon={Award} subtitle={`${academySnapshot?.stoppedQuizzes ?? 0} stopped`} />
                   <KPICard label="Attendance" value={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceRate ?? 0}%` : "—"} icon={CheckCircle} subtitle={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceMarked} marks` : "No attendance marked yet"} />
                   <KPICard label="Reflections" value={academySnapshot?.reflections ?? 0} icon={FileText} onClick={() => setShowReflectionsDialog(true)} />

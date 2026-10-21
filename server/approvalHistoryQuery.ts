@@ -32,6 +32,15 @@ export function batchApprovalHistoryCountSql() {
   return `SELECT COUNT(*)::int AS total FROM approval_history ah WHERE ${batchApprovalHistoryFilter("ah")}`;
 }
 
+export function allApprovalHistorySelectSql(paged = false) {
+  const limit = paged ? "LIMIT $1 OFFSET $2" : "LIMIT 5000";
+  return `SELECT ah.id, ah.target_type, ah.target_id, ah.target_name, ah.target_email, ah.action,
+            ah.performed_by, ah.performed_by_name, ah.performed_by_role, ah.created_at
+          FROM approval_history ah
+          ORDER BY ah.created_at DESC
+          ${limit}`;
+}
+
 export function batchApprovalHistorySelectSql(paged: boolean) {
   const limit = paged ? "LIMIT $2 OFFSET $3" : "LIMIT 5000";
   return `SELECT ah.id, ah.target_type, ah.target_id, ah.target_name, ah.target_email, ah.action,

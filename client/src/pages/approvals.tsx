@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, User, GraduationCap, XCircle, ArrowLeft } from "lucide-react";
+import { CheckCircle, Clock, User, GraduationCap, XCircle, ArrowLeft, Download } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { AdminNav } from "@/components/AdminNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -144,18 +144,28 @@ export default function ApprovalsPage() {
     <div className="sl-page sl-bg-hall min-h-screen">
     {isAdmin && <AdminNav />}
     <div className="sl-sheet sl-frame my-6 p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/">
-          <Button variant="ghost" size="icon" data-testid="button-back">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Pending Approvals</h1>
-          <p className="text-muted-foreground">
-            Review and approve pending account requests
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/">
+            <Button variant="ghost" size="icon" data-testid="button-back">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Pending Approvals</h1>
+            <p className="text-muted-foreground">
+              Review and approve pending account requests
+            </p>
+          </div>
         </div>
+        {isAdmin && (
+          <Button variant="outline" asChild>
+            <a href="/api/admin/approval-history?format=csv" data-testid="button-export-approvals">
+              <Download className="h-4 w-4 mr-2" />
+              Export history
+            </a>
+          </Button>
+        )}
       </div>
 
       {isAdmin && (

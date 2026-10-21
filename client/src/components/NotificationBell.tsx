@@ -70,7 +70,7 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
       <Button
         variant="ghost"
         size="icon"
-        className={`relative h-9 w-9 ${tone === "light" ? "text-[#102448] hover:bg-[#102448]/5" : "text-white hover:bg-white/10"}`}
+        className={`relative h-9 w-9 ${tone === "light" ? "text-[#17233c] hover:bg-[#102448]/5 dark:text-[#f6f1e8] dark:hover:bg-white/10" : "text-white hover:bg-white/10"}`}
         onClick={handleOpen}
         aria-label="Notifications"
       >

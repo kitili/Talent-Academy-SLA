@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  allApprovalHistorySelectSql,
   approvalHistoryPage,
   approvalHistoryToCsv,
   batchApprovalHistoryCountSql,
@@ -17,9 +18,11 @@ describe("admin desk", () => {
   it("puts admin links in a navbar and drops the handover card", () => {
     const nav = read("client/src/components/AdminNav.tsx");
     const home = read("client/src/pages/admin-home.tsx");
-    for (const label of ["Approvals", "Trainers", "Teachers", "Cohorts", "Analytics", "Courses"]) {
+    for (const label of ["Approvals", "Trainers", "Teachers", "Cohorts", "Analytics"]) {
       assert.match(nav, new RegExp(label));
     }
+    assert.equal(nav.includes('href: "/courses"'), false);
+    assert.match(nav, /sm:w-\[80%\]/);
     assert.equal(nav.toLowerCase().includes("handover"), false);
     assert.equal(nav.includes("rounded-full"), false);
     assert.match(nav, /flex-wrap/);
@@ -28,6 +31,7 @@ describe("admin desk", () => {
     assert.equal(home.includes("showAdminNav"), true);
     assert.equal(home.includes("LearningPath"), false);
     assert.equal(home.includes("Total Trainers"), false);
+    assert.equal(home.includes('href: "/courses"'), false);
   });
 
   it("asks for areas and people before clearing activity", () => {
@@ -85,5 +89,11 @@ describe("batch approval history", () => {
     assert.match(panel, /select-approval-history/);
     assert.match(panel, /format=csv/);
     assert.match(panel, /choice === "history"/);
+    assert.match(approvals, /button-export-approvals/);
+    assert.match(approvals, /\/api\/admin\/approval-history\?format=csv/);
+    const allSql = allApprovalHistorySelectSql(false);
+    assert.match(allSql, /FROM approval_history/);
+    assert.equal(allSql.includes("batch_teachers"), false);
+    assert.match(allApprovalHistorySelectSql(true), /LIMIT \$1 OFFSET \$2/);
   });
 });

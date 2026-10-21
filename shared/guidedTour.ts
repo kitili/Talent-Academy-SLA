@@ -12,12 +12,12 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Counts",
-    body: "Trainers, teachers, and courses. If someone is waiting, a Needs attention row appears and opens Approvals.",
+    body: "Trainers and teachers. If someone is waiting, a Needs attention row appears and opens Approvals.",
     target: "admin-stats",
   },
   {
     title: "Where to go next",
-    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses. Approvals lets people in. Cohorts is one place to add cohorts, the batches inside them, and courses, and to open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
+    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, and Analytics. Approvals lets people in. Cohorts is where you add cohorts, the batches inside them, and Courses on each batch. A batch can hold more than one teacher, and a cohort can hold more than one trainer. Analytics is the gradebook.",
     target: "admin-nav",
   },
   {

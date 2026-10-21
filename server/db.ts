@@ -145,6 +145,16 @@ export async function ensureWrittenAssignmentTables() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_cohort_batch_course
       ON cohort_batch_courses(cohort_batch_id, course_id);
+    CREATE TABLE IF NOT EXISTS cohort_trainers (
+      cohort_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      trainer_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      PRIMARY KEY (cohort_id, trainer_id)
+    );
+    CREATE TABLE IF NOT EXISTS cohort_batch_teachers (
+      cohort_batch_id varchar NOT NULL REFERENCES cohort_batches(id) ON DELETE CASCADE,
+      teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      PRIMARY KEY (cohort_batch_id, teacher_id)
+    );
     CREATE TABLE IF NOT EXISTS desk_messages (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       from_id varchar NOT NULL,

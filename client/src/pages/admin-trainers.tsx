@@ -56,7 +56,9 @@ export default function AdminTrainers() {
     listQuery,
     (trainer) => `${trainer.username} ${trainer.email || ""}`,
   );
-  const trainerPager = usePager(filteredTrainers);
+  const activeTrainers = filteredTrainers.filter((trainer) => trainer.approvalStatus !== "inactive");
+  const inactiveTrainers = filteredTrainers.filter((trainer) => trainer.approvalStatus === "inactive");
+  const trainerPager = usePager(activeTrainers);
 
   const createTrainerMutation = useMutation({
     mutationFn: async (data: { name: string; email: string; password: string }) => {
@@ -133,7 +135,7 @@ export default function AdminTrainers() {
             <div>
               <h1 className="text-3xl font-bold">Trainers</h1>
               <p className="text-muted-foreground">
-                Manage all trainers in the system
+                Active trainers are listed here. Inactive desks stay folded below.
               </p>
             </div>
           </div>
@@ -288,6 +290,16 @@ export default function AdminTrainers() {
               </Card>
             ))}
             <PageStrip page={trainerPager.page} pages={trainerPager.pages} setPage={trainerPager.setPage} />
+            {inactiveTrainers.length > 0 && (
+              <details className="rounded-xl border p-4" data-testid="inactive-trainers">
+                <summary className="cursor-pointer font-medium">Inactive ({inactiveTrainers.length})</summary>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {inactiveTrainers.map((trainer) => (
+                    <li key={trainer.id}>{trainer.username}{trainer.email ? ` · ${trainer.email}` : ""}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         ) : (
           <Card className="p-8 text-center">

@@ -167,18 +167,17 @@ export default function AdminHome() {
     >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-[#102448]">
+            <h1 className="text-3xl font-semibold text-[#17233c] dark:text-[#f6f1e8]">
               {user?.username ? user.username : "Admin"}
             </h1>
-            <p className="mt-1 text-sm text-[#4a5b73]">The pictures open each part of the academy.</p>
+            <p className="mt-1 text-sm text-[#243044] dark:text-[#d7deea]">The pictures open each part of the academy.</p>
           </div>
           {isLoading ? (
-            <div className="h-8 w-48 animate-pulse rounded-md bg-[#102448]/10" data-tour="admin-stats" />
+            <div className="h-8 w-48 animate-pulse rounded-md bg-[#102448]/10 dark:bg-white/10" data-tour="admin-stats" />
           ) : (
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[#4a5b73]" data-tour="admin-stats">
-              <span><strong className="text-[#102448]">{stats?.totalTrainers || 0}</strong> trainers</span>
-              <span><strong className="text-[#102448]">{stats?.totalTeachers || 0}</strong> teachers</span>
-              <span><strong className="text-[#102448]">{stats?.totalCourses || 0}</strong> courses</span>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[#243044] dark:text-[#d7deea]" data-tour="admin-stats">
+              <span><strong className="text-[#17233c] dark:text-[#f6f1e8]">{stats?.totalTrainers || 0}</strong> trainers</span>
+              <span><strong className="text-[#17233c] dark:text-[#f6f1e8]">{stats?.totalTeachers || 0}</strong> teachers</span>
             </div>
           )}
         </div>
@@ -186,12 +185,12 @@ export default function AdminHome() {
         {((stats?.pendingTrainers || 0) + (stats?.pendingTeachers || 0) > 0) && (
           <button
             type="button"
-            className="w-full rounded-2xl border border-[#c4842a]/40 bg-[#fffaf4] p-4 text-left"
+            className="w-full rounded-2xl border border-[#c4842a]/40 bg-[#fffaf4] p-4 text-left dark:bg-[#1c2740]"
             onClick={() => navigate("/approvals")}
             data-testid="button-needs-attention"
           >
-            <p className="font-semibold text-[#102448]">Needs attention</p>
-            <p className="text-sm text-[#4a5b73] mt-1">
+            <p className="font-semibold text-[#17233c] dark:text-[#f6f1e8]">Needs attention</p>
+            <p className="text-sm text-[#243044] dark:text-[#d7deea] mt-1">
               {(stats?.pendingTrainers || 0)} trainer{(stats?.pendingTrainers || 0) === 1 ? "" : "s"} and {(stats?.pendingTeachers || 0)} teacher{(stats?.pendingTeachers || 0) === 1 ? "" : "s"} waiting for approval.
             </p>
           </button>
@@ -204,7 +203,6 @@ export default function AdminHome() {
             { href: "/admin/teachers", title: "Teachers", test: "button-go-teachers", place: "garden" as PlaceName },
             { href: "/admin/batches", title: "Cohorts", test: "button-go-batches", place: "classroom" as PlaceName },
             { href: "/admin/analytics", title: "Analytics", test: "button-go-analytics", place: "library" as PlaceName },
-            { href: "/courses", title: "Courses", test: "button-go-courses", place: "lessons" as PlaceName },
           ].map((item) => (
             <button
               key={item.href}
@@ -216,7 +214,7 @@ export default function AdminHome() {
               <span className="sl-place-tile block">
                 <PlaceCover place={item.place} className="h-36" />
               </span>
-              <span className="block px-4 py-3 font-semibold text-[#102448]">{item.title}</span>
+              <span className="block px-4 py-3 font-semibold text-[#17233c] dark:text-[#f6f1e8]">{item.title}</span>
             </button>
           ))}
         </div>
@@ -306,7 +304,7 @@ export default function AdminHome() {
             </Dialog>
         </div>
 
-        <Card className="p-4 border-[#102448]/10 bg-[#fffaf4]" data-tour="admin-fresh">
+        <Card className="p-4 border-[#102448]/10 bg-[#fffaf4] text-[#17233c] dark:border-white/10 dark:bg-[#1c2740] dark:text-[#f6f1e8]" data-tour="admin-fresh">
           <p className="font-semibold">Start fresh</p>
           <p className="text-sm text-muted-foreground mt-1">
             Clears cohorts, progress, quizzes, certificates, or notices for the people you choose.
