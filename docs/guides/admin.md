@@ -1,14 +1,50 @@
-# Admin guide
+# Admin walkthrough
 
-Sign in on the Admin tab.
+You run the academy. Trainers coach the adult teachers. You decide who those trainers are, which batch they own, and when the whole school needs one message.
 
-1. Create users (admin, trainer, or teacher) and approve pending accounts.
-2. Create courses. Set **draft** while you are still editing. Set **published** when teachers should see it.
-3. Add modules (weeks) with a competency focus, objectives, and lesson files or lesson text.
-4. Approve a quiz, or leave the Classroom Practice quizzes which are already approved.
-5. Certificates, analytics, and CSV exports use the same completion status as the teacher dashboard.
-6. The first visit opens a short tour. **Tour** in the header replays it.
-7. **Start fresh** clears courses, cohorts, progress, quizzes, certificates, and messages. Login accounts stay. Passwords are hashed and are not shown. Type `CLEAR ACTIVITY` to confirm.
-8. Environment: set `NEON_DATABASE_URL` or `DATABASE_URL` to the one Postgres project, plus `SESSION_SECRET`. Do not commit those values.
+Sign in on the Admin tab. The first visit starts a short tour. **Tour** in the header plays it again.
 
-SSO and SMS wait for school keys. Email sends when `RESEND_API_KEY` is set; otherwise the same notice stays in the app. A quiz can be written by hand when no AI key is set. The last lesson opened on this device stays available if the network drops.
+## A. The desk
+
+You land on the admin home. The strip shows both tracks: primary trainers from playgroup through Standard 7, and secondary trainers for Form I.
+
+Four counts sit under that: trainers, teachers, courses, and active people. If someone is waiting, **Needs attention** opens Approvals.
+
+## B. The header
+
+| Control | What it does |
+| --- | --- |
+| Academy notice | One note to every approved trainer and every approved teacher. It lands in the bell. They do not reply inside it. |
+| Reset User Password | Set a new password for any account. The old password is stored hashed, so you cannot read it. |
+| Tour | Replay the short tour. |
+
+## C. The seven cards
+
+| Card | What you do |
+| --- | --- |
+| Handover | The three-week staff plan, plus live health: whether the database answers and whether lesson files are on Blob or only on this machine. |
+| Approvals | Let a waiting trainer or teacher in, or turn them away. |
+| Trainers | Create a trainer account. A trainer you create here is approved at once. Open a trainer to see that account. |
+| Teachers | Create a teacher account, already approved. Open a teacher to see progress and files viewed. |
+| Cohorts | Every batch, not only one trainer’s. Each card says Primary or Secondary. Assign the trainer who will coach that batch, or clear the assignment. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
+| Analytics | The gradebook for the whole academy: completion, quizzes, attendance, reflections, and course ratings. |
+| Courses | The same curriculum the trainers use. Keep a course on draft while you edit it. Publish it when teachers should see it. Add modules and lesson files. Plan each module as Introduction, Competence development, Design, then Realisation. |
+
+## D. The job only you do
+
+A trainer sees only their own batches. You see all of them, and you are the person who puts a trainer on a batch. Until you do that, the trainer’s desk stays empty.
+
+You can also create trainer accounts. A trainer cannot create another trainer or an admin.
+
+## E. Start fresh
+
+**Start fresh** removes courses, cohorts, progress, quizzes, certificates, notices, and messages so you can import again. Login accounts stay, and their passwords stay. Type `CLEAR ACTIVITY` only when you mean it. Everyone is signed out and comes back with the same password.
+
+## F. A normal week
+
+1. Approve anyone waiting.
+2. Confirm each batch has the right trainer. Primary batches stay with primary trainers. Form I stays with a secondary trainer.
+3. Confirm the course for that stage is published and assigned.
+4. Send an academy notice only when every desk needs the same sentence.
+5. Open Analytics when you need the school picture, not one class.
+6. Open a cohort room when you need to do the trainer’s work yourself.
