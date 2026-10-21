@@ -9,6 +9,7 @@ import { Link, useLocation, useRoute } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, CheckCircle, FileText } from "lucide-react";
+import { AdminNav } from "@/components/AdminNav";
 
 interface BatchCertificateTemplate {
   id: string;
@@ -98,7 +99,9 @@ export default function AdminCertificateApproval() {
   }
 
   return (
-    <div className="sl-page sl-bg-paper min-h-screen p-4 sm:p-6 md:p-8">
+    <div className="sl-page sl-bg-paper min-h-screen">
+      {user?.role === "admin" && <AdminNav />}
+      <div className="p-4 sm:p-6 md:p-8">
       <Button onClick={() => navigate("/admin")} variant="outline" className="mb-4 sm:mb-6 md:mb-8">
         <ArrowLeft className="w-4 h-4 mr-2" /> Back
       </Button>
@@ -203,6 +206,7 @@ export default function AdminCertificateApproval() {
             )}
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

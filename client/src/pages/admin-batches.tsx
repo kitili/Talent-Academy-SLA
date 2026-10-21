@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AcademyShell } from "@/components/AcademyShell";
+import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
 import { PageStrip, usePager } from "@/components/PageStrip";
 import { LEARNING_STAGES } from "@shared/tanzaniaPath";
 
@@ -218,7 +219,7 @@ export default function AdminBatches() {
   }
 
   return (
-    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Cohorts" userLabel={user?.username}>
+    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Cohorts" userLabel={user?.username} showAdminNav>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <Button variant="ghost" onClick={() => navigate("/admin")} className="mb-4" data-testid="button-back-admin">
@@ -377,6 +378,7 @@ export default function AdminBatches() {
                     </div>
                   )}
                 </div>
+                <BatchApprovalHistory batchId={batch.id} />
               </Card>
             );
           })}

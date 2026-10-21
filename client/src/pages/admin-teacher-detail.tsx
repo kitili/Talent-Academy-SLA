@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { AdminNav } from "@/components/AdminNav";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, FileText, MessageSquare, Award } from "lucide-react";
@@ -126,7 +127,9 @@ export default function AdminTeacherDetail() {
   }
 
   return (
-    <div className="sl-page sl-bg-board min-h-screen p-4 sm:p-6 md:p-8">
+    <div className="sl-page sl-bg-board min-h-screen">
+      <AdminNav />
+      <div className="p-4 sm:p-6 md:p-8">
       <div className="sl-sheet max-w-4xl mx-auto">
         {/* Back Button */}
         <Button
@@ -297,6 +300,7 @@ export default function AdminTeacherDetail() {
             </div>
           </Card>
         )}
+      </div>
       </div>
     </div>
   );

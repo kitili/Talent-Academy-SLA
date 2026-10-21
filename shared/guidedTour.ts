@@ -8,25 +8,25 @@ export type TourStep = {
 export const ADMIN_TOUR: TourStep[] = [
   {
     title: "Admin desk",
-    body: "This short tour shows where to move. You land here after signing in on the Admin tab. Counts sit at the top. The cards below open the rest of the academy.",
+    body: "This short tour shows where to move. You land here after signing in on the Admin tab. A short count line sits under the greeting. The pictures below open the rest of the academy.",
   },
   {
     title: "Counts",
-    body: "Trainers, teachers, courses, and active people. If someone is waiting, a Needs attention row appears above these cards and opens Approvals.",
+    body: "Trainers, teachers, and courses. If someone is waiting, a Needs attention row appears and opens Approvals.",
     target: "admin-stats",
   },
   {
     title: "Where to go next",
-    body: "Handover is the three-week staff plan. Approvals lets people in. Trainers and Teachers are the accounts. Cohorts is where you add a batch, assign a trainer, and open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
+    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses. Approvals lets people in. Cohorts is where you add a batch, assign a trainer, and open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
     target: "admin-nav",
   },
   {
     title: "Passwords stay hidden",
-    body: "Use Reset User Password in the header when someone needs a new password. The academy stores passwords hashed, so it cannot show the current one. You set a new password; you do not read the old one.",
+    body: "Use Reset password on this desk when someone needs a new password. The academy stores passwords hashed, so it cannot show the current one. You set a new password; you do not read the old one.",
   },
   {
     title: "Start fresh",
-    body: "Start fresh removes courses, cohorts, progress, quizzes, certificates, notices, and messages so you can import again. Login accounts stay, including their passwords. Type CLEAR ACTIVITY only when you mean it.",
+    body: "Start fresh clears only the areas you tick: cohorts, progress, quizzes, certificates, or notices. Pick the people it applies to. It does not clear the whole academy, and login accounts stay. Type CLEAR ACTIVITY only when you mean it.",
     target: "admin-fresh",
   },
 ];

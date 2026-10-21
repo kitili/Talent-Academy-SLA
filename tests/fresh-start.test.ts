@@ -1,31 +1,90 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   ADMIN_TOUR,
   TEACHER_TOUR,
 } from "../shared/guidedTour.ts";
 import {
+  ACTIVITY_AREAS,
   FRESH_START_PHRASE,
   KEPT_LOGIN_TABLES,
-  CLEARED_ACTIVITY_TABLES,
-  activityDeleteSql,
+  PROTECTED_TABLES,
   assertFreshStartIsSafe,
+  buildActivityStatements,
+  parseActivityScope,
 } from "../server/freshStart.ts";
 
-describe("fresh start keeps logins", () => {
-  it("never clears users, teachers, or their profiles", () => {
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+describe("fresh start keeps logins and stays scoped", () => {
+  it("never clears users, teachers, courses, sessions, or approval history", () => {
     assertFreshStartIsSafe();
-    for (const table of ["users", "teachers", "user_profiles", "teacher_profiles"]) {
-      assert.equal(KEPT_LOGIN_TABLES.includes(table as typeof KEPT_LOGIN_TABLES[number]), true);
-      assert.throws(() => activityDeleteSql(table), /Refusing to clear/);
+    for (const table of ["users", "teachers", "user_profiles", "teacher_profiles", "approval_history", "courses", "sessions"]) {
+      assert.equal(KEPT_LOGIN_TABLES.includes(table as typeof KEPT_LOGIN_TABLES[number]) || PROTECTED_TABLES.includes(table as typeof PROTECTED_TABLES[number]), true);
+    }
+    const statements = buildActivityStatements(
+      { areas: [...ACTIVITY_AREAS], teacherIds: ["teacher-1"], trainerIds: ["trainer-1"] },
+      ["batch-1"],
+    );
+    for (const step of statements) {
+      assert.match(step.sql, /\bWHERE\b/);
+      for (const table of PROTECTED_TABLES) {
+        assert.equal(step.sql.includes(`public.${table}`), false);
+      }
     }
   });
 
-  it("clears courses, progress, and sessions so import can start clean", () => {
-    for (const table of ["courses", "quiz_attempts", "teacher_content_progress", "batches", "sessions", "desk_messages"]) {
-      assert.equal(CLEARED_ACTIVITY_TABLES.includes(table as typeof CLEARED_ACTIVITY_TABLES[number]), true);
-      assert.equal(activityDeleteSql(table), `DELETE FROM public.${table}`);
-    }
+  it("clears one area for one person and leaves the rest of the academy", () => {
+    const scope = parseActivityScope({
+      confirm: "CLEAR ACTIVITY",
+      areas: ["notices"],
+      teacherIds: ["teacher-1"],
+      trainerIds: [],
+    });
+    assert.equal("error" in scope, false);
+    if ("error" in scope) return;
+    const statements = buildActivityStatements(scope, []);
+    assert.equal(statements.length, 1);
+    assert.equal(statements[0].table, "notifications");
+    assert.match(statements[0].sql, /recipient_id = ANY/);
+    assert.deepEqual(statements[0].params, [["teacher-1"]]);
+  });
+
+  it("refuses a whole-academy wipe", () => {
+    const missingPeople = parseActivityScope({ confirm: "CLEAR ACTIVITY", areas: ["quizzes"] });
+    assert.equal("error" in missingPeople, true);
+    const missingAreas = parseActivityScope({ confirm: "CLEAR ACTIVITY", teacherIds: ["teacher-1"] });
+    assert.equal("error" in missingAreas, true);
+    const unknown = parseActivityScope({
+      confirm: "CLEAR ACTIVITY",
+      areas: ["courses"],
+      teacherIds: ["teacher-1"],
+    });
+    assert.equal("error" in unknown, true);
+    const phrase = parseActivityScope({
+      confirm: "please",
+      areas: ["notices"],
+      teacherIds: ["teacher-1"],
+    });
+    assert.equal("error" in phrase, true);
+  });
+
+  it("offers cohorts, progress, quizzes, certificates, and notices on their own", () => {
+    assert.deepEqual(ACTIVITY_AREAS, ["cohorts", "progress", "quizzes", "certificates", "notices"]);
+    const scope = parseActivityScope({
+      confirm: FRESH_START_PHRASE,
+      areas: ["cohorts"],
+      trainerIds: ["trainer-1"],
+    });
+    assert.equal("error" in scope, false);
+    if ("error" in scope) return;
+    const statements = buildActivityStatements(scope, ["batch-1"]);
+    assert.equal(statements.some((step) => step.table === "batches" && step.sql.includes("WHERE id = ANY")), true);
+    assert.equal(statements.some((step) => step.table === "courses"), false);
+    assert.equal(statements.some((step) => step.table === "sessions"), false);
   });
 
   it("requires an explicit confirmation phrase", () => {
@@ -40,7 +99,16 @@ describe("in-app tours", () => {
     assert.ok(text.includes("Courses"));
     assert.ok(text.includes("Cohorts"));
     assert.ok(text.includes("CLEAR ACTIVITY"));
+    assert.equal(text.includes("Handover"), false);
     assert.equal(ADMIN_TOUR.some((step) => step.target === "admin-nav"), true);
+  });
+
+  it("keeps the tour card above the highlighted fresh-start card", () => {
+    const tour = readFileSync(join(root, "client/src/components/GuidedTour.tsx"), "utf8");
+    const css = readFileSync(join(root, "client/src/index.css"), "utf8");
+    assert.match(tour, /z-\[90\]/);
+    assert.match(css, /\.sla-tour-target[\s\S]*z-index:\s*81/);
+    assert.match(css, /\.sla-tour-target[\s\S]*pointer-events:\s*none/);
   });
 
   it("walks a teacher from continue learning to certificates", () => {

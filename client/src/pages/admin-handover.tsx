@@ -57,6 +57,7 @@ export default function AdminHandover() {
       title="Silverleaf Academy"
       subtitle="Three-week handover"
       userLabel={user?.username}
+      showAdminNav
       onLogout={() => logoutMutation.mutate()}
     >
       <Button variant="ghost" onClick={() => navigate("/admin")}>Back</Button>
