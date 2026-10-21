@@ -23,6 +23,8 @@ import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
+import { CohortMedals } from "@/components/CohortMedals";
+import type { Medal } from "@shared/cohortMedals";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 function TeacherPathCard() {
@@ -94,6 +96,9 @@ export default function TeacherDashboard() {
   const { data: assignedWeeks = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/assigned-weeks"],
   });
+  const { data: medalRows = [] } = useQuery<Array<{ batchId: string; batchName: string; medals: Medal[] }>>({
+    queryKey: ["/api/teacher/medals"],
+  });
   const { data: deskPeers = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/desk-peers"],
   });
@@ -108,6 +113,20 @@ export default function TeacherDashboard() {
   });
 
   const { toast } = useToast();
+  const completeCourse = useMutation({
+    mutationFn: async ({ courseId, batchId }: { courseId: string; batchId: string }) => {
+      await apiRequest("POST", `/api/teacher/courses/${courseId}/complete`, { batchId });
+    },
+    onSuccess: () => {
+      toast({ title: "Course complete", description: "The next course is open." });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/assigned-weeks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/medals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/academy-path"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not mark the course complete", description: error.message, variant: "destructive" });
+    },
+  });
   const [reflectionWeekId, setReflectionWeekId] = useState("");
   const [reflectionBatchId, setReflectionBatchId] = useState("");
   const [reflectionContent, setReflectionContent] = useState("");
@@ -262,12 +281,18 @@ export default function TeacherDashboard() {
       acc[key] = {
         courseId: week.courseId,
         courseName: week.courseName || week.title,
+        batchId: week.batchId,
+        courseChecked: false,
+        canCheckComplete: false,
         weeks: [],
         totalCompleted: 0,
         totalFiles: 0,
       };
     }
     acc[key].weeks.push(week);
+    acc[key].batchId = acc[key].batchId || week.batchId;
+    acc[key].courseChecked = acc[key].courseChecked || Boolean(week.courseChecked);
+    acc[key].canCheckComplete = acc[key].canCheckComplete || Boolean(week.canCheckComplete);
     acc[key].totalCompleted += week.progress?.completed || 0;
     acc[key].totalFiles += week.progress?.total || 0;
     return acc;
@@ -538,11 +563,30 @@ export default function TeacherDashboard() {
           </CardContent>
         </Card>
 
+        {medalRows.length > 0 && (
+          <Card className="sl-rise" data-testid="card-teacher-medals">
+            <CardHeader>
+              <CardTitle>Medals</CardTitle>
+              <CardDescription>
+                Earned from starting, keeping time, answering, passing quizzes, and checking a course complete. A trainer can also give you a star.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {medalRows.map((row) => (
+                <div key={row.batchId}>
+                  <p className="text-sm font-medium mb-2">{row.batchName}</p>
+                  <CohortMedals medals={row.medals || []} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <Card id="my-learning" className="sl-rise sl-stat-card" data-tour="teacher-learning">
           <CardHeader>
             <CardTitle>My learning</CardTitle>
             <CardDescription>
-              Assigned courses, progress, and the same status your trainer sees.
+              Assigned courses, progress, and the same status your trainer sees. Check a course complete to open the next one.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
@@ -560,16 +604,30 @@ export default function TeacherDashboard() {
                 <tbody>
                   {uniqueCourses.map((course: any) => {
                     const anyLocked = course.weeks.some((w: any) => w.locked && (w.progress?.percentage || 0) < 100);
-                    const status = learningStatus({
-                      percentage: course.aggregateProgress.percentage,
-                      locked: anyLocked && course.aggregateProgress.percentage === 0,
-                    });
+                    const status = course.courseChecked
+                      ? "Completed"
+                      : learningStatus({
+                        percentage: course.aggregateProgress.percentage,
+                        locked: anyLocked && course.aggregateProgress.percentage === 0,
+                      });
                     return (
                       <tr key={course.courseId || course.courseName} className="border-b last:border-0">
                         <td className="py-3 pr-3 font-medium">{course.courseName}</td>
-                        <td className="py-3 pr-3">{course.aggregateProgress.percentage}%</td>
+                        <td className="py-3 pr-3">{course.courseChecked ? 100 : course.aggregateProgress.percentage}%</td>
                         <td className="py-3">
-                          <Badge variant={learningStatusBadgeVariant(status)}>{status}</Badge>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={learningStatusBadgeVariant(status)}>{status}</Badge>
+                            {course.canCheckComplete && course.courseId && course.batchId && (
+                              <Button
+                                size="sm"
+                                disabled={completeCourse.isPending}
+                                onClick={() => completeCourse.mutate({ courseId: course.courseId, batchId: course.batchId })}
+                                data-testid={`button-complete-course-${course.courseId}`}
+                              >
+                                Mark complete and open the next
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

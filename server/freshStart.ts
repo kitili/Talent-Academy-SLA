@@ -117,6 +117,7 @@ export function buildActivityStatements(scope: ActivityScope, batchIds: string[]
     steps.push(
       ...del("teacher_content_progress", "teacher_id", scope.teacherIds),
       ...del("teacher_course_completion", "teacher_id", scope.teacherIds),
+      ...del("trainer_stars", "teacher_id", scope.teacherIds),
       ...del("course_repetitions", "teacher_id", scope.teacherIds),
       ...del("attendance_records", "teacher_id", scope.teacherIds),
       ...del("deck_file_progress", "user_id", scope.trainerIds),
@@ -187,6 +188,7 @@ export function buildActivityStatements(scope: ActivityScope, batchIds: string[]
         ...del("alert_rules", "batch_id", batchIds),
         ...del("attendance_records", "batch_id", batchIds),
         ...del("teacher_course_completion", "batch_id", batchIds),
+        ...del("trainer_stars", "batch_id", batchIds),
         ...del("course_repetitions", "batch_id", batchIds),
         ...del("teacher_certificates", "batch_id", batchIds),
         ...del("batch_certificate_templates", "batch_id", batchIds),

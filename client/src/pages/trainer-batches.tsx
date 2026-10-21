@@ -20,7 +20,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
-import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar } from "lucide-react";
+import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar, Star } from "lucide-react";
+import { CohortMedals } from "@/components/CohortMedals";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { TRAINER_TOUR } from "@shared/guidedTour";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
@@ -245,6 +246,21 @@ export default function TrainerBatches() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const starMutation = useMutation({
+    mutationFn: async ({ teacherId, give }: { teacherId: string; give: boolean }) => {
+      const path = `/api/batches/${selectedBatch?.id}/teachers/${teacherId}/star`;
+      if (give) await apiRequest("POST", path, {});
+      else await apiRequest("DELETE", path);
+    },
+    onSuccess: (_data, { give }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "progress"] });
+      toast({ title: give ? "Star given" : "Star taken back" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not update the star", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1360,6 +1376,21 @@ export default function TrainerBatches() {
                                 ))}
                               </div>
                             )}
+                            <CohortMedals medals={teacherProgress.medals || []} />
+                            <Button
+                              size="sm"
+                              variant={teacherProgress.trainerStar ? "secondary" : "default"}
+                              className={teacherProgress.trainerStar ? "" : "bg-[#b8860b] text-white hover:bg-[#9a7209]"}
+                              disabled={starMutation.isPending}
+                              onClick={() => starMutation.mutate({
+                                teacherId: teacher.id,
+                                give: !teacherProgress.trainerStar,
+                              })}
+                              data-testid={`button-give-star-${teacher.id}`}
+                            >
+                              <Star className="h-4 w-4 mr-1" />
+                              {teacherProgress.trainerStar ? "Take the star back" : "Give a star"}
+                            </Button>
                             <div className="grid grid-cols-4 gap-2 text-sm">
                               <div className="text-center p-2 bg-muted rounded">
                                 <p className="text-muted-foreground text-xs">Completed</p>

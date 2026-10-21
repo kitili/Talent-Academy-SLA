@@ -9,7 +9,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards } from "@shared/schema";
+import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars } from "@shared/schema";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
@@ -27,6 +27,7 @@ import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
+import { cohortMedals, nextCourseToCheck } from "@shared/cohortMedals";
 import { recordAudit } from "./audit";
 import { sanitizeLessonHtml } from "./htmlSanitize";
 import { signFileGrant, verifyFileGrant } from "./fileGrant";
@@ -3190,6 +3191,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
       const assignedCourses = await storage.getCoursesForBatch(req.params.batchId);
       const courseNameById = Object.fromEntries(assignedCourses.map(c => [c.id, c.name]));
+      const attendanceRows = await storage.getBatchAttendanceSummary(req.params.batchId);
+      const attendanceByTeacher = Object.fromEntries(
+        (attendanceRows || []).map((row: any) => [row.teacher_id || row.teacherId, row]),
+      );
+      const starRows = await db.select().from(trainerStars).where(eq(trainerStars.batchId, req.params.batchId));
+      const starredTeacherIds = new Set(starRows.map((row) => row.teacherId));
       const progress = await Promise.all(
         teachers.map(async (teacher) => {
           const reportCard = await storage.refreshTeacherReportCard(teacher.id);
@@ -3211,6 +3218,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const overallPercentage = assignedCourses.length > 0
             ? Math.round((completedCount / assignedCourses.length) * 100)
             : 0;
+          const attendanceRow = attendanceByTeacher[teacher.id];
+          const medals = cohortMedals({
+            progressPercentage: overallPercentage,
+            coursesCompleted: completedCount,
+            attendanceRate: Number(attendanceRow?.attendance_rate || 0),
+            attendanceDays: Number(attendanceRow?.total_days || 0),
+            questionsAnswered: reportCard?.totalQuizzesTaken || 0,
+            quizzesPassed: reportCard?.totalQuizzesPassed || 0,
+            trainerStar: starredTeacherIds.has(teacher.id),
+          });
           return {
             teacher: {
               id: teacher.id,
@@ -3232,6 +3249,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             inProgressCount: courseCompletions.filter(c => c.status !== "completed").length,
             notStartedCount: Math.max(0, assignedCourses.length - courseCompletions.length),
             overallPercentage,
+            trainerStar: starredTeacherIds.has(teacher.id),
+            medals,
           };
         })
       );
@@ -3425,6 +3444,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      const checkedRows = await db
+        .select({ courseId: teacherCourseCompletion.courseId, batchId: teacherCourseCompletion.batchId })
+        .from(teacherCourseCompletion)
+        .where(and(eq(teacherCourseCompletion.teacherId, teacherId), eq(teacherCourseCompletion.status, "completed")));
       const byBatch = new Map<string, any[]>();
       for (const week of allWeeks) {
         const key = week.batchId || "none";
@@ -3432,10 +3455,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
         list.push(week);
         byBatch.set(key, list);
       }
-      res.json([...byBatch.values()].flatMap(list => applyModuleLocks(list)));
+      const annotated = [...byBatch.entries()].flatMap(([batchId, list]) => {
+        const checkedHere = checkedRows.filter((row) => row.batchId === batchId).map((row) => row.courseId);
+        const locked = applyModuleLocks(list, checkedHere).map((week) => ({
+          ...week,
+          courseChecked: checkedHere.includes(week.courseId),
+        }));
+        const order: string[] = [];
+        for (const week of locked) {
+          if (week.courseId && !order.includes(week.courseId)) order.push(week.courseId);
+        }
+        const nextId = nextCourseToCheck(order, checkedHere);
+        return locked.map((week) => ({
+          ...week,
+          canCheckComplete: Boolean(nextId) && week.courseId === nextId && !week.locked,
+        }));
+      });
+      res.json(annotated);
     } catch (error) {
       console.error("Error fetching assigned weeks:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/teacher/courses/:courseId/complete", isTeacherAuthenticated, async (req, res) => {
+    try {
+      const teacherId = req.teacherId!;
+      const batchId = String(req.body?.batchId || "");
+      const courseId = req.params.courseId;
+      if (!batchId) return res.status(400).json({ error: "Choose the cohort for this course" });
+      const enrolled = await storage.getTeachersInBatch(batchId);
+      if (!enrolled.some((teacher) => teacher.id === teacherId)) {
+        return res.status(403).json({ error: "You are not in this cohort" });
+      }
+      const assigned = await storage.getCoursesForBatch(batchId);
+      const order = [...assigned]
+        .sort((a, b) => new Date(a.assignedAt || 0).getTime() - new Date(b.assignedAt || 0).getTime())
+        .map((course) => course.id);
+      if (!order.includes(courseId)) return res.status(404).json({ error: "That course is not in this cohort" });
+      const doneRows = await db
+        .select({ courseId: teacherCourseCompletion.courseId })
+        .from(teacherCourseCompletion)
+        .where(and(
+          eq(teacherCourseCompletion.teacherId, teacherId),
+          eq(teacherCourseCompletion.batchId, batchId),
+          eq(teacherCourseCompletion.status, "completed"),
+        ));
+      const nextId = nextCourseToCheck(order, doneRows.map((row) => row.courseId));
+      if (nextId !== courseId) {
+        return res.status(400).json({
+          error: nextId ? "Finish the course before this one first" : "Every course in this cohort is already complete",
+        });
+      }
+      const saved = await storage.upsertTeacherCourseCompletion({
+        teacherId,
+        courseId,
+        batchId,
+        status: "completed",
+        completedAt: new Date(),
+      });
+      res.json(saved);
+    } catch (error) {
+      console.error("Error checking a course complete:", error);
+      res.status(500).json({ error: "Could not mark the course complete" });
+    }
+  });
+
+  app.get("/api/teacher/medals", isTeacherAuthenticated, async (req, res) => {
+    try {
+      const teacherId = req.teacherId!;
+      const enrolled = await storage.getBatchesForTeacher(teacherId);
+      const reportCard = await storage.getTeacherReportCard(teacherId);
+      const rows = [];
+      for (const batch of enrolled) {
+        const courses = await storage.getCoursesForBatch(batch.id);
+        const completions = await db
+          .select()
+          .from(teacherCourseCompletion)
+          .where(and(eq(teacherCourseCompletion.teacherId, teacherId), eq(teacherCourseCompletion.batchId, batch.id)));
+        const completed = completions.filter((row) => row.status === "completed").length;
+        const attendance = await storage.getBatchAttendanceSummary(batch.id);
+        const mine = (attendance || []).find((row: any) => (row.teacher_id || row.teacherId) === teacherId);
+        const [star] = await db
+          .select()
+          .from(trainerStars)
+          .where(and(eq(trainerStars.teacherId, teacherId), eq(trainerStars.batchId, batch.id)));
+        rows.push({
+          batchId: batch.id,
+          batchName: batch.name,
+          medals: cohortMedals({
+            progressPercentage: courses.length ? Math.round((completed / courses.length) * 100) : 0,
+            coursesCompleted: completed,
+            attendanceRate: Number(mine?.attendance_rate || 0),
+            attendanceDays: Number(mine?.total_days || 0),
+            questionsAnswered: reportCard?.totalQuizzesTaken || 0,
+            quizzesPassed: reportCard?.totalQuizzesPassed || 0,
+            trainerStar: Boolean(star),
+          }),
+        });
+      }
+      res.json(rows);
+    } catch (error) {
+      console.error("Error loading teacher medals:", error);
+      res.status(500).json({ error: "Could not load medals" });
+    }
+  });
+
+  app.post("/api/batches/:batchId/teachers/:teacherId/star", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Cohort not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const enrolled = await storage.getTeachersInBatch(batch.id);
+      const teacher = enrolled.find((row) => row.id === req.params.teacherId);
+      if (!teacher) return res.status(404).json({ error: "That teacher is not in this cohort" });
+      const [existing] = await db
+        .select()
+        .from(trainerStars)
+        .where(and(eq(trainerStars.teacherId, teacher.id), eq(trainerStars.batchId, batch.id)));
+      if (existing) return res.json(existing);
+      const [created] = await db.insert(trainerStars).values({
+        teacherId: teacher.id,
+        batchId: batch.id,
+        awardedBy: req.user!.id,
+        note: req.body?.note ? String(req.body.note).slice(0, 280) : null,
+      }).returning();
+      try {
+        await storage.createNotification({
+          recipientId: teacher.id,
+          recipientType: "teacher",
+          type: "general",
+          title: "A trainer star",
+          message: `${req.user!.username || "Your trainer"} gave you a star in ${batch.name}.`,
+        });
+      } catch {
+        /* the star still stands if the notice cannot be saved */
+      }
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error giving a trainer star:", error);
+      res.status(500).json({ error: "Could not give the star" });
+    }
+  });
+
+  app.delete("/api/batches/:batchId/teachers/:teacherId/star", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Cohort not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      await db.delete(trainerStars).where(and(
+        eq(trainerStars.teacherId, req.params.teacherId),
+        eq(trainerStars.batchId, batch.id),
+      ));
+      res.sendStatus(204);
+    } catch (error) {
+      console.error("Error removing a trainer star:", error);
+      res.status(500).json({ error: "Could not remove the star" });
     }
   });
 

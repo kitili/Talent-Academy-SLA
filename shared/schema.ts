@@ -591,6 +591,20 @@ export const insertTeacherCourseCompletionSchema = createInsertSchema(teacherCou
 export type InsertTeacherCourseCompletion = z.infer<typeof insertTeacherCourseCompletionSchema>;
 export type TeacherCourseCompletion = typeof teacherCourseCompletion.$inferSelect;
 
+/** A star a trainer gives by hand inside one cohort. Earned medals are computed, not stored. */
+export const trainerStars = pgTable("trainer_stars", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
+  batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
+  awardedBy: varchar("awarded_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_trainer_star_unique").on(table.teacherId, table.batchId),
+]);
+
+export type TrainerStar = typeof trainerStars.$inferSelect;
+
 // Batch certificate templates (one template per batch, requires admin approval)
 export const batchCertificateTemplates = pgTable("batch_certificate_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
