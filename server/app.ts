@@ -4,6 +4,7 @@ import { serveStatic, log } from "./static";
 import { applySecurity, redactForLog } from "./security";
 import { resolveDatabaseUrl } from "./databaseUrl";
 import { ensureWrittenAssignmentTables } from "./db";
+import { ensureAllTestLogins } from "./ensureTestLogins";
 
 export async function createApp() {
   const app = express();
@@ -57,6 +58,12 @@ export async function createApp() {
     await ensureWrittenAssignmentTables();
   } catch (error) {
     log(`Written assignment tables: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    await ensureAllTestLogins();
+  } catch (error) {
+    log(`Test logins: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   await registerRoutes(app);

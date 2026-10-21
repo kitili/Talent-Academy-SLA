@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, User, GraduationCap, XCircle, History, ArrowLeft } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { CheckCircle, Clock, User, GraduationCap, XCircle, ArrowLeft } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { AdminNav } from "@/components/AdminNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type User = {
@@ -33,19 +34,6 @@ type CurrentUser = {
   username?: string;
 };
 
-type ApprovalHistoryItem = {
-  id: string;
-  targetType: string;
-  targetId: string;
-  targetName: string;
-  targetEmail?: string;
-  action: string;
-  performedBy: string;
-  performedByName: string;
-  performedByRole: string;
-  createdAt: string;
-};
-
 export default function ApprovalsPage() {
   const { toast } = useToast();
 
@@ -64,11 +52,6 @@ export default function ApprovalsPage() {
 
   const isAdmin = currentUser?.role === "admin";
 
-  const { data: approvalHistory = [], isLoading: historyLoading } = useQuery<ApprovalHistoryItem[]>({
-    queryKey: ["/api/approval-history"],
-    enabled: currentUser?.role === "admin" || currentUser?.role === "trainer",
-  });
-
   const approveAdmin = useMutation({
     mutationFn: async (adminId: string) => {
       const response = await apiRequest("POST", `/api/admin/approve-trainer/${adminId}`);
@@ -80,7 +63,6 @@ export default function ApprovalsPage() {
         description: data.message,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-trainers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/approval-history"] });
     },
     onError: (error: any) => {
       toast({
@@ -104,7 +86,6 @@ export default function ApprovalsPage() {
       });
       const pendingKey = isAdmin ? "/api/admin/pending-teachers" : "/api/trainer/pending-teachers";
       queryClient.invalidateQueries({ queryKey: [pendingKey] });
-      queryClient.invalidateQueries({ queryKey: ["/api/approval-history"] });
     },
     onError: (error: any) => {
       toast({
@@ -126,7 +107,6 @@ export default function ApprovalsPage() {
         description: data.message,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-trainers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/approval-history"] });
     },
     onError: (error: any) => {
       toast({
@@ -150,7 +130,6 @@ export default function ApprovalsPage() {
       });
       const pendingKey = isAdmin ? "/api/admin/pending-teachers" : "/api/trainer/pending-teachers";
       queryClient.invalidateQueries({ queryKey: [pendingKey] });
-      queryClient.invalidateQueries({ queryKey: ["/api/approval-history"] });
     },
     onError: (error: any) => {
       toast({
@@ -163,6 +142,7 @@ export default function ApprovalsPage() {
 
   return (
     <div className="sl-page sl-bg-hall min-h-screen">
+    {isAdmin && <AdminNav />}
     <div className="sl-sheet sl-frame my-6 p-6 space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/">
@@ -313,60 +293,6 @@ export default function ApprovalsPage() {
                       <XCircle className="w-4 h-4" />
                       Dismiss
                     </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="w-5 h-5" />
-            Approval History
-          </CardTitle>
-          <CardDescription>
-            Recent approval and dismissal actions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {historyLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading history...
-            </div>
-          ) : approvalHistory.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No approval history yet
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {approvalHistory.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                  data-testid={`history-item-${item.id}`}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium">{item.targetName}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {item.targetType}
-                      </Badge>
-                      <Badge 
-                        variant={item.action === "approved" ? "default" : "destructive"}
-                        className="text-xs"
-                      >
-                        {item.action}
-                      </Badge>
-                    </div>
-                    {item.targetEmail && (
-                      <p className="text-sm text-muted-foreground">{item.targetEmail}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      By {item.performedByName} ({item.performedByRole}) - {format(new Date(item.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                    </p>
                   </div>
                 </div>
               ))}

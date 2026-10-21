@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AcademyShell } from "@/components/AcademyShell";
+import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
 import { ACADEMY_TERMS } from "@shared/academyPath";
 
 type CourseRow = { id: string; name: string; description?: string | null; publishStatus?: string };
@@ -270,7 +271,7 @@ export default function AdminBatches() {
   const cohortCount = data?.cohorts.length ?? 0;
 
   return (
-    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Academy path" userLabel={user?.username}>
+    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Academy path" userLabel={user?.username} showAdminNav>
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate("/admin")} className="mb-4" data-testid="button-back-admin">
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -482,6 +483,7 @@ export default function AdminBatches() {
                       Add batch
                     </Button>
                   </div>
+                  <BatchApprovalHistory batchId={cohort.id} />
                 </CardContent>
               </Card>
             ))}

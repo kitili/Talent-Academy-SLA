@@ -15,7 +15,14 @@ import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
 import * as mammoth from "mammoth";
 import { db, getDatabaseUrl, pool } from "./db";
-import { clearAcademyActivity, FRESH_START_PHRASE } from "./freshStart";
+import { clearSelectedActivity, parseActivityScope } from "./freshStart";
+import {
+  approvalHistoryPage,
+  approvalHistoryToCsv,
+  batchApprovalHistoryCountSql,
+  batchApprovalHistorySelectSql,
+  mapApprovalHistoryRow,
+} from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
@@ -284,57 +291,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Note: /api/register, /api/login, /api/logout, /api/user are now in auth.ts
   // Note: /api/teacher/* routes are in teacherAuth.ts
 
-  // Emergency admin password reset (no login required - uses secret key)
-  const emergencyResetSchema = z.object({
-    masterKey: z.string().min(1, "Master key required"),
-    username: z.string().trim().min(1, "Username required"),
-    newPassword: z.string().trim().min(6, "Password must be at least 6 characters"),
-  });
-
-  app.post("/api/emergency-admin-reset", async (req, res) => {
-    try {
-      const masterKey = process.env.ADMIN_RESET_KEY;
-      
-      if (!masterKey) {
-        return res.status(503).json({ error: "Emergency reset not configured. Set ADMIN_RESET_KEY environment variable." });
-      }
-      
-      const { masterKey: providedKey, username, newPassword } = emergencyResetSchema.parse(req.body);
-      
-      if (providedKey !== masterKey) {
-        return res.status(403).json({ error: "Invalid master key" });
-      }
-      
-      // Find the user
-      const user = await storage.getUserByUsername(username);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      
-      // Hash and update password
-      const hashedPassword = await hashPassword(newPassword);
-      const updatedUser = await storage.updateUserPassword(user.id, hashedPassword);
-
-      if (!updatedUser) {
-        return res.status(500).json({ error: "Failed to update password" });
-      }
-
-      // Sync password to linked teacher accounts with the same email
-      if (updatedUser.email) {
-        await storage.syncPasswordByEmail(updatedUser.email, hashedPassword, 'users');
-      }
-
-      res.json({
-        success: true,
-        message: `Password reset successful for: ${updatedUser.username}`
-      });
-    } catch (error) {
-      console.error("Error in emergency password reset:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors[0].message });
-      }
-      res.status(500).json({ error: "Internal server error" });
-    }
+  app.post("/api/emergency-admin-reset", async (_req, res) => {
+    res.status(403).json({ error: "This academy only accepts the test logins." });
   });
 
   // Admin password reset endpoint
@@ -3952,24 +3910,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/fresh-start", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
-      if (String(req.body?.confirm || "") !== FRESH_START_PHRASE) {
-        return res.status(400).json({ error: "Type CLEAR ACTIVITY to confirm" });
+      const scope = parseActivityScope(req.body);
+      if ("error" in scope) {
+        return res.status(400).json({ error: scope.error });
       }
-      const summary = await clearAcademyActivity(pool);
+      const summary = await clearSelectedActivity(pool, scope);
       await recordAudit({
         actorId: req.user?.id,
         actorRole: req.user?.role,
         action: "fresh_start",
         targetType: "academy",
-        metadata: { removedRows: summary.removedRows },
+        metadata: {
+          removedRows: summary.removedRows,
+          areas: summary.areas,
+          people: summary.people,
+        },
       });
       res.json({
         ok: true,
         removedRows: summary.removedRows,
+        areas: summary.areas,
+        people: summary.people,
         kept: summary.kept,
       });
     } catch (error) {
       console.error("Error clearing academy activity:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/batches/:id/approval-history", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.id);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      const format = String(req.query.format || "");
+      if (format === "csv") {
+        const result = await pool.query(batchApprovalHistorySelectSql(false), [req.params.id]);
+        const csv = approvalHistoryToCsv(result.rows);
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="batch-${req.params.id}-approval-history.csv"`);
+        return res.send(csv);
+      }
+      const paging = approvalHistoryPage(req.query.page);
+      const [countResult, pageResult] = await Promise.all([
+        pool.query(batchApprovalHistoryCountSql(), [req.params.id]),
+        pool.query(batchApprovalHistorySelectSql(true), [req.params.id, paging.pageSize, paging.offset]),
+      ]);
+      const total = Number(countResult.rows[0]?.total || 0);
+      res.json({
+        items: pageResult.rows.map((row) => mapApprovalHistoryRow(row)),
+        page: paging.page,
+        pageSize: paging.pageSize,
+        pages: paging.pages(total),
+        total,
+      });
+    } catch (error) {
+      console.error("Error reading batch approval history:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

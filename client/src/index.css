@@ -1100,6 +1100,7 @@ body {
 .sla-tour-target {
   position: relative;
   z-index: 81;
+  pointer-events: none;
   outline: 3px solid white;
   outline-offset: 4px;
   border-radius: 16px;

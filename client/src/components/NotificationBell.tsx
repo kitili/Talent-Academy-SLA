@@ -16,7 +16,7 @@ interface Notification {
   metadata?: any;
 }
 
-export function NotificationBell() {
+export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" }) {
   const [open, setOpen] = useState(false);
 
   const { data: countData } = useQuery<{ count: number }>({
@@ -70,7 +70,7 @@ export function NotificationBell() {
       <Button
         variant="ghost"
         size="icon"
-        className="relative text-white hover:bg-white/10 h-9 w-9"
+        className={`relative h-9 w-9 ${tone === "light" ? "text-[#102448] hover:bg-[#102448]/5" : "text-white hover:bg-white/10"}`}
         onClick={handleOpen}
         aria-label="Notifications"
       >

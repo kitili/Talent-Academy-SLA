@@ -4,13 +4,16 @@ import mammoth from "mammoth";
 import { objectStorageService } from "./objectStorage";
 
 const require = createRequire(import.meta.url);
-const _pdfParseModule = require("pdf-parse");
-const pdfParse = typeof _pdfParseModule === "function" ? _pdfParseModule : _pdfParseModule.default;
+
+function loadPdfParse() {
+  const loaded = require("pdf-parse");
+  return typeof loaded === "function" ? loaded : loaded.default;
+}
 
 export async function extractTextFromPDF(fileUrl: string): Promise<string> {
   try {
     const buffer = await objectStorageService.getObjectEntity(fileUrl);
-    const data = await pdfParse(buffer);
+    const data = await loadPdfParse()(buffer);
     return data.text || "";
   } catch (error) {
     console.error("Error extracting text from PDF:", error);

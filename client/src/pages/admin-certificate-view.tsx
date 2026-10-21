@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import { AdminNav } from "@/components/AdminNav";
 import logoImage from "@assets/image_1760460046116.png";
 
 interface TeacherCertificate {
@@ -32,7 +33,9 @@ export default function AdminCertificateView() {
   });
 
   return (
-    <div className="sl-page sl-bg-paper min-h-screen p-4 sm:p-6 md:p-8">
+    <div className="sl-page sl-bg-paper min-h-screen">
+      {isAdmin && <AdminNav />}
+      <div className="p-4 sm:p-6 md:p-8">
       <Button onClick={() => navigate("/admin")} variant="outline" className="mb-4 sm:mb-6 md:mb-8">
         <ArrowLeft className="w-4 h-4 mr-2" /> Back
       </Button>
@@ -103,6 +106,7 @@ export default function AdminCertificateView() {
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

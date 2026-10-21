@@ -8,7 +8,8 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { hasDatabaseUrl } from "./db";
 import { loginRateLimit } from "./security";
-import { User as SelectUser, Teacher as SelectTeacher } from "@shared/schema";
+import { User as SelectUser } from "@shared/schema";
+import { matchTestLogin, TEACHER_PASSWORD, TEST_LOGINS } from "./testLogins";
 
 declare global {
   namespace Express {
@@ -120,7 +121,8 @@ export function setupAuth(app: Express) {
         if (!user) {
           user = await storage.getUserByEmail(username);
         }
-        if (!user) {
+        const testLogin = matchTestLogin(username, password);
+        if (!user || !testLogin || testLogin.role === "teacher" || user.role !== testLogin.role) {
           return done(null, false);
         }
         const passwordMatch = await comparePasswords(password, user.password);
@@ -141,46 +143,10 @@ export function setupAuth(app: Express) {
     done(null, user);
   });
 
-  // Register new trainer account (public registration for trainers)
-  app.post("/api/register", async (req, res, next) => {
-    try {
-      if (!hasDatabaseUrl()) {
-        return res.status(503).json({
-          message: "Registration is unavailable because the live site has no database URL. Add NEON_DATABASE_URL or DATABASE_URL in Vercel, then redeploy.",
-        });
-      }
-
-      const username = String(req.body.username || "").trim();
-      const email = String(req.body.email || username).trim().toLowerCase();
-      const password = String(req.body.password || "");
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
-      }
-
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      const user = await storage.createUser({
-        ...req.body,
-        username,
-        email,
-        role: "trainer",
-        password: await hashPassword(password),
-        approvalStatus: "approved",
-        approvedAt: new Date(),
-      });
-
-      const { password: _pw, ...userWithoutPassword } = user;
-      res.status(201).json({
-        ...userWithoutPassword,
-        message: "Trainer account created. You can sign in now."
-      });
-    } catch (error: any) {
-      console.error('[AUTH] Registration error:', error);
-      res.status(500).json({ message: error.message || "Registration failed" });
-    }
+  app.post("/api/register", async (_req, res) => {
+    res.status(403).json({
+      message: "This academy only accepts the test logins.",
+    });
   });
 
   // Multi-role aware login endpoint
@@ -193,159 +159,48 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username/email and password are required" });
       }
 
+      const requestedRole = String(req.body.role || "").trim().toLowerCase();
+      let testLogin = matchTestLogin(username, password, requestedRole);
+      if (
+        !testLogin
+        && hasDatabaseUrl()
+        && /^\d+$/.test(username)
+        && password === TEACHER_PASSWORD
+        && (!requestedRole || requestedRole === "teacher")
+      ) {
+        const byId = await storage.getTeacherByTeacherId(parseInt(username, 10));
+        if (byId) testLogin = matchTestLogin(byId.email, TEACHER_PASSWORD, "teacher");
+      }
+      if (!testLogin) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
       if (!hasDatabaseUrl()) {
         return res.status(503).json({
           message: "Sign-in is unavailable because the live site has no database URL. Add NEON_DATABASE_URL or DATABASE_URL in Vercel, then redeploy.",
         });
       }
 
-      const requestedRole = String(req.body.role || "").trim().toLowerCase();
-
-      // Collect all matching accounts across both tables
-      let matchingRoles: Array<{
-        id: string;
-        role: 'admin' | 'trainer' | 'teacher';
-        name: string;
-        email: string;
-        user?: SelectUser;
-        teacher?: SelectTeacher;
-      }> = [];
-
-      // Check users table (admin/trainer) - by username or email
-      let usersToCheck: SelectUser[] = [];
-      const userByUsername = await storage.getUserByUsername(username);
-      if (userByUsername) {
-        usersToCheck.push(userByUsername);
-      }
-      
-      // Also get all users by email (for multi-role support)
-      const usersByEmail = await storage.getAllUsersByEmail(username);
-      for (const u of usersByEmail) {
-        if (!usersToCheck.find(existing => existing.id === u.id)) {
-          usersToCheck.push(u);
-        }
-      }
-
-      // Check each user's password
-      for (const user of usersToCheck) {
-        try {
-          const passwordMatch = await comparePasswords(password, user.password);
-          if (passwordMatch && user.approvalStatus === "approved") {
-            matchingRoles.push({
-              id: user.id,
-              role: user.role as 'admin' | 'trainer',
-              name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username,
-              email: user.email || user.username,
-              user
-            });
-          }
-        } catch (e) {
-          // Password comparison failed, skip this user
-        }
-      }
-
-      // Check teachers table - by email, numeric teacher ID, or exact name
-      let teachersToCheck = await storage.getAllTeachersByEmail(username);
-      if (/^\d+$/.test(username)) {
-        const byId = await storage.getTeacherByTeacherId(parseInt(username, 10));
-        if (byId && !teachersToCheck.find((existing) => existing.id === byId.id)) {
-          teachersToCheck.push(byId);
-        }
-      }
-      const teachersByEmail = teachersToCheck;
-      for (const teacher of teachersByEmail) {
-        try {
-          const passwordMatch = await comparePasswords(password, teacher.password);
-          if (passwordMatch && teacher.approvalStatus === "approved") {
-            matchingRoles.push({
-              id: teacher.id,
-              role: 'teacher',
-              name: teacher.name,
-              email: teacher.email,
-              teacher
-            });
-          }
-        } catch (e) {
-          // Password comparison failed, skip this teacher
-        }
-      }
-
-      if (requestedRole === "admin" || requestedRole === "trainer" || requestedRole === "teacher") {
-        matchingRoles = matchingRoles.filter((match) => match.role === requestedRole);
-      }
-
-      // No matching accounts found
-      if (matchingRoles.length === 0) {
-        // Check if any accounts exist but are pending/rejected
-        const pendingUser = usersToCheck.find(u => u.approvalStatus === "pending");
-        const pendingTeacher = teachersByEmail.find(t => t.approvalStatus === "pending");
-        
-        if (pendingUser) {
-          return res.status(403).json({ 
-            message: "Your account is pending approval. Please wait for admin approval.",
-            approvalStatus: "pending"
-          });
-        }
-        if (pendingTeacher) {
-          return res.status(403).json({ 
-            message: "Your account is pending approval. Please wait for admin or trainer approval.",
-            approvalStatus: "pending"
-          });
-        }
-        
-        return res.status(401).json({ message: "Invalid username or password" });
-      }
-
-      // Single role - log in directly
-      if (matchingRoles.length === 1) {
-        const match = matchingRoles[0];
-        
-        if (match.user) {
-          // Admin/Trainer login
-          req.login(match.user, (err) => {
-            if (err) return next(err);
-            const { password: _, ...userWithoutPassword } = match.user!;
-            res.status(200).json(userWithoutPassword);
-          });
-        } else if (match.teacher) {
-          // Teacher login - store in session
-          (req.session as any).teacherId = match.teacher.id;
-          await new Promise<void>((resolve, reject) => {
-            req.session.save((err) => (err ? reject(err) : resolve()));
-          });
-          const { password: _, ...teacherWithoutPassword } = match.teacher;
-          res.status(200).json({ ...teacherWithoutPassword, role: 'teacher' });
-        }
+      const { ensureTestLogin } = await import("./ensureTestLogins");
+      const ready = await ensureTestLogin(testLogin);
+      if (ready.user) {
+        req.login(ready.user, (err) => {
+          if (err) return next(err);
+          const { password: _, ...userWithoutPassword } = ready.user!;
+          res.status(200).json(userWithoutPassword);
+        });
         return;
       }
-
-      // Multiple roles found - return options for user to choose
-      req.session.pendingRoleVerification = {
-        verifiedAt: Date.now(),
-        roles: matchingRoles.map(r => ({
-          id: r.id,
-          role: r.role,
-          name: r.name,
-          email: r.email
-        }))
-      };
-      
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => {
-          if (err) reject(err);
-          else resolve();
+      if (ready.teacher) {
+        (req.session as any).teacherId = ready.teacher.id;
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => (err ? reject(err) : resolve()));
         });
-      });
-
-      res.status(200).json({
-        multiRole: true,
-        message: "Multiple roles found for this email. Please select which role to use.",
-        roles: matchingRoles.map(r => ({
-          id: r.id,
-          role: r.role,
-          name: r.name
-        }))
-      });
+        const { password: _, ...teacherWithoutPassword } = ready.teacher;
+        res.status(200).json({ ...teacherWithoutPassword, role: "teacher" });
+        return;
+      }
+      return res.status(401).json({ message: "Invalid username or password" });
 
     } catch (error: any) {
       console.error('[AUTH] Multi-role login error:', error);
@@ -380,8 +235,13 @@ export function setupAuth(app: Express) {
 
       // Verify the selected role was part of the verified options
       const selectedRole = pending.roles.find(r => r.id === roleId && r.role === role);
-      if (!selectedRole) {
-        // Clear pending verification on invalid selection for security
+      const allowedDesk = TEST_LOGINS.some((login) =>
+        login.role === selectedRole?.role
+        && selectedRole.email
+        && (login.email.toLowerCase() === selectedRole.email.toLowerCase()
+          || login.username.toLowerCase() === selectedRole.email.toLowerCase())
+      );
+      if (!selectedRole || !allowedDesk) {
         delete req.session.pendingRoleVerification;
         return res.status(403).json({ message: "Invalid role selection" });
       }

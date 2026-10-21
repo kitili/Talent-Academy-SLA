@@ -44,7 +44,7 @@ export function useGuidedTour(storageKey: string) {
   return { open, index, setIndex, close, replay };
 }
 
-export function TourButton({ onClick, testId }: { onClick: () => void; testId: string }) {
+export function TourButton({ onClick, testId, tone = "dark" }: { onClick: () => void; testId: string; tone?: "dark" | "light" }) {
   return (
     <Button
       type="button"
@@ -52,7 +52,9 @@ export function TourButton({ onClick, testId }: { onClick: () => void; testId: s
       size="sm"
       onClick={onClick}
       data-testid={testId}
-      className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+      className={tone === "light"
+        ? "bg-transparent text-[#102448] border-[#102448]/15 hover:bg-[#102448]/5"
+        : "bg-white/10 text-white border-white/20 hover:bg-white/20"}
     >
       <CircleHelp className="h-4 w-4 sm:mr-2" />
       <span className="hidden sm:inline">Tour</span>
@@ -88,9 +90,15 @@ export function GuidedTour({
   const last = index === steps.length - 1;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-slate-950/55" role="dialog" aria-modal="true" aria-labelledby="guided-tour-title">
-      <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-lg rounded-2xl bg-white text-slate-900 shadow-2xl border p-5 space-y-4">
+    <>
+      <div className="fixed inset-0 z-[80] bg-slate-950/55" />
+      <div className="fixed inset-x-0 bottom-0 z-[90] p-4 sm:p-6 flex justify-center pointer-events-none">
+        <div
+          className="pointer-events-auto w-full max-w-lg rounded-2xl bg-white text-slate-900 shadow-2xl border p-5 space-y-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="guided-tour-title"
+        >
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-medium uppercase tracking-wide text-primary">
               Step {index + 1} of {steps.length}
@@ -125,6 +133,6 @@ export function GuidedTour({
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
