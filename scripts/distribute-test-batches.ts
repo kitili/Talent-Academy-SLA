@@ -5,6 +5,7 @@
  *   SMOKE_BASE_URL=http://127.0.0.1:8765 npx tsx scripts/distribute-test-batches.ts
  */
 import { TEST_COHORTS, TEST_TEACHERS } from "./test-cohorts";
+import { LEARNING_STAGES, LESSON_STAGES, RETIRED_BATCH_NAMES } from "../shared/tanzaniaPath";
 
 const BASE = process.env.SMOKE_BASE_URL || "http://127.0.0.1:8765";
 const ADMIN_USERNAME = "admin";
@@ -111,7 +112,65 @@ async function main() {
   }
 
   const batchList = await request("/api/batches", {}, cookies);
-  const batches = Array.isArray(batchList.json) ? batchList.json : [];
+  const listed = Array.isArray(batchList.json) ? batchList.json : [];
+  for (const row of listed) {
+    if (!RETIRED_BATCH_NAMES.includes(row.name)) continue;
+    const removed = await request(`/api/batches/${row.id}`, { method: "DELETE" }, cookies);
+    if (removed.status === 204 || removed.status === 200) console.log(`retired ${row.name}`);
+    else console.error(`could not retire ${row.name} HTTP ${removed.status}`);
+  }
+
+  const courseList = await request("/api/courses", {}, cookies);
+  const existingCourses = Array.isArray(courseList.json) ? courseList.json : [];
+  const courseIdByStage = new Map<string, string>();
+  for (const [index, stage] of LEARNING_STAGES.entries()) {
+    let course = existingCourses.find((row: any) => row.name === stage.course);
+    if (!course) {
+      const created = await request("/api/courses", {
+        method: "POST",
+        body: JSON.stringify({
+          name: stage.course,
+          description: stage.summary,
+          objectives: `Government lesson: ${LESSON_STAGES.join(", ")}.`,
+          stage: stage.id,
+          track: stage.track,
+          publishStatus: "published",
+          orderIndex: index,
+        }),
+      }, cookies);
+      course = created.json;
+      if (!course?.id) {
+        console.error(`could not create course ${stage.course} HTTP ${created.status}`);
+        process.exit(1);
+      }
+      console.log(`created course ${stage.course}`);
+    }
+    const weeksRes = await request(`/api/courses/${course.id}/weeks`, {}, cookies);
+    const weeks = Array.isArray(weeksRes.json) ? weeksRes.json : [];
+    for (let moduleIndex = 0; moduleIndex < stage.modules.length; moduleIndex += 1) {
+      const weekNumber = moduleIndex + 1;
+      const module = stage.modules[moduleIndex];
+      if (weeks.some((week: any) => week.weekNumber === weekNumber || week.competencyFocus === module.focus)) continue;
+      const createdWeek = await request("/api/training-weeks", {
+        method: "POST",
+        body: JSON.stringify({
+          courseId: course.id,
+          weekNumber,
+          competencyFocus: module.focus,
+          objective: module.objective,
+        }),
+      }, cookies);
+      if (!createdWeek.json?.id) {
+        console.error(`could not add module ${module.focus} HTTP ${createdWeek.status}`);
+        process.exit(1);
+      }
+      console.log(`added ${module.focus} to ${stage.course}`);
+    }
+    courseIdByStage.set(stage.id, course.id);
+  }
+
+  const freshList = await request("/api/batches", {}, cookies);
+  const batches = Array.isArray(freshList.json) ? freshList.json : [];
   for (const cohort of TEST_COHORTS) {
     const trainerId = trainerIdByUsername.get(cohort.trainerUsername);
     if (!trainerId) throw new Error(`Missing ${cohort.trainerUsername}`);
@@ -119,7 +178,12 @@ async function main() {
     if (!batch) {
       const created = await request("/api/batches", {
         method: "POST",
-        body: JSON.stringify({ name: cohort.name, description: cohort.description }),
+        body: JSON.stringify({
+          name: cohort.name,
+          description: cohort.description,
+          stage: cohort.stage,
+          track: cohort.track,
+        }),
       }, cookies);
       if (created.status !== 201 || !created.json?.id) {
         console.error(`could not create ${cohort.name} HTTP ${created.status}`);
@@ -135,6 +199,32 @@ async function main() {
     if (assigned.status !== 200) {
       console.error(`could not assign ${cohort.trainerUsername} HTTP ${assigned.status}`);
       process.exit(1);
+    }
+    const patched = await request(`/api/batches/${batch.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: cohort.name,
+        description: cohort.description,
+        stage: cohort.stage,
+        track: cohort.track,
+      }),
+    }, cookies);
+    if (patched.status !== 200 && patched.status !== 404) {
+      console.error(`could not label ${cohort.name} HTTP ${patched.status}`);
+    }
+    const courseId = courseIdByStage.get(cohort.stage);
+    if (courseId) {
+      const linked = await request(`/api/batches/${batch.id}/courses`, {}, cookies);
+      const linkedCourses = Array.isArray(linked.json) ? linked.json : [];
+      if (!linkedCourses.some((row: any) => row.id === courseId)) {
+        const addedCourse = await request(`/api/batches/${batch.id}/courses`, {
+          method: "POST",
+          body: JSON.stringify({ courseId }),
+        }, cookies);
+        if (addedCourse.status === 200 || addedCourse.status === 201) console.log(`course on ${cohort.name}`);
+        else if (addedCourse.status === 409) console.log(`course already on ${cohort.name}`);
+        else console.error(`could not put course on ${cohort.name} HTTP ${addedCourse.status}`);
+      }
     }
     const detail = await request(`/api/batches/${batch.id}`, {}, cookies);
     const present = new Set(

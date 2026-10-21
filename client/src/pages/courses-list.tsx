@@ -489,6 +489,11 @@ export default function CoursesList() {
                       <div>
                         <h3 className="text-lg sm:text-xl font-bold" data-testid={`text-course-name-${course.id}`}>
                           {course.name}
+                          {course.track && (
+                            <Badge variant="secondary" className="ml-2 align-middle">
+                              {course.track === "secondary" ? "Secondary" : "Primary"}
+                            </Badge>
+                          )}
                         </h3>
                         {course.description && (
                           <p className="text-sm text-muted-foreground mt-2">{course.description}</p>

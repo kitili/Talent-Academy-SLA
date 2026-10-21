@@ -246,7 +246,7 @@ export default function AdminTeachers() {
         ) : isError ? (
           <Card className="p-8 text-center">
             <p className="font-semibold">Could not load teachers</p>
-            <p className="text-muted-foreground mt-1">Open Cohorts → Batch 1, or refresh this page.</p>
+            <p className="text-muted-foreground mt-1">Open Cohorts, or refresh this page.</p>
           </Card>
         ) : teachers && teachers.length > 0 ? (
           <div className="space-y-4">

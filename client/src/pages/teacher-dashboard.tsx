@@ -19,6 +19,7 @@ import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, 
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
+import { LearningPath, activeStagesFromNames } from "@/components/LearningPath";
 import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
@@ -236,10 +237,14 @@ export default function TeacherDashboard() {
 
   const nextLesson = [...assignedWeeks]
     .sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0))
-    .find((week: any) => !week.locked && (week.progress?.percentage || 0) < 100);
+    .find((week: any) => !week.locked && (week.progress?.total || 0) > 0 && (week.progress?.percentage || 0) < 100);
   const lastWeekId = typeof window !== "undefined" ? sessionStorage.getItem("sl-last-week") : null;
+  const shelfIsEmpty = assignedWeeks.length > 0 && assignedWeeks.every((week: any) => (week.progress?.total || 0) === 0);
+  const firstModule = [...assignedWeeks]
+    .sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0))
+    .find((week: any) => !week.locked);
   const resumeWeek =
-    assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson;
+    assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson || (shelfIsEmpty ? firstModule : undefined);
 
   const { data: upcomingEvents = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/events"],
@@ -354,9 +359,10 @@ export default function TeacherDashboard() {
         <PlaceBanner
           place="garden"
           title={`Welcome, ${teacher?.name || "teacher"}`}
-          subtitle="You are an adult teacher in training. The classrooms in these pictures are the young pupils you are preparing to teach."
+          subtitle="Adult teacher. The pictures are the pupils you will teach."
           titleTestId="text-welcome"
         />
+        <LearningPath activeStageIds={activeStagesFromNames(assignedWeeks.map((week: any) => week.courseName))} />
 
         {deskPeers[0] && (
           <DeskMail
@@ -447,7 +453,9 @@ export default function TeacherDashboard() {
               Continue learning
             </CardTitle>
             <CardDescription>
-              {resumeWeek
+              {shelfIsEmpty
+                ? "Your modules are ready. Lesson files can be added as the course is built."
+                : resumeWeek
                 ? "Jump back into the next unlocked module. Finish it to open the one after."
                 : assignedWeeks.length === 0
                   ? "Your trainer has not assigned modules yet. You are in the right place when they do."
@@ -474,7 +482,7 @@ export default function TeacherDashboard() {
             )}
             {resumeWeek && (
               <Button onClick={() => setLocation(`/teacher/week/${resumeWeek.id}/content`)}>
-                Resume
+                {shelfIsEmpty ? "Open" : "Resume"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
@@ -773,7 +781,9 @@ export default function TeacherDashboard() {
                                 <span className="block text-xs text-muted-foreground">
                                   {isLocked
                                     ? "Locked until the previous module quiz is passed"
-                                    : learningStatus({ percentage: week.progress?.percentage || 0 })}
+                                    : (week.progress?.total || 0) === 0
+                                      ? "Open the module"
+                                      : learningStatus({ percentage: week.progress?.percentage || 0 })}
                                   {week.progress?.total > 0 ? ` · ${week.progress.completed}/${week.progress.total} lessons` : ""}
                                 </span>
                               </span>

@@ -29,6 +29,7 @@ import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/Pag
 import { DeskMail } from "@/components/DeskMail";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 import { PlaceBanner, PlaceCover } from "@/components/PlaceArt";
+import { LearningPath } from "@/components/LearningPath";
 
 export default function TrainerBatches() {
   const [, setLocation] = useLocation();
@@ -653,8 +654,17 @@ export default function TrainerBatches() {
         <PlaceBanner
           place="hall"
           title="Training batches"
-          subtitle="Your batches of adult teachers. They are preparing to teach young pupils."
+          subtitle={
+            batches.some((batch: any) => batch.track === "secondary") && !batches.some((batch: any) => batch.track === "primary")
+              ? "Secondary trainers. These teachers will teach Form I."
+              : batches.some((batch: any) => batch.track === "primary") && !batches.some((batch: any) => batch.track === "secondary")
+                ? "Primary trainers. Playgroup through Standard 7."
+                : "Adult teachers, grouped by the class they will teach."
+          }
         />
+        <div className="mb-4">
+          <LearningPath activeStageIds={batches.map((batch: any) => batch.stage).filter(Boolean)} />
+        </div>
 
         {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
@@ -690,6 +700,11 @@ export default function TrainerBatches() {
                     >
                       <PlaceCover place="hall" className="mb-2 h-16 rounded-lg" />
                       <p className="font-semibold text-sm truncate">{batch.name}</p>
+                      {batch.track && (
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
+                          {batch.track === "secondary" ? "Secondary" : "Primary"}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         {batch.teacherCount || 0} teachers
                       </p>

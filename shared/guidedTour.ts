@@ -34,7 +34,7 @@ export const ADMIN_TOUR: TourStep[] = [
 export const TRAINER_TOUR: TourStep[] = [
   {
     title: "Trainer desk",
-    body: "This is your cohort home after you sign in on the Trainer tab. You see the classes an admin assigned to you, plus any class you created.",
+    body: "This is your cohort home. Primary trainers cover playgroup to Standard 7. Secondary trainers cover Form I.",
   },
   {
     title: "Your cohorts",
