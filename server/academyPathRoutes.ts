@@ -76,6 +76,8 @@ async function loadTree() {
       track: cohort.track,
       stage: cohort.stage,
       trainerId: cohort.trainerId,
+      status: cohort.status,
+      quizzesStatus: cohort.quizzesStatus,
       batches: await stepsForCohort(cohort.id),
     });
   }

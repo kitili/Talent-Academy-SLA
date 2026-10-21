@@ -35,19 +35,15 @@ describe("Tanzanian teacher path", () => {
     assert.match(LEARNING_STAGES[2].modules.at(-1)?.objective || "", /Introduction/);
   });
 
-  it("gives primary and secondary trainers their own batches", () => {
+  it("keeps one trainer desk and the test teacher on playgroup", () => {
     assert.equal(batchTitle("playgroup"), "Playgroup — Montessori");
     assert.equal(batchTitle("secondary"), "Secondary — Form I");
     assert.equal(cohortName(LEARNING_BATCHES[6]), "Secondary — Form I practice");
-    const primaryTrainers = new Set(
-      LEARNING_BATCHES.filter((batch) => batch.stageId !== "secondary").map((batch) => batch.trainerUsername),
+    assert.deepEqual([...new Set(LEARNING_BATCHES.map((batch) => batch.trainerUsername))], ["trainer1"]);
+    assert.deepEqual(
+      [...new Set(LEARNING_BATCHES.flatMap((batch) => [...batch.teacherEmails]))],
+      ["teacher@test.com"],
     );
-    const secondaryTrainers = new Set(
-      LEARNING_BATCHES.filter((batch) => batch.stageId === "secondary").map((batch) => batch.trainerUsername),
-    );
-    assert.equal(primaryTrainers.has("trainer1"), true);
-    assert.equal(secondaryTrainers.has("trainer6"), true);
-    assert.equal([...primaryTrainers].some((name) => secondaryTrainers.has(name)), false);
     assert.ok(RETIRED_BATCH_NAMES.includes("Batch 1 — Classroom practice"));
   });
 });

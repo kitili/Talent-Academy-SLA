@@ -117,6 +117,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql as sqlOp, desc, max, inArray } from "drizzle-orm";
+import { courseHealth, quizStoppedReason } from "./cohortAccess";
 import { batchRiskStatus, moduleCoveragePercentage } from "./progressLogic";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -317,6 +318,7 @@ export interface IStorage {
   getPipelineOverview(): Promise<any>;
   getDemographicsAnalytics(): Promise<any>;
   getCohortAnalytics(): Promise<any>;
+  getAcademySnapshot(): Promise<any>;
   getPerformanceAnalytics(): Promise<any>;
   getCompletionTrends(): Promise<any>;
 
@@ -1196,6 +1198,8 @@ export class DatabaseStorage implements IStorage {
         track: batches.track,
         createdBy: batches.createdBy,
         trainerId: batches.trainerId,
+        status: batches.status,
+        quizzesStatus: batches.quizzesStatus,
         createdAt: batches.createdAt,
         teacherCount: sqlOp`COUNT(DISTINCT ${batchTeachers.teacherId})::int`,
       })
@@ -1331,9 +1335,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssignedQuizzesForTeacher(teacherId: string): Promise<AssignedQuiz[]> {
-    const batches = await this.getBatchesForTeacher(teacherId);
-    const batchIds = batches.map(b => b.id);
-    
+    const enrolled = await this.getBatchesForTeacher(teacherId);
+    const batchIds = enrolled.filter((batch) => quizStoppedReason(batch) === null).map((batch) => batch.id);
+
     if (batchIds.length === 0) {
       return [];
     }
@@ -1342,7 +1346,7 @@ export class DatabaseStorage implements IStorage {
       batchIds.map(batchId => this.getAssignedQuizzesForBatch(batchId))
     );
 
-    return allQuizzes.flat();
+    return allQuizzes.flat().filter((quiz) => (quiz.status || "open") === "open");
   }
 
   async getAssignedQuiz(id: string): Promise<AssignedQuiz | undefined> {
@@ -2146,22 +2150,71 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCourseAnalytics(courseId?: string): Promise<any> {
-    if (courseId) {
-      const course = await this.getCourse(courseId);
-      const weeks = await this.getWeeksForCourse(courseId);
+    const list = courseId
+      ? [await this.getCourse(courseId)].filter((course): course is Course => Boolean(course))
+      : await this.getAllCourses();
+    const summaries = [];
+    for (const course of list) {
+      const weeks = await this.getWeeksForCourse(course.id);
       const assignmentCount = await db
         .select({ count: sqlOp`COUNT(*)::int` })
         .from(batchCourses)
-        .where(eq(batchCourses.courseId, courseId));
-      
-      return {
-        course,
+        .where(eq(batchCourses.courseId, course.id));
+      const enrolled = await db
+        .select({ count: sqlOp`COUNT(DISTINCT ${batchTeachers.teacherId})::int` })
+        .from(batchTeachers)
+        .innerJoin(batchCourses, eq(batchCourses.batchId, batchTeachers.batchId))
+        .where(eq(batchCourses.courseId, course.id));
+      const completion = await db
+        .select({
+          avg: sqlOp`COALESCE(AVG(CASE WHEN ${teacherCourseCompletion.totalWeeks} > 0 THEN (${teacherCourseCompletion.completedWeeks}::float / ${teacherCourseCompletion.totalWeeks}) * 100 ELSE NULL END), 0)::float`,
+        })
+        .from(teacherCourseCompletion)
+        .where(eq(teacherCourseCompletion.courseId, course.id));
+      const trainerRows = await db
+        .select({ username: users.username })
+        .from(batchCourses)
+        .innerJoin(batches, eq(batches.id, batchCourses.batchId))
+        .innerJoin(users, eq(users.id, batches.trainerId))
+        .where(eq(batchCourses.courseId, course.id));
+      const overdue = await db.execute(sqlOp`
+        SELECT COUNT(*)::int AS count
+        FROM written_assignments wa
+        JOIN batch_courses bc ON bc.batch_id = wa.batch_id
+        JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
+        WHERE bc.course_id = ${course.id}
+          AND wa.due_date IS NOT NULL
+          AND wa.due_date < NOW()
+          AND NOT EXISTS (
+            SELECT 1 FROM assignment_submissions s
+            WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id
+          )
+      `);
+      const enrolledTeachers = Number(enrolled[0]?.count || 0);
+      const completionPercentage = Math.round(Number(completion[0]?.avg || 0) * 10) / 10;
+      summaries.push({
+        id: course.id,
+        name: course.name,
+        publishStatus: course.publishStatus,
+        track: course.track,
+        stage: course.stage,
         weekCount: weeks.length,
-        batchAssignments: assignmentCount[0]?.count || 0,
-      };
-    } else {
-      return await this.getAllCourses();
+        batchAssignments: Number(assignmentCount[0]?.count || 0),
+        enrolledTeachers,
+        completionPercentage,
+        trainers: Array.from(new Set(trainerRows.map((row) => row.username).filter(Boolean))),
+        overdueAssignments: Number((overdue.rows?.[0] as { count?: number } | undefined)?.count || 0),
+        status: courseHealth({
+          publishStatus: course.publishStatus,
+          enrolledTeachers,
+          completionPercentage,
+        }),
+      });
     }
+    if (courseId) {
+      return { course: list[0], ...(summaries[0] || { weekCount: 0, batchAssignments: 0 }) };
+    }
+    return summaries;
   }
 
   async getTrainerAnalytics(trainerId: string): Promise<any> {
@@ -2341,6 +2394,24 @@ export class DatabaseStorage implements IStorage {
 
   async getCohortAnalytics(): Promise<any> {
     const allBatches = await this.getAllBatches();
+    const trainerRows = await db.select({ id: users.id, username: users.username }).from(users);
+    const trainerById = new Map(trainerRows.map((row) => [row.id, row.username]));
+    const attendance = await db.execute(sqlOp`
+      SELECT batch_id,
+        ROUND(
+          COUNT(*) FILTER (WHERE status IN ('present', 'late'))::numeric
+          / NULLIF(COUNT(*), 0) * 100,
+          1
+        ) AS rate
+      FROM attendance_records
+      GROUP BY batch_id
+    `);
+    const attendanceByBatch = new Map(
+      ((attendance.rows || []) as Array<{ batch_id: string; rate: number | string | null }>).map((row) => [
+        row.batch_id,
+        row.rate === null ? null : Number(row.rate),
+      ]),
+    );
     const cohorts = [];
 
     for (const batch of allBatches) {
@@ -2384,15 +2455,80 @@ export class DatabaseStorage implements IStorage {
       cohorts.push({
         batchId: batch.id,
         batchName: batch.name,
+        enrollment: enrollmentCount,
         enrollmentCount,
         completionPercentage,
         graduationRate,
         avgQuizScore,
         status,
+        trainerName: batch.trainerId ? trainerById.get(batch.trainerId) || null : null,
+        cohortStatus: batch.status || "open",
+        quizzesStatus: batch.quizzesStatus || "open",
+        attendanceRate: attendanceByBatch.get(batch.id) ?? null,
       });
     }
 
     return cohorts;
+  }
+
+  async getAcademySnapshot(): Promise<any> {
+    const [teacherCount] = await db
+      .select({ count: sqlOp`COUNT(*)::int` })
+      .from(teachers)
+      .where(eq(teachers.approvalStatus, "approved"));
+    const [trainerCount] = await db
+      .select({ count: sqlOp`COUNT(*)::int` })
+      .from(users)
+      .where(and(eq(users.role, "trainer"), eq(users.approvalStatus, "approved")));
+    const [courseCount] = await db.select({ count: sqlOp`COUNT(*)::int` }).from(courses);
+    const [openQuizzes] = await db
+      .select({ count: sqlOp`COUNT(*) FILTER (WHERE ${assignedQuizzes.status} <> 'stopped')::int` })
+      .from(assignedQuizzes);
+    const [stoppedQuizzes] = await db
+      .select({ count: sqlOp`COUNT(*) FILTER (WHERE ${assignedQuizzes.status} = 'stopped')::int` })
+      .from(assignedQuizzes);
+    const [attendance] = await db
+      .select({
+        marked: sqlOp`COUNT(*)::int`,
+        rate: sqlOp`ROUND(COUNT(*) FILTER (WHERE ${attendanceRecords.status} IN ('present', 'late'))::numeric / NULLIF(COUNT(*), 0) * 100, 1)`,
+      })
+      .from(attendanceRecords);
+    const [reflectionCount] = await db.select({ count: sqlOp`COUNT(*)::int` }).from(fellowReflections);
+    const [rating] = await db
+      .select({ avg: sqlOp`ROUND(AVG(${satisfactionScores.score})::numeric, 1)` })
+      .from(satisfactionScores);
+    const overdue = await db.execute(sqlOp`
+      SELECT COUNT(*)::int AS count
+      FROM written_assignments wa
+      JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
+      WHERE wa.due_date IS NOT NULL
+        AND wa.due_date < NOW()
+        AND NOT EXISTS (
+          SELECT 1 FROM assignment_submissions s
+          WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id
+        )
+    `);
+    const cohorts = await this.getCohortAnalytics();
+    const averageCompletion = cohorts.length
+      ? Math.round((cohorts.reduce((sum: number, cohort: any) => sum + Number(cohort.completionPercentage || 0), 0) / cohorts.length) * 10) / 10
+      : 0;
+    return {
+      teachers: Number(teacherCount?.count || 0),
+      trainers: Number(trainerCount?.count || 0),
+      courses: Number(courseCount?.count || 0),
+      batches: cohorts.length,
+      openCohorts: cohorts.filter((cohort: any) => cohort.cohortStatus !== "closed").length,
+      closedCohorts: cohorts.filter((cohort: any) => cohort.cohortStatus === "closed").length,
+      averageCompletion,
+      atRiskBatches: cohorts.filter((cohort: any) => cohort.status === "red").length,
+      openQuizzes: Number(openQuizzes?.count || 0),
+      stoppedQuizzes: Number(stoppedQuizzes?.count || 0),
+      attendanceRate: attendance?.rate === null || attendance?.rate === undefined ? null : Number(attendance.rate),
+      attendanceMarked: Number(attendance?.marked || 0),
+      reflections: Number(reflectionCount?.count || 0),
+      averageRating: rating?.avg === null || rating?.avg === undefined ? null : Number(rating.avg),
+      overdueAssignments: Number((overdue.rows?.[0] as { count?: number } | undefined)?.count || 0),
+    };
   }
 
   async getPerformanceAnalytics(): Promise<any> {

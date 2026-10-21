@@ -186,24 +186,6 @@ async function main() {
     firstName: "Test",
     lastName: "Trainer",
   }));
-  trainerIds.set("test.trainer", await ensureUser({
-    username: "test.trainer",
-    email: "test.trainer@silverleaf.academy",
-    role: "trainer",
-    password: "trainer123",
-    firstName: "Test",
-    lastName: "Trainer",
-  }));
-  for (const number of [2, 3, 4, 5, 6]) {
-    trainerIds.set(`trainer${number}`, await ensureUser({
-      username: `trainer${number}`,
-      email: `trainer${number}@test.com`,
-      role: "trainer",
-      password: "trainer123",
-      firstName: "Test",
-      lastName: `Trainer ${number}`,
-    }));
-  }
 
   const teacherIds = new Map<string, string>();
   for (const teacher of TEST_TEACHERS) {

@@ -41,21 +41,7 @@ function staff(
 
 const trainers: TestLogin[] = [
   staff("trainer1", "trainer@test.com", "trainer", TRAINER_PASSWORD, "Test", "Trainer"),
-  staff("test.trainer", "test.trainer@silverleaf.academy", "trainer", TRAINER_PASSWORD, "Test", "Trainer"),
 ];
-
-for (const number of [2, 3, 4, 5, 6]) {
-  trainers.push(
-    staff(
-      `trainer${number}`,
-      `trainer${number}@test.com`,
-      "trainer",
-      TRAINER_PASSWORD,
-      "Test",
-      `Trainer ${number}`,
-    ),
-  );
-}
 
 export const TEST_LOGINS: TestLogin[] = [
   staff("admin", "admin@silverleaf.com", "admin", ADMIN_PASSWORD, "Admin", "User"),

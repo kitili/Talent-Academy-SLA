@@ -21,7 +21,16 @@ describe("test logins", () => {
     assert.equal(matchTestLogin("mourine", "admin123", "admin"), undefined);
     assert.equal(matchTestLogin("admin", "changed-password", "admin"), undefined);
     assert.equal(matchTestLogin("new.teacher@school.com", "teacher123", "teacher"), undefined);
-    assert.ok(TEST_LOGINS.length >= 3);
+    assert.deepEqual(
+      TEST_LOGINS.filter((login) => login.role === "trainer").map((login) => login.username),
+      ["trainer1"],
+    );
+    assert.deepEqual(
+      TEST_LOGINS.filter((login) => login.role === "teacher").map((login) => login.email),
+      ["teacher@test.com"],
+    );
+    assert.equal(matchTestLogin("trainer2", "trainer123", "trainer"), undefined);
+    assert.equal(matchTestLogin("teacher2@test.com", "teacher123", "teacher"), undefined);
     assert.equal(TEST_LOGINS.every((login) => ["admin123", "trainer123", "teacher123"].includes(login.password)), true);
   });
 });

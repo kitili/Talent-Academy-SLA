@@ -38,8 +38,11 @@ type CohortRow = {
   description?: string | null;
   track?: string | null;
   trainerId?: string | null;
+  status?: string | null;
+  quizzesStatus?: string | null;
   batches: StepRow[];
 };
+type AssignedQuiz = { id: string; title: string; status?: string | null };
 type TrainerRow = { id: string; username: string; email?: string | null };
 type PathPayload = {
   cohortsRequired: number;
@@ -63,16 +66,23 @@ export default function AdminBatches() {
   const [editingCourse, setEditingCourse] = useState<CourseRow | null>(null);
   const [batchName, setBatchName] = useState<Record<string, string>>({});
   const [editingBatch, setEditingBatch] = useState<StepRow | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data, isLoading, isError, error } = useQuery<PathPayload>({
     queryKey: ["/api/admin/academy-path"],
     enabled: user?.role === "admin",
   });
 
+  const { data: quizzes = [] } = useQuery<AssignedQuiz[]>({
+    queryKey: ["/api/batches", selectedId || "none", "quizzes"],
+    enabled: !!selectedId,
+  });
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/admin/academy-path"] });
     queryClient.invalidateQueries({ queryKey: ["/api/batches"] });
     queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
+    if (selectedId) queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedId, "quizzes"] });
   };
 
   const fail = (error: Error, title: string) => {
@@ -146,6 +156,28 @@ export default function AdminBatches() {
       refresh();
     },
     onError: (error: Error) => fail(error, "Could not assign the trainer"),
+  });
+
+  const accessMutation = useMutation({
+    mutationFn: async ({ batchId, patch }: { batchId: string; patch: { status?: string; quizzesStatus?: string } }) => {
+      await apiRequest("PATCH", `/api/batches/${batchId}/access`, patch);
+    },
+    onSuccess: () => {
+      toast({ title: "Cohort access updated" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not update the cohort"),
+  });
+
+  const quizStatusMutation = useMutation({
+    mutationFn: async ({ quizId, status }: { quizId: string; status: "open" | "stopped" }) => {
+      await apiRequest("PATCH", `/api/assigned-quizzes/${quizId}/status`, { status });
+    },
+    onSuccess: () => {
+      toast({ title: "Quiz updated" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not update the quiz"),
   });
 
   const createBatch = useMutation({
@@ -352,7 +384,10 @@ export default function AdminBatches() {
                 <p className="text-sm text-muted-foreground mb-4">Add the first group of teachers. Then add the batches they will go through.</p>
                 <Button onClick={() => setCohortOpen(true)}>Add cohort</Button>
               </Card>
-            ) : data?.cohorts.map((cohort) => (
+            ) : data?.cohorts.map((cohort) => {
+              const closed = (cohort.status || "open") === "closed";
+              const quizzesStopped = (cohort.quizzesStatus || "open") === "stopped";
+              return (
               <Card key={cohort.id} data-testid={`card-cohort-${cohort.id}`}>
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -364,6 +399,12 @@ export default function AdminBatches() {
                         )}
                         <Badge variant="outline" data-testid={`badge-batch-count-${cohort.id}`}>
                           {cohort.batches.length} {cohort.batches.length === 1 ? "batch" : "batches"}
+                        </Badge>
+                        <Badge variant={closed ? "destructive" : "outline"} data-testid={`badge-cohort-status-${cohort.id}`}>
+                          {closed ? "Closed" : "Open"}
+                        </Badge>
+                        <Badge variant={quizzesStopped ? "destructive" : "outline"} data-testid={`badge-quiz-status-${cohort.id}`}>
+                          {quizzesStopped ? "Quizzes stopped" : "Quizzes open"}
                         </Badge>
                       </CardTitle>
                       {cohort.description && <CardDescription className="mt-1">{cohort.description}</CardDescription>}
@@ -379,6 +420,27 @@ export default function AdminBatches() {
                         if (window.confirm(`Remove the cohort "${cohort.name}"? Teachers in it lose that room.`)) removeCohort.mutate(cohort.id);
                       }} data-testid={`button-delete-cohort-${cohort.id}`}>
                         <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={accessMutation.isPending}
+                        onClick={() => accessMutation.mutate({ batchId: cohort.id, patch: { status: closed ? "open" : "closed" } })}
+                        data-testid={`button-toggle-cohort-${cohort.id}`}
+                      >
+                        {closed ? "Open cohort" : "Close cohort"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={accessMutation.isPending}
+                        onClick={() => accessMutation.mutate({ batchId: cohort.id, patch: { quizzesStatus: quizzesStopped ? "open" : "stopped" } })}
+                        data-testid={`button-toggle-quizzes-${cohort.id}`}
+                      >
+                        {quizzesStopped ? "Open quizzes" : "Stop quizzes"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setSelectedId(selectedId === cohort.id ? null : cohort.id)} data-testid={`button-manage-quizzes-${cohort.id}`}>
+                        {selectedId === cohort.id ? "Hide quizzes" : "Quiz list"}
                       </Button>
                     </div>
                   </div>
@@ -483,10 +545,37 @@ export default function AdminBatches() {
                       Add batch
                     </Button>
                   </div>
+                  {selectedId === cohort.id && (
+                    <div className="border rounded-lg p-3 space-y-2" data-testid={`quiz-list-${cohort.id}`}>
+                      {quizzes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No assigned quizzes in this cohort yet. Open the room to assign one.</p>
+                      ) : quizzes.map((quiz) => {
+                        const stopped = (quiz.status || "open") === "stopped";
+                        return (
+                          <div key={quiz.id} className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-sm">{quiz.title}</p>
+                              <p className="text-xs text-muted-foreground">{stopped ? "Stopped" : "Open"}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={quizStatusMutation.isPending}
+                              onClick={() => quizStatusMutation.mutate({ quizId: quiz.id, status: stopped ? "open" : "stopped" })}
+                              data-testid={`button-quiz-status-${quiz.id}`}
+                            >
+                              {stopped ? "Open quiz" : "Stop quiz"}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <BatchApprovalHistory batchId={cohort.id} />
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
 
           <Card className="h-fit">

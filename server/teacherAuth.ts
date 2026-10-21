@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { loginRateLimit } from "./security";
 import { hasDatabaseUrl } from "./db";
 import { endSession } from "./auth";
+import { findApprovedAccount } from "./auth";
 import { matchTestLogin, TEACHER_PASSWORD } from "./testLogins";
 
 // Extend Express Request type to include teacherId
@@ -30,6 +31,18 @@ export function setupTeacherAuth(app: Express) {
       }
 
       let testLogin = matchTestLogin(identifier, password, "teacher");
+      if (!testLogin && hasDatabaseUrl()) {
+        const account = await findApprovedAccount(identifier, password, "teacher");
+        if (account?.teacher) {
+          (req.session as any).teacherId = account.teacher.id;
+          await new Promise<void>((resolve, reject) => {
+            req.session.save((err) => (err ? reject(err) : resolve()));
+          });
+          const { password: _, ...teacherWithoutPassword } = account.teacher;
+          res.status(200).json(teacherWithoutPassword);
+          return;
+        }
+      }
       if (!testLogin && hasDatabaseUrl() && /^\d+$/.test(identifier) && password === TEACHER_PASSWORD) {
         const byId = await storage.getTeacherByTeacherId(parseInt(identifier, 10));
         if (byId) testLogin = matchTestLogin(byId.email, TEACHER_PASSWORD, "teacher");

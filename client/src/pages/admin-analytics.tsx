@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Users, BookOpen, BarChart3, ChevronDown, ChevronUp, X, TrendingUp, AlertCircle, CheckCircle, Clock, Trash2, Ban, UserPlus, GraduationCap, MapPin, Briefcase, Activity, Plus, Award, FileText, Heart, Shield, Star, MessageSquare, Repeat, Target, Pencil } from "lucide-react";
+import { ArrowLeft, Users, BookOpen, BarChart3, ChevronDown, ChevronUp, X, TrendingUp, AlertCircle, CheckCircle, Clock, Trash2, Ban, UserPlus, GraduationCap, MapPin, Briefcase, Activity, Plus, Award, FileText, Heart, Shield, Star, MessageSquare, Repeat, Target, Pencil, Layers } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,6 +34,12 @@ interface CourseAnalytics {
   name: string;
   weekCount: number;
   batchAssignments: number;
+  enrolledTeachers?: number;
+  completionPercentage?: number;
+  trainers?: string[];
+  overdueAssignments?: number;
+  status?: string;
+  publishStatus?: string;
 }
 
 interface TrainerAnalytics {
@@ -48,10 +54,13 @@ interface UserWithStats {
   email: string;
   role: string;
   name?: string;
+  username?: string;
+  teacherNumber?: number;
   createdAt?: string;
   batchCount?: number;
   courseCount?: number;
   approvalStatus?: string;
+  risk?: string;
 }
 
 interface UserActivityStats {
@@ -336,6 +345,11 @@ export default function AdminAnalytics() {
   });
 
   // New analytics queries
+  const { data: academySnapshot, isLoading: loadingSnapshot } = useQuery<any>({
+    queryKey: ["/api/admin/analytics/snapshot"],
+    enabled: isAdmin,
+  });
+
   const { data: pipelineData, isLoading: loadingPipeline } = useQuery({
     queryKey: ["/api/admin/analytics/pipeline"],
     enabled: isAdmin,
@@ -816,7 +830,7 @@ export default function AdminAnalytics() {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-analytics-title">Silver Leaf – Trainer Dashboard</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-analytics-title">Silver Leaf – Admin Analytics</h1>
               <p className="text-sm text-muted-foreground mt-1">Organization overview and analytics</p>
             </div>
             <Button onClick={() => navigate("/")} variant="outline" size="sm" data-testid="button-back-header">
@@ -862,6 +876,36 @@ export default function AdminAnalytics() {
 
           {/* ===== TAB 1: OVERVIEW ===== */}
           <TabsContent value="overview">
+            <div className="mb-8">
+              <div className="mb-4 flex items-end justify-between gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-lg font-semibold">Academy</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Teachers, cohorts, quizzes, attendance, and ratings</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => navigate("/admin/batches")} data-testid="button-open-cohort-admin">
+                  Manage cohorts
+                </Button>
+              </div>
+              {loadingSnapshot ? (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, i) => (
+                    <Card key={i} className="animate-pulse"><CardContent className="pt-6 h-28" /></Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <KPICard label="Teachers" value={academySnapshot?.teachers ?? totalTeachers} icon={Users} subtitle={`${academySnapshot?.trainers ?? totalTrainers} trainers`} onClick={() => navigate("/admin/teachers")} />
+                  <KPICard label="Open cohorts" value={academySnapshot?.openCohorts ?? 0} icon={Layers} subtitle={`${academySnapshot?.closedCohorts ?? 0} closed · ${academySnapshot?.batches ?? 0} total`} onClick={() => navigate("/admin/batches")} />
+                  <KPICard label="Avg completion" value={`${academySnapshot?.averageCompletion ?? 0}%`} icon={TrendingUp} subtitle={`${academySnapshot?.atRiskBatches ?? 0} cohorts at risk`} />
+                  <KPICard label="Courses" value={academySnapshot?.courses ?? 0} icon={BookOpen} subtitle={`${academySnapshot?.overdueAssignments ?? 0} overdue written tasks`} onClick={() => navigate("/courses")} />
+                  <KPICard label="Quizzes" value={academySnapshot?.openQuizzes ?? 0} icon={Award} subtitle={`${academySnapshot?.stoppedQuizzes ?? 0} stopped`} />
+                  <KPICard label="Attendance" value={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceRate ?? 0}%` : "—"} icon={CheckCircle} subtitle={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceMarked} marks` : "No attendance marked yet"} />
+                  <KPICard label="Reflections" value={academySnapshot?.reflections ?? 0} icon={FileText} onClick={() => setShowReflectionsDialog(true)} />
+                  <KPICard label="Course rating" value={academySnapshot?.averageRating != null ? `${academySnapshot.averageRating}/5` : "—"} icon={Star} subtitle="Average of submitted ratings" />
+                </div>
+              )}
+            </div>
+
             {/* Pipeline KPIs */}
             <div className="mb-8">
               <div className="mb-6">
@@ -1061,17 +1105,32 @@ export default function AdminAnalytics() {
                             className="border rounded-lg p-4 hover-elevate cursor-pointer transition-all"
                             data-testid={`card-course-${course.id}`}
                           >
-                            <h3 className="font-semibold text-sm mb-3">{course.name}</h3>
+                            <div className="flex items-start justify-between gap-2 mb-3">
+                              <h3 className="font-semibold text-sm">{course.name}</h3>
+                              <Badge variant="outline" className="text-xs capitalize">{(course.status || "waiting").replace("-", " ")}</Badge>
+                            </div>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                               <div>
-                                <p className="text-xs text-muted-foreground mb-1">Weeks</p>
-                                <p className="font-bold text-lg">{course.weekCount || 0}</p>
+                                <p className="text-xs text-muted-foreground mb-1">Completion</p>
+                                <p className="font-bold text-lg">{course.completionPercentage ?? 0}%</p>
                               </div>
                               <div>
-                                <p className="text-xs text-muted-foreground mb-1">Batches</p>
-                                <p className="font-bold text-lg">{course.batchAssignments || 0}</p>
+                                <p className="text-xs text-muted-foreground mb-1">Teachers</p>
+                                <p className="font-bold text-lg">{course.enrolledTeachers ?? 0}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Weeks</p>
+                                <p className="font-bold">{course.weekCount || 0}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Overdue</p>
+                                <p className="font-bold">{course.overdueAssignments ?? 0}</p>
                               </div>
                             </div>
+                            <p className="text-xs text-muted-foreground mt-3">
+                              {course.trainers && course.trainers.length > 0 ? `Trainer: ${course.trainers.join(", ")}` : "No trainer assigned"}
+                              {course.publishStatus === "draft" ? " · Draft" : ""}
+                            </p>
                           </div>
                         ))}
                       </div>
@@ -1113,10 +1172,14 @@ export default function AdminAnalytics() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Batch</TableHead>
+                          <TableHead>Trainer</TableHead>
                           <TableHead className="text-center">Enrolled</TableHead>
                           <TableHead className="text-center">Completion %</TableHead>
+                          <TableHead className="text-center">Attendance</TableHead>
                           <TableHead className="text-center">Graduation Rate</TableHead>
                           <TableHead className="text-center">Avg Quiz Score</TableHead>
+                          <TableHead className="text-center">Cohort</TableHead>
+                          <TableHead className="text-center">Quizzes</TableHead>
                           <TableHead className="text-center">Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1124,15 +1187,27 @@ export default function AdminAnalytics() {
                         {cohortsData.map((cohort: any) => (
                           <TableRow key={cohort.batchId}>
                             <TableCell className="font-medium">{cohort.batchName}</TableCell>
-                            <TableCell className="text-center">{cohort.enrollment}</TableCell>
+                            <TableCell>{cohort.trainerName || "Unassigned"}</TableCell>
+                            <TableCell className="text-center">{cohort.enrollmentCount ?? cohort.enrollment ?? 0}</TableCell>
                             <TableCell className="text-center">
                               <div className="flex items-center gap-2 justify-center">
                                 <Progress value={cohort.completionPercentage} className="h-2 w-16" />
                                 <span className="text-sm">{cohort.completionPercentage}%</span>
                               </div>
                             </TableCell>
+                            <TableCell className="text-center">{cohort.attendanceRate == null ? "—" : `${cohort.attendanceRate}%`}</TableCell>
                             <TableCell className="text-center">{cohort.graduationRate}%</TableCell>
                             <TableCell className="text-center">{cohort.avgQuizScore}%</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={cohort.cohortStatus === "closed" ? "destructive" : "outline"}>
+                                {cohort.cohortStatus === "closed" ? "Closed" : "Open"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={cohort.quizzesStatus === "stopped" ? "destructive" : "outline"}>
+                                {cohort.quizzesStatus === "stopped" ? "Stopped" : "Open"}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-center">
                               <TrafficLightBadge status={cohort.status} />
                             </TableCell>
@@ -2626,8 +2701,8 @@ export default function AdminAnalytics() {
                               >
                                 <div className="flex items-start justify-between mb-2">
                                   <div>
-                                    <p className="font-semibold text-sm">{trainer.email}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Trainer</p>
+                                    <p className="font-semibold text-sm">{trainer.name || trainer.username || trainer.email}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{trainer.email}</p>
                                   </div>
                                   <Badge variant="outline" className="text-xs">{trainer.batchCount || 0} batches</Badge>
                                 </div>
@@ -2640,8 +2715,8 @@ export default function AdminAnalytics() {
                           <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
                           <p className="text-muted-foreground font-medium">No trainers</p>
                           <p className="text-sm text-muted-foreground mt-1">Invite trainers to create and manage courses</p>
-                          <Button size="sm" className="mt-4" data-testid="button-invite-trainer">
-                            Invite Trainer
+                          <Button size="sm" className="mt-4" data-testid="button-invite-trainer" onClick={() => { setNewUserRole("trainer"); setShowAddUser(true); }}>
+                            Add trainer
                           </Button>
                         </div>
                       )}
@@ -2661,12 +2736,17 @@ export default function AdminAnalytics() {
                               >
                                 <div className="flex items-start justify-between mb-2">
                                   <div>
-                                    <p className="font-semibold text-sm">{teacher.email}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Teacher</p>
+                                    <p className="font-semibold text-sm">{teacher.name || teacher.email}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{teacher.email}</p>
                                   </div>
                                   <Badge variant="outline" className="text-xs">{teacher.courseCount || 0} courses</Badge>
                                 </div>
-                                <p className="text-xs text-muted-foreground">ID: {teacher.id.slice(0, 8)}...</p>
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs text-muted-foreground">{teacher.teacherNumber ? `ID ${teacher.teacherNumber}` : "Teacher"}</p>
+                                  <Badge variant={teacher.risk === "at-risk" ? "destructive" : "outline"} className="text-xs">
+                                    {teacher.risk === "at-risk" ? "At risk" : "On track"}
+                                  </Badge>
+                                </div>
                               </button>
                             ))}
                         </div>
@@ -2675,8 +2755,8 @@ export default function AdminAnalytics() {
                           <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
                           <p className="text-muted-foreground font-medium">No teachers</p>
                           <p className="text-sm text-muted-foreground mt-1">Teachers will appear here once they are approved</p>
-                          <Button size="sm" className="mt-4" data-testid="button-invite-teacher">
-                            Invite Teacher
+                          <Button size="sm" className="mt-4" data-testid="button-invite-teacher" onClick={() => { setNewUserRole("teacher"); setShowAddUser(true); }}>
+                            Add teacher
                           </Button>
                         </div>
                       )}

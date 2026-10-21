@@ -25,8 +25,8 @@ The navbar stays on the admin pages: Desk, Approvals, Trainers, Teachers, Cohort
 | Approvals | Let a waiting trainer or teacher in, or turn them away. The saved approval history is not listed here. |
 | Trainers | Create a trainer account. A trainer you create here is approved at once. Open a trainer to see that account. |
 | Teachers | Create a teacher account, already approved. Open a teacher to see progress and files viewed. |
-| Cohorts | One place for three different things. A **cohort** is the group of teachers. A **batch** is a step inside that cohort, and each cohort can have a different number. A **course** is the lessons on a batch. Set how many cohorts a teacher finishes. You add cohorts, batches, and courses here. A trainer can add courses only. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
-| Analytics | The gradebook for the whole academy: completion, quizzes, attendance, reflections, and course ratings. |
+| Cohorts | One place for three different things. A **cohort** is the group of teachers. A **batch** is a step inside that cohort, and each cohort can have a different number. A **course** is the lessons on a batch. Set how many cohorts a teacher finishes. You add cohorts, batches, and courses here. Assign the trainer, then open or close the cohort and its quizzes. A trainer can add courses only. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
+| Analytics | The gradebook for the whole academy: teachers, open cohorts, completion, attendance, quizzes, reflections, course ratings, and who is at risk. |
 | Courses | The same curriculum the trainers use. Keep a course on draft while you edit it. Publish it when teachers should see it. Add modules and lesson files. Plan each module as Introduction, Competence development, Design, then Realisation. |
 
 ## D. The job only you do
@@ -44,7 +44,7 @@ On Cohorts, each cohort has an **Approval history** dropdown. It stays closed un
 ## F. A normal week
 
 1. Approve anyone waiting.
-2. Confirm each batch has the right trainer. Primary batches stay with primary trainers. Form I stays with a secondary trainer.
+2. Confirm each batch has the right trainer. Close a cohort, or stop its quizzes, when that class should pause.
 3. Confirm the course for that stage is published and assigned.
 4. Send an academy notice only when every desk needs the same sentence.
 5. Open Analytics when you need the school picture, not one class.
