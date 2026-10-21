@@ -6,9 +6,7 @@ Sign in on the Admin tab. The first visit starts a short tour. **Tour** in the h
 
 ## A. The desk
 
-You land on the admin home. The strip shows both tracks: primary trainers from playgroup through Standard 7, and secondary trainers for Form I.
-
-Four counts sit under that: trainers, teachers, courses, and active people. If someone is waiting, **Needs attention** opens Approvals.
+You land on the admin home. Four counts sit under the welcome: trainers, teachers, courses, and active people. If someone is waiting, **Needs attention** opens Approvals.
 
 ## B. The header
 

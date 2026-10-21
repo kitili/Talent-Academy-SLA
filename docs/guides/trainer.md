@@ -10,9 +10,7 @@ Open the Trainer tab and sign in. The first visit starts a short tour. **Tour** 
 
 ## B. Your desk
 
-You land on Your cohorts.
-
-The strip at the top is the whole ladder: Playgroup, Pre-primary, Standard 1–2, Standard 3–6, Standard 7, and Secondary. Your own stage is highlighted. Another trainer’s batch is not in the list on the left.
+You land on Your cohorts. Another trainer’s cohort is not in the list on the left.
 
 ## C. Open a batch
 

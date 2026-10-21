@@ -29,7 +29,6 @@ import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/Pag
 import { DeskMail } from "@/components/DeskMail";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 import { PlaceBanner, PlaceCover } from "@/components/PlaceArt";
-import { LearningPath } from "@/components/LearningPath";
 
 export default function TrainerBatches() {
   const [, setLocation] = useLocation();
@@ -663,10 +662,6 @@ export default function TrainerBatches() {
             + " You add courses. An admin adds the batches inside a cohort."
           }
         />
-        <div className="mb-4">
-          <LearningPath activeStageIds={batches.map((batch: any) => batch.stage).filter(Boolean)} />
-        </div>
-
         {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
           {/* Left Sidebar - Batch List */}

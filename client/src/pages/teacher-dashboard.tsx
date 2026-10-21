@@ -19,7 +19,6 @@ import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, 
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
-import { LearningPath, activeStagesFromNames } from "@/components/LearningPath";
 import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
@@ -412,7 +411,6 @@ export default function TeacherDashboard() {
           subtitle="Adult teacher. The pictures are the pupils you will teach."
           titleTestId="text-welcome"
         />
-        <LearningPath activeStageIds={activeStagesFromNames(assignedWeeks.map((week: any) => week.courseName))} />
         <TeacherPathCard />
 
         {deskPeers[0] && (
