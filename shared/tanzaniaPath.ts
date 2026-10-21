@@ -114,13 +114,13 @@ export const LEARNING_STAGES: LearningStage[] = [
 ];
 
 export const LEARNING_BATCHES = [
-  { id: "49c90cb7-04d6-4402-b5b8-93a3ae5b6db9", stageId: "playgroup", trainerUsername: "trainer1", teacherEmails: ["teacher@test.com", "teacher2@test.com"] },
-  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1002", stageId: "pre-primary", trainerUsername: "trainer2", teacherEmails: ["teacher3@test.com", "qa.teacher@silverleaf.academy"] },
-  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1003", stageId: "std-1-2", trainerUsername: "trainer3", teacherEmails: ["teacher4@test.com"] },
-  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1004", stageId: "std-3-6", trainerUsername: "trainer4", teacherEmails: ["teacher5@test.com"] },
-  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1005", stageId: "std-7", trainerUsername: "trainer5", teacherEmails: ["teacher6@test.com"] },
-  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1006", stageId: "secondary", trainerUsername: "trainer6", teacherEmails: ["teacher7@test.com"] },
-  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1007", stageId: "secondary", trainerUsername: "test.trainer", teacherEmails: ["qa.teacher@silverleaf.academy"], name: "Secondary — Form I practice" },
+  { id: "49c90cb7-04d6-4402-b5b8-93a3ae5b6db9", stageId: "playgroup", trainerUsername: "trainer1", teacherEmails: ["teacher@test.com"] },
+  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1002", stageId: "pre-primary", trainerUsername: "trainer1", teacherEmails: [] },
+  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1003", stageId: "std-1-2", trainerUsername: "trainer1", teacherEmails: [] },
+  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1004", stageId: "std-3-6", trainerUsername: "trainer1", teacherEmails: [] },
+  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1005", stageId: "std-7", trainerUsername: "trainer1", teacherEmails: [] },
+  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1006", stageId: "secondary", trainerUsername: "trainer1", teacherEmails: [] },
+  { id: "7c2a1f10-6b44-4c1e-9a11-0b5e2d3a1007", stageId: "secondary", trainerUsername: "trainer1", teacherEmails: [], name: "Secondary — Form I practice" },
 ] as const;
 
 export const RETIRED_BATCH_NAMES = [

@@ -303,6 +303,8 @@ export const batches = pgTable("batches", {
   track: varchar("track"),
   createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
   trainerId: varchar("trainer_id").references(() => users.id, { onDelete: "set null" }),
+  status: varchar("status").notNull().default("open"), // 'open' or 'closed'
+  quizzesStatus: varchar("quizzes_status").notNull().default("open"), // 'open' or 'stopped'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -346,6 +348,7 @@ export const assignedQuizzes = pgTable("assigned_quizzes", {
   shuffleQuestions: varchar("shuffle_questions").notNull().default("yes"),
   questions: jsonb("questions").$type<QuizQuestion[]>().notNull(),
   assignedBy: varchar("assigned_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status").notNull().default("open"), // 'open' or 'stopped'
   assignedAt: timestamp("assigned_at").defaultNow(),
 }, (table) => [
   index("idx_assigned_quizzes_batch").on(table.batchId),

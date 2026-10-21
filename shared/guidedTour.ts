@@ -17,7 +17,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Where to go next",
-    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses. Approvals lets people in. Cohorts are the rooms. Analytics is the gradebook. Courses is where you add modules and lesson files.",
+    body: "The navbar opens Approvals, Trainers, Teachers, Cohorts, Analytics, and Courses. Approvals lets people in. Cohorts is where you add a batch, assign a trainer, and open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
     target: "admin-nav",
   },
   {

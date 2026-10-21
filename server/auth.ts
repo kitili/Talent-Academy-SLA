@@ -80,6 +80,37 @@ export async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
+export async function findApprovedAccount(identifier: string, password: string, role: string) {
+  const wantStaff = !role || role === "admin" || role === "trainer";
+  const wantTeacher = !role || role === "teacher";
+  if (wantStaff) {
+    let user = await storage.getUserByUsername(identifier);
+    if (!user) user = await storage.getUserByEmail(identifier);
+    if (
+      user
+      && user.approvalStatus === "approved"
+      && (!role || user.role === role)
+      && await comparePasswords(password, user.password)
+    ) {
+      return { user };
+    }
+  }
+  if (wantTeacher) {
+    let teacher = await storage.getTeacherByEmail(identifier);
+    if (!teacher && /^\d+$/.test(identifier)) {
+      teacher = await storage.getTeacherByTeacherId(parseInt(identifier, 10));
+    }
+    if (
+      teacher
+      && teacher.approvalStatus === "approved"
+      && await comparePasswords(password, teacher.password)
+    ) {
+      return { teacher };
+    }
+  }
+  return null;
+}
+
 export async function comparePasswords(supplied: string, stored: string) {
   try {
     if (!supplied || !stored || !stored.includes(".")) return false;
@@ -161,6 +192,26 @@ export function setupAuth(app: Express) {
 
       const requestedRole = String(req.body.role || "").trim().toLowerCase();
       let testLogin = matchTestLogin(username, password, requestedRole);
+      if (!testLogin && hasDatabaseUrl()) {
+        const account = await findApprovedAccount(username, password, requestedRole);
+        if (account?.user) {
+          req.login(account.user, (err) => {
+            if (err) return next(err);
+            const { password: _, ...userWithoutPassword } = account.user!;
+            res.status(200).json(userWithoutPassword);
+          });
+          return;
+        }
+        if (account?.teacher) {
+          (req.session as any).teacherId = account.teacher.id;
+          await new Promise<void>((resolve, reject) => {
+            req.session.save((err) => (err ? reject(err) : resolve()));
+          });
+          const { password: _, ...teacherWithoutPassword } = account.teacher;
+          res.status(200).json({ ...teacherWithoutPassword, role: "teacher" });
+          return;
+        }
+      }
       if (
         !testLogin
         && hasDatabaseUrl()
