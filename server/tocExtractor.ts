@@ -3,9 +3,15 @@ import { createRequire } from 'module';
 import PizZip from 'pizzip';
 
 const require = createRequire(import.meta.url);
-const _pdfParseModule = require('pdf-parse');
-const pdfParse = typeof _pdfParseModule === 'function' ? _pdfParseModule : _pdfParseModule.default;
-const officeParser = require('officeparser');
+
+function loadPdfParse() {
+  const loaded = require("pdf-parse");
+  return typeof loaded === "function" ? loaded : loaded.default;
+}
+
+function loadOfficeParser() {
+  return require("officeparser");
+}
 
 /**
  * Extract Table of Contents from uploaded files
@@ -79,7 +85,7 @@ function extractHeadingFromText(text: string, pageNumber: number): string {
  */
 async function extractPdfToc(buffer: Buffer): Promise<TocEntry[]> {
   try {
-    const pdfData = await pdfParse(buffer);
+    const pdfData = await loadPdfParse()(buffer);
     const totalPages = pdfData.numpages;
     
     const toc: TocEntry[] = [];
@@ -231,7 +237,7 @@ async function extractPptxToc(buffer: Buffer): Promise<TocEntry[]> {
  */
 async function extractPptToc(buffer: Buffer): Promise<TocEntry[]> {
   try {
-    const text = await officeParser.parseOfficeAsync(buffer);
+    const text = await loadOfficeParser().parseOfficeAsync(buffer);
 
     // Split by common slide separators
     const slideTexts = text.split(/\n{3,}|\f/).filter((s: string) => s.trim().length > 0);
