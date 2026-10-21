@@ -29,6 +29,31 @@ export function normalizeCohortsRequired(value: unknown, fallback = 1) {
   return Math.max(1, Math.min(50, Math.floor(parsed)));
 }
 
+const BATCH_WORDS = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+
+/** The next step name, so a cohort reads Batch One, Batch Two, and onward. */
+export function nextBatchName(existingCount: number) {
+  const number = Math.max(0, Math.floor(existingCount)) + 1;
+  const word = BATCH_WORDS[number - 1] || String(number);
+  return `Batch ${word}`;
+}
+
+export function sortBatches<T extends { id: string; orderIndex: number }>(batches: T[]): T[] {
+  return [...batches].sort((a, b) => a.orderIndex - b.orderIndex || a.id.localeCompare(b.id));
+}
+
+/** Move one batch earlier or later. The returned ids are the new order. */
+export function moveBatchOrder(ids: string[], id: string, direction: "earlier" | "later"): string[] {
+  const index = ids.indexOf(id);
+  if (index < 0) return ids.slice();
+  const target = direction === "earlier" ? index - 1 : index + 1;
+  if (target < 0 || target >= ids.length) return ids.slice();
+  const next = ids.slice();
+  const [item] = next.splice(index, 1);
+  next.splice(target, 0, item);
+  return next;
+}
+
 export function batchIsComplete(batch: PathBatch) {
   return batch.courses.length > 0 && batch.courses.every((course) => course.completed === true);
 }

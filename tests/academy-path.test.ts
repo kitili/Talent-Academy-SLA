@@ -4,6 +4,8 @@ import {
   ACADEMY_TERMS,
   batchIsComplete,
   cohortIsComplete,
+  moveBatchOrder,
+  nextBatchName,
   normalizeCohortsRequired,
   pathSummary,
 } from "../shared/academyPath.ts";
@@ -33,6 +35,18 @@ describe("academy path", () => {
     assert.equal(summary.batchesByCohort[1].complete, false);
     assert.equal(cohortIsComplete({ id: "empty", batches: [] }), false);
     assert.equal(batchIsComplete({ id: "empty", courses: [] }), false);
+  });
+
+  it("keeps batches in order from Batch One through Batch Five", () => {
+    assert.deepEqual(
+      [0, 1, 2, 3, 4].map(nextBatchName),
+      ["Batch One", "Batch Two", "Batch Three", "Batch Four", "Batch Five"],
+    );
+    const ids = ["a", "b", "c", "d", "e"];
+    assert.deepEqual(moveBatchOrder(ids, "c", "earlier"), ["a", "c", "b", "d", "e"]);
+    assert.deepEqual(moveBatchOrder(ids, "a", "earlier"), ids);
+    assert.deepEqual(moveBatchOrder(ids, "e", "later"), ids);
+    assert.deepEqual(moveBatchOrder(ids, "missing", "later"), ids);
   });
 
   it("counts a teacher done only after the required cohorts", () => {

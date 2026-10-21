@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
-import { BookOpen, Layers, ArrowLeft, Plus, Trash2, Pencil, Users } from "lucide-react";
+import { BookOpen, Layers, ArrowLeft, Plus, Trash2, Pencil, Users, ChevronUp, ChevronDown } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -29,11 +29,23 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AcademyShell } from "@/components/AcademyShell";
 import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
-import { ACADEMY_TERMS } from "@shared/academyPath";
+import { ACADEMY_TERMS, nextBatchName } from "@shared/academyPath";
+
+const STEP_TONES = [
+  { chip: "bg-[#1d4e89]", wash: "bg-[#e7f0fa]", edge: "border-[#1d4e89]/30" },
+  { chip: "bg-[#c47b2b]", wash: "bg-[#fff3e4]", edge: "border-[#c47b2b]/35" },
+  { chip: "bg-[#0f7a6c]", wash: "bg-[#e5f5f2]", edge: "border-[#0f7a6c]/30" },
+  { chip: "bg-[#9b3d55]", wash: "bg-[#fdecef]", edge: "border-[#9b3d55]/30" },
+  { chip: "bg-[#3d6b2f]", wash: "bg-[#eef6ea]", edge: "border-[#3d6b2f]/30" },
+];
+
+function stepTone(index: number) {
+  return STEP_TONES[index % STEP_TONES.length];
+}
 
 type CourseRow = { id: string; name: string; description?: string | null; publishStatus?: string };
 type PersonRow = { id: string; name: string; email?: string | null };
-type StepRow = { id: string; name: string; description?: string | null; courses: CourseRow[]; teachers?: PersonRow[] };
+type StepRow = { id: string; name: string; description?: string | null; orderIndex?: number; courses: CourseRow[]; teachers?: PersonRow[] };
 type CohortRow = {
   id: string;
   name: string;
@@ -196,17 +208,24 @@ export default function AdminBatches() {
   });
 
   const createBatch = useMutation({
-    mutationFn: async (cohortId: string) => {
-      const name = (batchName[cohortId] || "").trim();
+    mutationFn: async ({ cohortId, name }: { cohortId: string; name: string }) => {
       const res = await apiRequest("POST", `/api/admin/academy-path/cohorts/${cohortId}/batches`, { name });
       return res.json();
     },
-    onSuccess: (_data, cohortId) => {
+    onSuccess: (_data, { cohortId }) => {
       setBatchName((current) => ({ ...current, [cohortId]: "" }));
       toast({ title: "Batch added" });
       refresh();
     },
     onError: (error: Error) => fail(error, "Could not add the batch"),
+  });
+
+  const moveBatch = useMutation({
+    mutationFn: async ({ batchId, direction }: { batchId: string; direction: "earlier" | "later" }) => {
+      await apiRequest("PATCH", `/api/admin/academy-path/batches/${batchId}/order`, { direction });
+    },
+    onSuccess: () => refresh(),
+    onError: (error: Error) => fail(error, "Could not reorder the batch"),
   });
 
   const updateBatch = useMutation({
@@ -324,25 +343,35 @@ export default function AdminBatches() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to admin desk
         </Button>
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Cohorts, batches, and courses</h1>
-            <p className="text-muted-foreground max-w-2xl">
-              One place to add all three. You add cohorts and the batches inside them. You and a trainer can add courses. A trainer cannot add a cohort or a batch.
-            </p>
+        <div className="overflow-hidden rounded-2xl bg-[#102448] text-white shadow-md">
+          <div className="h-1.5 bg-gradient-to-r from-[#1d4e89] via-[#c47b2b] to-[#0f7a6c]" />
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 p-5 sm:p-6">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f3d7b0]">Academy path</p>
+              <h1 className="text-3xl font-bold mt-1 mb-2">Cohorts, batches, and courses</h1>
+              <p className="text-white/80 max-w-2xl">
+                Batches follow each other: Batch One, then Batch Two, and onward. You add the cohorts and the batches. You and a trainer can add courses.
+              </p>
+            </div>
+            <Button onClick={() => setCohortOpen(true)} className="bg-[#c47b2b] text-white hover:bg-[#a86722]" data-testid="button-add-cohort">
+              <Plus className="h-4 w-4 mr-2" />
+              Add cohort
+            </Button>
           </div>
-          <Button onClick={() => setCohortOpen(true)} data-testid="button-add-cohort">
-            <Plus className="h-4 w-4 mr-2" />
-            Add cohort
-          </Button>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 mb-6">
-        {(["cohort", "batch", "course"] as const).map((key) => (
-          <Card key={key} data-testid={`card-term-${key}`}>
+        {([
+          ["cohort", "border-t-[#1d4e89]", "bg-[#e7f0fa] text-[#1d4e89]"],
+          ["batch", "border-t-[#c47b2b]", "bg-[#fff3e4] text-[#8a5414]"],
+          ["course", "border-t-[#0f7a6c]", "bg-[#e5f5f2] text-[#0f7a6c]"],
+        ] as const).map(([key, edge, chip]) => (
+          <Card key={key} className={`border-t-4 ${edge}`} data-testid={`card-term-${key}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">{ACADEMY_TERMS[key].title}</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${chip}`}>{ACADEMY_TERMS[key].title}</span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">{ACADEMY_TERMS[key].body}</p>
@@ -351,7 +380,7 @@ export default function AdminBatches() {
         ))}
       </div>
 
-      <Card className="mb-6">
+      <Card className="mb-6 border-l-4 border-l-[#c47b2b]">
         <CardHeader>
           <CardTitle className="text-base">Cohorts to finish</CardTitle>
           <CardDescription>
@@ -402,23 +431,27 @@ export default function AdminBatches() {
             ) : data?.cohorts.map((cohort) => {
               const closed = (cohort.status || "open") === "closed";
               const quizzesStopped = (cohort.quizzesStatus || "open") === "stopped";
+              const batches = [...cohort.batches].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
               return (
-              <Card key={cohort.id} data-testid={`card-cohort-${cohort.id}`}>
+              <Card key={cohort.id} className="overflow-hidden border-[#102448]/10 shadow-sm" data-testid={`card-cohort-${cohort.id}`}>
+                <div className={`h-1.5 ${closed ? "bg-[#9b3d55]" : "bg-[#0f7a6c]"}`} />
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div>
                       <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
                         {cohort.name}
                         {cohort.track && (
-                          <Badge variant="secondary">{cohort.track === "secondary" ? "Secondary" : "Primary"}</Badge>
+                          <Badge className={cohort.track === "secondary" ? "bg-[#c47b2b] text-white hover:bg-[#c47b2b]" : "bg-[#1d4e89] text-white hover:bg-[#1d4e89]"}>
+                            {cohort.track === "secondary" ? "Secondary" : "Primary"}
+                          </Badge>
                         )}
-                        <Badge variant="outline" data-testid={`badge-batch-count-${cohort.id}`}>
-                          {cohort.batches.length} {cohort.batches.length === 1 ? "batch" : "batches"}
+                        <Badge className="bg-[#102448] text-white hover:bg-[#102448]" data-testid={`badge-batch-count-${cohort.id}`}>
+                          {batches.length} {batches.length === 1 ? "batch" : "batches"}
                         </Badge>
-                        <Badge variant={closed ? "destructive" : "outline"} data-testid={`badge-cohort-status-${cohort.id}`}>
+                        <Badge className={closed ? "bg-[#9b3d55] text-white hover:bg-[#9b3d55]" : "bg-[#0f7a6c] text-white hover:bg-[#0f7a6c]"} data-testid={`badge-cohort-status-${cohort.id}`}>
                           {closed ? "Closed" : "Open"}
                         </Badge>
-                        <Badge variant={quizzesStopped ? "destructive" : "outline"} data-testid={`badge-quiz-status-${cohort.id}`}>
+                        <Badge className={quizzesStopped ? "bg-[#9b3d55] text-white hover:bg-[#9b3d55]" : "bg-[#1d4e89] text-white hover:bg-[#1d4e89]"} data-testid={`badge-quiz-status-${cohort.id}`}>
                           {quizzesStopped ? "Quizzes stopped" : "Quizzes open"}
                         </Badge>
                       </CardTitle>
@@ -490,109 +523,140 @@ export default function AdminBatches() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {cohort.batches.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No batches in this cohort yet. Add as many as this group needs.</p>
-                  )}
-                  {cohort.batches.map((batch, index) => (
-                    <div key={batch.id} className="rounded-lg border p-3 space-y-2" data-testid={`card-batch-${batch.id}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium">Batch {index + 1}: {batch.name}</p>
-                          {batch.description && <p className="text-sm text-muted-foreground">{batch.description}</p>}
+                <CardContent className="space-y-4">
+                  {batches.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No batches in this cohort yet. The first one will be Batch One.</p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl bg-[#102448]/[0.04] px-3 py-3" data-testid={`batch-order-${cohort.id}`}>
+                      {batches.map((batch, index) => (
+                        <div key={batch.id} className="flex items-center gap-2">
+                          <span className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm font-semibold text-white ${stepTone(index).chip}`}>
+                            {index + 1}
+                          </span>
+                          <span className="text-sm font-medium text-[#102448]">{batch.name}</span>
+                          {index < batches.length - 1 && <span className="px-1 text-lg leading-none font-bold text-[#c47b2b]" aria-hidden="true">→</span>}
                         </div>
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => setEditingBatch(batch)} data-testid={`button-edit-batch-${batch.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => {
-                            if (window.confirm(`Remove batch "${batch.name}" from this cohort?`)) removeBatch.mutate(batch.id);
-                          }} data-testid={`button-delete-batch-${batch.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {batch.courses.map((course) => (
-                          <Badge key={course.id} variant="secondary" className="gap-1">
-                            {course.name}
-                            <button
-                              type="button"
-                              className="ml-1"
-                              aria-label={`Remove ${course.name}`}
-                              onClick={() => removeCourseFromBatch.mutate({ batchId: batch.id, courseId: course.id })}
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                        {batch.courses.length === 0 && (
-                          <span className="text-xs text-muted-foreground">No course on this batch yet.</span>
-                        )}
-                      </div>
-                      {(() => {
-                        const available = (data?.courses || []).filter((course) => !batch.courses.some((placed) => placed.id === course.id));
-                        if (available.length === 0) return null;
-                        return (
-                          <Select
-                            key={`${batch.id}-${batch.courses.map((course) => course.id).join(",")}`}
-                            onValueChange={(courseId) => addCourseToBatch.mutate({ batchId: batch.id, courseId })}
-                          >
-                            <SelectTrigger data-testid={`select-course-${batch.id}`}>
-                              <SelectValue placeholder="Add a course to this batch" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {available.map((course) => (
-                                <SelectItem key={course.id} value={course.id}>{course.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        );
-                      })()}
-                      <div className="pt-1" data-testid={`teachers-${batch.id}`}>
-                        <p className="mb-2 text-sm font-medium">Teachers in this batch</p>
-                        <div className="flex max-h-36 flex-wrap gap-x-4 gap-y-2 overflow-y-auto">
-                          {(data?.teachers || []).length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No active teachers yet.</p>
-                          ) : (data?.teachers || []).map((teacher) => {
-                            const selected = (batch.teachers || []).some((row) => row.id === teacher.id);
-                            return (
-                              <label key={teacher.id} className="flex items-center gap-2 text-sm">
-                                <Checkbox
-                                  checked={selected}
-                                  disabled={saveBatchTeachers.isPending}
-                                  onCheckedChange={(checked) => {
-                                    const current = (batch.teachers || []).map((row) => row.id);
-                                    const teacherIds = checked
-                                      ? [...current, teacher.id]
-                                      : current.filter((id) => id !== teacher.id);
-                                    saveBatchTeachers.mutate({ batchId: batch.id, teacherIds });
-                                  }}
-                                  data-testid={`check-teacher-${batch.id}-${teacher.id}`}
-                                />
-                                {teacher.name}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  <div className="space-y-3">
+                    {batches.map((batch, index) => {
+                      const tone = stepTone(index);
+                      const available = (data?.courses || []).filter((course) => !batch.courses.some((placed) => placed.id === course.id));
+                      return (
+                        <div key={batch.id} className="relative pl-14" data-testid={`card-batch-${batch.id}`}>
+                          {index < batches.length - 1 && (
+                            <span className={`absolute left-[18px] top-11 bottom-[-12px] w-1 rounded-full ${tone.chip} opacity-70`} aria-hidden="true" />
+                          )}
+                          <span className={`absolute left-0 top-3 flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${tone.chip}`}>
+                            {index + 1}
+                          </span>
+                          <div className={`rounded-xl border p-3 space-y-2 ${tone.wash} ${tone.edge}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-medium text-[#102448]">{batch.name}</p>
+                                {batch.description && <p className="text-sm text-muted-foreground">{batch.description}</p>}
+                              </div>
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" disabled={index === 0 || moveBatch.isPending} aria-label={`Move ${batch.name} earlier`} onClick={() => moveBatch.mutate({ batchId: batch.id, direction: "earlier" })} data-testid={`button-batch-earlier-${batch.id}`}>
+                                  <ChevronUp className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" disabled={index === batches.length - 1 || moveBatch.isPending} aria-label={`Move ${batch.name} later`} onClick={() => moveBatch.mutate({ batchId: batch.id, direction: "later" })} data-testid={`button-batch-later-${batch.id}`}>
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => setEditingBatch(batch)} data-testid={`button-edit-batch-${batch.id}`}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => {
+                                  if (window.confirm(`Remove batch "${batch.name}" from this cohort?`)) removeBatch.mutate(batch.id);
+                                }} data-testid={`button-delete-batch-${batch.id}`}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {batch.courses.map((course) => (
+                                <Badge key={course.id} className="gap-1 bg-white text-[#102448] hover:bg-white border border-[#102448]/10">
+                                  {course.name}
+                                  <button
+                                    type="button"
+                                    className="ml-1"
+                                    aria-label={`Remove ${course.name}`}
+                                    onClick={() => removeCourseFromBatch.mutate({ batchId: batch.id, courseId: course.id })}
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                              {batch.courses.length === 0 && (
+                                <span className="text-xs text-muted-foreground">No course on this batch yet.</span>
+                              )}
+                            </div>
+                            {available.length > 0 && (
+                              <Select
+                                key={`${batch.id}-${batch.courses.map((course) => course.id).join(",")}`}
+                                onValueChange={(courseId) => addCourseToBatch.mutate({ batchId: batch.id, courseId })}
+                              >
+                                <SelectTrigger className="bg-white" data-testid={`select-course-${batch.id}`}>
+                                  <SelectValue placeholder="Add a course to this batch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {available.map((course) => (
+                                    <SelectItem key={course.id} value={course.id}>{course.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            <div className="pt-1" data-testid={`teachers-${batch.id}`}>
+                              <p className="mb-2 text-sm font-medium">Teachers in this batch</p>
+                              <div className="flex max-h-36 flex-wrap gap-x-4 gap-y-2 overflow-y-auto">
+                                {(data?.teachers || []).length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No active teachers yet.</p>
+                                ) : (data?.teachers || []).map((teacher) => {
+                                  const selected = (batch.teachers || []).some((row) => row.id === teacher.id);
+                                  return (
+                                    <label key={teacher.id} className="flex items-center gap-2 text-sm">
+                                      <Checkbox
+                                        checked={selected}
+                                        disabled={saveBatchTeachers.isPending}
+                                        onCheckedChange={(checked) => {
+                                          const current = (batch.teachers || []).map((row) => row.id);
+                                          const teacherIds = checked
+                                            ? [...current, teacher.id]
+                                            : current.filter((id) => id !== teacher.id);
+                                          saveBatchTeachers.mutate({ batchId: batch.id, teacherIds });
+                                        }}
+                                        data-testid={`check-teacher-${batch.id}-${teacher.id}`}
+                                      />
+                                      {teacher.name}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Name the next batch"
+                      placeholder={nextBatchName(batches.length)}
                       value={batchName[cohort.id] || ""}
                       onChange={(event) => setBatchName((current) => ({ ...current, [cohort.id]: event.target.value }))}
                       data-testid={`input-batch-name-${cohort.id}`}
                     />
                     <Button
-                      variant="outline"
-                      disabled={!(batchName[cohort.id] || "").trim() || createBatch.isPending}
-                      onClick={() => createBatch.mutate(cohort.id)}
+                      className="bg-[#1d4e89] text-white hover:bg-[#163a66]"
+                      disabled={createBatch.isPending}
+                      onClick={() => createBatch.mutate({
+                        cohortId: cohort.id,
+                        name: (batchName[cohort.id] || "").trim() || nextBatchName(batches.length),
+                      })}
                       data-testid={`button-add-batch-${cohort.id}`}
                     >
                       <Plus className="h-4 w-4 mr-1" />
-                      Add batch
+                      Add {nextBatchName(batches.length)}
                     </Button>
                   </div>
                   {selectedId === cohort.id && (
@@ -628,7 +692,7 @@ export default function AdminBatches() {
             })}
           </div>
 
-          <Card className="h-fit">
+          <Card className="h-fit border-t-4 border-t-[#0f7a6c]">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <BookOpen className="h-4 w-4" />

@@ -57,16 +57,21 @@ function TeacherPathCard() {
             {(cohort.batches || []).length === 0 ? (
               <p className="text-sm text-muted-foreground mt-2">No batches in this cohort yet.</p>
             ) : (
-              <ul className="mt-2 space-y-1 text-sm">
-                {cohort.batches.map((batch: any, index: number) => (
-                  <li key={batch.id} className="flex items-center justify-between gap-2">
-                    <span>Batch {index + 1}: {batch.name}</span>
-                    <span className="text-muted-foreground">
-                      {(batch.courses || []).filter((course: any) => course.completed).length}/{(batch.courses || []).length} courses
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <ol className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
+                {cohort.batches.map((batch: any, index: number) => {
+                  const tone = ["#1d4e89", "#c47b2b", "#0f7a6c", "#9b3d55", "#3d6b2f"][index % 5];
+                  const done = (batch.courses || []).filter((course: any) => course.completed).length;
+                  const total = (batch.courses || []).length;
+                  return (
+                    <li key={batch.id} className="flex items-center gap-2">
+                      <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-semibold text-white" style={{ background: tone }}>{index + 1}</span>
+                      <span>{batch.name}</span>
+                      <span className="text-muted-foreground">{done}/{total}</span>
+                      {index < cohort.batches.length - 1 && <span className="font-bold text-[#c47b2b]" aria-hidden="true">→</span>}
+                    </li>
+                  );
+                })}
+              </ol>
             )}
           </div>
         ))}
