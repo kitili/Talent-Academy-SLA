@@ -69,7 +69,7 @@ export const TEACHER_TOUR: TourStep[] = [
   },
   {
     title: "Your progress",
-    body: "Level, quizzes, average score, attendance, modules, and reflections sit here. Calendar and written work are just above when your cohort has them.",
+    body: "Level, quizzes, average score, attendance, modules, and reflections sit on the Progress tab. Calendar and written work are on the Work tab.",
     target: "teacher-progress",
   },
   {

@@ -25,6 +25,46 @@ import { ModuleScene } from "@/components/ModuleScene";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import { CohortMedals } from "@/components/CohortMedals";
 import type { Medal } from "@shared/cohortMedals";
+import { PageStrip, usePager } from "@/components/PageStrip";
+
+const TEACHER_TABS = [
+  { id: "home", label: "Home" },
+  { id: "learning", label: "Learning" },
+  { id: "work", label: "Work" },
+  { id: "progress", label: "Progress" },
+  { id: "reflect", label: "Reflect" },
+  { id: "messages", label: "Messages" },
+] as const;
+
+type TeacherTab = (typeof TEACHER_TABS)[number]["id"];
+
+function TeacherSideTabs({ tab, onTab }: { tab: TeacherTab; onTab: (next: TeacherTab) => void }) {
+  return (
+    <nav aria-label="Teacher pages" data-testid="teacher-sidebar" className="lg:sticky lg:top-24 lg:w-44 shrink-0">
+      <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+        {TEACHER_TABS.map((item) => {
+          const active = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={active ? "page" : undefined}
+              data-testid={`teacher-tab-${item.id}`}
+              onClick={() => onTab(item.id)}
+              className={`rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition ${
+                active
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-card text-foreground hover:bg-muted"
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 function TeacherPathCard() {
@@ -137,6 +177,36 @@ export default function TeacherDashboard() {
 
   const { logoutMutation } = useAuth();
   const tour = useGuidedTour("sla-tour-teacher-v1");
+  const [tab, setTab] = useState<TeacherTab>("home");
+
+  useEffect(() => {
+    const fromHash = () => {
+      const hash = window.location.hash;
+      if (hash === "#my-learning") setTab("learning");
+      if (hash === "#my-work") setTab("work");
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, []);
+
+  useEffect(() => {
+    if (!tour.open) return;
+    const target = TEACHER_TOUR[tour.index]?.target;
+    if (target === "teacher-continue") setTab("home");
+    if (target === "teacher-learning") setTab("learning");
+    if (target === "teacher-progress") setTab("progress");
+  }, [tour.open, tour.index]);
+
+  useEffect(() => {
+    if (!tour.open) return;
+    const target = TEACHER_TOUR[tour.index]?.target;
+    if (!target) return;
+    const element = document.querySelector(`[data-tour="${target}"]`);
+    if (!element) return;
+    element.classList.add("sla-tour-target");
+    element.scrollIntoView({ block: "center" });
+  }, [tour.open, tour.index, tab]);
 
   // Fetch own reflections
   const { data: reflections = [] } = useQuery<any[]>({
@@ -362,6 +432,15 @@ export default function TeacherDashboard() {
     onError: () => toast({ title: "Could not submit work", variant: "destructive" }),
   });
 
+  const courseListPager = usePager(uniqueCourses, 6);
+  const courseCardPager = usePager(uniqueCourses, 2);
+  const eventPager = usePager(upcomingEvents, 5);
+  const workPager = usePager(myWork, 4);
+  const reflectionPager = usePager(reflections, 4);
+  const commentPager = usePager(trainerComments, 4);
+  const goalPager = usePager(goals, 5);
+  const noticePager = usePager(deskNotices, 4);
+
   return (
     <div className="sl-page sl-bg-garden min-h-screen">
       {/* Header matching Admin dashboard */}
@@ -428,41 +507,46 @@ export default function TeacherDashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="sl-sheet sl-frame my-4 sm:my-6 p-4 sm:p-6 space-y-6 pb-20 sm:pb-6">
+      <div className="sl-sheet sl-frame my-4 sm:my-6 p-4 sm:p-6 pb-20 sm:pb-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <TeacherSideTabs tab={tab} onTab={setTab} />
+          <div className="min-w-0 flex-1 space-y-6">
+        {tab === "home" && (
         <PlaceBanner
           place="garden"
           title={`Welcome, ${teacher?.name || "teacher"}`}
           subtitle="Adult teacher. The pictures are the pupils you will teach."
           titleTestId="text-welcome"
         />
-        <TeacherPathCard />
+        )}
+        {tab === "learning" && <TeacherPathCard />}
 
-        {deskPeers[0] && (
+        {tab === "messages" && (
           <DeskMail
-            peer={{ id: deskPeers[0].id, name: deskPeers[0].name, role: deskPeers[0].role || "trainer" }}
+            peer={deskPeers[0] ? { id: deskPeers[0].id, name: deskPeers[0].name, role: deskPeers[0].role || "trainer" } : null}
             selfLabel={teacher?.name || "Teacher"}
           />
         )}
 
-        {deskNotices.length > 0 && (
-          <Card className="sl-rise">
+        {tab === "messages" && deskNotices.length > 0 && (
+          <Card className="sl-rise max-w-md">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">From the academy</CardTitle>
               <CardDescription>Notices from trainers and admin, so you do not miss a change of plan.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {deskNotices.slice(0, 4).map((note: any) => (
-                <div key={note.id} className="rounded-xl border bg-white px-3 py-2">
+              {noticePager.slice.map((note: any) => (
+                <div key={note.id} className="rounded-xl border bg-card px-3 py-2">
                   <p className="font-medium">{note.title}</p>
                   <p className="text-sm text-muted-foreground">{note.message}</p>
                 </div>
               ))}
+              <PageStrip page={noticePager.page} pages={noticePager.pages} setPage={noticePager.setPage} />
             </CardContent>
           </Card>
         )}
 
-        {(() => {
+        {tab === "home" && (() => {
           const openWork = myWork.filter((item: any) => !(item.my_response || item.myResponse));
           const nextEvent = upcomingEvents[0];
           const items = [
@@ -501,11 +585,9 @@ export default function TeacherDashboard() {
                     type="button"
                     className="flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2 text-left hover:border-primary"
                     onClick={() => {
-                      if (item.href.startsWith("#")) {
-                        document.querySelector(item.href)?.scrollIntoView({ behavior: "smooth" });
-                      } else {
-                        setLocation(item.href);
-                      }
+                      if (item.href === "#my-work") setTab("work");
+                      else if (item.href === "#my-learning") setTab("learning");
+                      else setLocation(item.href);
                     }}
                   >
                     <span>
@@ -520,6 +602,7 @@ export default function TeacherDashboard() {
           );
         })()}
 
+        {tab === "home" && (
         <Card className="sl-continue shadow-lg rounded-xl" data-tour="teacher-continue">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -562,8 +645,9 @@ export default function TeacherDashboard() {
             )}
           </CardContent>
         </Card>
+        )}
 
-        {medalRows.length > 0 && (
+        {tab === "learning" && medalRows.length > 0 && (
           <Card className="sl-rise" data-testid="card-teacher-medals">
             <CardHeader>
               <CardTitle>Medals</CardTitle>
@@ -582,6 +666,7 @@ export default function TeacherDashboard() {
           </Card>
         )}
 
+        {tab === "learning" && (
         <Card id="my-learning" className="sl-rise sl-stat-card" data-tour="teacher-learning">
           <CardHeader>
             <CardTitle>My learning</CardTitle>
@@ -602,7 +687,7 @@ export default function TeacherDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {uniqueCourses.map((course: any) => {
+                  {courseListPager.slice.map((course: any) => {
                     const anyLocked = course.weeks.some((w: any) => w.locked && (w.progress?.percentage || 0) < 100);
                     const status = course.courseChecked
                       ? "Completed"
@@ -635,9 +720,12 @@ export default function TeacherDashboard() {
                 </tbody>
               </table>
             )}
+            <PageStrip page={courseListPager.page} pages={courseListPager.pages} setPage={courseListPager.setPage} />
           </CardContent>
         </Card>
+        )}
 
+        {tab === "work" && (
         <div className="grid md:grid-cols-2 gap-4">
           <Card className="sl-rise">
             <CardHeader>
@@ -650,7 +738,7 @@ export default function TeacherDashboard() {
             <CardContent className="space-y-3">
               {upcomingEvents.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nothing scheduled yet.</p>
-              ) : upcomingEvents.slice(0, 8).map((event: any) => (
+              ) : eventPager.slice.map((event: any) => (
                 <div key={event.id} className="text-sm">
                   <p className="font-medium">{event.title}</p>
                   <p className="text-muted-foreground">
@@ -658,6 +746,7 @@ export default function TeacherDashboard() {
                   </p>
                 </div>
               ))}
+              <PageStrip page={eventPager.page} pages={eventPager.pages} setPage={eventPager.setPage} />
             </CardContent>
           </Card>
           <Card id="my-work" className="sl-rise">
@@ -671,7 +760,7 @@ export default function TeacherDashboard() {
             <CardContent className="space-y-4">
               {myWork.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No written work assigned yet.</p>
-              ) : myWork.map((item: any) => {
+              ) : workPager.slice.map((item: any) => {
                 const id = item.id;
                 const submitted = item.my_response || item.myResponse;
                 return (
@@ -710,10 +799,13 @@ export default function TeacherDashboard() {
                   </div>
                 );
               })}
+              <PageStrip page={workPager.page} pages={workPager.pages} setPage={workPager.setPage} />
             </CardContent>
           </Card>
         </div>
+        )}
 
+        {tab === "progress" && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4" data-tour="teacher-progress">
           <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -789,8 +881,9 @@ export default function TeacherDashboard() {
             </CardContent>
           </Card>
         </div>
+        )}
 
-        {skills.length > 0 && (
+        {tab === "progress" && skills.length > 0 && (
           <Card className="shadow-lg border-border/50 rounded-xl sl-rise">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -813,6 +906,7 @@ export default function TeacherDashboard() {
           </Card>
         )}
 
+        {tab === "learning" && (
         <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -833,7 +927,7 @@ export default function TeacherDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {uniqueCourses.map((course: any) => {
+                {courseCardPager.slice.map((course: any) => {
                   const status = learningStatus({ percentage: course.aggregateProgress.percentage });
                   return (
                   <Card key={course.courseId || course.courseName} data-testid={`card-course-${course.courseName}`} className="overflow-hidden shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-border/50 rounded-lg sl-stat-card">
@@ -904,10 +998,12 @@ export default function TeacherDashboard() {
                 })}
               </div>
             )}
+            <PageStrip page={courseCardPager.page} pages={courseCardPager.pages} setPage={courseCardPager.setPage} />
           </CardContent>
         </Card>
+        )}
 
-        {/* Course reflection */}
+        {tab === "reflect" && (
         <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -990,7 +1086,7 @@ export default function TeacherDashboard() {
               <div className="mt-6">
                 <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Previous Reflections</h3>
                 <div className="space-y-2">
-                  {reflections.slice(0, 5).map((r: any) => (
+                  {reflectionPager.slice.map((r: any) => (
                     <div key={r.id} className="p-3 bg-muted rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         {r.rating && <Badge variant="outline">{r.rating}/5</Badge>}
@@ -1002,13 +1098,14 @@ export default function TeacherDashboard() {
                     </div>
                   ))}
                 </div>
+                <PageStrip page={reflectionPager.page} pages={reflectionPager.pages} setPage={reflectionPager.setPage} />
               </div>
             )}
           </CardContent>
         </Card>
+        )}
 
-        {/* Course Satisfaction Rating */}
-        {uniqueCourses.length > 0 && (
+        {tab === "reflect" && uniqueCourses.length > 0 && (
           <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1076,8 +1173,7 @@ export default function TeacherDashboard() {
           </Card>
         )}
 
-        {/* Progress Toward Graduation */}
-        {progressSummary && (
+        {tab === "progress" && progressSummary && (
           <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1123,8 +1219,7 @@ export default function TeacherDashboard() {
           </Card>
         )}
 
-        {/* Attendance Record */}
-        {attendanceSummary && (
+        {tab === "progress" && attendanceSummary && (
           <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1163,7 +1258,8 @@ export default function TeacherDashboard() {
           </Card>
         )}
 
-        {/* Trainer Feedback (Read-Only) */}
+        {tab === "reflect" && (
+        <>
         <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1177,7 +1273,7 @@ export default function TeacherDashboard() {
               <p className="text-muted-foreground text-center py-4 text-sm">No feedback received yet</p>
             ) : (
               <div className="space-y-3">
-                {trainerComments.slice(0, 5).map((comment: any) => (
+                {commentPager.slice.map((comment: any) => (
                   <div key={comment.id} className="p-3 bg-muted rounded-lg">
                     <div className="flex items-center justify-between mb-1">
                       {comment.category && (
@@ -1192,10 +1288,10 @@ export default function TeacherDashboard() {
                 ))}
               </div>
             )}
+            <PageStrip page={commentPager.page} pages={commentPager.pages} setPage={commentPager.setPage} />
           </CardContent>
         </Card>
 
-        {/* Improvement Tips */}
         {tips.length > 0 && (
           <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
             <CardHeader>
@@ -1256,7 +1352,7 @@ export default function TeacherDashboard() {
                 <p className="text-muted-foreground text-center py-2 text-sm">No goals set yet</p>
               ) : (
                 <div className="space-y-2">
-                  {goals.map((goal: any) => (
+                  {goalPager.slice.map((goal: any) => (
                     <div key={goal.id} className={`flex items-start gap-3 p-3 rounded-lg border ${
                       goal.status === 'completed' ? 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800' : 'bg-muted border-transparent'
                     }`}>
@@ -1292,9 +1388,14 @@ export default function TeacherDashboard() {
                   ))}
                 </div>
               )}
+              <PageStrip page={goalPager.page} pages={goalPager.pages} setPage={goalPager.setPage} />
             </div>
           </CardContent>
         </Card>
+        </>
+        )}
+          </div>
+        </div>
 
         <TeacherLearnerNav />
         <GuidedTour
