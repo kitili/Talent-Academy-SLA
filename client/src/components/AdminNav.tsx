@@ -34,6 +34,7 @@ export function AdminNav({ embedded = false, flow = false }: { embedded?: boolea
               key={link.href}
               href={link.href}
               data-testid={`admin-nav-${link.test}`}
+              data-tour={`admin-nav-${link.test}`}
               className={`shrink-0 border-b-2 pb-0.5 text-[15px] ${
                 active
                   ? "border-[#c4842a] font-semibold text-[#17233c] dark:text-[#f6f1e8]"

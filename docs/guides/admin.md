@@ -2,7 +2,7 @@
 
 You run the academy. Trainers coach the adult teachers. You decide who those trainers are, which batch they own, and when the whole school needs one message.
 
-Sign in on the Admin tab. The first visit starts a short tour. **Tour** in the header plays it again.
+Sign in on the Admin tab. The first visit starts a tour. **Tour** in the header plays it again. The tour points at each control in the top bar, then each navbar name, and leaves that control clear so you can read it while the page moves.
 
 ## A. The desk
 
@@ -12,9 +12,14 @@ You land on the admin home. A short line shows trainers, teachers, and courses. 
 
 | Control | What it does |
 | --- | --- |
-| Academy notice | One note to every approved trainer and every approved teacher. It lands in the bell. They do not reply inside it. |
-| Reset User Password | Set a new password for any account. The old password is stored hashed, so you cannot read it. |
-| Tour | Replay the short tour. |
+| Academy mark | Silverleaf Academy, and the line that says this is the admin desk. |
+| Signed-in account | The admin username, so you can see which desk is open. |
+| Tour | Replay the walk of the bar and the navbar. |
+| Academy notice | On the desk, under the pictures. One note to every approved trainer and every approved teacher. It lands in the bell. They do not reply inside it. |
+| Reset password | On the desk, next to Academy notice. Set a new password for any account. The old password is stored hashed, so you cannot read it. |
+| Bell | Notices sent to you. A red number means unread notes. |
+| Light and dark | Switches this browser between a light page and a dark page. |
+| Logout | Signs this admin account out. |
 
 ## C. The navbar and the cards
 

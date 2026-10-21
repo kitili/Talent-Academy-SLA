@@ -51,7 +51,7 @@ export default function AdminHome() {
   const [freshTeachers, setFreshTeachers] = useState<string[]>([]);
   const [freshTrainers, setFreshTrainers] = useState<string[]>([]);
   const [personQuery, setPersonQuery] = useState("");
-  const tour = useGuidedTour("sla-tour-admin-v2");
+  const tour = useGuidedTour("sla-tour-admin-v3");
 
   // Fetch dashboard stats
   const { data: stats, isLoading } = useQuery<DashboardStats>({
@@ -162,7 +162,7 @@ export default function AdminHome() {
       showAdminNav
       onLogout={() => logoutMutation.mutate()}
       actions={
-        <TourButton onClick={tour.replay} testId="button-admin-tour" tone="light" />
+        <TourButton onClick={tour.replay} testId="button-admin-tour" tone="light" tourId="admin-tour" />
       }
     >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -196,7 +196,7 @@ export default function AdminHome() {
           </button>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="admin-pictures">
           {[
             { href: "/approvals", title: "Approvals", test: "button-go-approvals", place: "classroom" as PlaceName },
             { href: "/admin/trainers", title: "Trainers", test: "button-go-trainers", place: "hall" as PlaceName },
@@ -222,7 +222,7 @@ export default function AdminHome() {
         <div className="flex flex-wrap items-center gap-3">
           <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-academy-notice">
+              <Button variant="outline" data-testid="button-academy-notice" data-tour="admin-notice">
                 <Megaphone className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Academy notice</span>
               </Button>
@@ -254,7 +254,7 @@ export default function AdminHome() {
           </Dialog>
           <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-reset-password">
+              <Button variant="outline" data-testid="button-reset-password" data-tour="admin-password">
                 Reset password
               </Button>
             </DialogTrigger>
