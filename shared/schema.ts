@@ -379,9 +379,11 @@ export type BatchTeacher = typeof batchTeachers.$inferSelect;
 export const assignedQuizzes = pgTable("assigned_quizzes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
-  weekId: varchar("week_id").notNull().references(() => trainingWeeks.id, { onDelete: "cascade" }),
+  weekId: varchar("week_id").references(() => trainingWeeks.id, { onDelete: "cascade" }),
   deckFileId: varchar("deck_file_id"),
   fileName: varchar("file_name"),
+  paperUrl: text("paper_url"),
+  paperName: varchar("paper_name"),
   title: varchar("title").notNull(),
   description: text("description"),
   numQuestions: integer("num_questions").notNull().default(5),
@@ -402,6 +404,14 @@ export const insertAssignedQuizSchema = createInsertSchema(assignedQuizzes).omit
 
 export type InsertAssignedQuiz = z.infer<typeof insertAssignedQuizSchema>;
 export type AssignedQuiz = typeof assignedQuizzes.$inferSelect;
+
+// Empty audience means every teacher in the cohort. Rows mean only those teachers.
+export const assignedQuizTeachers = pgTable("assigned_quiz_teachers", {
+  quizId: varchar("quiz_id").notNull().references(() => assignedQuizzes.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
+}, (table) => [
+  primaryKey({ columns: [table.quizId, table.teacherId] }),
+]);
 
 // Teacher quiz attempts table (for teachers taking assigned quizzes)
 export const teacherQuizAttempts = pgTable("teacher_quiz_attempts", {

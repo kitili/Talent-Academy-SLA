@@ -10,7 +10,7 @@ Open the Trainer tab and sign in. The first visit starts a short tour. **Tour** 
 
 ## B. Your desk
 
-You land on Your cohorts. Another trainer’s cohort is not in the list on the left.
+You land on Your cohorts. The numbers across the top are yours: cohorts, teachers, progress, quizzes, paper exams, attendance, certificates, and upcoming sessions. Another trainer’s cohort is not in the list on the left.
 
 ## C. Open a batch
 
@@ -21,7 +21,7 @@ Six tabs sit on the batch:
 | Tab | What you do |
 | --- | --- |
 | Teachers | See who is enrolled. Add a teacher. Write feedback. Send a short desk note. |
-| Quizzes | Assign a module quiz, including a question you write yourself. |
+| Quizzes | Assign a module quiz, write an open exam, or upload a paper. Tick teachers to give it only to them. Leave the boxes empty to give it to the whole cohort. |
 | Progress | See the same course percent the teacher sees. |
 | Attendance | Mark who came. |
 | Schedule | Put a session or a deadline on the calendar. |

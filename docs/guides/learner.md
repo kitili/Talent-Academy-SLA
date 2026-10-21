@@ -9,11 +9,12 @@ You only see your own batch, your own courses, and your own marks.
 1. **Continue learning** opens the next module. If the course has no lesson file yet, it still opens so you can read the objective.
 2. **My learning** shows each course, a percent, and a status: Not Started, In Progress, Completed, Passed, Failed, or Locked.
 3. **My courses** lists the modules. Open one, read the lesson, mark it read, then take the quiz. The next module stays locked until this one is passed. The pass mark is 80%.
-4. **My work** is written work besides the quiz. You write the answer. The trainer’s mark and comment appear on the same card.
-5. **My calendar** shows sessions and deadlines for your batch.
-6. **Course reflection** is your note after a module, with an optional rating.
-7. **Trainer feedback** is comments your trainer wrote about you. You can read them. You do not reply on that card.
-8. **Certificates** opens when a course is complete.
+4. **Your exams** lists quizzes your trainer assigned to you. A written exam opens as a document. An uploaded paper opens on the left, and you write your answers in the document on the right.
+5. **My work** is written work besides the quiz. You write the answer. The trainer’s mark and comment appear on the same card.
+6. **My calendar** shows sessions and deadlines for your batch.
+7. **Course reflection** is your note after a module, with an optional rating.
+8. **Trainer feedback** is comments your trainer wrote about you. You can read them. You do not reply on that card.
+9. **Certificates** opens when a course is complete.
 
 ## What you do in a module
 
