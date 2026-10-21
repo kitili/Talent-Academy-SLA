@@ -120,12 +120,12 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "Your cohorts",
-    body: "Pick a batch on the left. These are adult teachers, not the pupils. Another trainer's batch stays off this list.",
+    body: "Open Cohorts in the side bar and pick a group. Another trainer's cohort stays off this list.",
     target: "trainer-batches",
   },
   {
-    title: "Teachers, work, and documents",
-    body: "Inside a cohort: Teachers, Quizzes, Progress, Attendance, Schedule, and Certificates. The numbers above are your own cohorts, teachers, progress, attendance, certificates, and exams. Assign a quiz to the whole cohort or to chosen teachers. Courses in the header is where modules and lesson documents live.",
+    title: "The side bar",
+    body: "Desk is the home, with the counts. Then Cohorts, Teachers, Assignments, Assessments, and Quizzes. Progress, Attendance, Schedule, and Certificates follow. Courses is where lesson files live.",
     target: "trainer-tools",
   },
   {
