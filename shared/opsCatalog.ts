@@ -40,6 +40,7 @@ export const OPS_TABLES: { table: string; area: OpsAreaId; label: string }[] = [
   { table: "quiz_attempts", area: "learning", label: "Quiz attempts" },
   { table: "quiz_cache", area: "learning", label: "Generated quiz bank" },
   { table: "assigned_quizzes", area: "learning", label: "Quizzes assigned to a cohort" },
+  { table: "assigned_quiz_teachers", area: "learning", label: "Teachers chosen for a quiz" },
   { table: "teacher_quiz_attempts", area: "learning", label: "Fellow assigned-quiz attempts" },
   { table: "teacher_content_progress", area: "learning", label: "Fellow module progress" },
   { table: "teacher_content_quiz_attempts", area: "learning", label: "Fellow module quizzes" },

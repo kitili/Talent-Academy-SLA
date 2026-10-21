@@ -315,6 +315,16 @@ export default function TeacherDashboard() {
     },
   });
 
+  const { data: myExams = [] } = useQuery<any[]>({
+    queryKey: ["/api/teacher/quizzes"],
+    queryFn: async () => {
+      const res = await fetch("/api/teacher/quizzes", { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
   const { data: myWork = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/assignments"],
     queryFn: async () => {
@@ -447,6 +457,12 @@ export default function TeacherDashboard() {
               detail: "Continue the unlocked lesson",
               href: `/teacher/week/${resumeWeek.id}/content`,
             },
+            myExams[0] && {
+              key: "exam",
+              title: myExams[0].title,
+              detail: myExams[0].paperUrl ? "Open the paper and write your answers" : "Write this exam on your desk",
+              href: `/teacher/exams/${myExams[0].id}`,
+            },
             openWork[0] && {
               key: "work",
               title: openWork[0].title,
@@ -535,6 +551,39 @@ export default function TeacherDashboard() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="sl-rise" data-testid="card-teacher-exams">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Your exams
+            </CardTitle>
+            <CardDescription>
+              Quizzes your trainer assigned to you. A paper opens beside the document where you write.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {myExams.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No exam is assigned to you yet.</p>
+            ) : myExams.map((exam: any) => (
+              <button
+                key={exam.id}
+                type="button"
+                className="flex w-full items-center justify-between rounded-xl border bg-white px-3 py-2 text-left hover:border-primary"
+                onClick={() => setLocation(`/teacher/exams/${exam.id}`)}
+                data-testid={`link-exam-${exam.id}`}
+              >
+                <span>
+                  <span className="block font-medium">{exam.title}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    {exam.kind === "paper" ? "Paper exam" : exam.kind === "written" ? "Written exam" : "Quiz"}
+                  </span>
+                </span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            ))}
           </CardContent>
         </Card>
 

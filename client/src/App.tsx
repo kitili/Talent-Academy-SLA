@@ -14,6 +14,7 @@ import RoleHome from "@/pages/role-home";
 import CohortWorkspace from "@/pages/cohort-workspace";
 import UnifiedAuth from "@/pages/unified-auth";
 import TeacherDashboard from "@/pages/teacher-dashboard";
+import TeacherExam from "@/pages/teacher-exam";
 import TeacherContentView from "@/pages/teacher-content-view";
 import TrainerBatches from "@/pages/trainer-batches";
 import TrainerTeacherContentHistory from "@/pages/trainer-teacher-content-history";
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/login" component={UnifiedAuth} />
       <Route path="/emergency-reset" component={EmergencyReset} />
       <Route path="/teacher/dashboard" component={TeacherDashboard} />
+      <Route path="/teacher/exams/:quizId" component={TeacherExam} />
       <Route path="/teacher/certificates" component={TeacherCertificates} />
       <Route path="/teacher/certificates/:certId" component={TeacherCertificateView} />
       <Route path="/teacher/week/:weekId/content" component={TeacherContentView} />

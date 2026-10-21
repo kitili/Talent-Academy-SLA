@@ -32,6 +32,7 @@ import { recordAudit } from "./audit";
 import { sanitizeLessonHtml } from "./htmlSanitize";
 import { signFileGrant, verifyFileGrant } from "./fileGrant";
 import { passMarkOf, shuffleQuestions } from "./quizDelivery";
+import { isWritingExam } from "@shared/trainerDesk";
 import { blockAssignedQuiz, blockTeacherWeekQuiz } from "./cohortGate";
 import { normalizeManualQuestions } from "./quizService";
 import { sendTransactionalEmail } from "./mailer";
@@ -133,6 +134,57 @@ async function notifyBatchTeachers(batchId: string, title: string, message: stri
   for (const teacher of enrolled) {
     await notifyTeacher(teacher.id, title, message, type, { batchId });
   }
+}
+
+function cleanTeacherIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((id): id is string => typeof id === "string" && id.trim().length > 0))];
+}
+
+async function resolveQuizAudience(batchId: string, requested: unknown) {
+  const ids = cleanTeacherIds(requested);
+  if (ids.length === 0) return { teacherIds: [] as string[] };
+  const enrolled = await storage.getTeachersInBatch(batchId);
+  const allowed = new Set(enrolled.map((teacher) => teacher.id));
+  const teacherIds = ids.filter((id) => allowed.has(id));
+  if (teacherIds.length === 0) return { teacherIds, error: "Choose teachers who are in this cohort" };
+  return { teacherIds };
+}
+
+async function notifyQuizTeachers(batchId: string, teacherIds: string[], title: string, message: string) {
+  if (teacherIds.length === 0) {
+    await notifyBatchTeachers(batchId, title, message, "deadline");
+    return;
+  }
+  for (const teacherId of teacherIds) {
+    await notifyTeacher(teacherId, title, message, "deadline", { batchId });
+  }
+}
+
+async function saveWritingExam(
+  batchId: string,
+  assignedBy: string,
+  body: { title?: string; description?: string; prompt?: string; paperUrl?: string; paperName?: string; teacherIds?: unknown },
+) {
+  const title = String(body.title || "").trim();
+  if (!title) return { error: "Add a title", status: 400 as const };
+  const audience = await resolveQuizAudience(batchId, body.teacherIds);
+  if (audience.error) return { error: audience.error, status: 400 as const };
+  const prompt = String(body.prompt || "").trim() || "Write your answers in the document beside this paper.";
+  const quiz = await storage.createAssignedQuiz({
+    batchId,
+    weekId: null,
+    title,
+    description: body.description ? String(body.description) : null,
+    paperUrl: body.paperUrl || null,
+    paperName: body.paperName || null,
+    numQuestions: 1,
+    passMark: 80,
+    questions: [{ id: randomUUID(), type: "open_ended", question: prompt }],
+    assignedBy,
+  });
+  await storage.replaceQuizAudience(quiz.id, audience.teacherIds);
+  return { quiz, teacherIds: audience.teacherIds };
 }
 
 type TeacherLearningSummary = {
@@ -2626,6 +2678,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create assigned quiz
+      const audience = await resolveQuizAudience(req.params.batchId, req.body?.teacherIds);
+      if (audience.error) return res.status(400).json({ error: audience.error });
+
       const assignedQuiz = await storage.createAssignedQuiz({
         batchId: req.params.batchId,
         weekId,
@@ -2636,13 +2691,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         questions,
         assignedBy: req.user!.id,
       });
+      await storage.replaceQuizAudience(assignedQuiz.id, audience.teacherIds);
 
-      res.status(201).json(assignedQuiz);
-      notifyBatchTeachers(
+      res.status(201).json({ ...assignedQuiz, teacherIds: audience.teacherIds });
+      notifyQuizTeachers(
         req.params.batchId,
+        audience.teacherIds,
         "A quiz is ready",
-        `${title || "A module quiz"} is ready for ${batch.name}. Open your modules to take it.`,
-        "deadline",
+        `${title || "A module quiz"} is ready for ${batch.name}. Open your exams to write it.`,
       ).catch((error) => console.error("Quiz ready notice failed:", error));
     } catch (error) {
       console.error("Error assigning quiz:", error);
@@ -2701,6 +2757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const audience = await resolveQuizAudience(req.params.batchId, req.body?.teacherIds);
+      if (audience.error) return res.status(400).json({ error: audience.error });
+
       const assignedQuiz = await storage.createAssignedQuiz({
         batchId: req.params.batchId,
         weekId,
@@ -2713,18 +2772,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         questions,
         assignedBy: req.user!.id,
       });
+      await storage.replaceQuizAudience(assignedQuiz.id, audience.teacherIds);
 
-      res.status(201).json(assignedQuiz);
-      notifyBatchTeachers(
+      res.status(201).json({ ...assignedQuiz, teacherIds: audience.teacherIds });
+      notifyQuizTeachers(
         req.params.batchId,
+        audience.teacherIds,
         "A quiz is ready",
-        `${title || selectedFile.fileName || "A slide quiz"} is ready for ${batch.name}. Open your modules to take it.`,
-        "deadline",
+        `${title || selectedFile.fileName || "A slide quiz"} is ready for ${batch.name}. Open your exams to write it.`,
       ).catch((error) => console.error("Quiz ready notice failed:", error));
     } catch (error: any) {
       console.error("Error assigning file quiz:", error);
       const errorMessage = error?.message || "Failed to assign file quiz";
       res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  app.post("/api/batches/:batchId/paper-exam", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const paperUrl = String(req.body?.paperUrl || "").trim();
+      if (!paperUrl) return res.status(400).json({ error: "Upload the exam paper first" });
+      const saved = await saveWritingExam(req.params.batchId, req.user!.id, {
+        title: req.body?.title,
+        description: req.body?.description,
+        prompt: req.body?.prompt,
+        paperUrl,
+        paperName: req.body?.paperName,
+        teacherIds: req.body?.teacherIds,
+      });
+      if (saved.error) return res.status(saved.status || 400).json({ error: saved.error });
+      res.status(201).json({ ...saved.quiz, teacherIds: saved.teacherIds });
+      notifyQuizTeachers(
+        req.params.batchId,
+        saved.teacherIds || [],
+        "A paper exam is ready",
+        `${req.body?.title || "A paper exam"} is ready for ${batch.name}. Open it beside your answer document.`,
+      ).catch((error) => console.error("Paper exam notice failed:", error));
+    } catch (error) {
+      console.error("Error assigning paper exam:", error);
+      res.status(500).json({ error: "Failed to assign paper exam" });
+    }
+  });
+
+  app.post("/api/batches/:batchId/open-exam", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const prompt = String(req.body?.prompt || "").trim();
+      if (!prompt) return res.status(400).json({ error: "Write the exam prompt" });
+      const saved = await saveWritingExam(req.params.batchId, req.user!.id, {
+        title: req.body?.title,
+        description: req.body?.description,
+        prompt,
+        teacherIds: req.body?.teacherIds,
+      });
+      if (saved.error) return res.status(saved.status || 400).json({ error: saved.error });
+      res.status(201).json({ ...saved.quiz, teacherIds: saved.teacherIds });
+      notifyQuizTeachers(
+        req.params.batchId,
+        saved.teacherIds || [],
+        "An exam is ready",
+        `${req.body?.title || "An exam"} is ready for ${batch.name}. Open your exams and write your answers.`,
+      ).catch((error) => console.error("Open exam notice failed:", error));
+    } catch (error) {
+      console.error("Error assigning open exam:", error);
+      res.status(500).json({ error: "Failed to assign exam" });
     }
   });
 
@@ -2740,7 +2856,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
       const quizzes = await storage.getAssignedQuizzesForBatch(req.params.batchId);
-      res.json(quizzes);
+      const audience = await storage.getQuizAudienceMap(quizzes.map((quiz) => quiz.id));
+      res.json(quizzes.map((quiz) => ({ ...quiz, teacherIds: audience[quiz.id] || [] })));
     } catch (error) {
       console.error("Error fetching assigned quizzes:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -2845,7 +2962,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get pending open-ended reviews for trainer
   app.get("/api/trainer/pending-reviews", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const reviews = await storage.getPendingReviewsForTrainer(req.user!.id);
+      const trainerId = req.user?.role === "trainer" ? req.user.id : undefined;
+      const reviews = await storage.getPendingReviewsForTrainer(trainerId);
       res.json(reviews);
     } catch (error) {
       console.error("Error fetching pending reviews:", error);
@@ -2900,7 +3018,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/quizzes", isTeacherAuthenticated, async (req, res) => {
     try {
       const quizzes = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
-      res.json(quizzes);
+      res.json(quizzes.map((quiz) => ({
+        ...quiz,
+        kind: quiz.paperUrl ? "paper" : isWritingExam(quiz) ? "written" : "quiz",
+      })));
     } catch (error) {
       console.error("Error fetching teacher quizzes:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -2915,7 +3036,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Quiz not found" });
       }
       if (await blockAssignedQuiz(res, quiz)) return;
-      const questions = quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
+      const visible = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
+      if (!visible.some((item) => item.id === quiz.id)) {
+        return res.status(403).json({ error: "This exam is not assigned to you" });
+      }
+      const writing = isWritingExam(quiz);
+      const questions = writing || quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
       res.json({ ...quiz, questions, passMark: passMarkOf(quiz.passMark) });
     } catch (error) {
       console.error("Error fetching quiz:", error);
@@ -2933,6 +3059,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Quiz not found" });
       }
       if (await blockAssignedQuiz(res, quiz)) return;
+      const visible = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
+      if (!visible.some((item) => item.id === quiz.id)) {
+        return res.status(403).json({ error: "This exam is not assigned to you" });
+      }
 
       // Get all existing attempts for this quiz
       const existingAttempts = await storage.getTeacherQuizAttemptsByQuiz(
@@ -4644,9 +4774,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Trainer analytics (their batches/teachers)
+  app.get("/api/trainer/desk", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const trainerId = req.user?.role === "trainer" ? req.user.id : undefined;
+      res.json(await storage.getTrainerDesk(trainerId));
+    } catch (error) {
+      console.error("Error getting trainer desk:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/trainer/analytics", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const analytics = await storage.getTrainerAnalytics(req.user!.id);
+      const trainerId = req.user?.role === "trainer" ? req.user.id : undefined;
+      const analytics = await storage.getTrainerAnalytics(trainerId);
       res.json(analytics);
     } catch (error) {
       console.error("Error getting trainer analytics:", error);
@@ -4657,7 +4798,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trainer teacher analytics
   app.get("/api/trainer/analytics/teachers", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const analytics = await storage.getTeacherAnalyticsForTrainer(req.user!.id);
+      const trainerId = req.user?.role === "trainer" ? req.user.id : undefined;
+      const analytics = await storage.getTeacherAnalyticsForTrainer(trainerId);
       res.json(analytics);
     } catch (error) {
       console.error("Error getting teacher analytics:", error);

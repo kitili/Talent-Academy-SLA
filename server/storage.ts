@@ -112,12 +112,15 @@ import {
   discussionPosts,
   deskMessages,
   cohortTrainers,
+  cohortBatches,
+  assignedQuizTeachers,
   type OpenEndedReview,
   type InsertOpenEndedReview,
   type QuizQuestion,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql as sqlOp, desc, max, inArray } from "drizzle-orm";
+import { quizVisibleToTeacher, summarizeTrainerDesk, type TrainerCohortSummary } from "@shared/trainerDesk";
 import { courseHealth, quizStoppedReason } from "./cohortAccess";
 import { batchRiskStatus, moduleCoveragePercentage } from "./progressLogic";
 import session from "express-session";
@@ -233,6 +236,8 @@ export interface IStorage {
   getFileQuizzesForBatch(batchId: string): Promise<any[]>;
   getAssignedQuizzesForTeacher(teacherId: string): Promise<AssignedQuiz[]>;
   getAssignedQuiz(id: string): Promise<AssignedQuiz | undefined>;
+  replaceQuizAudience(quizId: string, teacherIds: string[]): Promise<void>;
+  getQuizAudienceMap(quizIds: string[]): Promise<Record<string, string[]>>;
   deleteAssignedQuiz(id: string): Promise<boolean>;
   updateAssignedQuizQuestions(quizId: string, questions: QuizQuestion[]): Promise<AssignedQuiz>;
   resetTeacherQuizAttempts(quizId: string, teacherId: string): Promise<void>;
@@ -241,7 +246,7 @@ export interface IStorage {
   createOpenEndedReview(review: InsertOpenEndedReview): Promise<OpenEndedReview>;
   getOpenEndedReviews(attemptId: string): Promise<OpenEndedReview[]>;
   updateAttemptReviewStatus(attemptId: string, openEndedPending: boolean, finalPassed: boolean | null): Promise<void>;
-  getPendingReviewsForTrainer(trainerId: string): Promise<any[]>;
+  getPendingReviewsForTrainer(trainerId?: string): Promise<any[]>;
 
   // Teacher quiz attempt operations
   saveTeacherQuizAttempt(attempt: InsertTeacherQuizAttempt): Promise<TeacherQuizAttempt>;
@@ -312,8 +317,9 @@ export interface IStorage {
   // Analytics operations
   getBatchAnalytics(batchId?: string): Promise<any>;
   getCourseAnalytics(courseId?: string): Promise<any>;
-  getTrainerAnalytics(trainerId: string): Promise<any>;
-  getTeacherAnalyticsForTrainer(trainerId: string): Promise<any>;
+  getTrainerAnalytics(trainerId?: string): Promise<any>;
+  getTeacherAnalyticsForTrainer(trainerId?: string): Promise<any>;
+  getTrainerDesk(trainerId?: string): Promise<any>;
 
   // Enhanced analytics
   getPipelineOverview(): Promise<any>;
@@ -1353,7 +1359,31 @@ export class DatabaseStorage implements IStorage {
       batchIds.map(batchId => this.getAssignedQuizzesForBatch(batchId))
     );
 
-    return allQuizzes.flat().filter((quiz) => (quiz.status || "open") === "open");
+    const open = allQuizzes.flat().filter((quiz) => (quiz.status || "open") === "open");
+    if (open.length === 0) return [];
+    const audience = await this.getQuizAudienceMap(open.map((quiz) => quiz.id));
+    return open.filter((quiz) => quizVisibleToTeacher(audience[quiz.id], teacherId));
+  }
+
+  async replaceQuizAudience(quizId: string, teacherIds: string[]): Promise<void> {
+    await db.delete(assignedQuizTeachers).where(eq(assignedQuizTeachers.quizId, quizId));
+    const unique = [...new Set(teacherIds.filter(Boolean))];
+    if (unique.length === 0) return;
+    await db.insert(assignedQuizTeachers).values(unique.map((teacherId) => ({ quizId, teacherId })));
+  }
+
+  async getQuizAudienceMap(quizIds: string[]): Promise<Record<string, string[]>> {
+    if (quizIds.length === 0) return {};
+    const rows = await db
+      .select()
+      .from(assignedQuizTeachers)
+      .where(inArray(assignedQuizTeachers.quizId, quizIds));
+    const map: Record<string, string[]> = {};
+    for (const row of rows) {
+      if (!map[row.quizId]) map[row.quizId] = [];
+      map[row.quizId].push(row.teacherId);
+    }
+    return map;
   }
 
   async getAssignedQuiz(id: string): Promise<AssignedQuiz | undefined> {
@@ -1415,12 +1445,8 @@ export class DatabaseStorage implements IStorage {
       .where(eq(teacherQuizAttempts.id, attemptId));
   }
 
-  async getPendingReviewsForTrainer(trainerId: string): Promise<any[]> {
-    // Get batches managed by this trainer
-    const trainerBatches = await db
-      .select()
-      .from(batches)
-      .where(eq(batches.trainerId, trainerId));
+  async getPendingReviewsForTrainer(trainerId?: string): Promise<any[]> {
+    const trainerBatches = await this.getAllBatches(trainerId);
     const batchIds = trainerBatches.map(b => b.id);
     if (batchIds.length === 0) return [];
 
@@ -2224,23 +2250,87 @@ export class DatabaseStorage implements IStorage {
     return summaries;
   }
 
-  async getTrainerAnalytics(trainerId: string): Promise<any> {
-    const createdBatches = await this.getAllBatches();
-    const assignedCourses = await db
-      .select({ count: sqlOp`COUNT(DISTINCT ${batchCourses.courseId})::int` })
-      .from(batchCourses)
-      .where(eq(batchCourses.assignedBy, trainerId));
+  async getTrainerAnalytics(trainerId?: string): Promise<any> {
+    const createdBatches = await this.getAllBatches(trainerId);
+    const assignedCourses = trainerId
+      ? await db
+          .select({ count: sqlOp`COUNT(DISTINCT ${batchCourses.courseId})::int` })
+          .from(batchCourses)
+          .where(eq(batchCourses.assignedBy, trainerId))
+      : [{ count: 0 }];
     
     return {
-      trainerId,
+      trainerId: trainerId || null,
       batchCount: createdBatches.length,
       courseAssignmentCount: assignedCourses[0]?.count || 0,
       batches: createdBatches,
     };
   }
 
-  async getTeacherAnalyticsForTrainer(trainerId: string): Promise<any> {
-    const trainerBatches = await this.getAllBatches();
+  async getTrainerDesk(trainerId?: string): Promise<any> {
+    const owned = await this.getAllBatches(trainerId);
+    const ids = owned.map((cohort) => cohort.id);
+    if (ids.length === 0) {
+      return summarizeTrainerDesk({
+        cohorts: [],
+        quizzes: [],
+        teacherCount: 0,
+        attendanceRate: null,
+        certificateCount: 0,
+        upcomingEvents: 0,
+        progressPercent: null,
+      });
+    }
+
+    const [quizRows, stepRows, attendance, certs, events, people, progress] = await Promise.all([
+      db.select({
+        status: assignedQuizzes.status,
+        paperUrl: assignedQuizzes.paperUrl,
+      }).from(assignedQuizzes).where(inArray(assignedQuizzes.batchId, ids)),
+      db.select({
+        cohortId: cohortBatches.cohortId,
+        id: cohortBatches.id,
+        name: cohortBatches.name,
+      }).from(cohortBatches).where(inArray(cohortBatches.cohortId, ids)),
+      db.select({
+        rate: sqlOp`ROUND(COUNT(*) FILTER (WHERE ${attendanceRecords.status} IN ('present', 'late'))::numeric / NULLIF(COUNT(*), 0) * 100, 1)`,
+      }).from(attendanceRecords).where(inArray(attendanceRecords.batchId, ids)),
+      db.select({ count: sqlOp`COUNT(*)::int` }).from(teacherCertificates).where(inArray(teacherCertificates.batchId, ids)),
+      db.select({ count: sqlOp`COUNT(*)::int` }).from(scheduledEvents).where(and(
+        inArray(scheduledEvents.batchId, ids),
+        sqlOp`${scheduledEvents.startDate} >= now()`,
+      )),
+      db.select({ count: sqlOp`COUNT(DISTINCT ${batchTeachers.teacherId})::int` }).from(batchTeachers).where(inArray(batchTeachers.batchId, ids)),
+      db.select({
+        avg: sqlOp`ROUND(AVG(CASE WHEN ${teacherCourseCompletion.totalWeeks} > 0 THEN ${teacherCourseCompletion.completedWeeks}::numeric / ${teacherCourseCompletion.totalWeeks} * 100 ELSE NULL END), 1)`,
+      }).from(teacherCourseCompletion).where(inArray(teacherCourseCompletion.batchId, ids)),
+    ]);
+
+    const cohorts: TrainerCohortSummary[] = owned.map((cohort) => ({
+      id: cohort.id,
+      name: cohort.name,
+      teacherCount: Number(cohort.teacherCount || 0),
+      status: cohort.status,
+      batches: stepRows
+        .filter((step) => step.cohortId === cohort.id)
+        .map((step) => ({ id: step.id, name: step.name })),
+    }));
+
+    const rate = attendance[0]?.rate;
+    const progressAvg = progress[0]?.avg;
+    return summarizeTrainerDesk({
+      cohorts,
+      quizzes: quizRows,
+      teacherCount: Number(people[0]?.count || 0),
+      attendanceRate: rate === null || rate === undefined ? null : Number(rate),
+      certificateCount: Number(certs[0]?.count || 0),
+      upcomingEvents: Number(events[0]?.count || 0),
+      progressPercent: progressAvg === null || progressAvg === undefined ? null : Number(progressAvg),
+    });
+  }
+
+  async getTeacherAnalyticsForTrainer(trainerId?: string): Promise<any> {
+    const trainerBatches = await this.getAllBatches(trainerId);
     const batchIds = trainerBatches.map(b => b.id);
     
     if (batchIds.length === 0) {

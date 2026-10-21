@@ -43,7 +43,7 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "Teachers, work, and documents",
-    body: "Inside a cohort: Teachers, Quizzes, Progress, Attendance, Schedule, and Certificates. Add teachers, assign a quiz, and set written work. Courses in the header is where modules and lesson documents live.",
+    body: "Inside a cohort: Teachers, Quizzes, Progress, Attendance, Schedule, and Certificates. The numbers above are your own cohorts, teachers, progress, attendance, certificates, and exams. Assign a quiz to the whole cohort or to chosen teachers. Courses in the header is where modules and lesson documents live.",
     target: "trainer-tools",
   },
   {

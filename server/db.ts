@@ -155,6 +155,39 @@ export async function ensureWrittenAssignmentTables() {
       teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
       PRIMARY KEY (cohort_batch_id, teacher_id)
     );
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'assigned_quizzes') THEN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'assigned_quizzes' AND column_name = 'week_id' AND is_nullable = 'NO'
+        ) THEN
+          ALTER TABLE assigned_quizzes ALTER COLUMN week_id DROP NOT NULL;
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'assigned_quizzes' AND column_name = 'paper_url'
+        ) THEN
+          ALTER TABLE assigned_quizzes ADD COLUMN paper_url text;
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'assigned_quizzes' AND column_name = 'paper_name'
+        ) THEN
+          ALTER TABLE assigned_quizzes ADD COLUMN paper_name varchar;
+        END IF;
+      END IF;
+    END $$;
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'assigned_quizzes') THEN
+        CREATE TABLE IF NOT EXISTS assigned_quiz_teachers (
+          quiz_id varchar NOT NULL REFERENCES assigned_quizzes(id) ON DELETE CASCADE,
+          teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+          PRIMARY KEY (quiz_id, teacher_id)
+        );
+      END IF;
+    END $$;
     CREATE TABLE IF NOT EXISTS desk_messages (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       from_id varchar NOT NULL,
