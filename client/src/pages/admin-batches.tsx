@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
-import { Layers, User, ArrowLeft, Plus, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Layers, ArrowLeft, Plus, Trash2, Pencil, Users } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,79 +24,52 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AcademyShell } from "@/components/AcademyShell";
 import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
-import { PageStrip, usePager } from "@/components/PageStrip";
-import { LEARNING_STAGES } from "@shared/tanzaniaPath";
+import { ACADEMY_TERMS } from "@shared/academyPath";
 
-interface Batch {
+type CourseRow = { id: string; name: string; description?: string | null; publishStatus?: string };
+type StepRow = { id: string; name: string; description?: string | null; courses: CourseRow[] };
+type CohortRow = {
   id: string;
   name: string;
-  description: string | null;
-  stage?: string | null;
+  description?: string | null;
   track?: string | null;
-  createdBy: string;
-  trainerId: string | null;
+  trainerId?: string | null;
   status?: string | null;
   quizzesStatus?: string | null;
-  teacherCount?: number;
-  createdAt: string;
-}
-
-interface Trainer {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-}
-
-interface AssignedQuiz {
-  id: string;
-  title: string;
-  description?: string | null;
-  status?: string | null;
-}
-
-const emptyForm = {
-  name: "",
-  description: "",
-  stage: "",
-  track: "",
-  trainerId: "none",
+  batches: StepRow[];
+};
+type AssignedQuiz = { id: string; title: string; status?: string | null };
+type TrainerRow = { id: string; username: string; email?: string | null };
+type PathPayload = {
+  cohortsRequired: number;
+  cohorts: CohortRow[];
+  courses: CourseRow[];
+  trainers: TrainerRow[];
 };
 
 export default function AdminBatches() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [assigningBatchId, setAssigningBatchId] = useState<string | null>(null);
+  const [requiredInput, setRequiredInput] = useState("");
+  const [cohortOpen, setCohortOpen] = useState(false);
+  const [cohortName, setCohortName] = useState("");
+  const [cohortDescription, setCohortDescription] = useState("");
+  const [cohortTrack, setCohortTrack] = useState("primary");
+  const [editingCohort, setEditingCohort] = useState<CohortRow | null>(null);
+  const [courseName, setCourseName] = useState("");
+  const [courseDescription, setCourseDescription] = useState("");
+  const [editingCourse, setEditingCourse] = useState<CourseRow | null>(null);
+  const [batchName, setBatchName] = useState<Record<string, string>>({});
+  const [editingBatch, setEditingBatch] = useState<StepRow | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editing, setEditing] = useState<Batch | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [batchToDelete, setBatchToDelete] = useState<Batch | null>(null);
 
-  const { data: batches = [], isLoading: batchesLoading } = useQuery<Batch[]>({
-    queryKey: ["/api/batches"],
-  });
-
-  const { data: trainers = [] } = useQuery<Trainer[]>({
-    queryKey: ["/api/trainers"],
+  const { data, isLoading, isError, error } = useQuery<PathPayload>({
+    queryKey: ["/api/admin/academy-path"],
     enabled: user?.role === "admin",
   });
 
@@ -102,64 +78,84 @@ export default function AdminBatches() {
     enabled: !!selectedId,
   });
 
-  const batchPager = usePager(batches);
-
   const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/academy-path"] });
     queryClient.invalidateQueries({ queryKey: ["/api/batches"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
     if (selectedId) queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedId, "quizzes"] });
   };
 
-  const assignTrainerMutation = useMutation({
-    mutationFn: async ({ batchId, trainerId }: { batchId: string; trainerId: string | null }) => {
-      return apiRequest("PUT", `/api/batches/${batchId}/trainer`, { trainerId });
+  const fail = (error: Error, title: string) => {
+    toast({ title, description: error.message, variant: "destructive" });
+  };
+
+  const saveRequired = useMutation({
+    mutationFn: async (cohortsRequired: number) => {
+      const res = await apiRequest("PUT", "/api/admin/academy-path", { cohortsRequired });
+      return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Trainer assignment saved" });
+      toast({ title: "Saved", description: "That is how many cohorts a teacher finishes." });
+      setRequiredInput("");
       refresh();
-      setAssigningBatchId(null);
     },
-    onError: (error: Error) => {
-      toast({ title: "Could not assign trainer", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => fail(error, "Could not save"),
   });
 
-  const saveBatchMutation = useMutation({
+  const createCohort = useMutation({
     mutationFn: async () => {
-      const body = {
-        name: form.name.trim(),
-        description: form.description.trim(),
-        stage: form.stage || null,
-        track: form.track || null,
-        trainerId: form.trainerId === "none" ? null : form.trainerId,
-      };
-      if (editing) {
-        await apiRequest("PATCH", `/api/batches/${editing.id}`, body);
-        await apiRequest("PUT", `/api/batches/${editing.id}/trainer`, { trainerId: body.trainerId });
-        return;
-      }
-      await apiRequest("POST", "/api/batches", body);
+      const res = await apiRequest("POST", "/api/batches", {
+        name: cohortName.trim(),
+        description: cohortDescription.trim(),
+        track: cohortTrack,
+      });
+      return res.json();
     },
     onSuccess: () => {
-      toast({ title: editing ? "Cohort updated" : "Cohort added" });
-      setEditorOpen(false);
+      setCohortOpen(false);
+      setCohortName("");
+      setCohortDescription("");
+      toast({ title: "Cohort added" });
       refresh();
     },
-    onError: (error: Error) => {
-      toast({ title: "Could not save cohort", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => fail(error, "Could not add the cohort"),
   });
 
-  const deleteBatchMutation = useMutation({
-    mutationFn: async (batchId: string) => apiRequest("DELETE", `/api/batches/${batchId}`),
+  const updateCohort = useMutation({
+    mutationFn: async (cohort: CohortRow) => {
+      await apiRequest("PATCH", `/api/batches/${cohort.id}`, {
+        name: cohort.name,
+        description: cohort.description,
+      });
+    },
+    onSuccess: () => {
+      setEditingCohort(null);
+      toast({ title: "Cohort updated" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not update the cohort"),
+  });
+
+  const removeCohort = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/batches/${id}`);
+    },
     onSuccess: () => {
       toast({ title: "Cohort removed" });
-      if (batchToDelete?.id === selectedId) setSelectedId(null);
-      setBatchToDelete(null);
       refresh();
     },
-    onError: (error: Error) => {
-      toast({ title: "Could not remove cohort", description: error.message, variant: "destructive" });
+    onError: (error: Error) => fail(error, "Could not remove the cohort"),
+  });
+
+  const assignTrainer = useMutation({
+    mutationFn: async ({ cohortId, trainerId }: { cohortId: string; trainerId: string | null }) => {
+      await apiRequest("PUT", `/api/batches/${cohortId}/trainer`, { trainerId });
     },
+    onSuccess: () => {
+      toast({ title: "Trainer updated" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not assign the trainer"),
   });
 
   const accessMutation = useMutation({
@@ -170,9 +166,7 @@ export default function AdminBatches() {
       toast({ title: "Cohort access updated" });
       refresh();
     },
-    onError: (error: Error) => {
-      toast({ title: "Could not update cohort", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => fail(error, "Could not update the cohort"),
   });
 
   const quizStatusMutation = useMutation({
@@ -183,176 +177,376 @@ export default function AdminBatches() {
       toast({ title: "Quiz updated" });
       refresh();
     },
-    onError: (error: Error) => {
-      toast({ title: "Could not update quiz", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => fail(error, "Could not update the quiz"),
   });
 
-  const getTrainerName = (trainerId: string | null) => {
-    if (!trainerId) return null;
-    const trainer = trainers.find((item) => item.id === trainerId);
-    return trainer ? trainer.username : "Unknown";
-  };
+  const createBatch = useMutation({
+    mutationFn: async (cohortId: string) => {
+      const name = (batchName[cohortId] || "").trim();
+      const res = await apiRequest("POST", `/api/admin/academy-path/cohorts/${cohortId}/batches`, { name });
+      return res.json();
+    },
+    onSuccess: (_data, cohortId) => {
+      setBatchName((current) => ({ ...current, [cohortId]: "" }));
+      toast({ title: "Batch added" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not add the batch"),
+  });
 
-  const openEditor = (batch?: Batch) => {
-    setEditing(batch || null);
-    setForm(batch ? {
-      name: batch.name,
-      description: batch.description || "",
-      stage: batch.stage || "",
-      track: batch.track || "",
-      trainerId: batch.trainerId || "none",
-    } : emptyForm);
-    setEditorOpen(true);
-  };
+  const updateBatch = useMutation({
+    mutationFn: async (batch: StepRow) => {
+      await apiRequest("PATCH", `/api/admin/academy-path/batches/${batch.id}`, {
+        name: batch.name,
+        description: batch.description,
+      });
+    },
+    onSuccess: () => {
+      setEditingBatch(null);
+      toast({ title: "Batch updated" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not update the batch"),
+  });
+
+  const removeBatch = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/admin/academy-path/batches/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Batch removed" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not remove the batch"),
+  });
+
+  const addCourseToBatch = useMutation({
+    mutationFn: async ({ batchId, courseId }: { batchId: string; courseId: string }) => {
+      await apiRequest("POST", `/api/admin/academy-path/batches/${batchId}/courses`, { courseId });
+    },
+    onSuccess: () => {
+      toast({ title: "Course placed on the batch" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not add the course"),
+  });
+
+  const removeCourseFromBatch = useMutation({
+    mutationFn: async ({ batchId, courseId }: { batchId: string; courseId: string }) => {
+      await apiRequest("DELETE", `/api/admin/academy-path/batches/${batchId}/courses/${courseId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Course removed from the batch" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not remove the course"),
+  });
+
+  const createCourse = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/courses", {
+        name: courseName.trim(),
+        description: courseDescription.trim(),
+        publishStatus: "published",
+        orderIndex: data?.courses.length || 0,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      setCourseName("");
+      setCourseDescription("");
+      toast({ title: "Course added" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not add the course"),
+  });
+
+  const updateCourse = useMutation({
+    mutationFn: async (course: CourseRow) => {
+      await apiRequest("PATCH", `/api/courses/${course.id}`, {
+        name: course.name,
+        description: course.description,
+      });
+    },
+    onSuccess: () => {
+      setEditingCourse(null);
+      toast({ title: "Course updated" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not update the course"),
+  });
+
+  const removeCourse = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/courses/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Course removed" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not remove the course"),
+  });
 
   if (user?.role !== "admin") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="p-8 text-center max-w-md">
-          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-          <p className="text-muted-foreground mb-6">Only administrators can access this page.</p>
-          <Button onClick={() => navigate("/")} variant="outline" data-testid="button-go-home">Go Home</Button>
+          <h2 className="text-2xl font-bold mb-4">Access denied</h2>
+          <p className="text-muted-foreground mb-6">Only an admin can set cohorts, batches, and the path.</p>
+          <Button onClick={() => navigate("/")} variant="outline">Go home</Button>
         </Card>
       </div>
     );
   }
 
+  const requiredShown = requiredInput || String(data?.cohortsRequired ?? "");
+  const cohortCount = data?.cohorts.length ?? 0;
+
   return (
-    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Cohorts" userLabel={user?.username} showAdminNav>
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <Button variant="ghost" onClick={() => navigate("/admin")} className="mb-4" data-testid="button-back-admin">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to admin desk
-          </Button>
-          <h1 className="text-3xl font-bold mb-2">Cohorts</h1>
-          <p className="text-muted-foreground">
-            Add or remove a batch, put a trainer on it, and open or close the cohort and its quizzes.
-          </p>
-        </div>
-        <Button onClick={() => openEditor()} data-testid="button-add-batch">
-          <Plus className="h-4 w-4 mr-2" />
-          Add cohort
+    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Academy path" userLabel={user?.username} showAdminNav>
+      <div className="mb-6">
+        <Button variant="ghost" onClick={() => navigate("/admin")} className="mb-4" data-testid="button-back-admin">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to admin desk
         </Button>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Cohorts, batches, and courses</h1>
+            <p className="text-muted-foreground max-w-2xl">
+              One place to add all three. You add cohorts and the batches inside them. You and a trainer can add courses. A trainer cannot add a cohort or a batch.
+            </p>
+          </div>
+          <Button onClick={() => setCohortOpen(true)} data-testid="button-add-cohort">
+            <Plus className="h-4 w-4 mr-2" />
+            Add cohort
+          </Button>
+        </div>
       </div>
 
-      {batchesLoading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading cohorts...</div>
-      ) : batches.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No cohorts yet</h3>
-          <p className="text-muted-foreground mb-4">Add the first batch, then assign the trainer who will coach it.</p>
-          <Button onClick={() => openEditor()} data-testid="button-add-first-batch">Add cohort</Button>
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        {(["cohort", "batch", "course"] as const).map((key) => (
+          <Card key={key} data-testid={`card-term-${key}`}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{ACADEMY_TERMS[key].title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{ACADEMY_TERMS[key].body}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Cohorts to finish</CardTitle>
+          <CardDescription>
+            A teacher is done after this many cohorts. You currently have {cohortCount}. Cohorts do not have to contain the same batches.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <div className="space-y-2">
+            <Label htmlFor="cohorts-required">Number of cohorts</Label>
+            <Input
+              id="cohorts-required"
+              type="number"
+              min={1}
+              max={50}
+              value={requiredShown}
+              onChange={(event) => setRequiredInput(event.target.value)}
+              className="w-32"
+              data-testid="input-cohorts-required"
+            />
+          </div>
+          <Button
+            data-testid="button-save-cohorts-required"
+            disabled={saveRequired.isPending || !requiredShown}
+            onClick={() => saveRequired.mutate(Number(requiredShown))}
+          >
+            Save
+          </Button>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <p className="text-muted-foreground py-8">Loading the path...</p>
+      ) : isError ? (
+        <Card className="p-6">
+          <p className="font-medium">The path did not load.</p>
+          <p className="text-sm text-muted-foreground mt-1">{error instanceof Error ? error.message : "Try again in a moment."}</p>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {batchPager.slice.map((batch) => {
-            const closed = (batch.status || "open") === "closed";
-            const quizzesStopped = (batch.quizzesStatus || "open") === "stopped";
-            return (
-              <Card key={batch.id} className="p-4 sm:p-6 sl-stat-card sl-rise" data-testid={`card-batch-${batch.id}`}>
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <Layers className="h-5 w-5 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold" data-testid={`text-batch-name-${batch.id}`}>{batch.name}</h3>
-                        {batch.track && (
-                          <Badge variant="secondary">{batch.track === "secondary" ? "Secondary" : "Primary"}</Badge>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.8fr)]">
+          <div className="space-y-4">
+            {cohortCount === 0 ? (
+              <Card className="p-8 text-center">
+                <Layers className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                <h3 className="font-semibold mb-1">No cohorts yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">Add the first group of teachers. Then add the batches they will go through.</p>
+                <Button onClick={() => setCohortOpen(true)}>Add cohort</Button>
+              </Card>
+            ) : data?.cohorts.map((cohort) => {
+              const closed = (cohort.status || "open") === "closed";
+              const quizzesStopped = (cohort.quizzesStatus || "open") === "stopped";
+              return (
+              <Card key={cohort.id} data-testid={`card-cohort-${cohort.id}`}>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
+                        {cohort.name}
+                        {cohort.track && (
+                          <Badge variant="secondary">{cohort.track === "secondary" ? "Secondary" : "Primary"}</Badge>
                         )}
-                        <Badge variant={closed ? "destructive" : "outline"} data-testid={`badge-cohort-status-${batch.id}`}>
+                        <Badge variant="outline" data-testid={`badge-batch-count-${cohort.id}`}>
+                          {cohort.batches.length} {cohort.batches.length === 1 ? "batch" : "batches"}
+                        </Badge>
+                        <Badge variant={closed ? "destructive" : "outline"} data-testid={`badge-cohort-status-${cohort.id}`}>
                           {closed ? "Closed" : "Open"}
                         </Badge>
-                        <Badge variant={quizzesStopped ? "destructive" : "outline"} data-testid={`badge-quiz-status-${batch.id}`}>
+                        <Badge variant={quizzesStopped ? "destructive" : "outline"} data-testid={`badge-quiz-status-${cohort.id}`}>
                           {quizzesStopped ? "Quizzes stopped" : "Quizzes open"}
                         </Badge>
-                      </div>
-                      {batch.description && <p className="text-sm text-muted-foreground mb-3">{batch.description}</p>}
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Trainer:</span>
-                        {batch.trainerId ? (
-                          <Badge variant="secondary" data-testid={`badge-trainer-${batch.id}`}>{getTrainerName(batch.trainerId)}</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground">Not assigned</Badge>
-                        )}
-                        {typeof batch.teacherCount === "number" && (
-                          <span className="text-sm text-muted-foreground">{batch.teacherCount} teachers</span>
-                        )}
-                      </div>
+                      </CardTitle>
+                      {cohort.description && <CardDescription className="mt-1">{cohort.description}</CardDescription>}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/cohorts/${batch.id}`)} data-testid={`button-open-cohort-${batch.id}`}>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/cohorts/${cohort.id}`)} data-testid={`button-open-cohort-${cohort.id}`}>
                         Open room
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => openEditor(batch)} data-testid={`button-edit-batch-${batch.id}`}>
-                        <Pencil className="h-4 w-4 mr-1" /> Edit
+                      <Button size="sm" variant="outline" onClick={() => setEditingCohort(cohort)} data-testid={`button-edit-cohort-${cohort.id}`}>
+                        <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => setBatchToDelete(batch)} data-testid={`button-delete-batch-${batch.id}`}>
-                        <Trash2 className="h-4 w-4 mr-1" /> Remove
-                      </Button>
-                    </div>
-                  </div>
-
-                  {assigningBatchId === batch.id ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Select
-                        value={batch.trainerId || "none"}
-                        onValueChange={(value) => {
-                          assignTrainerMutation.mutate({
-                            batchId: batch.id,
-                            trainerId: value === "none" ? null : value,
-                          });
-                        }}
-                        disabled={assignTrainerMutation.isPending}
-                      >
-                        <SelectTrigger className="w-[240px]" data-testid={`select-trainer-${batch.id}`}>
-                          <SelectValue placeholder="Select trainer..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Remove trainer</SelectItem>
-                          {trainers.map((trainer) => (
-                            <SelectItem key={trainer.id} value={trainer.id}>
-                              {trainer.username} ({trainer.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button variant="outline" size="sm" onClick={() => setAssigningBatchId(null)}>Cancel</Button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setAssigningBatchId(batch.id)} data-testid={`button-assign-trainer-${batch.id}`}>
-                        {batch.trainerId ? "Reassign trainer" : "Assign trainer"}
+                      <Button size="sm" variant="outline" onClick={() => {
+                        if (window.confirm(`Remove the cohort "${cohort.name}"? Teachers in it lose that room.`)) removeCohort.mutate(cohort.id);
+                      }} data-testid={`button-delete-cohort-${cohort.id}`}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="outline"
                         size="sm"
+                        variant="outline"
                         disabled={accessMutation.isPending}
-                        onClick={() => accessMutation.mutate({ batchId: batch.id, patch: { status: closed ? "open" : "closed" } })}
-                        data-testid={`button-toggle-cohort-${batch.id}`}
+                        onClick={() => accessMutation.mutate({ batchId: cohort.id, patch: { status: closed ? "open" : "closed" } })}
+                        data-testid={`button-toggle-cohort-${cohort.id}`}
                       >
                         {closed ? "Open cohort" : "Close cohort"}
                       </Button>
                       <Button
-                        variant="outline"
                         size="sm"
+                        variant="outline"
                         disabled={accessMutation.isPending}
-                        onClick={() => accessMutation.mutate({ batchId: batch.id, patch: { quizzesStatus: quizzesStopped ? "open" : "stopped" } })}
-                        data-testid={`button-toggle-quizzes-${batch.id}`}
+                        onClick={() => accessMutation.mutate({ batchId: cohort.id, patch: { quizzesStatus: quizzesStopped ? "open" : "stopped" } })}
+                        data-testid={`button-toggle-quizzes-${cohort.id}`}
                       >
                         {quizzesStopped ? "Open quizzes" : "Stop quizzes"}
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => setSelectedId(selectedId === batch.id ? null : batch.id)} data-testid={`button-manage-quizzes-${batch.id}`}>
-                        {selectedId === batch.id ? "Hide quizzes" : "Quiz list"}
+                      <Button size="sm" variant="outline" onClick={() => setSelectedId(selectedId === cohort.id ? null : cohort.id)} data-testid={`button-manage-quizzes-${cohort.id}`}>
+                        {selectedId === cohort.id ? "Hide quizzes" : "Quiz list"}
                       </Button>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Select
+                      value={cohort.trainerId || "none"}
+                      onValueChange={(value) => assignTrainer.mutate({
+                        cohortId: cohort.id,
+                        trainerId: value === "none" ? null : value,
+                      })}
+                    >
+                      <SelectTrigger className="w-[240px]" data-testid={`select-trainer-${cohort.id}`}>
+                        <SelectValue placeholder="Assign a trainer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No trainer</SelectItem>
+                        {(data?.trainers || []).map((trainer) => (
+                          <SelectItem key={trainer.id} value={trainer.id}>
+                            {trainer.username}{trainer.email ? ` (${trainer.email})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {cohort.batches.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No batches in this cohort yet. Add as many as this group needs.</p>
                   )}
-
-                  {selectedId === batch.id && (
-                    <div className="border rounded-lg p-3 space-y-2" data-testid={`quiz-list-${batch.id}`}>
+                  {cohort.batches.map((batch, index) => (
+                    <div key={batch.id} className="rounded-lg border p-3 space-y-2" data-testid={`card-batch-${batch.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium">Batch {index + 1}: {batch.name}</p>
+                          {batch.description && <p className="text-sm text-muted-foreground">{batch.description}</p>}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setEditingBatch(batch)} data-testid={`button-edit-batch-${batch.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => {
+                            if (window.confirm(`Remove batch "${batch.name}" from this cohort?`)) removeBatch.mutate(batch.id);
+                          }} data-testid={`button-delete-batch-${batch.id}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {batch.courses.map((course) => (
+                          <Badge key={course.id} variant="secondary" className="gap-1">
+                            {course.name}
+                            <button
+                              type="button"
+                              className="ml-1"
+                              aria-label={`Remove ${course.name}`}
+                              onClick={() => removeCourseFromBatch.mutate({ batchId: batch.id, courseId: course.id })}
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                        {batch.courses.length === 0 && (
+                          <span className="text-xs text-muted-foreground">No course on this batch yet.</span>
+                        )}
+                      </div>
+                      {(() => {
+                        const available = (data?.courses || []).filter((course) => !batch.courses.some((placed) => placed.id === course.id));
+                        if (available.length === 0) return null;
+                        return (
+                          <Select
+                            key={`${batch.id}-${batch.courses.map((course) => course.id).join(",")}`}
+                            onValueChange={(courseId) => addCourseToBatch.mutate({ batchId: batch.id, courseId })}
+                          >
+                            <SelectTrigger data-testid={`select-course-${batch.id}`}>
+                              <SelectValue placeholder="Add a course to this batch" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {available.map((course) => (
+                                <SelectItem key={course.id} value={course.id}>{course.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Name the next batch"
+                      value={batchName[cohort.id] || ""}
+                      onChange={(event) => setBatchName((current) => ({ ...current, [cohort.id]: event.target.value }))}
+                      data-testid={`input-batch-name-${cohort.id}`}
+                    />
+                    <Button
+                      variant="outline"
+                      disabled={!(batchName[cohort.id] || "").trim() || createBatch.isPending}
+                      onClick={() => createBatch.mutate(cohort.id)}
+                      data-testid={`button-add-batch-${cohort.id}`}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add batch
+                    </Button>
+                  </div>
+                  {selectedId === cohort.id && (
+                    <div className="border rounded-lg p-3 space-y-2" data-testid={`quiz-list-${cohort.id}`}>
                       {quizzes.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No assigned quizzes in this cohort yet. Open the room to assign one.</p>
                       ) : quizzes.map((quiz) => {
@@ -377,101 +571,228 @@ export default function AdminBatches() {
                       })}
                     </div>
                   )}
-                </div>
-                <BatchApprovalHistory batchId={batch.id} />
+                  <BatchApprovalHistory batchId={cohort.id} />
+                </CardContent>
               </Card>
-            );
-          })}
-          <PageStrip page={batchPager.page} pages={batchPager.pages} setPage={batchPager.setPage} />
+              );
+            })}
+          </div>
+
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Courses
+              </CardTitle>
+              <CardDescription>
+                Add a course here, then place it on a batch. Trainers can also add courses from the Courses page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-course-name">New course</Label>
+                <Input
+                  id="new-course-name"
+                  placeholder="Course name"
+                  value={courseName}
+                  onChange={(event) => setCourseName(event.target.value)}
+                  data-testid="input-new-course-name"
+                />
+                <Textarea
+                  placeholder="What this course teaches"
+                  value={courseDescription}
+                  onChange={(event) => setCourseDescription(event.target.value)}
+                  data-testid="input-new-course-description"
+                />
+                <Button
+                  disabled={!courseName.trim() || createCourse.isPending}
+                  onClick={() => createCourse.mutate()}
+                  data-testid="button-add-course"
+                >
+                  Add course
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {(data?.courses || []).length === 0 && (
+                  <p className="text-sm text-muted-foreground">No courses yet.</p>
+                )}
+                {(data?.courses || []).map((course) => (
+                  <div key={course.id} className="flex items-start justify-between gap-2 rounded-md border p-3" data-testid={`card-course-${course.id}`}>
+                    <div>
+                      <p className="font-medium text-sm">{course.name}</p>
+                      {course.publishStatus === "draft" && <Badge variant="outline" className="mt-1">Draft</Badge>}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => setEditingCourse(course)} data-testid={`button-edit-course-${course.id}`}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => {
+                        if (window.confirm(`Remove the course "${course.name}"?`)) removeCourse.mutate(course.id);
+                      }} data-testid={`button-delete-course-${course.id}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+      <Dialog open={cohortOpen} onOpenChange={setCohortOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit cohort" : "Add cohort"}</DialogTitle>
-            <DialogDescription>Name the batch, choose its stage, and assign the trainer who coaches it.</DialogDescription>
+            <DialogTitle>Add a cohort</DialogTitle>
+            <DialogDescription>This is the group. You will add its batches next. They do not have to match any other cohort.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="cohort-name">Name</Label>
-              <Input id="cohort-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-cohort-name" />
+              <Input id="cohort-name" value={cohortName} onChange={(event) => setCohortName(event.target.value)} data-testid="input-cohort-name" />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="cohort-description">Description</Label>
-              <Textarea id="cohort-description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+              <Textarea id="cohort-description" value={cohortDescription} onChange={(event) => setCohortDescription(event.target.value)} />
             </div>
-            <div>
-              <Label>Stage</Label>
-              <Select value={form.stage || "none"} onValueChange={(value) => {
-                const stage = LEARNING_STAGES.find((item) => item.id === value);
-                setForm({ ...form, stage: value === "none" ? "" : value, track: stage?.track || form.track });
-              }}>
-                <SelectTrigger data-testid="select-cohort-stage"><SelectValue placeholder="Stage" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No stage</SelectItem>
-                  {LEARNING_STAGES.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>{stage.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
+            <div className="space-y-2">
               <Label>Track</Label>
-              <Select value={form.track || "none"} onValueChange={(value) => setForm({ ...form, track: value === "none" ? "" : value })}>
-                <SelectTrigger data-testid="select-cohort-track"><SelectValue placeholder="Track" /></SelectTrigger>
+              <Select value={cohortTrack} onValueChange={setCohortTrack}>
+                <SelectTrigger data-testid="select-cohort-track">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No track</SelectItem>
                   <SelectItem value="primary">Primary</SelectItem>
                   <SelectItem value="secondary">Secondary</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Trainer</Label>
-              <Select value={form.trainerId} onValueChange={(value) => setForm({ ...form, trainerId: value })}>
-                <SelectTrigger data-testid="select-cohort-trainer"><SelectValue placeholder="Trainer" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No trainer</SelectItem>
-                  {trainers.map((trainer) => (
-                    <SelectItem key={trainer.id} value={trainer.id}>{trainer.username}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditorOpen(false)}>Cancel</Button>
-            <Button
-              disabled={!form.name.trim() || saveBatchMutation.isPending}
-              onClick={() => saveBatchMutation.mutate()}
-              data-testid="button-save-cohort"
-            >
-              {saveBatchMutation.isPending ? "Saving..." : "Save"}
+            <Button variant="outline" onClick={() => setCohortOpen(false)}>Cancel</Button>
+            <Button disabled={!cohortName.trim() || createCohort.isPending} onClick={() => createCohort.mutate()} data-testid="button-save-cohort">
+              Add cohort
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!batchToDelete} onOpenChange={(open) => !open && setBatchToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove this cohort?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {batchToDelete ? `${batchToDelete.name} and its roster links will be removed.` : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => batchToDelete && deleteBatchMutation.mutate(batchToDelete.id)}
-              data-testid="button-confirm-delete-cohort"
+      <Dialog open={!!editingCohort} onOpenChange={(open) => !open && setEditingCohort(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit cohort</DialogTitle>
+          </DialogHeader>
+          {editingCohort && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-cohort-name">Name</Label>
+                <Input
+                  id="edit-cohort-name"
+                  value={editingCohort.name}
+                  onChange={(event) => setEditingCohort({ ...editingCohort, name: event.target.value })}
+                  data-testid="input-edit-cohort-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cohort-description">Description</Label>
+                <Textarea
+                  id="edit-cohort-description"
+                  value={editingCohort.description || ""}
+                  onChange={(event) => setEditingCohort({ ...editingCohort, description: event.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCohort(null)}>Cancel</Button>
+            <Button
+              disabled={!editingCohort?.name.trim() || updateCohort.isPending}
+              onClick={() => editingCohort && updateCohort.mutate(editingCohort)}
+              data-testid="button-update-cohort"
             >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingBatch} onOpenChange={(open) => !open && setEditingBatch(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit batch</DialogTitle>
+          </DialogHeader>
+          {editingBatch && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-batch-name">Name</Label>
+                <Input
+                  id="edit-batch-name"
+                  value={editingBatch.name}
+                  onChange={(event) => setEditingBatch({ ...editingBatch, name: event.target.value })}
+                  data-testid="input-edit-batch-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-batch-description">Description</Label>
+                <Textarea
+                  id="edit-batch-description"
+                  value={editingBatch.description || ""}
+                  onChange={(event) => setEditingBatch({ ...editingBatch, description: event.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingBatch(null)}>Cancel</Button>
+            <Button
+              disabled={!editingBatch?.name.trim() || updateBatch.isPending}
+              onClick={() => editingBatch && updateBatch.mutate(editingBatch)}
+              data-testid="button-update-batch"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingCourse} onOpenChange={(open) => !open && setEditingCourse(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit course</DialogTitle>
+          </DialogHeader>
+          {editingCourse && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-course-name">Name</Label>
+                <Input
+                  id="edit-course-name"
+                  value={editingCourse.name}
+                  onChange={(event) => setEditingCourse({ ...editingCourse, name: event.target.value })}
+                  data-testid="input-edit-course-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-course-description">Description</Label>
+                <Textarea
+                  id="edit-course-description"
+                  value={editingCourse.description || ""}
+                  onChange={(event) => setEditingCourse({ ...editingCourse, description: event.target.value })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCourse(null)}>Cancel</Button>
+            <Button
+              disabled={!editingCourse?.name.trim() || updateCourse.isPending}
+              onClick={() => editingCourse && updateCourse.mutate(editingCourse)}
+              data-testid="button-update-course"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AcademyShell>
   );
 }

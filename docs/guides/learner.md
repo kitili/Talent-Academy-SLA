@@ -15,8 +15,6 @@ You only see your own batch, your own courses, and your own marks.
 7. **Trainer feedback** is comments your trainer wrote about you. You can read them. You do not reply on that card.
 8. **Certificates** opens when a course is complete.
 
-The strip under the welcome shows where your course sits, from playgroup to Form I.
-
 ## What you do in a module
 
 Read the objective. If a file is there, read it and mark it read. Take the quiz. If you miss it twice, a notice asks you to read the lesson again. When you pass, the next lesson or the next module opens, and a notice says so.

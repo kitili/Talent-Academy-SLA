@@ -124,6 +124,27 @@ export async function ensureWrittenAssignmentTables() {
     DROP INDEX IF EXISTS idx_teacher_certificate_unique;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_certificate_kind
       ON teacher_certificates(teacher_id, batch_id, course_id, kind);
+    CREATE TABLE IF NOT EXISTS academy_settings (
+      id varchar PRIMARY KEY,
+      cohorts_required integer NOT NULL DEFAULT 1,
+      updated_at timestamp DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS cohort_batches (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      cohort_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      name varchar NOT NULL,
+      description text,
+      order_index integer NOT NULL DEFAULT 0,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS cohort_batch_courses (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      cohort_batch_id varchar NOT NULL REFERENCES cohort_batches(id) ON DELETE CASCADE,
+      course_id varchar NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+      order_index integer NOT NULL DEFAULT 0
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_cohort_batch_course
+      ON cohort_batch_courses(cohort_batch_id, course_id);
     CREATE TABLE IF NOT EXISTS desk_messages (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       from_id varchar NOT NULL,

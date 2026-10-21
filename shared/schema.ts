@@ -316,6 +316,32 @@ export const insertBatchSchema = createInsertSchema(batches).omit({
 export type InsertBatch = z.infer<typeof insertBatchSchema>;
 export type Batch = typeof batches.$inferSelect;
 
+/** How many cohorts a teacher finishes before the academy counts them as done. */
+export const academySettings = pgTable("academy_settings", {
+  id: varchar("id").primaryKey(),
+  cohortsRequired: integer("cohorts_required").notNull().default(1),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** A batch is one step inside a cohort. Cohorts do not have to hold the same number. */
+export const cohortBatches = pgTable("cohort_batches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cohortId: varchar("cohort_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  orderIndex: integer("order_index").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const cohortBatchCourses = pgTable("cohort_batch_courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cohortBatchId: varchar("cohort_batch_id").notNull().references(() => cohortBatches.id, { onDelete: "cascade" }),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+  orderIndex: integer("order_index").notNull().default(0),
+}, (table) => [
+  uniqueIndex("idx_cohort_batch_course").on(table.cohortBatchId, table.courseId),
+]);
+
 // Batch teachers junction table (many-to-many)
 export const batchTeachers = pgTable("batch_teachers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

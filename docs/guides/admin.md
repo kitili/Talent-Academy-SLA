@@ -25,21 +25,21 @@ The navbar stays on the admin pages: Desk, Approvals, Trainers, Teachers, Cohort
 | Approvals | Let a waiting trainer or teacher in, or turn them away. The saved approval history is not listed here. |
 | Trainers | Create a trainer account. A trainer you create here is approved at once. Open a trainer to see that account. |
 | Teachers | Create a teacher account, already approved. Open a teacher to see progress and files viewed. |
-| Cohorts | Every batch. Add a batch, edit it, or remove it. Assign, reassign, or clear the trainer. Open or close the cohort, and open or stop its quizzes. Open the cohort room for roster, written work, calendar, and certificates. |
+| Cohorts | One place for three different things. A **cohort** is the group of teachers. A **batch** is a step inside that cohort, and each cohort can have a different number. A **course** is the lessons on a batch. Set how many cohorts a teacher finishes. You add cohorts, batches, and courses here. Assign the trainer, then open or close the cohort and its quizzes. A trainer can add courses only. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
 | Analytics | The gradebook for the whole academy: teachers, open cohorts, completion, attendance, quizzes, reflections, course ratings, and who is at risk. |
 | Courses | The same curriculum the trainers use. Keep a course on draft while you edit it. Publish it when teachers should see it. Add modules and lesson files. Plan each module as Introduction, Competence development, Design, then Realisation. |
 
 ## D. The job only you do
 
-A trainer sees only their own batches. You see all of them, and you are the person who puts a trainer on a batch. Until you do that, the trainer’s desk stays empty.
+A trainer sees only their own cohorts. You see all of them, and you are the person who puts a trainer on a cohort. Until you do that, the trainer’s desk stays empty.
 
-You can also create trainer accounts. A trainer cannot create another trainer or an admin.
+You add cohorts and the batches inside them. A trainer cannot. A trainer can add a course, and so can you. You can also create trainer accounts. A trainer cannot create another trainer or an admin.
 
 ## E. Start fresh
 
 **Clear previous activity** removes only the areas you tick: cohorts, progress, quizzes, certificates, or notices. Tick the trainers or teachers it applies to. It does not clear the whole academy, and it does not remove courses or login accounts. Type `CLEAR ACTIVITY` only when you mean it. You stay signed in.
 
-On Cohorts, each batch has an **Approval history** dropdown. It stays closed until you select it, then it pages the rows already saved in the database. **Export** downloads that batch as a CSV file.
+On Cohorts, each cohort has an **Approval history** dropdown. It stays closed until you select it, then it pages the rows already saved for that room. **Export** downloads them as a CSV file.
 
 ## F. A normal week
 
