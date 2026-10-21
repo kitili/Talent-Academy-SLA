@@ -26,6 +26,18 @@ Use desk mail when one teacher needs a private reply. Use a batch note when the 
 | Course rating | The teacher scores the course. That score goes to analytics, not into a thread with the trainer. |
 | Module discussion | The teacher can post on the lesson page. The trainer’s screens do not open that thread, so a post there does not reach the trainer’s desk. |
 
+## Where the admin speaks
+
+The admin does not sit in desk mail. Private replies stay between a trainer and a teacher.
+
+| Point | What happens |
+| --- | --- |
+| Academy notice | Admin only, from the header. It goes to every approved trainer and every approved teacher. They see it in the bell. There is no reply. |
+| Any cohort room | An admin can open every batch. From that room they can send a batch note, set written work, and mark it, the same way the assigned trainer can. |
+| Password reset | Admin sets a new password. That is not a message, and the old password cannot be shown. |
+
+Send an academy notice when the whole school needs one sentence. Leave a single teacher’s question to that teacher’s trainer.
+
 ## When they need to talk
 
 Talk when the lesson file is missing and the teacher is blocked, when written work is unclear, when a quiz has been missed twice, when attendance does not match the session, and when one teacher needs a different explanation from the rest of the batch.
