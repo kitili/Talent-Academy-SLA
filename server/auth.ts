@@ -10,6 +10,7 @@ import { hasDatabaseUrl } from "./db";
 import { loginRateLimit } from "./security";
 import { User as SelectUser } from "@shared/schema";
 import { matchTestLogin, TEACHER_PASSWORD, TEST_LOGINS } from "./testLogins";
+import { registerAccessRequestRoutes, signInBlock } from "./accessRequests";
 
 declare global {
   namespace Express {
@@ -211,6 +212,8 @@ export function setupAuth(app: Express) {
           res.status(200).json({ ...teacherWithoutPassword, role: "teacher" });
           return;
         }
+        const block = await signInBlock(username, requestedRole);
+        if (block) return res.status(block.status).json({ message: block.message, code: block.code });
       }
       if (
         !testLogin
@@ -352,9 +355,11 @@ export function setupAuth(app: Express) {
       const teacher = await storage.getTeacher(teacherId);
       if (teacher) {
         const { password: _pw, ...teacherWithoutPassword } = teacher;
-        return res.json({ ...teacherWithoutPassword, role: "teacher", username: teacher.email });
+        return res.json({ ...teacherWithoutPassword, role: "teacher", username: teacher.username || teacher.email });
       }
     }
     return res.sendStatus(401);
   });
+
+  registerAccessRequestRoutes(app);
 }

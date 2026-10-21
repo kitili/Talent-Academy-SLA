@@ -36,6 +36,11 @@ export default function UnifiedAuth() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [mode, setMode] = useState<"sign-in" | "request" | "password">("sign-in");
+  const [requestName, setRequestName] = useState("");
+  const [requestUsername, setRequestUsername] = useState("");
+  const [requestEmail, setRequestEmail] = useState("");
+  const [requestSent, setRequestSent] = useState(false);
 
   // Multi-role selection state
   const [showRolePicker, setShowRolePicker] = useState(false);
@@ -119,7 +124,7 @@ export default function UnifiedAuth() {
         signal: AbortSignal.timeout(20000),
       });
 
-      let data: { message?: string; multiRole?: boolean; roles?: MultiRoleOption[]; role?: Role } = {};
+      let data: { message?: string; code?: string; multiRole?: boolean; roles?: MultiRoleOption[]; role?: Role } = {};
       try {
         data = await response.json();
       } catch {
@@ -158,9 +163,13 @@ export default function UnifiedAuth() {
         setLoginLoading(false);
         setLocation(homeForRole(signedInRole));
       } else {
+        if (data.code === "needs_password") {
+          setMode("password");
+          if (loginRole === "admin") setLoginRole("trainer");
+        }
         toast({
           variant: "destructive",
-          title: response.status >= 500 ? "Sign-in unavailable" : "Incorrect password",
+          title: response.status >= 500 ? "Sign-in unavailable" : data.code === "pending" ? "Waiting for an admin" : "Sign-in stopped",
           description: data.message || "Invalid username or password",
         });
       }
@@ -170,6 +179,73 @@ export default function UnifiedAuth() {
         title: "Error",
         description: "An error occurred during login",
       });
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const openMode = (next: "sign-in" | "request" | "password") => {
+    setMode(next);
+    setRequestSent(false);
+    if (next !== "sign-in" && loginRole === "admin") setLoginRole("trainer");
+  };
+
+  const handleRequest = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoginLoading(true);
+    try {
+      const response = await fetch("/api/access-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: requestName,
+          username: requestUsername,
+          email: requestEmail,
+          role: loginRole,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok && response.status !== 200) {
+        toast({ variant: "destructive", title: "Request not saved", description: data.message || "Try again" });
+        return;
+      }
+      if (data.code === "needs_password") {
+        openMode("password");
+        toast({ title: "Already signed in", description: data.message });
+        return;
+      }
+      setRequestSent(true);
+      toast({ title: "Request sent", description: "An admin will sign you in. Then come back and create your password." });
+    } catch {
+      toast({ variant: "destructive", title: "Request not saved", description: "Try again in a moment." });
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleCreatePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoginLoading(true);
+    try {
+      const response = await fetch("/api/access-requests/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: loginEmail,
+          role: loginRole,
+          password: loginPassword,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast({ variant: "destructive", title: "Password not saved", description: data.message || "Try again" });
+        return;
+      }
+      setLoginPassword("");
+      openMode("sign-in");
+      toast({ title: "Password saved", description: "Sign in with it." });
+    } catch {
+      toast({ variant: "destructive", title: "Password not saved", description: "Try again in a moment." });
     } finally {
       setLoginLoading(false);
     }
@@ -278,14 +354,19 @@ export default function UnifiedAuth() {
                   </div>
                 </div>
                 <CardTitle className="text-2xl font-bold">Come in</CardTitle>
-                <CardDescription>Test desks only. This academy has no other sign-in.</CardDescription>
+                <CardDescription>Sign in, ask for a desk, or create your password after an admin signs you in.</CardDescription>
               </CardHeader>
               
               <CardContent className="px-4 sm:px-6">
-                    <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
+                    <div className="mb-4 grid grid-cols-3 gap-2 text-[11px] font-semibold leading-tight">
+                      <button type="button" className={`rounded-full px-2 py-2 ${mode === "sign-in" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("sign-in")} data-testid="button-mode-signin">Sign in</button>
+                      <button type="button" className={`rounded-full px-2 py-2 ${mode === "request" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("request")} data-testid="button-mode-request">Request a desk</button>
+                      <button type="button" className={`rounded-full px-2 py-2 ${mode === "password" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("password")} data-testid="button-mode-password">Create your password</button>
+                    </div>
+                    <form onSubmit={mode === "request" ? handleRequest : mode === "password" ? handleCreatePassword : handleLogin} className="space-y-4 sm:space-y-6">
                       {/* Role Selection Cards */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {roleCards.map((role) => {
+                      <div className={`grid gap-2 ${mode === "sign-in" ? "grid-cols-3" : "grid-cols-2"}`}>
+                        {roleCards.filter((role) => mode === "sign-in" || role.value !== "admin").map((role) => {
                           const isSelected = loginRole === role.value;
                           const place = scenes[role.value as Role].place;
                           return (
@@ -308,28 +389,42 @@ export default function UnifiedAuth() {
                         })}
                       </div>
 
+                      {mode === "request" && (
+                        <div className="space-y-2 text-left">
+                          <Label htmlFor="request-name">Name</Label>
+                          <Input id="request-name" data-testid="input-request-name" value={requestName} onChange={(e) => setRequestName(e.target.value)} required placeholder="Your name" className="h-12 bg-card border-2" />
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                         <Label htmlFor="login-email">
-                          {loginRole === "teacher" ? "Teacher ID or email" : "Username or email"}
+                          {mode === "request" ? "Username" : loginRole === "teacher" ? "Username, teacher ID, or email" : "Username or email"}
                         </Label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
                           <Input
                             id="login-email"
-                            data-testid="input-login-email"
+                            data-testid={mode === "request" ? "input-request-username" : "input-login-email"}
                             type="text"
                             autoComplete="username"
-                            placeholder={loginRole === "teacher" ? "teacher@test.com" : loginRole === "trainer" ? "trainer1" : "admin"}
-                            value={loginEmail}
-                            onChange={(e) => setLoginEmail(e.target.value)}
+                            placeholder="Username or email"
+                            value={mode === "request" ? requestUsername : loginEmail}
+                            onChange={(e) => mode === "request" ? setRequestUsername(e.target.value) : setLoginEmail(e.target.value)}
                             required
-                            className="pl-10 h-12 text-sm sm:text-base bg-card border-2"
+                            className="pl-10 h-12 text-sm sm:text-base bg-card border-2 text-[#17233c]"
                           />
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="login-password">Password</Label>
+                      {mode === "request" && (
+                        <div className="space-y-2 text-left">
+                          <Label htmlFor="request-email">Email</Label>
+                          <Input id="request-email" data-testid="input-request-email" type="email" value={requestEmail} onChange={(e) => setRequestEmail(e.target.value)} required placeholder="name@school.com" className="h-12 bg-card border-2 text-[#17233c]" />
+                        </div>
+                      )}
+
+                      {mode !== "request" && <div className="space-y-2">
+                        <Label htmlFor="login-password">{mode === "password" ? "New password" : "Password"}</Label>
                         <div className="relative">
                           <PasswordInput
                             id="login-password"
@@ -342,32 +437,37 @@ export default function UnifiedAuth() {
                             className="h-12 text-sm sm:text-base bg-card border-2"
                           />
                         </div>
-                      </div>
+                      </div>}
 
-                      {/* Login Button */}
                       <Button 
                         type="submit" 
                         size="lg"
                         className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-xl hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98]" 
                         disabled={loginLoading}
-                        data-testid="button-login"
+                        data-testid={mode === "request" ? "button-submit-request" : mode === "password" ? "button-save-password" : "button-login"}
                       >
                         {loginLoading ? (
                           <span className="flex items-center gap-2">
                             <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span className="text-sm sm:text-base">Logging in...</span>
+                            <span className="text-sm sm:text-base">Please wait...</span>
                           </span>
+                        ) : mode === "request" ? (
+                          "Ask to be signed in"
+                        ) : mode === "password" ? (
+                          "Save password"
                         ) : (
                           "Sign In"
                         )}
                       </Button>
 
-                      <div className="space-y-0.5 text-left text-xs text-muted-foreground" data-testid="text-test-logins">
-                        <p>Select the matching desk.</p>
-                        <p>admin / admin123</p>
-                        <p>trainer1 / trainer123</p>
-                        <p>teacher@test.com / teacher123</p>
-                      </div>
+                      {requestSent && mode === "request" && (
+                        <p className="text-left text-sm text-[#17233c]" data-testid="text-request-sent">
+                          Request sent. An admin signs you in from Approvals. Then come back here and create your password.
+                        </p>
+                      )}
+                      {mode === "password" && (
+                        <p className="text-left text-xs text-[#3a4a60]">Use the username or email from your request. This stays closed until an admin signs you in.</p>
+                      )}
                     </form>
               </CardContent>
             </Card>

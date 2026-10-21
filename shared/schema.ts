@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   role: varchar("role").notNull().default("trainer"), // 'admin' or 'trainer'
   approvalStatus: varchar("approval_status").notNull().default("pending"), // 'pending', 'approved', 'rejected'
+  passwordSet: varchar("password_set").notNull().default("yes"),
   approvedBy: varchar("approved_by"), // ID of admin who approved (null if pending)
   approvedAt: timestamp("approved_at"), // timestamp when approved
   resetToken: varchar("reset_token"), // password reset token
@@ -266,9 +267,11 @@ export const teachers = pgTable("teachers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teacherId: integer("teacher_id").notNull().unique(), // Numeric ID starting at 7100
   name: varchar("name").notNull(),
+  username: varchar("username"),
   email: varchar("email").notNull(), // Removed unique constraint - same email can have multiple roles
   password: varchar("password").notNull(), // hashed password
   approvalStatus: varchar("approval_status").notNull().default("pending"), // 'pending', 'approved', 'rejected'
+  passwordSet: varchar("password_set").notNull().default("yes"),
   approvedBy: varchar("approved_by"), // ID of admin/trainer who approved (null if pending)
   approvedByRole: varchar("approved_by_role"), // 'admin' or 'trainer' - who approved them
   approvedAt: timestamp("approved_at"), // timestamp when approved

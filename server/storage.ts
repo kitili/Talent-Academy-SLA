@@ -196,6 +196,7 @@ export interface IStorage {
   
   // Teacher operations (new user type separate from trainer/admin)
   getTeacher(id: string): Promise<Teacher | undefined>;
+  getTeacherByUsername(username: string): Promise<Teacher | undefined>;
   getTeacherByEmail(email: string): Promise<Teacher | undefined>;
   getAllTeachersByEmail(email: string): Promise<Teacher[]>; // For multi-role support
   getTeacherByTeacherId(teacherId: number): Promise<Teacher | undefined>;
@@ -499,7 +500,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserPassword(userId: string, hashedPassword: string): Promise<User | undefined> {
     const [user] = await db
       .update(users)
-      .set({ password: hashedPassword })
+      .set({ password: hashedPassword, passwordSet: "yes" })
       .where(eq(users.id, userId))
       .returning();
     return user;
@@ -1066,6 +1067,14 @@ export class DatabaseStorage implements IStorage {
     return teacher;
   }
 
+  async getTeacherByUsername(username: string): Promise<Teacher | undefined> {
+    const [teacher] = await db
+      .select()
+      .from(teachers)
+      .where(sqlOp`LOWER(${teachers.username}) = LOWER(${username})`);
+    return teacher;
+  }
+
   async getTeacherByEmail(email: string): Promise<Teacher | undefined> {
     const [teacher] = await db
       .select()
@@ -1117,7 +1126,7 @@ export class DatabaseStorage implements IStorage {
   async updateTeacherPassword(teacherId: string, hashedPassword: string): Promise<Teacher | undefined> {
     const [teacher] = await db
       .update(teachers)
-      .set({ password: hashedPassword })
+      .set({ password: hashedPassword, passwordSet: "yes" })
       .where(eq(teachers.id, teacherId))
       .returning();
     return teacher;
