@@ -85,14 +85,14 @@ export function DeskGraffiti() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true" data-testid="desk-graffiti">
-      <LogoWash className={leafLeft} color="#f7f9fc" blend="screen" />
-      <LogoWash className={`${leafLeft} opacity-80`} color="#16315f" blend="multiply" />
-      <LogoWash className={leafRight} color="#f7f9fc" blend="screen" />
-      <LogoWash className={`${leafRight} opacity-70`} color="#16315f" blend="multiply" />
-      <WallTag name={name} className={left} color="#ffffff" blend="screen" opacity={0.72} />
-      <WallTag name={name} className={left} color="#16315f" blend="multiply" opacity={0.55} />
-      <WallTag name={name} className={right} color="#ffffff" blend="screen" opacity={0.62} />
-      <WallTag name={name} className={right} color="#16315f" blend="multiply" opacity={0.45} />
+      <LogoWash className={`${leafLeft} opacity-80`} color="#f7f9fc" blend="screen" />
+      <LogoWash className={`${leafLeft} opacity-40`} color="#16315f" blend="multiply" />
+      <LogoWash className={`${leafRight} opacity-70`} color="#f7f9fc" blend="screen" />
+      <LogoWash className={`${leafRight} opacity-35`} color="#16315f" blend="multiply" />
+      <WallTag name={name} className={left} color="#ffffff" blend="screen" opacity={0.7} />
+      <WallTag name={name} className={left} color="#16315f" blend="multiply" opacity={0.42} />
+      <WallTag name={name} className={right} color="#ffffff" blend="screen" opacity={0.58} />
+      <WallTag name={name} className={right} color="#16315f" blend="multiply" opacity={0.34} />
     </div>
   );
 }
