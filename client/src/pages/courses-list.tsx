@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BackButton } from "@/components/BackButton";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -374,10 +375,11 @@ export default function CoursesList() {
             </MobileMenu>
           </div>
         </div>
-        {isAdmin && <AdminNav embedded />}
+        {isAdmin && <AdminNav />}
       </header>
 
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
+        <BackButton fallback={isAdmin ? "/admin" : "/"} className="mb-3" />
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold">Training Courses</h2>

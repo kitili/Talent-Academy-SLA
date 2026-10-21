@@ -15,7 +15,7 @@ import {
   teachers,
   users,
 } from "@shared/schema";
-import { ACADEMY_TERMS, moveBatchOrder, nextBatchName, normalizeCohortsRequired, pathSummary, sortBatches } from "@shared/academyPath";
+import { ACADEMY_TERMS, batchHoldingCourse, moveBatchOrder, nextBatchName, normalizeCohortsRequired, pathSummary, sortBatches } from "@shared/academyPath";
 
 const SETTINGS_ID = "path";
 
@@ -258,6 +258,8 @@ export function registerAcademyPathRoutes(
       if (!step) return res.status(404).json({ error: "Batch not found" });
       const course = await storage.getCourse(courseId);
       if (!course) return res.status(404).json({ error: "Course not found" });
+      const held = batchHoldingCourse(await stepsForCohort(step.cohortId), course.id);
+      if (held) return res.status(409).json({ error: `That course is already on ${held.name}. Each batch has its own courses.` });
       const [link] = await db.insert(cohortBatchCourses).values({
         cohortBatchId: step.id,
         courseId: course.id,

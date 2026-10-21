@@ -35,7 +35,6 @@ export function PlaceBanner({
 }) {
   return (
     <section className="sl-place-banner">
-      <img src={PLACES[place]} alt="" />
       <div className="sl-place-banner-copy">
         <h2 data-testid={titleTestId} className="text-2xl sm:text-3xl font-bold text-white">
           {title}
@@ -53,5 +52,5 @@ export function PlaceCover({
   place: PlaceName;
   className?: string;
 }) {
-  return <img src={PLACES[place]} alt="" className={`w-full object-cover ${className}`} />;
+  return null;
 }

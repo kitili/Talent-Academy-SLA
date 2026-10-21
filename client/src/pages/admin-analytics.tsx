@@ -827,7 +827,7 @@ export default function AdminAnalytics() {
     <div className="sl-page sl-bg-lamp min-h-screen">
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
-        <AdminNav flow />
+        <AdminNav />
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-6">
           <div className="flex items-center justify-between">
             <div>

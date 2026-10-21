@@ -127,7 +127,8 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 
 import { resolveDatabaseUrl } from "./databaseUrl";
-import { distinctionAppreciation, graduationAppreciation, TALENT_SIGNATORY_1, TALENT_SIGNATORY_2 } from "@shared/talentCertificate";
+import { TALENT_SIGNATORY_1, TALENT_SIGNATORY_2 } from "@shared/talentCertificate";
+import { kindForIssue, wordingForIssue } from "@shared/certificateDesigns";
 
 const PostgresSessionStore = connectPg(session);
 const sessionDatabaseUrl = resolveDatabaseUrl();
@@ -309,6 +310,14 @@ export interface IStorage {
   getTeacherCertificateById(certificateId: string): Promise<TeacherCertificate | undefined>;
   getTeacherCertificates(teacherId: string): Promise<TeacherCertificate[]>;
   getCertificatesForBatch(batchId: string): Promise<(TeacherCertificate & { teacher: Teacher })[]>;
+  listAllTeacherCertificates(): Promise<TeacherCertificate[]>;
+  issueAcademyCertificate(input: {
+    teacherId: string;
+    design: "fellowship" | "advanced";
+    occasion: "graduation" | "course";
+    courseId?: string;
+    batchId?: string;
+  }): Promise<TeacherCertificate>;
   updateTeacherCertificate(certificateId: string, updates: Partial<Pick<TeacherCertificate, 'teacherName' | 'courseName' | 'appreciationText' | 'adminName1' | 'adminName2'>>): Promise<TeacherCertificate | undefined>;
   
   // Auto certificate generation
@@ -2034,6 +2043,54 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => ({ ...r.certificate, teacher: r.teacher }));
   }
 
+  async listAllTeacherCertificates(): Promise<TeacherCertificate[]> {
+    return db.select().from(teacherCertificates).orderBy(desc(teacherCertificates.generatedAt));
+  }
+
+  async issueAcademyCertificate(input: {
+    teacherId: string;
+    design: "fellowship" | "advanced";
+    occasion: "graduation" | "course";
+    courseId?: string;
+    batchId?: string;
+  }): Promise<TeacherCertificate> {
+    const teacher = await this.getTeacher(input.teacherId);
+    if (!teacher) throw new Error("Teacher not found");
+    const course = input.courseId ? await this.getCourse(input.courseId) : undefined;
+    if (input.occasion === "course" && !course) throw new Error("Course not found");
+    const courseName = input.occasion === "course" ? course!.name : "Fellowship Program";
+    let batchId = input.batchId || undefined;
+    const courseId = input.occasion === "course" ? input.courseId : input.courseId;
+    if (courseId && !batchId) {
+      const batches = await this.getBatchesForTeacher(input.teacherId);
+      for (const batch of batches) {
+        const assigned = await this.getCoursesForBatch(batch.id);
+        if (assigned.some((item) => item.id === courseId)) {
+          batchId = batch.id;
+          break;
+        }
+      }
+    }
+    const payload: InsertTeacherCertificate = {
+      teacherId: input.teacherId,
+      batchId,
+      courseId: courseId || undefined,
+      design: input.design,
+      kind: kindForIssue(input.design, input.occasion),
+      teacherName: teacher.name,
+      courseName,
+      appreciationText: wordingForIssue(input.design, input.occasion, courseName),
+      adminName1: TALENT_SIGNATORY_1.name,
+      adminName2: TALENT_SIGNATORY_2.name,
+      completionPercentage: 100,
+    };
+    if (payload.batchId && payload.courseId) {
+      return this.generateTeacherCertificate(payload);
+    }
+    const [result] = await db.insert(teacherCertificates).values(payload).returning();
+    return result;
+  }
+
   async calculateTeacherCourseCompletionPercentage(teacherId: string, courseId: string): Promise<number> {
     const weeks = await this.getWeeksForCourse(courseId);
     if (weeks.length === 0) return 0;
@@ -2055,89 +2112,7 @@ export class DatabaseStorage implements IStorage {
 
   async tryAutoGenerateCertificate(teacherId: string, courseId: string): Promise<TeacherCertificate | null> {
     await this.syncTeacherCourseCompletion(teacherId, courseId);
-    const completionPercentage = await this.calculateTeacherCourseCompletionPercentage(teacherId, courseId);
-    if (completionPercentage < 80) {
-      return null;
-    }
-
-    const teacher = await this.getTeacher(teacherId);
-    const course = await this.getCourse(courseId);
-    if (!teacher || !course) return null;
-
-    const weeks = await this.getWeeksForCourse(courseId);
-    const areas = weeks.map((week) => week.competencyFocus || `Module ${week.weekNumber}`).filter(Boolean);
-    const attempts = await this.getAllTeacherQuizAttempts(teacherId);
-    const quizzes = await this.getAssignedQuizzesForTeacher(teacherId);
-    const outstanding: string[] = [];
-    let quizPercents: number[] = [];
-    for (const quiz of quizzes) {
-      if (quiz.weekId && !weeks.some((week) => week.id === quiz.weekId)) continue;
-      const attempt = attempts.find((row) => row.assignedQuizId === quiz.id);
-      if (!attempt || !attempt.totalQuestions) continue;
-      const percent = (attempt.score / attempt.totalQuestions) * 100;
-      quizPercents.push(percent);
-      const week = weeks.find((item) => item.id === quiz.weekId);
-      if (percent >= 90) {
-        outstanding.push(week?.competencyFocus || quiz.title || "this module");
-      }
-    }
-    const avgQuiz = quizPercents.length
-      ? quizPercents.reduce((sum, value) => sum + value, 0) / quizPercents.length
-      : completionPercentage;
-    const earnsDistinction = completionPercentage >= 90 && avgQuiz >= 90;
-
-    const teacherBatches = await this.getBatchesForTeacher(teacherId);
-    let latest: TeacherCertificate | null = null;
-
-    for (const batch of teacherBatches) {
-      const coursesForBatch = await this.getCoursesForBatch(batch.id);
-      if (!coursesForBatch.some((item) => item.id === courseId)) continue;
-
-      await this.upsertTeacherCourseCompletion({
-        teacherId,
-        courseId,
-        batchId: batch.id,
-        status: "completed",
-        completedAt: new Date(),
-      });
-
-      const template = await this.getBatchCourseCertificateTemplate(batch.id, courseId);
-      const sign1 = template?.adminName1 || TALENT_SIGNATORY_1.name;
-      const sign2 = template?.adminName2 || TALENT_SIGNATORY_2.name;
-
-      latest = await this.generateTeacherCertificate({
-        teacherId,
-        batchId: batch.id,
-        courseId,
-        templateId: template?.id,
-        kind: "graduation",
-        teacherName: teacher.name,
-        courseName: course.name,
-        appreciationText: graduationAppreciation(areas, course.name),
-        adminName1: sign1,
-        adminName2: sign2,
-        completionPercentage,
-      });
-
-      if (earnsDistinction) {
-        latest = await this.generateTeacherCertificate({
-          teacherId,
-          batchId: batch.id,
-          courseId,
-          templateId: template?.id,
-          kind: "distinction",
-          outstandingAreas: outstanding.join(", ") || areas.slice(0, 3).join(", "),
-          teacherName: teacher.name,
-          courseName: course.name,
-          appreciationText: distinctionAppreciation(areas, course.name, outstanding),
-          adminName1: sign1,
-          adminName2: sign2,
-          completionPercentage,
-        });
-      }
-    }
-
-    return latest;
+    return null;
   }
 
   // Analytics operations

@@ -39,7 +39,7 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {userLabel && (
               <span
-                className={`text-xs max-w-[5.5rem] sm:max-w-[140px] truncate ${showAdminNav ? "inline text-[#243044] dark:text-[#d7deea]" : "hidden lg:inline text-white/90"}`}
+                className={`text-xs italic max-w-[5.5rem] sm:max-w-[140px] truncate ${showAdminNav ? "inline text-[#243044] dark:text-[#d7deea]" : "hidden lg:inline text-white/90"}`}
                 data-tour={showAdminNav ? "admin-account" : undefined}
               >
                 {userLabel}
@@ -68,7 +68,7 @@ export function AcademyShell({ title, subtitle, userLabel, onLogout, actions, sc
             )}
           </div>
         </div>
-        {showAdminNav && <AdminNav embedded />}
+        {showAdminNav && <AdminNav />}
       </header>
       <div className={`${frame} py-6 sm:py-8`}>
         <div className="sl-sheet space-y-6">

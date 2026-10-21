@@ -29,7 +29,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AcademyShell } from "@/components/AcademyShell";
 import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
-import { ACADEMY_TERMS, nextBatchName } from "@shared/academyPath";
+import { ACADEMY_TERMS, batchHoldingCourse, nextBatchName } from "@shared/academyPath";
 import { deskName } from "@shared/deskName";
 
 const STEP_TONES = [
@@ -72,7 +72,6 @@ export default function AdminBatches() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [requiredInput, setRequiredInput] = useState("");
   const [cohortOpen, setCohortOpen] = useState(false);
   const [cohortName, setCohortName] = useState("");
   const [cohortDescription, setCohortDescription] = useState("");
@@ -105,19 +104,6 @@ export default function AdminBatches() {
   const fail = (error: Error, title: string) => {
     toast({ title, description: error.message, variant: "destructive" });
   };
-
-  const saveRequired = useMutation({
-    mutationFn: async (cohortsRequired: number) => {
-      const res = await apiRequest("PUT", "/api/admin/academy-path", { cohortsRequired });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Saved", description: "That is how many cohorts a teacher finishes." });
-      setRequiredInput("");
-      refresh();
-    },
-    onError: (error: Error) => fail(error, "Could not save"),
-  });
 
   const createCohort = useMutation({
     mutationFn: async () => {
@@ -334,7 +320,6 @@ export default function AdminBatches() {
     );
   }
 
-  const requiredShown = requiredInput || String(data?.cohortsRequired ?? "");
   const cohortCount = data?.cohorts.length ?? 0;
 
   return (
@@ -380,37 +365,6 @@ export default function AdminBatches() {
           </Card>
         ))}
       </div>
-
-      <Card className="mb-6 border-l-4 border-l-[#c47b2b]">
-        <CardHeader>
-          <CardTitle className="text-base">Cohorts to finish</CardTitle>
-          <CardDescription>
-            A teacher is done after this many cohorts. You currently have {cohortCount}. Cohorts do not have to contain the same batches.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="space-y-2">
-            <Label htmlFor="cohorts-required">Number of cohorts</Label>
-            <Input
-              id="cohorts-required"
-              type="number"
-              min={1}
-              max={50}
-              value={requiredShown}
-              onChange={(event) => setRequiredInput(event.target.value)}
-              className="w-32"
-              data-testid="input-cohorts-required"
-            />
-          </div>
-          <Button
-            data-testid="button-save-cohorts-required"
-            disabled={saveRequired.isPending || !requiredShown}
-            onClick={() => saveRequired.mutate(Number(requiredShown))}
-          >
-            Save
-          </Button>
-        </CardContent>
-      </Card>
 
       {isLoading ? (
         <p className="text-muted-foreground py-8">Loading the path...</p>
@@ -548,7 +502,7 @@ export default function AdminBatches() {
                   <div className="space-y-3">
                     {batches.map((batch, index) => {
                       const tone = stepTone(index);
-                      const available = (data?.courses || []).filter((course) => !batch.courses.some((placed) => placed.id === course.id));
+                      const available = (data?.courses || []).filter((course) => !batchHoldingCourse(batches, course.id));
                       return (
                         <div key={batch.id} className="relative pl-14" data-testid={`card-batch-${batch.id}`}>
                           {index < batches.length - 1 && (
@@ -562,7 +516,7 @@ export default function AdminBatches() {
                               <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-[#c47b2b]">Week {index + 1}</p>
                                 <p className="font-medium text-[#102448]">{batch.name}</p>
-                                <p className="text-xs text-[#3a4a60]">Courses in this batch are the lessons a teacher does this week.</p>
+                                <p className="text-xs text-[#3a4a60]">These courses are taught in week {index + 1}, and in no other week.</p>
                                 {batch.description && <p className="text-sm text-muted-foreground">{batch.description}</p>}
                               </div>
                               <div className="flex gap-1">

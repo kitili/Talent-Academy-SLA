@@ -11,7 +11,6 @@ import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { homeForRole, persistSessionUser, readSessionUser } from "@/lib/sessionUser";
 import { Shield, GraduationCap, Users, Mail } from "lucide-react";
-import { PLACES, type PlaceName } from "@/components/PlaceArt";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 type Role = "admin" | "trainer" | "teacher";
@@ -342,16 +341,15 @@ export default function UnifiedAuth() {
     }
   };
 
-  const scenes: Record<Role, { src: string; line: string; place: PlaceName }> = {
-    admin: { src: "/bg-library.jpg", line: "The library is open", place: "library" },
-    trainer: { src: "/bg-hall.jpg", line: "The hall is open", place: "hall" },
-    teacher: { src: "/bg-garden.jpg", line: "For adult teachers", place: "garden" },
+  const scenes: Record<Role, { line: string }> = {
+    admin: { line: "The library is open" },
+    trainer: { line: "The hall is open" },
+    teacher: { line: "For adult teachers" },
   };
   const scene = scenes[loginRole];
 
   return (
     <div className="relative min-h-screen">
-      <img key={scene.src} src={scene.src} alt="" className="pointer-events-none fixed inset-0 h-full w-full object-cover object-center" decoding="async" />
       <div className="fixed inset-0 bg-[#102448]/20" />
       {/* Multi-role picker dialog */}
       <Dialog open={showRolePicker} onOpenChange={setShowRolePicker}>
@@ -425,7 +423,6 @@ export default function UnifiedAuth() {
                       <div className={`grid gap-2 ${mode === "sign-in" ? "grid-cols-3" : "grid-cols-2"}`}>
                         {roleCards.filter((role) => mode === "sign-in" || role.value !== "admin").map((role) => {
                           const isSelected = loginRole === role.value;
-                          const place = scenes[role.value as Role].place;
                           return (
                             <button
                               key={role.value}
@@ -436,7 +433,6 @@ export default function UnifiedAuth() {
                                 isSelected ? "border-[#102448] ring-2 ring-[#102448]" : "border-transparent hover:border-[#102448]/30"
                               }`}
                             >
-                              <img src={PLACES[place]} alt="" className="h-16 w-full object-cover sm:h-20" />
                               <span className={`block px-2 py-1.5 text-center ${isSelected ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`}>
                                 <span className="block text-sm font-semibold">{role.title}</span>
                                 <span className="mt-0.5 block text-[10px] leading-tight opacity-80">{role.description}</span>

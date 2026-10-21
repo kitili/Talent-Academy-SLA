@@ -881,42 +881,10 @@ body {
   transform: translateZ(0);
 }
 
-.sl-bg-room,
-.sl-bg-library,
-.sl-bg-board,
-.sl-bg-garden,
-.sl-bg-lamp,
-.sl-bg-hall,
-.sl-bg-paper {
-  background-image: none;
-}
-.sl-bg-room::before,
-.sl-bg-library::before,
-.sl-bg-board::before,
-.sl-bg-garden::before,
-.sl-bg-lamp::before,
-.sl-bg-hall::before,
-.sl-bg-paper::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
 .sl-page > * {
   position: relative;
   z-index: 1;
 }
-.sl-bg-room::before { background-image: url("/silverleaf-room.jpg"); }
-.sl-bg-library::before { background-image: url("/bg-library.jpg"); }
-.sl-bg-board::before { background-image: url("/bg-board.jpg"); }
-.sl-bg-garden::before { background-image: url("/bg-garden.jpg"); }
-.sl-bg-lamp::before { background-image: url("/bg-lamp.jpg"); }
-.sl-bg-hall::before { background-image: url("/bg-hall.jpg"); }
-.sl-bg-paper::before { background-image: url("/bg-paper.jpg"); }
 
 .sl-frame {
   width: calc(100% - 1rem);
@@ -958,9 +926,7 @@ body {
 }
 
 .sl-stage {
-  background:
-    linear-gradient(180deg, rgba(255, 248, 236, 0.18), rgba(18, 36, 72, 0.22)),
-    url("/silverleaf-room.jpg") center / cover no-repeat scroll;
+  background: linear-gradient(180deg, rgba(255, 248, 236, 0.18), rgba(18, 36, 72, 0.22));
 }
 
 .sl-orbit {
@@ -1034,9 +1000,8 @@ body {
 .sl-place-banner {
   position: relative;
   overflow: hidden;
-  min-height: 168px;
   border-radius: 1.25rem;
-  box-shadow: 0 16px 40px rgba(16, 36, 72, 0.18);
+  background: #102448;
 }
 
 .sl-place-banner img {
@@ -1051,11 +1016,9 @@ body {
   position: relative;
   z-index: 1;
   display: flex;
-  min-height: 168px;
   flex-direction: column;
   justify-content: flex-end;
   padding: 1.25rem 1.4rem;
-  background: linear-gradient(90deg, rgba(16, 36, 72, 0.82) 0%, rgba(16, 36, 72, 0.28) 70%, rgba(16, 36, 72, 0.05) 100%);
 }
 
 .sl-place-tile img {
@@ -1132,4 +1095,10 @@ body {
 
 .sla-tour-target {
   border-radius: 16px;
+}
+/* The admin side menu is fixed to the left edge on wide screens, so the page makes room for it. */
+@media (min-width: 1024px) {
+  body:has(nav[data-admin-rail]) {
+    padding-left: 14rem;
+  }
 }

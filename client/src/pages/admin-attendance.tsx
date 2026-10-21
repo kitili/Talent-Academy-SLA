@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BackButton } from "@/components/BackButton";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AcademyShell } from "@/components/AcademyShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -6,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AttendanceBoard } from "@/components/AttendanceBoard";
 import { attendanceCounts, type AttendancePerson } from "@shared/attendanceDesk";
 
 type Payload = {
@@ -95,6 +97,7 @@ export default function AdminAttendance() {
       scene="hall"
     >
       <div className="space-y-4" data-testid="admin-attendance">
+        <BackButton fallback="/admin" label="Back" />
         <div className="grid grid-cols-3 gap-3">
           {[
             ["Teachers", counts.teachers],
@@ -143,6 +146,8 @@ export default function AdminAttendance() {
         {isLoading && <p className="text-sm text-[#3a4a60]">Opening the lists…</p>}
         {error && <p className="text-sm text-[#9b3d55]">The attendance list needs the academy database.</p>}
         {mark.error && <p className="text-sm text-[#9b3d55]">{mark.error.message}</p>}
+
+        <AttendanceBoard />
 
         <div className="grid gap-4 lg:grid-cols-2">
           <PeopleList title="Teachers" rows={data?.teachers || []} testId="attendance-teachers" />

@@ -131,8 +131,14 @@ describe("trainer desk wiring", () => {
     assert.match(trainer, /data-testid="trainer-sidebar"/);
     assert.match(trainer, /trainer-nav-\$\{item\.id\}/);
     assert.match(trainer, /id: "assignments"/);
-    assert.match(trainer, /id: "assessments"/);
-    assert.match(trainer, /id: "quizzes"/);
+    assert.equal(trainer.includes('id: "assessments", label: "Assessments", icon'), false);
+    assert.equal(trainer.includes('id: "quizzes", label: "Quizzes", icon'), false);
+    assert.equal(trainer.includes('id: "teachers", label: "Teachers", icon'), false);
+    assert.match(trainer, /id: "messages"/);
+    assert.match(trainer, /data-testid="trainer-quizzes"/);
+    assert.match(trainer, /data-testid="trainer-assessments"/);
+    assert.match(trainer, /dueDate: deadlineIso/);
+    assert.match(routes, /parseDeadline\(req\.body\?\.dueDate\)/);
     assert.equal(trainer.includes("Adult teachers"), false);
     assert.match(trainer, /button-upload-exam/);
     assert.match(trainer, /check-quiz-teacher-/);

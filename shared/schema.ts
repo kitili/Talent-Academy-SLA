@@ -395,6 +395,7 @@ export const assignedQuizzes = pgTable("assigned_quizzes", {
   questions: jsonb("questions").$type<QuizQuestion[]>().notNull(),
   assignedBy: varchar("assigned_by").notNull().references(() => users.id, { onDelete: "cascade" }),
   status: varchar("status").notNull().default("open"), // 'open' or 'stopped'
+  dueDate: timestamp("due_date"),
   assignedAt: timestamp("assigned_at").defaultNow(),
 }, (table) => [
   index("idx_assigned_quizzes_batch").on(table.batchId),
@@ -661,10 +662,11 @@ export type BatchCertificateTemplate = typeof batchCertificateTemplates.$inferSe
 export const teacherCertificates = pgTable("teacher_certificates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
-  batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
-  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+  batchId: varchar("batch_id").references(() => batches.id, { onDelete: "cascade" }),
+  courseId: varchar("course_id").references(() => courses.id, { onDelete: "cascade" }),
   templateId: varchar("template_id").references(() => batchCertificateTemplates.id, { onDelete: "set null" }),
   kind: varchar("kind").notNull().default("graduation"),
+  design: varchar("design").notNull().default("fellowship"),
   outstandingAreas: text("outstanding_areas"),
   teacherName: varchar("teacher_name").notNull(),
   courseName: varchar("course_name").notNull(),

@@ -20,8 +20,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
-import { SceneBackdrop } from "@/components/SceneBackdrop";
-import { AdminNav } from "@/components/AdminNav";
+import { AdminPage } from "@/components/AdminPage";
 
 interface Teacher {
   id: string;
@@ -37,7 +36,7 @@ interface Teacher {
   courseCompletion?: number;
 }
 
-export default function AdminTeachers() {
+export default function AdminTeachers({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -145,10 +144,7 @@ export default function AdminTeachers() {
   }
 
   return (
-    <SceneBackdrop scene="garden">
-    <AdminNav />
-    <div className="p-4 sm:p-6 md:p-8">
-      <div className="sl-sheet sl-frame">
+    <AdminPage embedded={embedded} scene="garden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-4">
             <Button
@@ -408,8 +404,6 @@ export default function AdminTeachers() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
-    </div>
-    </SceneBackdrop>
+    </AdminPage>
   );
 }

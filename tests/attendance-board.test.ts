@@ -35,7 +35,7 @@ describe("admin attendance lists", () => {
     assert.deepEqual(rollupTrainer([{ marked: 0, rate: null }]), { marked: 0, rate: null });
   });
 
-  it("lists teachers and trainers on the admin desk and in analytics", () => {
+  it("lists teachers and trainers on the attendance desk and in analytics only", () => {
     const board = read("server/attendanceBoard.ts");
     const routes = read("server/routes.ts");
     const list = read("client/src/components/AttendanceBoard.tsx");
@@ -44,7 +44,8 @@ describe("admin attendance lists", () => {
     assert.match(board, /attendance_records/);
     assert.match(board, /approval_status = 'approved'/);
     assert.match(board, /cohort_trainers/);
-    assert.match(read("client/src/pages/admin-home.tsx"), /AttendanceBoard/);
+    assert.match(read("client/src/pages/admin-attendance.tsx"), /AttendanceBoard/);
+    assert.equal(read("client/src/pages/admin-home.tsx").includes("AttendanceBoard"), false);
     assert.match(read("client/src/pages/admin-analytics.tsx"), /AttendanceBoard/);
     assert.match(list, /title="Teachers"/);
     assert.match(list, /title="Trainers"/);

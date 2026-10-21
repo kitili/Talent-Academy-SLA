@@ -26,6 +26,7 @@ import {
 } from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
+import { parseDeadline } from "@shared/academyPath";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
@@ -168,7 +169,7 @@ async function notifyQuizTeachers(batchId: string, teacherIds: string[], title: 
 async function saveWritingExam(
   batchId: string,
   assignedBy: string,
-  body: { title?: string; description?: string; prompt?: string; paperUrl?: string; paperName?: string; teacherIds?: unknown },
+  body: { title?: string; description?: string; prompt?: string; paperUrl?: string; paperName?: string; teacherIds?: unknown; dueDate?: unknown },
 ) {
   const title = String(body.title || "").trim();
   if (!title) return { error: "Add a title", status: 400 as const };
@@ -186,6 +187,7 @@ async function saveWritingExam(
     passMark: 80,
     questions: [{ id: randomUUID(), type: "open_ended", question: prompt }],
     assignedBy,
+    dueDate: parseDeadline(body.dueDate),
   });
   await storage.replaceQuizAudience(quiz.id, audience.teacherIds);
   return { quiz, teacherIds: audience.teacherIds };
@@ -2694,6 +2696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         passMark: passMarkOf(req.body?.passMark),
         questions,
         assignedBy: req.user!.id,
+        dueDate: parseDeadline(req.body?.dueDate),
       });
       await storage.replaceQuizAudience(assignedQuiz.id, audience.teacherIds);
 
@@ -2775,6 +2778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         passMark: passMarkOf(req.body?.passMark),
         questions,
         assignedBy: req.user!.id,
+        dueDate: parseDeadline(req.body?.dueDate),
       });
       await storage.replaceQuizAudience(assignedQuiz.id, audience.teacherIds);
 
@@ -2806,6 +2810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paperUrl,
         paperName: req.body?.paperName,
         teacherIds: req.body?.teacherIds,
+        dueDate: req.body?.dueDate,
       });
       if (saved.error) return res.status(saved.status || 400).json({ error: saved.error });
       res.status(201).json({ ...saved.quiz, teacherIds: saved.teacherIds });
@@ -2833,6 +2838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: req.body?.description,
         prompt,
         teacherIds: req.body?.teacherIds,
+        dueDate: req.body?.dueDate,
       });
       if (saved.error) return res.status(saved.status || 400).json({ error: saved.error });
       res.status(201).json({ ...saved.quiz, teacherIds: saved.teacherIds });
@@ -4789,29 +4795,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/certificate-templates", isAuthenticated, isStrictAdmin, async (_req, res) => {
+    const { CERTIFICATE_DESIGNS, CERTIFICATE_SIGNERS } = await import("@shared/certificateDesigns");
+    res.json({ designs: CERTIFICATE_DESIGNS, signers: CERTIFICATE_SIGNERS });
+  });
+
+  app.get("/api/admin/certificates", isAuthenticated, isStrictAdmin, async (_req, res) => {
+    try {
+      const certs = await storage.listAllTeacherCertificates();
+      res.json(certs);
+    } catch (error) {
+      console.error("Error listing academy certificates:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/certificates/issue", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const { isCertificateDesignId } = await import("@shared/certificateDesigns");
+      const teacherId = String(req.body?.teacherId || "").trim();
+      const design = String(req.body?.design || "fellowship").trim();
+      const occasion = String(req.body?.occasion || "graduation").trim() === "course" ? "course" : "graduation";
+      const courseId = String(req.body?.courseId || "").trim() || undefined;
+      const batchId = String(req.body?.batchId || "").trim() || undefined;
+      if (!teacherId || !isCertificateDesignId(design)) {
+        return res.status(400).json({ error: "teacherId and a valid design are required" });
+      }
+      if (occasion === "course" && !courseId) {
+        return res.status(400).json({ error: "courseId is required for course completion certificates" });
+      }
+      const cert = await storage.issueAcademyCertificate({
+        teacherId,
+        design,
+        occasion,
+        courseId,
+        batchId,
+      });
+      res.status(201).json(cert);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Internal server error";
+      const status = message === "Teacher not found" || message === "Course not found" ? 404 : 500;
+      console.error("Error issuing academy certificate:", error);
+      res.status(status).json({ error: message === "Teacher not found" || message === "Course not found" ? message : "Internal server error" });
+    }
+  });
+
   // Generate certificates for completed teachers in batch-course (admin only)
-  app.post("/api/batches/:batchId/courses/:courseId/generate-certificates", isAuthenticated, isTrainer, async (req, res) => {
+  app.post("/api/batches/:batchId/courses/:courseId/generate-certificates", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const completedTeachers = await storage.getCompletedTeachersForBatchCourse(req.params.batchId, req.params.courseId);
-      const template = await storage.getBatchCertificateTemplate(req.params.batchId);
       const course = await storage.getCourse(req.params.courseId);
 
-      if (!template || !course) {
-        return res.status(404).json({ error: "Certificate template or course not found" });
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
       }
 
       const generatedCerts = await Promise.all(
-        completedTeachers.map(teacher =>
-          storage.generateTeacherCertificate({
+        completedTeachers.map((teacher) =>
+          storage.issueAcademyCertificate({
             teacherId: teacher.id,
-            batchId: req.params.batchId,
+            design: "fellowship",
+            occasion: "course",
             courseId: req.params.courseId,
-            templateId: template.id,
-            teacherName: teacher.name,
-            courseName: course.name,
-            appreciationText: template.appreciationText,
-            adminName1: template.adminName1 || undefined,
-            adminName2: template.adminName2 || undefined,
+            batchId: req.params.batchId,
           })
         )
       );
@@ -4842,14 +4888,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       if (!(await teacherRecordAllowed(req, req.params.teacherId))) {
         return res.status(403).json({ error: "Access denied" });
-      }
-      const courses = await storage.getCoursesForTeacher(req.params.teacherId);
-      for (const course of courses) {
-        try {
-          await storage.tryAutoGenerateCertificate(req.params.teacherId, course.id);
-        } catch (error) {
-          console.error("Auto certificate skipped:", error);
-        }
       }
       const certs = await storage.getTeacherCertificates(req.params.teacherId);
       res.json(certs);
@@ -4892,7 +4930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update certificate (admin/trainer only)
-  app.patch("/api/certificates/:certId", isAuthenticated, isTrainer, async (req, res) => {
+  app.patch("/api/certificates/:certId", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const { teacherName, courseName, appreciationText, adminName1, adminName2 } = req.body;
       
@@ -6363,7 +6401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batchId: batch.id,
         title,
         instructions: instructions || (assignmentKind === "assessment" ? "Open the assessment and write your answers." : "Open the assignment and write your answers."),
-        dueDate: dueDate ? new Date(dueDate) : null,
+        dueDate: parseDeadline(dueDate),
         createdBy: req.user!.id,
         fileUrl: fileUrl || null,
         fileName: fileName || null,

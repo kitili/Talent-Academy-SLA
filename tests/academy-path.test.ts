@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   ACADEMY_TERMS,
+  batchHoldingCourse,
+  parseDeadline,
   batchIsComplete,
   cohortIsComplete,
   moveBatchOrder,
@@ -58,5 +60,23 @@ describe("academy path", () => {
     assert.equal(normalizeCohortsRequired("4"), 4);
     assert.equal(normalizeCohortsRequired(0), 1);
     assert.equal(normalizeCohortsRequired(99), 50);
+  });
+});
+
+describe("one course per batch and optional deadlines", () => {
+  it("keeps a course in one batch", () => {
+    const batches = [
+      { id: "b1", name: "Batch One", courses: [{ id: "c1" }] },
+      { id: "b2", name: "Batch Two", courses: [{ id: "c2" }] },
+    ];
+    assert.equal(batchHoldingCourse(batches, "c2")?.id, "b2");
+    assert.equal(batchHoldingCourse(batches, "c3"), undefined);
+  });
+
+  it("reads a deadline or none", () => {
+    assert.equal(parseDeadline(""), null);
+    assert.equal(parseDeadline("not a date"), null);
+    assert.equal(parseDeadline(undefined), null);
+    assert.equal(parseDeadline("2026-11-01T10:00:00.000Z")?.toISOString(), "2026-11-01T10:00:00.000Z");
   });
 });

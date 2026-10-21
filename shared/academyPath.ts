@@ -79,3 +79,16 @@ export function pathSummary(cohorts: PathCohort[], cohortsRequired: number) {
     })),
   };
 }
+
+/** A course sits in one batch of a cohort. This is the batch that already holds it, if any. */
+export function batchHoldingCourse<T extends { id: string; courses: { id: string }[] }>(batches: T[], courseId: string): T | undefined {
+  return batches.find((batch) => batch.courses.some((course) => course.id === courseId));
+}
+
+/** A deadline from a form field. Empty or unreadable text means no deadline. */
+export function parseDeadline(value: unknown): Date | null {
+  if (typeof value !== "string" && !(value instanceof Date)) return null;
+  if (typeof value === "string" && !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}

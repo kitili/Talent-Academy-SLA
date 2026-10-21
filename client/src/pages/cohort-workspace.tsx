@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Users, ClipboardCheck, Award, BarChart3, GraduationCap, Megaphone, Calendar, FileText, Upload } from "lucide-react";
+import { ArrowLeft, Users, ClipboardCheck, BarChart3, GraduationCap, Megaphone, Calendar, FileText, Upload } from "lucide-react";
 import { learningStatus, staffWatchLabel } from "@shared/learningStatus";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
@@ -18,9 +18,6 @@ export default function CohortWorkspace() {
   const batchId = params.batchId;
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const today = new Date().toISOString().slice(0, 10);
-  const [attendanceDate, setAttendanceDate] = useState(today);
-  const [marks, setMarks] = useState<Record<string, string>>({});
   const [announceTitle, setAnnounceTitle] = useState("");
   const [announceMessage, setAnnounceMessage] = useState("");
   const [csvText, setCsvText] = useState("name,email,password\n");
@@ -55,16 +52,6 @@ export default function CohortWorkspace() {
 
   const { data: progress = [] } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "progress"],
-    enabled: Boolean(batchId),
-  });
-
-  const { data: attendance = [] } = useQuery<any[]>({
-    queryKey: ["/api/batches", batchId, "attendance", "summary"],
-    queryFn: async () => {
-      const res = await fetch(`/api/batches/${batchId}/attendance/summary`);
-      if (!res.ok) return [];
-      return res.json();
-    },
     enabled: Boolean(batchId),
   });
 
@@ -129,27 +116,6 @@ export default function CohortWorkspace() {
       needsSupport: rows.filter((row) => staffWatchLabel(row.overallPercentage || 0, learningStatus({ percentage: row.overallPercentage || 0 })) === "Needs support").length,
     };
   }, [progress, teachers.length]);
-
-  const saveAttendance = useMutation({
-    mutationFn: async () => {
-      const records = teachers
-        .map((teacher: any) => ({
-          teacherId: teacher.id,
-          status: marks[teacher.id] || "present",
-        }))
-        .filter((row: { teacherId: string }) => row.teacherId);
-      const res = await apiRequest("POST", `/api/batches/${batchId}/attendance`, {
-        date: attendanceDate,
-        records,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Register saved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "attendance", "summary"] });
-    },
-    onError: () => toast({ title: "Could not save attendance", variant: "destructive" }),
-  });
 
   const announce = useMutation({
     mutationFn: async () => {
@@ -256,13 +222,12 @@ export default function CohortWorkspace() {
 
       <div className="sl-sheet sl-frame my-4 sm:my-6 p-4 sm:p-8 space-y-6">
         <p className="text-muted-foreground sl-rise">
-          {batch?.description || "People, quizzes, the register, performance, and graduates — in one classroom."}
+          {batch?.description || "People, quizzes, performance, and graduates — in one classroom."}
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Stat label="People" value={overview.total} delay="sl-rise-delay-1" />
           <Stat label="Quizzes" value={quizzes.length + fileQuizzes.length} delay="sl-rise-delay-2" />
-          <Stat label="On the register" value={Array.isArray(attendance) ? attendance.length : 0} delay="sl-rise-delay-3" />
           <Stat label="In progress" value={overview.inProgress} />
           <Stat label="Completed" value={overview.completed} />
           <Stat label="Needs support" value={overview.needsSupport} />
@@ -272,7 +237,6 @@ export default function CohortWorkspace() {
           <TabsList className="flex flex-wrap h-auto">
             <TabsTrigger value="people"><Users className="h-4 w-4 mr-2" />People</TabsTrigger>
             <TabsTrigger value="quizzes"><ClipboardCheck className="h-4 w-4 mr-2" />Quizzes</TabsTrigger>
-            <TabsTrigger value="attendance"><Award className="h-4 w-4 mr-2" />Register</TabsTrigger>
             <TabsTrigger value="performance"><BarChart3 className="h-4 w-4 mr-2" />Gradebook</TabsTrigger>
             <TabsTrigger value="graduates"><GraduationCap className="h-4 w-4 mr-2" />Graduates</TabsTrigger>
             <TabsTrigger value="announce"><Megaphone className="h-4 w-4 mr-2" />Announce</TabsTrigger>
@@ -319,54 +283,6 @@ export default function CohortWorkspace() {
                   </Card>
                 ))}
               </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="attendance" className="space-y-4 mt-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <p className="text-sm font-medium mb-1">Date</p>
-                <Input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} />
-              </div>
-              <Button onClick={() => saveAttendance.mutate()} disabled={saveAttendance.isPending || teachers.length === 0}>
-                {saveAttendance.isPending ? "Saving..." : "Save register"}
-              </Button>
-            </div>
-            {teachers.length === 0 ? (
-              <Empty text="Enroll teachers before taking the register." />
-            ) : teachers.map((teacher: any) => (
-              <Card key={teacher.id} className="sl-rise">
-                <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
-                  <span className="font-medium">{teacher.name}</span>
-                  <div className="flex gap-2">
-                    {["present", "absent"].map((status) => (
-                      <Button
-                        key={status}
-                        size="sm"
-                        variant={(marks[teacher.id] || "present") === status ? "default" : "outline"}
-                        onClick={() => setMarks((current) => ({ ...current, [teacher.id]: status }))}
-                      >
-                        {status === "present" ? "Here" : "Away"}
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {Array.isArray(attendance) && attendance.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Rates so far</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {attendance.map((row: any) => (
-                    <div key={row.teacher_id} className="flex justify-between text-sm">
-                      <span>{row.teacher_name}</span>
-                      <span>{row.attendance_rate || 0}%</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
             )}
           </TabsContent>
 

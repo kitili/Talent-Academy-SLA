@@ -8,7 +8,7 @@ export type TourStep = {
 export const ADMIN_TOUR: TourStep[] = [
   {
     title: "The top bar",
-    body: "This bar stays on every admin page. The next steps name each control, then each name in the navbar under it.",
+    body: "This bar stays on every admin page. The next steps name each control, then each name in the side menu.",
     target: "admin-header",
   },
   {
@@ -23,7 +23,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Tour",
-    body: "Tour starts this walk again from the first step. Use it any time you want the bar and the navbar explained.",
+    body: "Tour starts this walk again from the first step. Use it any time you want the bar and the side menu explained.",
     target: "admin-tour",
   },
   {
@@ -42,8 +42,8 @@ export const ADMIN_TOUR: TourStep[] = [
     target: "admin-logout",
   },
   {
-    title: "The navbar",
-    body: "These names stay under the bar on every admin page. Each one opens a different part of the academy. The next steps say what each name does.",
+    title: "The side menu",
+    body: "These names stay down the left side of every admin page. Each one opens a different part of the academy. The next steps say what each name does.",
     target: "admin-nav",
   },
   {
@@ -57,14 +57,9 @@ export const ADMIN_TOUR: TourStep[] = [
     target: "admin-nav-approvals",
   },
   {
-    title: "Trainers",
-    body: "Create a trainer account. A trainer you create here is approved at once. Open a name to see that account. A trainer cannot create another trainer.",
-    target: "admin-nav-trainers",
-  },
-  {
-    title: "Teachers",
-    body: "Create a teacher account, already approved. Open a teacher to see progress and the files they have viewed.",
-    target: "admin-nav-teachers",
+    title: "People",
+    body: "Trainers and teachers share this one tab. Switch between them at the top. Create a trainer or a teacher account, already approved, and open a name to see that account. A trainer cannot create another trainer.",
+    target: "admin-nav-people",
   },
   {
     title: "Attendance",
@@ -93,7 +88,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Pictures",
-    body: "Each picture opens the same place as its name in the navbar: Approvals, Trainers, Teachers, Cohorts, Attendance, and Analytics.",
+    body: "Each picture opens the same place as its name in the side menu: Approvals, People, Cohorts, Attendance, Analytics, and Certificates.",
     target: "admin-pictures",
   },
   {

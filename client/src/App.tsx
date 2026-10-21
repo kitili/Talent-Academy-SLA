@@ -21,13 +21,13 @@ import TrainerTeacherContentHistory from "@/pages/trainer-teacher-content-histor
 import Approvals from "@/pages/approvals";
 import AdminHome from "@/pages/admin-home";
 import AdminHandover from "@/pages/admin-handover";
-import AdminTrainers from "@/pages/admin-trainers";
+import AdminPeople from "@/pages/admin-people";
 import AdminTrainerDetail from "@/pages/admin-trainer-detail";
-import AdminTeachers from "@/pages/admin-teachers";
 import AdminTeacherDetail from "@/pages/admin-teacher-detail";
 import AdminAnalytics from "@/pages/admin-analytics";
 import AdminCertificateApproval from "@/pages/admin-certificate-approval";
 import AdminCertificateView from "@/pages/admin-certificate-view";
+import AdminCertificates from "@/pages/admin-certificates";
 import AdminBatches from "@/pages/admin-batches";
 import AdminAttendance from "@/pages/admin-attendance";
 import TeacherCertificates from "@/pages/teacher-certificates";
@@ -55,10 +55,12 @@ function Router() {
       <ProtectedRoute path="/approvals" component={Approvals} />
       <ProtectedRoute path="/admin/certificates/:batchId/approve" component={AdminCertificateApproval} />
       <ProtectedRoute path="/admin/certificates/batch/:batchId/view" component={AdminCertificateView} />
+      <ProtectedRoute path="/admin/certificates" component={AdminCertificates} />
       <ProtectedRoute path="/admin/trainers/:id" component={AdminTrainerDetail} />
-      <ProtectedRoute path="/admin/trainers" component={AdminTrainers} />
+      <ProtectedRoute path="/admin/trainers" component={AdminPeople} />
       <ProtectedRoute path="/admin/teachers/:id" component={AdminTeacherDetail} />
-      <ProtectedRoute path="/admin/teachers" component={AdminTeachers} />
+      <ProtectedRoute path="/admin/teachers" component={AdminPeople} />
+      <ProtectedRoute path="/admin/people" component={AdminPeople} />
       <ProtectedRoute path="/admin/analytics" component={AdminAnalytics} />
       <ProtectedRoute path="/admin/batches" component={AdminBatches} />
       <ProtectedRoute path="/admin/attendance" component={AdminAttendance} />

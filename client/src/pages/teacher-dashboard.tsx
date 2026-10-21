@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
-import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, ClipboardCheck, BookOpen } from "lucide-react";
+import { Award, CheckCircle, LogOut, GraduationCap, ArrowRight, FileText, Star, Calendar, MessageSquare, Target, Lightbulb, TrendingUp, BookOpen } from "lucide-react";
 import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceBanner, PlaceCover, placeForLabel } from "@/components/PlaceArt";
@@ -223,16 +223,6 @@ export default function TeacherDashboard() {
     queryFn: async () => {
       const response = await fetch("/api/teacher/reflections");
       if (!response.ok) return [];
-      return await response.json();
-    },
-  });
-
-  // Fetch attendance summary
-  const { data: attendanceSummary } = useQuery<any>({
-    queryKey: ["/api/teacher/attendance/summary"],
-    queryFn: async () => {
-      const response = await fetch("/api/teacher/attendance/summary");
-      if (!response.ok) return null;
       return await response.json();
     },
   });
@@ -718,6 +708,7 @@ export default function TeacherDashboard() {
                   <span className="block font-medium">{exam.title}</span>
                   <span className="block text-sm text-muted-foreground">
                     {exam.kind === "paper" ? "Paper exam" : exam.kind === "written" ? "Written exam" : "Quiz"}
+                    {exam.dueDate ? ` · Due ${new Date(exam.dueDate).toLocaleString()}` : ""}
                   </span>
                 </span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -929,18 +920,6 @@ export default function TeacherDashboard() {
             <CardContent>
               <div className="text-lg font-bold" data-testid="text-average-score">
                 {reportCard?.averageScore || 0}%
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs font-medium">Attendance</CardTitle>
-              <ClipboardCheck className="h-4 w-4 text-primary/60" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg font-bold">
-                {attendanceSummary?.attendance_rate || 0}%
               </div>
             </CardContent>
           </Card>
@@ -1284,7 +1263,7 @@ export default function TeacherDashboard() {
                   <p className="text-sm text-muted-foreground mt-1">Graduation Probability</p>
                 </div>
                 <Progress value={progressSummary.graduationProbability} className="h-3" />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-sm">
+                <div className="grid grid-cols-3 gap-3 text-center text-sm">
                   <div className="p-2 bg-muted rounded-lg">
                     <div className="font-semibold">{progressSummary.contentCompletion}%</div>
                     <div className="text-muted-foreground text-xs">Content</div>
@@ -1294,51 +1273,8 @@ export default function TeacherDashboard() {
                     <div className="text-muted-foreground text-xs">Quiz Pass Rate</div>
                   </div>
                   <div className="p-2 bg-muted rounded-lg">
-                    <div className="font-semibold">{progressSummary.attendanceRate}%</div>
-                    <div className="text-muted-foreground text-xs">Attendance</div>
-                  </div>
-                  <div className="p-2 bg-muted rounded-lg">
                     <div className="font-semibold">{progressSummary.reflectionCount}</div>
                     <div className="text-muted-foreground text-xs">Reflections</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {tab === "progress" && attendanceSummary && (
-          <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardCheck className="h-5 w-5" />
-                Attendance Record
-              </CardTitle>
-              <CardDescription>Your training attendance overview</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Attendance Rate</span>
-                  <span className="font-bold">{attendanceSummary.attendance_rate || 0}%</span>
-                </div>
-                <Progress value={parseFloat(attendanceSummary.attendance_rate || '0')} className="h-2" />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-sm">
-                  <div className="p-2 bg-green-50 dark:bg-green-950/30 rounded-lg">
-                    <div className="font-semibold text-green-700 dark:text-green-400">{attendanceSummary.present_days || 0}</div>
-                    <div className="text-muted-foreground text-xs">Present</div>
-                  </div>
-                  <div className="p-2 bg-red-50 dark:bg-red-950/30 rounded-lg">
-                    <div className="font-semibold text-red-700 dark:text-red-400">{attendanceSummary.absent_days || 0}</div>
-                    <div className="text-muted-foreground text-xs">Absent</div>
-                  </div>
-                  <div className="p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg">
-                    <div className="font-semibold text-yellow-700 dark:text-yellow-400">{attendanceSummary.late_days || 0}</div>
-                    <div className="text-muted-foreground text-xs">Late</div>
-                  </div>
-                  <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                    <div className="font-semibold text-blue-700 dark:text-blue-400">{attendanceSummary.excused_days || 0}</div>
-                    <div className="text-muted-foreground text-xs">Excused</div>
                   </div>
                 </div>
               </div>

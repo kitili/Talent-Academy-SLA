@@ -103,6 +103,7 @@ export async function ensureWrittenAssignmentTables() {
     ALTER TABLE batches ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';
     ALTER TABLE batches ADD COLUMN IF NOT EXISTS quizzes_status varchar NOT NULL DEFAULT 'open';
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';
+    ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS due_date timestamp;
     ALTER TABLE courses ADD COLUMN IF NOT EXISTS objectives text;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS pass_mark integer NOT NULL DEFAULT 80;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS shuffle_questions varchar NOT NULL DEFAULT 'yes';
@@ -120,7 +121,10 @@ export async function ensureWrittenAssignmentTables() {
     );
     ALTER TABLE teacher_certificates ADD COLUMN IF NOT EXISTS kind varchar NOT NULL DEFAULT 'graduation';
     ALTER TABLE teacher_certificates ADD COLUMN IF NOT EXISTS outstanding_areas text;
+    ALTER TABLE teacher_certificates ADD COLUMN IF NOT EXISTS design varchar NOT NULL DEFAULT 'fellowship';
     ALTER TABLE teacher_certificates ALTER COLUMN template_id DROP NOT NULL;
+    ALTER TABLE teacher_certificates ALTER COLUMN batch_id DROP NOT NULL;
+    ALTER TABLE teacher_certificates ALTER COLUMN course_id DROP NOT NULL;
     DROP INDEX IF EXISTS idx_teacher_certificate_unique;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_certificate_kind
       ON teacher_certificates(teacher_id, batch_id, course_id, kind);

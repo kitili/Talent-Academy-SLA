@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { BackButton } from "@/components/BackButton";
 import { Card } from "@/components/ui/card";
 import { AcademyShell } from "@/components/AcademyShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -30,6 +31,7 @@ export default function AdminOpsCatalog() {
 
   return (
     <AcademyShell title="Data catalog" scene="paper" showAdminNav>
+      <BackButton fallback="/admin" />
       <p className="text-muted-foreground mb-6 max-w-3xl">
         {data?.howToFind ||
           "Each Supabase table is tagged with an ops area so onboarding, marketing, and the rest stay separate."}

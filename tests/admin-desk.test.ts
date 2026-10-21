@@ -15,18 +15,18 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 describe("admin desk", () => {
-  it("puts admin links in a navbar and drops the handover card", () => {
+  it("puts admin links in a side menu, joins trainers and teachers, and drops the handover card", () => {
     const nav = read("client/src/components/AdminNav.tsx");
     const home = read("client/src/pages/admin-home.tsx");
-    for (const label of ["Approvals", "Trainers", "Teachers", "Cohorts", "Analytics"]) {
+    for (const label of ["Approvals", "People", "Cohorts", "Attendance", "Analytics"]) {
       assert.match(nav, new RegExp(label));
     }
     assert.equal(nav.includes('href: "/courses"'), false);
-    assert.match(nav, /sm:w-\[80%\]/);
+    assert.equal(nav.includes('label: "Trainers"'), false);
+    assert.equal(nav.includes('label: "Teachers"'), false);
+    assert.match(nav, /lg:fixed/);
     assert.equal(nav.toLowerCase().includes("handover"), false);
     assert.equal(nav.includes("rounded-full"), false);
-    assert.match(nav, /flex-wrap/);
-    assert.match(nav, /gap-x-6/);
     assert.equal(home.includes("/admin/handover"), false);
     assert.equal(home.includes("showAdminNav"), true);
     assert.equal(home.includes("LearningPath"), false);
