@@ -8,6 +8,8 @@ import { Megaphone } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { PlaceCover, type PlaceName } from "@/components/PlaceArt";
+import { AttendanceBoard } from "@/components/AttendanceBoard";
+import { deskName } from "@shared/deskName";
 import { ADMIN_TOUR } from "@shared/guidedTour";
 import {
   Dialog,
@@ -158,7 +160,7 @@ export default function AdminHome() {
       scene="library"
       title="Silverleaf Academy"
       subtitle="Admin desk"
-      userLabel={user?.username}
+      userLabel={user ? deskName(user) : undefined}
       showAdminNav
       onLogout={() => logoutMutation.mutate()}
       actions={
@@ -168,7 +170,7 @@ export default function AdminHome() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-3xl font-semibold text-[#17233c] dark:text-[#f6f1e8]">
-              {user?.username ? user.username : "Admin"}
+              {user ? deskName(user) : "Admin"}
             </h1>
             <p className="mt-1 text-sm text-[#243044] dark:text-[#d7deea]">The pictures open each part of the academy.</p>
           </div>
@@ -219,6 +221,8 @@ export default function AdminHome() {
             </button>
           ))}
         </div>
+
+        <AttendanceBoard />
 
         <div className="flex flex-wrap items-center gap-3">
           <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>

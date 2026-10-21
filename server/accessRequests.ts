@@ -131,6 +131,26 @@ export function registerAccessRequestRoutes(app: Express) {
     }
   });
 
+  app.get("/api/access-requests/status", loginRateLimit, async (req, res) => {
+    try {
+      const identifier = String(req.query.identifier || "").trim();
+      const role = String(req.query.role || "").trim().toLowerCase();
+      if (role !== "trainer" && role !== "teacher") {
+        return res.status(400).json({ message: "Choose trainer or teacher" });
+      }
+      if (identifier.length < 3) return res.json({ code: "unknown" });
+      if (!hasDatabaseUrl()) return res.status(503).json({ message: "Requests need the academy database." });
+      const account = role === "teacher"
+        ? await teacherByIdentifier(identifier)
+        : await staffByIdentifier(identifier);
+      if (!account || ("role" in account && account.role !== role)) return res.json({ code: "unknown" });
+      res.json({ code: deskState(account) });
+    } catch (error) {
+      console.error("Access request status failed:", error);
+      res.status(500).json({ message: "Could not check the request" });
+    }
+  });
+
   app.post("/api/access-requests/password", loginRateLimit, async (req, res) => {
     try {
       const parsed = parsePasswordSetup(req.body);

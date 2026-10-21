@@ -4,6 +4,7 @@ import { AcademyShell } from "@/components/AcademyShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { deskName } from "@shared/deskName";
 
 export default function AdminHandover() {
   const { user, logoutMutation } = useAuth();
@@ -56,7 +57,7 @@ export default function AdminHandover() {
       scene="paper"
       title="Silverleaf Academy"
       subtitle="Three-week handover"
-      userLabel={user?.username}
+      userLabel={user ? deskName(user) : undefined}
       showAdminNav
       onLogout={() => logoutMutation.mutate()}
     >
