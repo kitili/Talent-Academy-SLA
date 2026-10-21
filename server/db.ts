@@ -100,6 +100,9 @@ export async function ensureWrittenAssignmentTables() {
     ALTER TABLE courses ADD COLUMN IF NOT EXISTS track varchar;
     ALTER TABLE batches ADD COLUMN IF NOT EXISTS stage varchar;
     ALTER TABLE batches ADD COLUMN IF NOT EXISTS track varchar;
+    ALTER TABLE batches ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';
+    ALTER TABLE batches ADD COLUMN IF NOT EXISTS quizzes_status varchar NOT NULL DEFAULT 'open';
+    ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';
     ALTER TABLE courses ADD COLUMN IF NOT EXISTS objectives text;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS pass_mark integer NOT NULL DEFAULT 80;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS shuffle_questions varchar NOT NULL DEFAULT 'yes';

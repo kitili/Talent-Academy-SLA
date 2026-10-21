@@ -17,7 +17,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Where to go next",
-    body: "Handover is the three-week staff plan. Approvals lets people in. Trainers and Teachers are the accounts. Cohorts are the rooms. Analytics is the gradebook. Courses is where you add modules and lesson files.",
+    body: "Handover is the three-week staff plan. Approvals lets people in. Trainers and Teachers are the accounts. Cohorts is where you add a batch, assign a trainer, and open or close the class and its quizzes. Analytics is the gradebook. Courses is where you add modules and lesson files.",
     target: "admin-nav",
   },
   {

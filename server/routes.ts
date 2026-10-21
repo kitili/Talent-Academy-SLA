@@ -24,6 +24,7 @@ import { recordAudit } from "./audit";
 import { sanitizeLessonHtml } from "./htmlSanitize";
 import { signFileGrant, verifyFileGrant } from "./fileGrant";
 import { passMarkOf, shuffleQuestions } from "./quizDelivery";
+import { blockAssignedQuiz, blockTeacherWeekQuiz } from "./cohortGate";
 import { normalizeManualQuestions } from "./quizService";
 import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
@@ -2069,6 +2070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!questions || !Array.isArray(questions) || !answers || typeof answers !== 'object') {
         return res.status(400).json({ error: "Invalid quiz submission" });
       }
+      if (await blockTeacherWeekQuiz(res, teacherId, weekId)) return;
 
       // Defensive check: Verify the file belongs to this week
       const week = await storage.getTrainingWeek(weekId);
@@ -2240,12 +2242,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new batch (admin only)
   app.post("/api/batches", isAuthenticated, isAdmin, async (req, res) => {
     try {
+      const name = String(req.body.name || "").trim();
+      if (!name) return res.status(400).json({ error: "Batch name is required" });
+      let trainerId: string | null = null;
+      if (req.body.trainerId) {
+        const trainer = await storage.getUser(String(req.body.trainerId));
+        if (!trainer || trainer.role !== "trainer") {
+          return res.status(400).json({ error: "Invalid trainer ID" });
+        }
+        trainerId = trainer.id;
+      }
       const batch = await storage.createBatch({
-        name: req.body.name,
+        name,
         description: req.body.description,
         stage: req.body.stage || null,
         track: req.body.track === "secondary" ? "secondary" : req.body.track === "primary" ? "primary" : null,
         createdBy: req.user!.id,
+        trainerId,
       });
       res.status(201).json(batch);
     } catch (error) {
@@ -2331,6 +2344,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error assigning trainer to batch:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/batches/:batchId/access", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const existing = await storage.getBatch(req.params.batchId);
+      if (!existing) return res.status(404).json({ error: "Batch not found" });
+      const patch: { status?: string; quizzesStatus?: string } = {};
+      if (req.body.status !== undefined) {
+        if (req.body.status !== "open" && req.body.status !== "closed") {
+          return res.status(400).json({ error: "Status must be open or closed" });
+        }
+        patch.status = req.body.status;
+      }
+      if (req.body.quizzesStatus !== undefined) {
+        if (req.body.quizzesStatus !== "open" && req.body.quizzesStatus !== "stopped") {
+          return res.status(400).json({ error: "Quizzes must be open or stopped" });
+        }
+        patch.quizzesStatus = req.body.quizzesStatus;
+      }
+      if (!patch.status && !patch.quizzesStatus) {
+        return res.status(400).json({ error: "Nothing to update" });
+      }
+      const [updated] = await db.update(batches).set(patch).where(eq(batches.id, existing.id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating cohort access:", error);
+      res.status(500).json({ error: "Failed to update cohort" });
+    }
+  });
+
+  app.patch("/api/assigned-quizzes/:quizId/status", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const status = req.body.status === "stopped" ? "stopped" : req.body.status === "open" ? "open" : null;
+      if (!status) return res.status(400).json({ error: "Status must be open or stopped" });
+      const [updated] = await db
+        .update(assignedQuizzes)
+        .set({ status })
+        .where(eq(assignedQuizzes.id, req.params.quizId))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Quiz not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating quiz status:", error);
+      res.status(500).json({ error: "Failed to update quiz" });
     }
   });
 
@@ -2847,6 +2905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quiz) {
         return res.status(404).json({ error: "Quiz not found" });
       }
+      if (await blockAssignedQuiz(res, quiz)) return;
       const questions = quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
       res.json({ ...quiz, questions, passMark: passMarkOf(quiz.passMark) });
     } catch (error) {
@@ -2864,6 +2923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!quiz) {
         return res.status(404).json({ error: "Quiz not found" });
       }
+      if (await blockAssignedQuiz(res, quiz)) return;
 
       // Get all existing attempts for this quiz
       const existingAttempts = await storage.getTeacherQuizAttemptsByQuiz(
@@ -3600,6 +3660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!questions || !Array.isArray(questions) || !answers || typeof answers !== 'object' || !quizGenerationId) {
         return res.status(400).json({ error: "Invalid quiz submission" });
       }
+      if (await blockTeacherWeekQuiz(res, teacherId, weekId)) return;
       
       const { scoreQuizSubmission } = await import("./quizService");
       const graded = scoreQuizSubmission(questions, answers);
@@ -4570,6 +4631,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/analytics/snapshot", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      res.json(await storage.getAcademySnapshot());
+    } catch (error) {
+      console.error("Error getting academy snapshot:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/admin/analytics/completion-trends", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const data = await storage.getCompletionTrends();
@@ -4592,28 +4662,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich trainers with batch count
       const enrichedTrainers = await Promise.all(
         trainers.map(async (trainer) => {
-          const batches = await storage.getAllBatches(trainer.id);
+          const owned = await storage.getAllBatches(trainer.id);
+          const courseIds = new Set<string>();
+          for (const batch of owned) {
+            const linked = await storage.getCoursesForBatch(batch.id);
+            linked.forEach((course) => courseIds.add(course.id));
+          }
           return {
             id: trainer.id,
             email: trainer.email,
+            username: trainer.username,
+            name: `${trainer.firstName || ""} ${trainer.lastName || ""}`.trim() || trainer.username,
             role: trainer.role,
             approvalStatus: trainer.approvalStatus,
-            batchCount: batches.length,
+            batchCount: owned.length,
+            courseCount: courseIds.size,
           };
         })
       );
 
+      const completionRows = await db.select({
+        teacherId: teacherCourseCompletion.teacherId,
+        completedWeeks: teacherCourseCompletion.completedWeeks,
+        totalWeeks: teacherCourseCompletion.totalWeeks,
+      }).from(teacherCourseCompletion);
+      const riskByTeacher = new Map<string, boolean>();
+      for (const row of completionRows) {
+        if (!row.totalWeeks || row.totalWeeks <= 0) continue;
+        if ((row.completedWeeks / row.totalWeeks) * 100 < 30) riskByTeacher.set(row.teacherId, true);
+      }
+
       // Enrich teachers with course count
       const enrichedTeachers = await Promise.all(
         allTeachers.map(async (teacher) => {
-          const batches = await storage.getBatchesForTeacher(teacher.id);
-          const courseCount = batches.length;
+          const enrolled = await storage.getBatchesForTeacher(teacher.id);
+          const courseCount = enrolled.length;
           return {
             id: teacher.id,
             email: teacher.email,
+            name: teacher.name,
+            teacherNumber: teacher.teacherId,
             role: "teacher",
             approvalStatus: teacher.approvalStatus,
             courseCount,
+            risk: riskByTeacher.get(teacher.id) ? "at-risk" : "on-track",
           };
         })
       );

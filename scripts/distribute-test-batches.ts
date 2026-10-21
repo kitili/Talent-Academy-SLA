@@ -15,12 +15,6 @@ const TEACHER_PASSWORD = "teacher123";
 
 const TRAINERS = [
   { username: "trainer1", email: "trainer@test.com", name: "Test Trainer" },
-  { username: "trainer2", email: "trainer2@test.com", name: "Test Trainer 2" },
-  { username: "trainer3", email: "trainer3@test.com", name: "Test Trainer 3" },
-  { username: "trainer4", email: "trainer4@test.com", name: "Test Trainer 4" },
-  { username: "trainer5", email: "trainer5@test.com", name: "Test Trainer 5" },
-  { username: "trainer6", email: "trainer6@test.com", name: "Test Trainer 6" },
-  { username: "test.trainer", email: "test.trainer@silverleaf.academy", name: "Test Trainer" },
 ];
 
 async function request(path: string, options: RequestInit = {}, cookies = "") {
