@@ -20,8 +20,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
-import { AdminNav } from "@/components/AdminNav";
+import { AcademyShell } from "@/components/AcademyShell";
 import { AttendanceBoard } from "@/components/AttendanceBoard";
+import { deskName } from "@shared/deskName";
 
 interface BatchAnalytics {
   batch: { id: string; name: string };
@@ -128,7 +129,7 @@ function BatchStatusBadge({ status }: { status: "on-track" | "at-risk" }) {
 
 export default function AdminAnalytics() {
   const [, navigate] = useLocation();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [expandedCourseId, setExpandedCourseId] = useState<string | null>(null);
@@ -824,24 +825,15 @@ export default function AdminAnalytics() {
   };
 
   return (
-    <div className="sl-page sl-bg-lamp min-h-screen">
-      {/* Header */}
-      <div className="border-b bg-card sticky top-0 z-10">
-        <AdminNav />
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-analytics-title">Silver Leaf – Admin Analytics</h1>
-              <p className="text-sm text-muted-foreground mt-1">Organization overview and analytics</p>
-            </div>
-            <Button onClick={() => navigate("/")} variant="outline" size="sm" data-testid="button-back-header">
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="sl-sheet sl-frame my-6 px-4 sm:px-8 py-8">
+    <AcademyShell
+      scene="lamp"
+      title="Analytics"
+      subtitle="Organization overview"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      showAdminNav
+    >
+      <h1 className="sr-only" data-testid="text-analytics-title">Silver Leaf – Admin Analytics</h1>
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="flex w-full overflow-x-auto mb-8 sm:grid sm:grid-cols-7">
@@ -1739,7 +1731,7 @@ export default function AdminAnalytics() {
                         <div className="space-y-4 pr-4">
                           <div className="bg-muted/30 p-4 rounded-lg border">
                             <p className="text-sm text-muted-foreground mb-3">
-                              Configure the certificate template for this batch.
+                              Official certificates live on the Certificates tab. Issue them at graduation or course completion. Signatures stay as Aloyce Shirima and Nelly Zablon.
                             </p>
                             <div className="space-y-4">
                               <div>
@@ -2815,7 +2807,6 @@ export default function AdminAnalytics() {
             </div>
           </TabsContent>
         </Tabs>
-      </div>
 
       {/* ===== ALL MODALS (preserved exactly) ===== */}
 
@@ -3658,6 +3649,6 @@ export default function AdminAnalytics() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </div>
+    </AcademyShell>
   );
 }

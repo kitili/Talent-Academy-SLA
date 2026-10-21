@@ -2948,11 +2948,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Edit quiz questions (trainer/admin)
+  // Edit quiz questions and/or deadline (trainer/admin)
   app.patch("/api/assigned-quizzes/:quizId", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { questions } = req.body;
-      if (!Array.isArray(questions)) {
+      const hasQuestions = Array.isArray(questions);
+      const hasDueDate = Object.prototype.hasOwnProperty.call(req.body || {}, "dueDate");
+      if (!hasQuestions && !hasDueDate) {
         return res.status(400).json({ error: "questions must be an array" });
       }
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
@@ -2961,8 +2963,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const updated = await storage.updateAssignedQuizQuestions(req.params.quizId, questions);
+      if (hasQuestions) {
+        await storage.updateAssignedQuizQuestions(req.params.quizId, questions);
+      }
+      if (hasDueDate) {
+        await storage.updateAssignedQuiz(req.params.quizId, { dueDate: parseDeadline(req.body.dueDate) });
+      }
+      const updated = await storage.getAssignedQuiz(req.params.quizId);
       res.json(updated);
+      if (hasDueDate) {
+        const due = parseDeadline(req.body.dueDate);
+        const audience = await storage.getQuizAudienceMap([quiz.id]);
+        notifyQuizTeachers(
+          quiz.batchId,
+          audience[quiz.id] || [],
+          "Deadline updated",
+          due
+            ? `${quiz.title} is now due ${due.toLocaleString()}.`
+            : `${quiz.title} no longer has a deadline.`,
+        ).catch((error) => console.error("Deadline notice failed:", error));
+      }
     } catch (error) {
       console.error("Error updating quiz questions:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -4556,7 +4576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create course (admin only)
-  app.post("/api/courses", isAuthenticated, isTrainer, async (req, res) => {
+  app.post("/api/courses", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { name, description, orderIndex, objectives, publishStatus, stage, track } = req.body;
       const course = await storage.createCourse({
@@ -6417,6 +6437,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating assignment:", error);
       res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  app.patch("/api/batches/:batchId/assignments/:assignmentId", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (!assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
+      if (!Object.prototype.hasOwnProperty.call(req.body || {}, "dueDate")) {
+        return res.status(400).json({ error: "dueDate is required" });
+      }
+      const updated = await storage.updateWrittenAssignment(assignment.id, { dueDate: parseDeadline(req.body.dueDate) });
+      const due = parseDeadline(req.body.dueDate);
+      notifyBatchTeachers(
+        batch.id,
+        "Deadline updated",
+        due
+          ? `${assignment.title} is now due ${due.toLocaleString()}.`
+          : `${assignment.title} no longer has a deadline.`,
+        "deadline",
+      ).catch((error) => console.error("Assignment deadline notice failed:", error));
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating assignment:", error);
+      res.status(500).json({ error: "Failed to update assignment" });
     }
   });
 

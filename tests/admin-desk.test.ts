@@ -18,7 +18,7 @@ describe("admin desk", () => {
   it("puts admin links in a side menu, joins trainers and teachers, and drops the handover card", () => {
     const nav = read("client/src/components/AdminNav.tsx");
     const home = read("client/src/pages/admin-home.tsx");
-    for (const label of ["Approvals", "People", "Cohorts", "Attendance", "Analytics"]) {
+    for (const label of ["Approvals", "People", "Cohorts", "Attendance", "Analytics", "Certificates"]) {
       assert.match(nav, new RegExp(label));
     }
     assert.equal(nav.includes('href: "/courses"'), false);
@@ -29,9 +29,20 @@ describe("admin desk", () => {
     assert.equal(nav.includes("rounded-full"), false);
     assert.equal(home.includes("/admin/handover"), false);
     assert.equal(home.includes("showAdminNav"), true);
+    assert.match(home, /PlaceCover/);
+    assert.match(home, /place: "certificate"/);
+    const auth = read("client/src/pages/unified-auth.tsx");
+    assert.match(auth, /\/bg-library.jpg/);
+    assert.match(auth, /PLACES\[place\]/);
     assert.equal(home.includes("LearningPath"), false);
     assert.equal(home.includes("Total Trainers"), false);
     assert.equal(home.includes('href: "/courses"'), false);
+    const batches = read("client/src/pages/admin-batches.tsx");
+    const app = read("client/src/App.tsx");
+    assert.match(batches, /data-testid="button-add-course"/);
+    assert.match(batches, /button-open-course-\$\{course\.id\}/);
+    assert.match(app, /CoursesCatalogRedirect/);
+    assert.equal(app.includes("CoursesList"), false);
   });
 
   it("asks for areas and people before clearing activity", () => {

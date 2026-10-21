@@ -120,12 +120,12 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "The side bar",
-    body: "Desk is the home, with the counts. Then Cohorts, Teachers, Assignments, Assessments, and Quizzes. Progress, Attendance, Schedule, and Certificates follow. Courses is where lesson files live.",
+    body: "Desk is the home, with the counts. Then Cohorts, Teachers, Assessments & quizzes, Progress, Attendance, Messages, and Schedule.",
     target: "trainer-tools",
   },
   {
     title: "What stays with admin",
-    body: "You can add a course, approve a new teacher, and reset that teacher's password. You cannot add a cohort or a batch, create an admin, clear the academy, or open another trainer's cohort.",
+    body: "You can approve a new teacher and reset that teacher's password. You cannot add a course, add a cohort or a batch, create an admin, clear the academy, or open another trainer's cohort.",
   },
 ];
 

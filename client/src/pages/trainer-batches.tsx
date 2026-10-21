@@ -20,13 +20,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
-import { ArrowLeft, Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar, Upload, Star, Sparkles, Layers, PenLine, Mail } from "lucide-react";
+import { ArrowLeft, Users, Plus, Trash2, LogOut, Award, CheckCircle, TrendingUp, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar, Upload, Star, Sparkles, Layers, PenLine, Mail } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CohortMedals } from "@/components/CohortMedals";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { TRAINER_TOUR } from "@shared/guidedTour";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import { isWritingExam } from "@shared/trainerDesk";
+import { deadlineLocalValue } from "@shared/academyPath";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { TrainerMessages } from "@/components/TrainerMessages";
@@ -53,6 +54,40 @@ function DeadlineField({ id, value, onChange }: { id: string; value: string; onC
 
 function dueLabel(value?: string | null) {
   return value ? `Due ${new Date(value).toLocaleString()}` : "No deadline";
+}
+
+function WorkDeadlineEditor({
+  current,
+  onSave,
+  pending,
+  testId,
+}: {
+  current?: string | null;
+  onSave: (iso: string | null) => void;
+  pending?: boolean;
+  testId: string;
+}) {
+  const [draft, setDraft] = useState(() => deadlineLocalValue(current));
+  useEffect(() => {
+    setDraft(deadlineLocalValue(current));
+  }, [current]);
+  return (
+    <div className="flex flex-wrap items-end gap-2 pt-2" onClick={(event) => event.stopPropagation()}>
+      <div className="min-w-[12rem] flex-1">
+        <DeadlineField id={testId} value={draft} onChange={setDraft} />
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        onClick={() => onSave(deadlineIso(draft) || null)}
+        data-testid={`button-save-${testId}`}
+      >
+        Save deadline
+      </Button>
+    </div>
+  );
 }
 
 function TeacherAudience({
@@ -100,12 +135,11 @@ function TeacherAudience({
 const TRAINER_NAV = [
   { id: "desk", label: "Desk", icon: Sparkles, wash: "#fff4df", ink: "#8a5a12", live: "#c4842a" },
   { id: "cohorts", label: "Cohorts", icon: Layers, wash: "#e8eef8", ink: "#1d3f73", live: "#1d4e89" },
-  { id: "assignments", label: "Assignments, assessments & quizzes", icon: PenLine, wash: "#fde8ef", ink: "#9b3d55", live: "#c45b78" },
+  { id: "assessments", label: "Assessments & quizzes", icon: PenLine, wash: "#fde8ef", ink: "#9b3d55", live: "#c45b78" },
   { id: "progress", label: "Progress", icon: TrendingUp, wash: "#e7f7e4", ink: "#2f6b32", live: "#3d8b45" },
   { id: "attendance", label: "Attendance", icon: ClipboardCheck, wash: "#e6f3fb", ink: "#1d5f86", live: "#2f7eae" },
   { id: "messages", label: "Messages", icon: Mail, wash: "#e7f6f2", ink: "#0d6b5c", live: "#0f7a6c" },
   { id: "schedule", label: "Schedule", icon: Calendar, wash: "#f8eee6", ink: "#8a4b2f", live: "#c47b2b" },
-  { id: "certificates", label: "Certificates", icon: FileText, wash: "#f8e9f4", ink: "#8a3d6b", live: "#b85c8a" },
 ] as const;
 
 function TrainerSideNav({
@@ -149,15 +183,6 @@ function TrainerSideNav({
           );
         })}
         <Link
-          href="/courses"
-          data-testid="button-trainer-courses"
-          data-tour="trainer-courses"
-          className="flex min-w-[9.5rem] items-center gap-2 rounded-2xl bg-[#e7eefc] px-2.5 py-2 text-sm font-semibold text-[#243e86] shadow-sm lg:min-w-0"
-        >
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-white"><BookOpen className="h-4 w-4" /></span>
-          Courses
-        </Link>
-        <Link
           href="/approvals"
           data-testid="button-trainer-approvals"
           className="flex min-w-[9.5rem] items-center gap-2 rounded-2xl bg-[#e8f6ea] px-2.5 py-2 text-sm font-semibold text-[#24633a] shadow-sm lg:min-w-0"
@@ -181,10 +206,9 @@ function TrainerKpis({
     { id: "cohorts", label: "Cohorts", value: desk?.cohortCount ?? 0, tab: "cohorts", wash: "#e8eef8", ink: "#1d4e89" },
     { id: "teachers", label: "Teachers", value: desk?.teacherCount ?? 0, tab: "progress", wash: "#e7f6f2", ink: "#0f7a6c" },
     { id: "progress", label: "Progress", value: desk?.progressPercent == null ? "—" : `${desk.progressPercent}%`, tab: "progress", wash: "#e7f7e4", ink: "#2f6b32" },
-    { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "assignments", wash: "#efe8fb", ink: "#5b3d8a" },
-    { id: "papers", label: "Assessments", value: desk?.paperExams ?? 0, tab: "assignments", wash: "#fff1e0", ink: "#9a5b16" },
+    { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "assessments", wash: "#efe8fb", ink: "#5b3d8a" },
+    { id: "papers", label: "Assessments", value: desk?.paperExams ?? 0, tab: "assessments", wash: "#fff1e0", ink: "#9a5b16" },
     { id: "attendance", label: "Attendance", value: desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`, tab: "attendance", wash: "#e6f3fb", ink: "#1d5f86" },
-    { id: "certificates", label: "Certificates", value: desk?.certificateCount ?? 0, tab: "certificates", wash: "#f8e9f4", ink: "#8a3d6b" },
     { id: "schedule", label: "Upcoming", value: desk?.upcomingEvents ?? 0, tab: "schedule", wash: "#f8eee6", ink: "#8a4b2f" },
   ];
   return (
@@ -208,71 +232,43 @@ function TrainerKpis({
   );
 }
 
-function AssignmentDesk({ batchId, batchName }: { batchId: string; batchName: string }) {
+function AssessmentDesk({ batchId }: { batchId: string }) {
   const { toast } = useToast();
-  const [title, setTitle] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [due, setDue] = useState("");
   const { data: assignments = [] } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "assignments"],
   });
-  const create = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/batches/${batchId}/assignments`, {
-        title,
-        instructions,
-        dueDate: deadlineIso(due) || null,
-      });
+  const assessments = assignments.filter((item: any) => item.kind === "assessment");
+  const saveDue = useMutation({
+    mutationFn: async ({ id, dueDate }: { id: string; dueDate: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/batches/${batchId}/assignments/${id}`, { dueDate });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
-      setTitle("");
-      setInstructions("");
-      setDue("");
-      toast({ title: "Assignment added", description: `${batchName} can see it in My work.` });
+      toast({ title: "Deadline saved" });
     },
-    onError: (error: Error) => toast({ title: "Could not add the assignment", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Could not save the deadline", description: error.message, variant: "destructive" }),
   });
+  if (assessments.length === 0) return null;
   return (
-    <div className="space-y-4" data-testid="trainer-assignments">
-      <div className="rounded-2xl p-4" style={{ background: "#fde8ef", color: "#9b3d55" }}>
-        <p className="text-lg font-semibold">Written assignments</p>
-        <p className="mt-1 text-sm">Essays, lesson plans, and reflections for {batchName}. Assessments and quizzes follow below on this page.</p>
-      </div>
-      <Card className="border-[#c45b78]/30">
-        <CardHeader>
-          <CardTitle className="text-base">New assignment</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} data-testid="input-assignment-title" />
-          <Textarea placeholder="What should they hand in?" value={instructions} onChange={(e) => setInstructions(e.target.value)} data-testid="input-assignment-instructions" />
-          <Input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} data-testid="input-assignment-due" />
-          <Button
-            disabled={!title.trim() || !instructions.trim() || create.isPending}
-            onClick={() => create.mutate()}
-            data-testid="button-create-assignment"
-            className="bg-[#c45b78] hover:bg-[#9b3d55]"
-          >
-            {create.isPending ? "Adding..." : "Assign"}
-          </Button>
-        </CardContent>
-      </Card>
-      {assignments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No written assignments in this cohort yet.</p>
-      ) : assignments.map((item: any) => (
-        <Card key={item.id} className="border-[#fde8ef]">
+    <div className="space-y-3">
+      {assessments.map((item: any) => (
+        <Card key={item.id} className="border-[#fff1e0]">
           <CardHeader className="py-4">
-            <CardTitle className="text-base">{item.kind === "assessment" ? "Assessment · " : ""}{item.title}</CardTitle>
+            <CardTitle className="text-base">{item.title}</CardTitle>
             <CardDescription>
               {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}
             </CardDescription>
           </CardHeader>
-          {item.instructions && (
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{item.instructions}</p>
-            </CardContent>
-          )}
+          <CardContent className="space-y-2">
+            {item.instructions && <p className="text-sm text-muted-foreground">{item.instructions}</p>}
+            <WorkDeadlineEditor
+              current={item.dueDate}
+              pending={saveDue.isPending}
+              testId={`assignment-deadline-${item.id}`}
+              onSave={(dueDate) => saveDue.mutate({ id: item.id, dueDate })}
+            />
+          </CardContent>
         </Card>
       ))}
     </div>
@@ -310,9 +306,6 @@ export default function TrainerBatches() {
   const [selectedFileId, setSelectedFileId] = useState("");
   const [numQuestions, setNumQuestions] = useState("5");
   const [ownQuestion, setOwnQuestion] = useState("");
-  const [appreciationText, setAppreciationText] = useState("");
-  const [adminName1, setAdminName1] = useState("");
-  const [adminName2, setAdminName2] = useState("");
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [disqualifyDialogOpen, setDisqualifyDialogOpen] = useState(false);
   const [commentTeacher, setCommentTeacher] = useState<any>(null);
@@ -340,7 +333,7 @@ export default function TrainerBatches() {
   const [uploadExamOpen, setUploadExamOpen] = useState(false);
   const [examPrompt, setExamPrompt] = useState("");
   const [taskOpen, setTaskOpen] = useState(false);
-  const [taskKind, setTaskKind] = useState<"assignment" | "assessment">("assignment");
+  const [taskKind, setTaskKind] = useState<"assessment">("assessment");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskNote, setTaskNote] = useState("");
   const [taskFile, setTaskFile] = useState<File | null>(null);
@@ -361,6 +354,10 @@ export default function TrainerBatches() {
   // Fetch batch details including teachers
   const { data: batchDetails } = useQuery<any>({
     queryKey: ["/api/batches", selectedBatch?.id],
+    enabled: !!selectedBatch?.id,
+  });
+  const { data: selectedBatchCourses = [] } = useQuery<any[]>({
+    queryKey: ["/api/batches", selectedBatch?.id, "courses"],
     enabled: !!selectedBatch?.id,
   });
 
@@ -410,12 +407,6 @@ export default function TrainerBatches() {
       return res.json();
     },
     enabled: !!selectedQuizForAttempts?.id && quizAttemptsOpen,
-  });
-
-  // Fetch batch certificate template
-  const { data: template } = useQuery<any>({
-    queryKey: [`/api/batches/${selectedBatch?.id}/certificate-template`],
-    enabled: !!selectedBatch?.id && activeTab === "certificates",
   });
 
   // Fetch batch attendance summary (per teacher)
@@ -768,7 +759,7 @@ export default function TrainerBatches() {
         instructions: taskNote,
         fileUrl,
         fileName,
-        kind: taskKind,
+        kind: "assessment",
         dueDate: deadlineIso(deadline),
       });
       return response.json();
@@ -776,7 +767,7 @@ export default function TrainerBatches() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "assignments"] });
       toast({
-        title: taskKind === "assessment" ? "Assessment uploaded" : "Assignment uploaded",
+        title: "Assessment uploaded",
         description: "Teachers open it on Work, not with their quizzes.",
       });
       setTaskOpen(false);
@@ -825,6 +816,20 @@ export default function TrainerBatches() {
     },
   });
 
+  const saveQuizDeadlineMutation = useMutation({
+    mutationFn: async ({ quizId, dueDate }: { quizId: string; dueDate: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/assigned-quizzes/${quizId}`, { dueDate });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "quizzes"] });
+      toast({ title: "Deadline saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not save the deadline", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteQuizMutation = useMutation({
     mutationFn: async (quizId: string) => {
       await apiRequest("DELETE", `/api/assigned-quizzes/${quizId}`);
@@ -870,31 +875,6 @@ export default function TrainerBatches() {
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
-
-  const saveCertificateTemplateMutation = useMutation({
-    mutationFn: async () => {
-      const batchCoursesRes = await apiRequest("GET", `/api/batches/${selectedBatch.id}/courses`);
-      const batchCoursesData = await batchCoursesRes.json();
-      const courseId = batchCoursesData[0]?.id;
-      
-      return apiRequest("POST", `/api/batches/${selectedBatch.id}/certificate-template`, {
-        courseId,
-        appreciationText,
-        adminName1,
-        adminName2,
-      });
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/batches/${selectedBatch?.id}/certificate-template`] });
-      setAppreciationText(data.appreciationText);
-      setAdminName1(data.adminName1 || "");
-      setAdminName2(data.adminName2 || "");
-      toast({ title: "Template saved successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1096,6 +1076,20 @@ export default function TrainerBatches() {
                   {selectedBatch.description && (
                     <p className="text-sm text-muted-foreground mt-1">{selectedBatch.description}</p>
                   )}
+                  {selectedBatchCourses.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedBatchCourses.map((course: any) => (
+                        <Link
+                          key={course.id}
+                          href={`/courses/${course.id}`}
+                          className="text-sm font-medium text-primary underline"
+                          data-testid={`link-batch-course-${course.id}`}
+                        >
+                          {course.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                 <Button
@@ -1145,7 +1139,7 @@ export default function TrainerBatches() {
                 <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>{taskKind === "assessment" ? "Upload an assessment" : "Upload an assignment"}</DialogTitle>
+                      <DialogTitle>Upload an assessment</DialogTitle>
                       <DialogDescription>This goes to the teacher Work page. It is not a quiz.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -1172,20 +1166,13 @@ export default function TrainerBatches() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <TabsContent value="assignments" className="flex-1 overflow-y-auto p-4">
-                  <div className="mb-4 flex justify-end">
-                    <Button size="sm" variant="outline" data-testid="button-upload-assignment" onClick={() => { setTaskKind("assignment"); setTaskOpen(true); }}>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload assignment file
-                    </Button>
-                  </div>
-                  <AssignmentDesk batchId={selectedBatch.id} batchName={selectedBatch.name} />
-
-                <div className="mt-8 space-y-4 border-t pt-6" data-testid="trainer-assessments">
+                <TabsContent value="assessments" className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-4" data-testid="trainer-assessments">
                   <div className="rounded-2xl p-4" style={{ background: "#fff1e0", color: "#9a5b16" }}>
                     <p className="text-lg font-semibold">Assessments</p>
                     <p className="mt-1 text-sm">Paper exams and written exams. Lesson quizzes follow below.</p>
                   </div>
+                  <AssessmentDesk batchId={selectedBatch.id} />
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" data-testid="button-upload-assessment" onClick={() => { setTaskKind("assessment"); setTaskOpen(true); }}>
                       <ClipboardCheck className="mr-2 h-4 w-4" />
@@ -1272,19 +1259,27 @@ export default function TrainerBatches() {
                     <div className="space-y-2">
                       {assignedQuizzes.filter((quiz: any) => isWritingExam(quiz)).map((quiz: any) => (
                         <Card key={quiz.id} data-testid={`card-assessment-${quiz.id}`}>
-                          <CardContent className="flex items-center justify-between gap-3 py-4">
-                            <div>
-                              <p className="font-semibold">{quiz.title}</p>
-                              <p className="text-sm text-muted-foreground">{quiz.paperUrl ? "Uploaded paper" : "Written exam"} · {dueLabel(quiz.dueDate)}</p>
+                          <CardContent className="space-y-2 py-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold">{quiz.title}</p>
+                                <p className="text-sm text-muted-foreground">{quiz.paperUrl ? "Uploaded paper" : "Written exam"} · {dueLabel(quiz.dueDate)}</p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteQuizMutation.mutate(quiz.id)}
+                                data-testid={`button-delete-quiz-${quiz.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteQuizMutation.mutate(quiz.id)}
-                              data-testid={`button-delete-quiz-${quiz.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <WorkDeadlineEditor
+                              current={quiz.dueDate}
+                              pending={saveQuizDeadlineMutation.isPending}
+                              testId={`quiz-deadline-${quiz.id}`}
+                              onSave={(dueDate) => saveQuizDeadlineMutation.mutate({ quizId: quiz.id, dueDate })}
+                            />
                           </CardContent>
                         </Card>
                       ))}
@@ -1519,6 +1514,12 @@ export default function TrainerBatches() {
                                 <p className="text-sm text-muted-foreground mt-1">
                                   {quiz.description || "No description"} · {dueLabel(quiz.dueDate)}
                                 </p>
+                                <WorkDeadlineEditor
+                                  current={quiz.dueDate}
+                                  pending={saveQuizDeadlineMutation.isPending}
+                                  testId={`quiz-deadline-${quiz.id}`}
+                                  onSave={(dueDate) => saveQuizDeadlineMutation.mutate({ quizId: quiz.id, dueDate })}
+                                />
                               </div>
                               <div className="flex items-center gap-1">
                                 <Button
@@ -2096,133 +2097,6 @@ export default function TrainerBatches() {
                   </Card>
                 </TabsContent>
 
-                {/* Certificates Tab */}
-                <TabsContent value="certificates" className="overflow-y-auto flex-1 p-4">
-                  <div className="space-y-4 pr-4">
-                    <div className="bg-muted/30 p-4 rounded-lg border">
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Configure the certificate template for this batch. After setup, contact admin to approve.
-                      </p>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium">Appreciation Text</label>
-                          <Textarea
-                            value={appreciationText || (template?.appreciationText ?? "")}
-                            onChange={(e) => setAppreciationText(e.target.value)}
-                            placeholder="In recognition of successfully completing the training program"
-                            className="mt-2"
-                            data-testid="input-cert-appreciation-text"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium">Admin Name 1</label>
-                            <Input
-                              value={adminName1 || (template?.adminName1 ?? "")}
-                              onChange={(e) => setAdminName1(e.target.value)}
-                              placeholder="First admin name"
-                              className="mt-2"
-                              data-testid="input-cert-admin-name-1"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Admin Name 2</label>
-                            <Input
-                              value={adminName2 || (template?.adminName2 ?? "")}
-                              onChange={(e) => setAdminName2(e.target.value)}
-                              placeholder="Second admin name (optional)"
-                              className="mt-2"
-                              data-testid="input-cert-admin-name-2"
-                            />
-                          </div>
-                        </div>
-
-                        <Button
-                          onClick={() => saveCertificateTemplateMutation.mutate()}
-                          disabled={saveCertificateTemplateMutation.isPending}
-                          data-testid="button-save-cert-template"
-                        >
-                          {saveCertificateTemplateMutation.isPending ? "Saving..." : "Save Template"}
-                        </Button>
-
-                        {template?.status && (
-                          <div className="text-sm p-3 rounded-lg bg-muted/50">
-                            <p className="font-medium">
-                              Status: <span className="capitalize">{template.status}</span>
-                            </p>
-                            {template.status === "approved" && (
-                              <p className="text-green-600 flex items-center gap-1 mt-1">
-                                <CheckCircle className="w-4 h-4" /> Approved by admin
-                              </p>
-                            )}
-                            {template.status === "draft" && (
-                              <p className="text-muted-foreground text-xs mt-1">
-                                Save your template and request approval from admin
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border">
-                      <p className="text-sm font-medium mb-4 text-foreground">Certificate Preview</p>
-                      <div className="border-2 border-primary rounded-lg p-8 space-y-6 text-center bg-white dark:bg-slate-900">
-                        {/* Certificate Header */}
-                        <div className="space-y-2">
-                          <h1 className="text-3xl font-bold text-primary">Certificate of Completion</h1>
-                          <p className="text-sm text-muted-foreground">Silverleaf Academy</p>
-                        </div>
-
-                        {/* Divider */}
-                        <div className="flex justify-center">
-                          <div className="w-16 h-1 bg-primary rounded-full" />
-                        </div>
-
-                        {/* Content */}
-                        <div className="space-y-4">
-                          <p className="text-sm text-foreground">This certificate is proudly presented to</p>
-                          <p className="text-2xl font-bold text-primary">Teacher Name</p>
-                          <p className="text-xs text-muted-foreground border-t-2 border-primary pt-4">
-                            For successfully completing the course
-                          </p>
-                          <p className="text-lg font-bold text-primary">{selectedBatch?.name || "Course Name"}</p>
-                        </div>
-
-                        {/* Appreciation Text */}
-                        <div className="bg-primary/5 p-4 rounded-lg">
-                          <p className="text-xs leading-relaxed text-foreground italic">
-                            {appreciationText || template?.appreciationText || "In recognition of successfully completing the training program"}
-                          </p>
-                        </div>
-
-                        {/* Signatures */}
-                        <div className="grid grid-cols-2 gap-6 pt-6">
-                          <div className="space-y-8 text-center">
-                            <div className="h-12" />
-                            <div>
-                              <p className="text-xs font-semibold text-foreground">{adminName1 || template?.adminName1 || "Administrator"}</p>
-                              <p className="text-xs text-muted-foreground">Authorized Signatory</p>
-                            </div>
-                          </div>
-                          <div className="space-y-8 text-center">
-                            <div className="h-12" />
-                            <div>
-                              <p className="text-xs font-semibold text-foreground">{adminName2 || template?.adminName2 || "Director"}</p>
-                              <p className="text-xs text-muted-foreground">Program Director</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Date */}
-                        <p className="text-xs text-muted-foreground pt-4">
-                          Issued on {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
               </Tabs>
             </div>
           ) : (

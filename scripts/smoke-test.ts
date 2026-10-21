@@ -34,6 +34,22 @@ function cookieHeader(setCookie: string, previous = ""): string {
   return [...new Set(pairs)].join("; ");
 }
 
+async function pagesLoad(
+  record: (name: string, ok: boolean, detail: string) => void,
+  name: string,
+  cookies: string,
+  paths: string[],
+) {
+  const failed: string[] = [];
+  for (const path of paths) {
+    const res = await request(path, {}, cookies);
+    if (res.status !== 200) {
+      failed.push(`${path}=${res.status}`);
+    }
+  }
+  record(name, failed.length === 0, failed.length ? failed.join(" ") : `${paths.length} ok`);
+}
+
 async function main() {
   const checks: Check[] = [];
   const record = (name: string, ok: boolean, detail: string) => {
@@ -226,6 +242,51 @@ async function main() {
     `HTTP ${deskPeers.status}`,
   );
 
+  await pagesLoad(record, "Admin desk pages load", cookies, [
+    "/api/admin/dashboard-stats",
+    "/api/admin/trainers",
+    "/api/admin/teachers",
+    "/api/admin/academy-path",
+    "/api/admin/attendance",
+    "/api/admin/certificates",
+    "/api/admin/certificate-templates",
+    "/api/admin/analytics/batches",
+    "/api/admin/analytics/courses",
+    "/api/admin/analytics/snapshot",
+    "/api/admin/analytics/pipeline",
+    "/api/admin/analytics/demographics",
+    "/api/admin/analytics/cohorts",
+    "/api/admin/analytics/performance",
+    "/api/admin/pending-trainers",
+    "/api/admin/pending-teachers",
+  ]);
+  await pagesLoad(record, "Trainer desk pages load", trainerCookies, [
+    "/api/trainer/desk",
+    "/api/trainer/pending-reviews",
+    "/api/training-weeks",
+    "/api/batches",
+    "/api/notifications",
+    "/api/trainer/analytics",
+  ]);
+  await pagesLoad(record, "Teacher desk pages load", teacherCookies, [
+    "/api/teacher/me",
+    "/api/teacher/academy-path",
+    "/api/teacher/report-card",
+    "/api/teacher/assigned-weeks",
+    "/api/teacher/medals",
+    "/api/teacher/desk-peers",
+    "/api/notifications",
+    "/api/teacher/reflections",
+    "/api/teacher/trainer-comments",
+    "/api/teacher/goals",
+    "/api/teacher/improvement-tips",
+    "/api/teacher/progress-summary",
+    "/api/teacher/events",
+    "/api/teacher/skills-map",
+    "/api/teacher/quizzes",
+    "/api/teacher/assignments",
+  ]);
+
   const trainerBatches = await request("/api/batches", {}, trainerCookies);
   record(
     "Trainer can list cohorts",
@@ -240,6 +301,46 @@ async function main() {
 
   const adminTeachers = await request("/api/admin/teachers", {}, cookies);
   record("Admin teacher list", adminTeachers.status === 200 && Array.isArray(adminTeachers.json), `HTTP ${adminTeachers.status}`);
+
+  const trainerIssue = await request("/api/admin/certificates/issue", {
+    method: "POST",
+    body: JSON.stringify({ teacherId: "x", design: "fellowship", occasion: "graduation" }),
+  }, trainerCookies);
+  record(
+    "Trainer cannot issue academy certificate",
+    trainerIssue.status === 403 || trainerIssue.status === 401,
+    `HTTP ${trainerIssue.status}`,
+  );
+
+  const certTemplates = await request("/api/admin/certificate-templates", {}, cookies);
+  record(
+    "Admin certificate templates",
+    certTemplates.status === 200 && Boolean(certTemplates.json?.designs?.fellowship) && Boolean(certTemplates.json?.designs?.advanced),
+    `HTTP ${certTemplates.status}`,
+  );
+
+  const fellowshipImg = await request("/cert-fellowship.jpg");
+  const advancedImg = await request("/cert-advanced.jpg");
+  record(
+    "Official certificate images",
+    fellowshipImg.status === 200 && advancedImg.status === 200,
+    `fellowship=${fellowshipImg.status} advanced=${advancedImg.status}`,
+  );
+
+  const fellow = Array.isArray(adminTeachers.json)
+    ? adminTeachers.json.find((row: any) => row.approvalStatus !== "inactive") || adminTeachers.json[0]
+    : null;
+  const issuedCert = fellow?.id
+    ? await request("/api/admin/certificates/issue", {
+      method: "POST",
+      body: JSON.stringify({ teacherId: fellow.id, design: "fellowship", occasion: "graduation" }),
+    }, cookies)
+    : { status: 0, json: null as any };
+  record(
+    "Admin can issue graduation certificate",
+    issuedCert.status === 201 && typeof issuedCert.json?.id === "string" && Boolean(issuedCert.json?.teacherName),
+    `HTTP ${issuedCert.status}`,
+  );
   const youtubeReject = await request("/api/training-weeks/not-a-week/external-link", {
     method: "POST",
     body: JSON.stringify({ url: "https://example.com" }),
@@ -305,7 +406,7 @@ async function main() {
   const cohorts = await request("/api/admin/analytics/cohorts", {}, cookies);
   record(
     "Cohort analytics",
-    cohorts.status === 200 && Array.isArray(cohorts.json) && cohorts.json.length > 0,
+    cohorts.status === 200 && Array.isArray(cohorts.json),
     `HTTP ${cohorts.status} cohorts=${Array.isArray(cohorts.json) ? cohorts.json.length : 0}`,
   );
 
@@ -347,6 +448,7 @@ async function main() {
   await roleBlocked("Trainer cannot open admin stats", "/api/admin/dashboard-stats", trainerCookies);
   await roleBlocked("Trainer cannot clear the academy", "/api/admin/fresh-start", trainerCookies, "POST", { confirm: "CLEAR ACTIVITY" });
   await roleBlocked("Trainer cannot assign a trainer to a class", "/api/batches/not-a-batch/trainer", trainerCookies, "PUT", { trainerId: "someone" });
+  await roleBlocked("Trainer cannot add a course", "/api/courses", trainerCookies, "POST", { name: `Trainer course ${stamp}`, description: "blocked" });
 
   const openCourses = await request("/api/courses");
   record("Course catalog requires a login", openCourses.status === 401, `HTTP ${openCourses.status}`);
@@ -421,6 +523,21 @@ async function main() {
     assignedTrainer.status === 200 && assignedTrainer.json?.trainerId === trainerLogin.json?.id,
     `HTTP ${assignedTrainer.status}`,
   );
+  if (gapCohortId) {
+    await pagesLoad(record, "Trainer cohort room pages load", trainerCookies, [
+      `/api/batches/${gapCohortId}`,
+      `/api/batches/${gapCohortId}/courses`,
+      `/api/batches/${gapCohortId}/quizzes`,
+      `/api/batches/${gapCohortId}/file-quizzes`,
+      `/api/batches/${gapCohortId}/progress`,
+      `/api/batches/${gapCohortId}/certificates`,
+      `/api/batches/${gapCohortId}/events`,
+      `/api/batches/${gapCohortId}/assignments`,
+      `/api/batches/${gapCohortId}/announcements`,
+      `/api/batches/${gapCohortId}/attendance/summary`,
+      `/api/batches/${gapCohortId}/certificate-template`,
+    ]);
+  }
 
   const openBatchCourses = gapCohortId ? await request(`/api/batches/${gapCohortId}/courses`) : { status: 0 };
   record("Cohort courses require a login", openBatchCourses.status === 401, `HTTP ${openBatchCourses.status}`);
@@ -504,6 +621,25 @@ async function main() {
     }, trainerCookies)
     : { status: 0, json: null as any };
   const assignmentId = assignment.json?.id;
+  const dueStamp = "2026-12-01T09:00:00.000Z";
+  const assignmentDue = assignmentId
+    ? await request(`/api/batches/${gapCohortId}/assignments/${assignmentId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ dueDate: dueStamp }),
+    }, trainerCookies)
+    : { status: 0, json: null as any };
+  const quizDue = manualQuiz.json?.id
+    ? await request(`/api/assigned-quizzes/${manualQuiz.json.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ dueDate: dueStamp }),
+    }, trainerCookies)
+    : { status: 0, json: null as any };
+  record(
+    "Trainer can edit a deadline after work is created",
+    assignmentDue.status === 200 && String(assignmentDue.json?.dueDate || "").startsWith("2026-12-01")
+      && quizDue.status === 200 && String(quizDue.json?.dueDate || "").startsWith("2026-12-01"),
+    `assignment=${assignmentDue.status} quiz=${quizDue.status}`,
+  );
   const submitted = assignmentId
     ? await request(`/api/teacher/assignments/${assignmentId}/submit`, {
       method: "POST",

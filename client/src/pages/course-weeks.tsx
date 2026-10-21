@@ -785,11 +785,11 @@ export default function CourseWeeks() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/")}
+            onClick={() => navigate(user?.role === "admin" ? "/admin/batches" : user?.role === "trainer" ? "/trainer/batches" : user?.role === "teacher" ? "/teacher/dashboard" : "/")}
             data-testid="button-back-to-courses"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Courses
+            {user?.role === "teacher" ? "Back to desk" : "Back to Cohorts"}
           </Button>
         </div>
 

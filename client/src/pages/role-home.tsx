@@ -23,5 +23,5 @@ export default function RoleHome() {
     return <Redirect to="/teacher/dashboard" />;
   }
 
-  return <Redirect to="/courses" />;
+  return <Redirect to="/auth" />;
 }

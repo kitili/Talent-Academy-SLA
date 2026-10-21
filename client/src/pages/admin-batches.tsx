@@ -336,7 +336,7 @@ export default function AdminBatches() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f3d7b0]">Academy path</p>
               <h1 className="text-3xl font-bold mt-1 mb-2">Cohorts, batches, and courses</h1>
               <p className="text-white/80 max-w-2xl">
-                Batches follow each other: Batch One, then Batch Two, and onward. You add the cohorts and the batches. You and a trainer can add courses.
+                Batches follow each other: Batch One, then Batch Two, and onward. You add the cohorts, the batches, and the courses.
               </p>
             </div>
             <Button onClick={() => setCohortOpen(true)} className="bg-[#c47b2b] text-white hover:bg-[#a86722]" data-testid="button-add-cohort">
@@ -699,6 +699,9 @@ export default function AdminBatches() {
                       {course.publishStatus === "draft" && <Badge variant="outline" className="mt-1">Draft</Badge>}
                     </div>
                     <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => navigate(`/courses/${course.id}`)} data-testid={`button-open-course-${course.id}`} title="Open lessons">
+                        <BookOpen className="h-4 w-4" />
+                      </Button>
                       <Button size="icon" variant="ghost" onClick={() => setEditingCourse(course)} data-testid={`button-edit-course-${course.id}`}>
                         <Pencil className="h-4 w-4" />
                       </Button>

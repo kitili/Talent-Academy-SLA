@@ -461,10 +461,11 @@ export default function TeacherDashboard() {
     onError: () => toast({ title: "Could not submit work", variant: "destructive" }),
   });
 
+  const assessments = myWork.filter((item: any) => item.kind === "assessment");
   const courseListPager = usePager(uniqueCourses, 6);
   const courseCardPager = usePager(uniqueCourses, 2);
   const eventPager = usePager(upcomingEvents, 5);
-  const workPager = usePager(myWork, 4);
+  const workPager = usePager(assessments, 4);
   const reflectionPager = usePager(reflections, 4);
   const commentPager = usePager(trainerComments, 4);
   const goalPager = usePager(goals, 5);
@@ -544,7 +545,7 @@ export default function TeacherDashboard() {
         <PlaceBanner
           place="garden"
           title={`Welcome, ${teacher?.name || "teacher"}`}
-          subtitle="Goals are on this page. Lessons, assignments, and quizzes each have their own page."
+          subtitle="Goals you set on Reflect appear here. Lessons, assessments, and quizzes each have their own page."
           titleTestId="text-welcome"
         />
         )}
@@ -576,7 +577,7 @@ export default function TeacherDashboard() {
         )}
 
         {tab === "home" && (() => {
-          const openWork = myWork.filter((item: any) => !(item.my_response || item.myResponse));
+          const openWork = assessments.filter((item: any) => !(item.my_response || item.myResponse));
           const nextEvent = upcomingEvents[0];
           const items = [
             resumeWeek && {
@@ -690,7 +691,7 @@ export default function TeacherDashboard() {
               Quizzes
             </CardTitle>
             <CardDescription>
-              Quizzes stay on this page. Learning materials are on Learning, and assignments are on Work.
+              Quizzes stay on this page. Learning materials are on Learning, and assessments are on Work.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -828,18 +829,18 @@ export default function TeacherDashboard() {
                 <FileText className="h-5 w-5 text-primary" />
                 My work
               </CardTitle>
-              <CardDescription>Assignments and assessments your trainer uploaded. Quizzes stay on the Quiz page.</CardDescription>
+              <CardDescription>Assessments your trainer uploaded. Quizzes stay on the Quiz page.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {myWork.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No written work assigned yet.</p>
+              {assessments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No assessments assigned yet.</p>
               ) : workPager.slice.map((item: any) => {
                 const id = item.id;
                 const submitted = item.my_response || item.myResponse;
                 return (
                   <div key={id} className="space-y-2">
                     <p className="font-medium">{item.title}</p>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#c47b2b]">{item.kind === "assessment" ? "Assessment" : "Assignment"}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#c47b2b]">Assessment</p>
                     <p className="text-sm text-muted-foreground">{item.instructions}</p>
                     {(item.file_url || item.fileUrl) && (
                       <a className="text-sm font-medium text-primary underline" href={item.file_url || item.fileUrl} target="_blank" rel="noreferrer">
@@ -1066,6 +1067,84 @@ export default function TeacherDashboard() {
               </div>
             )}
             <PageStrip page={courseCardPager.page} pages={courseCardPager.pages} setPage={courseCardPager.setPage} />
+          </CardContent>
+        </Card>
+        )}
+
+        {tab === "reflect" && (
+        <Card className="border-[#c4842a]/30 bg-white text-[#17233c]" data-testid="card-reflect-goals">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Goals & Action Items
+            </CardTitle>
+            <CardDescription>Set personal learning goals. Filled goals also show on Home.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Textarea
+                  value={newGoalText}
+                  onChange={(e) => setNewGoalText(e.target.value)}
+                  placeholder="What do you want to achieve?"
+                  rows={2}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => {
+                    if (!newGoalText.trim()) return;
+                    createGoalMutation.mutate({ goalText: newGoalText });
+                  }}
+                  disabled={createGoalMutation.isPending || !newGoalText.trim()}
+                  size="sm"
+                  className="self-end"
+                >
+                  Add
+                </Button>
+              </div>
+
+              {goals.length === 0 ? (
+                <p className="text-muted-foreground text-center py-2 text-sm">No goals set yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {goalPager.slice.map((goal: any) => (
+                    <div key={goal.id} className={`flex items-start gap-3 p-3 rounded-lg border ${
+                      goal.status === 'completed' ? 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800' : 'bg-muted border-transparent'
+                    }`}>
+                      <div className="flex-1">
+                        <p className={`text-sm ${goal.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+                          {goal.goalText}
+                        </p>
+                        {goal.dueDate && (
+                          <span className="text-xs text-muted-foreground">
+                            Due: {new Date(goal.dueDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {goal.status === 'pending' && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs"
+                            onClick={() => updateGoalMutation.mutate({ id: goal.id, status: 'in_progress' })}>
+                            Start
+                          </Button>
+                        )}
+                        {goal.status === 'in_progress' && (
+                          <Button size="sm" variant="default" className="h-7 text-xs"
+                            onClick={() => updateGoalMutation.mutate({ id: goal.id, status: 'completed' })}>
+                            Done
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive"
+                          onClick={() => deleteGoalMutation.mutate(goal.id)}>
+                          x
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <PageStrip page={goalPager.page} pages={goalPager.pages} setPage={goalPager.setPage} />
+            </div>
           </CardContent>
         </Card>
         )}
@@ -1372,78 +1451,47 @@ export default function TeacherDashboard() {
         </>
         )}
 
-        {tab === "home" && (
+        {tab === "home" && goals.length > 0 && (
         <Card className="border-[#c4842a]/30 bg-white text-[#17233c]" data-testid="card-home-goals">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
               Goals & Action Items
             </CardTitle>
-            <CardDescription>Set personal learning goals and track your progress</CardDescription>
+            <CardDescription>Goals you set on Reflect</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Textarea
-                  value={newGoalText}
-                  onChange={(e) => setNewGoalText(e.target.value)}
-                  placeholder="What do you want to achieve?"
-                  rows={2}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={() => {
-                    if (!newGoalText.trim()) return;
-                    createGoalMutation.mutate({ goalText: newGoalText });
-                  }}
-                  disabled={createGoalMutation.isPending || !newGoalText.trim()}
-                  size="sm"
-                  className="self-end"
-                >
-                  Add
-                </Button>
-              </div>
-
-              {goals.length === 0 ? (
-                <p className="text-muted-foreground text-center py-2 text-sm">No goals set yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {goalPager.slice.map((goal: any) => (
-                    <div key={goal.id} className={`flex items-start gap-3 p-3 rounded-lg border ${
-                      goal.status === 'completed' ? 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800' : 'bg-muted border-transparent'
-                    }`}>
-                      <div className="flex-1">
-                        <p className={`text-sm ${goal.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
-                          {goal.goalText}
-                        </p>
-                        {goal.dueDate && (
-                          <span className="text-xs text-muted-foreground">
-                            Due: {new Date(goal.dueDate).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        {goal.status === 'pending' && (
-                          <Button size="sm" variant="outline" className="h-7 text-xs"
-                            onClick={() => updateGoalMutation.mutate({ id: goal.id, status: 'in_progress' })}>
-                            Start
-                          </Button>
-                        )}
-                        {goal.status === 'in_progress' && (
-                          <Button size="sm" variant="default" className="h-7 text-xs"
-                            onClick={() => updateGoalMutation.mutate({ id: goal.id, status: 'completed' })}>
-                            Done
-                          </Button>
-                        )}
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive"
-                          onClick={() => deleteGoalMutation.mutate(goal.id)}>
-                          x
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+            <div className="space-y-2">
+              {goalPager.slice.map((goal: any) => (
+                <div key={goal.id} className={`flex items-start gap-3 p-3 rounded-lg border ${
+                  goal.status === 'completed' ? 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800' : 'bg-muted border-transparent'
+                }`}>
+                  <div className="flex-1">
+                    <p className={`text-sm ${goal.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+                      {goal.goalText}
+                    </p>
+                    {goal.dueDate && (
+                      <span className="text-xs text-muted-foreground">
+                        Due: {new Date(goal.dueDate).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    {goal.status === 'pending' && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs"
+                        onClick={() => updateGoalMutation.mutate({ id: goal.id, status: 'in_progress' })}>
+                        Start
+                      </Button>
+                    )}
+                    {goal.status === 'in_progress' && (
+                      <Button size="sm" variant="default" className="h-7 text-xs"
+                        onClick={() => updateGoalMutation.mutate({ id: goal.id, status: 'completed' })}>
+                        Done
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              )}
+              ))}
               <PageStrip page={goalPager.page} pages={goalPager.pages} setPage={goalPager.setPage} />
             </div>
           </CardContent>

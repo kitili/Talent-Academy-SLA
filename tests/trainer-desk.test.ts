@@ -128,9 +128,14 @@ describe("trainer desk wiring", () => {
     assert.equal(trainer.includes("laid out in colour"), false);
     assert.match(read("server/routes.ts"), /encouragementFor/);
     assert.match(read("server/trainerEncouragement.ts"), /trainer_encouragements/);
+    assert.equal(trainer.includes('href="/courses"'), false);
+    assert.equal(trainer.includes("button-trainer-courses"), false);
+    assert.match(trainer, /link-batch-course-\$\{course\.id\}/);
     assert.match(trainer, /data-testid="trainer-sidebar"/);
     assert.match(trainer, /trainer-nav-\$\{item\.id\}/);
-    assert.match(trainer, /id: "assignments"/);
+    assert.match(trainer, /id: "assessments"/);
+    assert.equal(trainer.includes('id: "assignments"'), false);
+    assert.equal(trainer.includes('id: "certificates"'), false);
     assert.equal(trainer.includes('id: "assessments", label: "Assessments", icon'), false);
     assert.equal(trainer.includes('id: "quizzes", label: "Quizzes", icon'), false);
     assert.equal(trainer.includes('id: "teachers", label: "Teachers", icon'), false);
@@ -138,7 +143,11 @@ describe("trainer desk wiring", () => {
     assert.match(trainer, /data-testid="trainer-quizzes"/);
     assert.match(trainer, /data-testid="trainer-assessments"/);
     assert.match(trainer, /dueDate: deadlineIso/);
+    assert.match(trainer, /Save deadline/);
+    assert.match(trainer, /\/api\/assigned-quizzes\/\$\{quizId\}/);
     assert.match(routes, /parseDeadline\(req\.body\?\.dueDate\)/);
+    assert.match(routes, /hasOwnProperty\.call\(req\.body \|\| \{\}, "dueDate"\)/);
+    assert.match(routes, /\/api\/batches\/:batchId\/assignments\/:assignmentId/);
     assert.equal(trainer.includes("Adult teachers"), false);
     assert.match(trainer, /button-upload-exam/);
     assert.match(trainer, /check-quiz-teacher-/);

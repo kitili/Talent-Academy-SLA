@@ -10,8 +10,7 @@ import { useLocation, useRoute } from "wouter";
 import { Download, ArrowLeft, LogOut, Edit2, Save, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import logoImage from "@assets/image_1760460046116.png";
-import { TalentCertificate } from "@/components/TalentCertificate";
+import { SilverleafCertificate } from "@/components/SilverleafCertificate";
 
 interface Certificate {
   id: string;
@@ -20,6 +19,7 @@ interface Certificate {
   courseName: string;
   appreciationText: string;
   kind?: string;
+  design?: string | null;
   outstandingAreas?: string | null;
   adminName1?: string;
   adminName2?: string;
@@ -45,7 +45,7 @@ export default function TeacherCertificateView() {
     adminName2: "",
   });
 
-  const canEdit = user?.role === "admin" || user?.role === "trainer";
+  const canEdit = false;
 
   const { data: certificate, isLoading } = useQuery<Certificate>({
     queryKey: ["/api/certificates", certId],
@@ -217,15 +217,11 @@ export default function TeacherCertificateView() {
       <main className="container mx-auto px-4 py-8 flex justify-center">
         {!isEditing ? (
           <div className="w-full max-w-5xl print:shadow-none">
-            <TalentCertificate
-              teacherName={certificate.teacherName}
-              courseName={certificate.courseName}
-              appreciationText={certificate.appreciationText}
+            <SilverleafCertificate
+              design={certificate.design}
               kind={certificate.kind}
-              outstandingAreas={certificate.outstandingAreas}
-              adminName1={certificate.adminName1}
-              adminName2={certificate.adminName2}
-              generatedAt={certificate.generatedAt}
+              name={certificate.teacherName}
+              body={certificate.appreciationText}
             />
           </div>
         ) : (

@@ -13,7 +13,7 @@ export default function TeacherCertificates() {
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/teacher/me"] });
   const teacherId = user?.id || me?.id;
-  const { data: certificates = [], isLoading } = useQuery({
+  const { data: certificates = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher", teacherId, "certificates"],
     enabled: Boolean(teacherId),
   });
@@ -68,7 +68,7 @@ export default function TeacherCertificates() {
             <div className="py-8 px-4">
               <h2 className="text-xl font-semibold mb-2">No certificates yet</h2>
               <p className="text-muted-foreground">
-                Complete the modules and quizzes in your courses to earn one.
+                Your administrator issues certificates at graduation or when a course is complete.
               </p>
             </div>
           </div>
@@ -86,7 +86,11 @@ export default function TeacherCertificates() {
                   </div>
                   <CardTitle className="mt-2">{cert.courseName}</CardTitle>
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                    {cert.kind === "distinction" ? "Distinction — highest qualification" : "Graduation — attended and completed"}
+                    {cert.design === "advanced" || cert.kind === "distinction"
+                      ? "Advanced Level"
+                      : cert.kind === "course"
+                        ? "Course completion"
+                        : "Graduation"}
                   </p>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">

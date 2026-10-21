@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
 import { isHostedPostgres, resolveDatabaseUrl } from "./databaseUrl";
+import { ensureSchemaColumns } from "./schemaGuard";
 
 const databaseUrl = resolveDatabaseUrl();
 const hosted = isHostedPostgres(databaseUrl);
@@ -242,4 +243,5 @@ export async function ensureWrittenAssignmentTables() {
       created_at timestamp DEFAULT now()
     );
   `);
+  await ensureSchemaColumns((sql) => pool.query(sql));
 }

@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Clock, User, GraduationCap, XCircle, ArrowLeft, Download } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { AdminNav } from "@/components/AdminNav";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AcademyShell } from "@/components/AcademyShell";
+import { useAuth } from "@/hooks/use-auth";
+import { deskName } from "@shared/deskName";
 
 type User = {
   id: string;
@@ -39,6 +40,7 @@ type CurrentUser = {
 
 export default function ApprovalsPage() {
   const { toast } = useToast();
+  const { user, logoutMutation } = useAuth();
 
   const { data: currentUser } = useQuery<CurrentUser>({
     queryKey: ["/api/user"],
@@ -143,17 +145,17 @@ export default function ApprovalsPage() {
     },
   });
 
-  return (
-    <div className="sl-page sl-bg-hall min-h-screen">
-    {isAdmin && <AdminNav />}
-    <div className="sl-sheet sl-frame my-6 p-6 space-y-6">
+  const body = (
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
+          {!isAdmin && (
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+          )}
           <div>
             <h1 className="text-3xl font-bold mb-2">Pending Approvals</h1>
             <p className="text-muted-foreground">
@@ -312,6 +314,26 @@ export default function ApprovalsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+
+  if (isAdmin) {
+    return (
+      <AcademyShell
+        scene="hall"
+        title="Approvals"
+        subtitle="Pending account requests"
+        userLabel={user ? deskName(user) : undefined}
+        onLogout={() => logoutMutation.mutate()}
+        showAdminNav
+      >
+        {body}
+      </AcademyShell>
+    );
+  }
+
+  return (
+    <div className="sl-page sl-bg-hall min-h-screen">
+      <div className="sl-sheet sl-frame my-6 p-6">{body}</div>
     </div>
   );
 }

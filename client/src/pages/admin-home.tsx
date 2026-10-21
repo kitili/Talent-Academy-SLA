@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Megaphone } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
+import { PlaceCover, type PlaceName } from "@/components/PlaceArt";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { deskName } from "@shared/deskName";
 import { ADMIN_TOUR } from "@shared/guidedTour";
@@ -198,12 +199,12 @@ export default function AdminHome() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-tour="admin-pictures">
           {[
-            { href: "/approvals", title: "Approvals", test: "button-go-approvals" },
-            { href: "/admin/people", title: "People", test: "button-go-people" },
-            { href: "/admin/batches", title: "Cohorts", test: "button-go-batches" },
-            { href: "/admin/attendance", title: "Attendance", test: "button-go-attendance" },
-            { href: "/admin/analytics", title: "Analytics", test: "button-go-analytics" },
-            { href: "/admin/certificates", title: "Certificates", test: "button-go-certificates" },
+            { href: "/approvals", title: "Approvals", test: "button-go-approvals", place: "classroom" as PlaceName },
+            { href: "/admin/people", title: "People", test: "button-go-people", place: "hall" as PlaceName },
+            { href: "/admin/batches", title: "Cohorts", test: "button-go-batches", place: "classroom" as PlaceName },
+            { href: "/admin/attendance", title: "Attendance", test: "button-go-attendance", place: "hall" as PlaceName },
+            { href: "/admin/analytics", title: "Analytics", test: "button-go-analytics", place: "library" as PlaceName },
+            { href: "/admin/certificates", title: "Certificates", test: "button-go-certificates", place: "certificate" as PlaceName },
           ].map((item) => (
             <button
               key={item.href}
@@ -212,6 +213,9 @@ export default function AdminHome() {
               onClick={() => navigate(item.href)}
               className="sl-nav-card overflow-hidden rounded-2xl text-left"
             >
+              <span className="sl-place-tile block">
+                <PlaceCover place={item.place} className="h-36" />
+              </span>
               <span className="block px-4 py-3 font-semibold text-[#17233c] dark:text-[#f6f1e8]">{item.title}</span>
             </button>
           ))}

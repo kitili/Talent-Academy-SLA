@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
-import CoursesList from "@/pages/courses-list";
+import CoursesCatalogRedirect from "@/pages/courses-catalog-redirect";
 import CourseWeeks from "@/pages/course-weeks";
 import CourseView from "@/pages/course-view";
 import RoleHome from "@/pages/role-home";
@@ -41,7 +41,7 @@ function Router() {
     <Switch>
       {/* New course hierarchy */}
       <Route path="/" component={RoleHome} />
-      <ProtectedRoute path="/courses" component={CoursesList} />
+      <ProtectedRoute path="/courses" component={CoursesCatalogRedirect} />
       <ProtectedRoute path="/courses/:courseId" component={CourseWeeks} />
       <ProtectedRoute path="/courses/:courseId/weeks/:weekId" component={CourseView} />
       <ProtectedRoute path="/cohorts/:batchId" component={CohortWorkspace} />

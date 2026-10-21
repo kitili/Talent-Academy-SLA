@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { AdminNav } from "@/components/AdminNav";
+import { AcademyShell } from "@/components/AcademyShell";
+import { deskName } from "@shared/deskName";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, FileText, MessageSquare, Award } from "lucide-react";
@@ -31,7 +32,7 @@ interface TeacherDetail {
 }
 
 export default function AdminTeacherDetail() {
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const [, navigate] = useLocation();
   const [match, params] = useRoute("/admin/teachers/:id");
 
@@ -127,16 +128,20 @@ export default function AdminTeacherDetail() {
   }
 
   return (
-    <div className="sl-page sl-bg-board min-h-screen">
-      <AdminNav />
-      <div className="p-4 sm:p-6 md:p-8">
-      <div className="sl-sheet max-w-4xl mx-auto">
-        {/* Back Button */}
+    <AcademyShell
+      scene="board"
+      title={teacher.name}
+      subtitle="Teacher"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      showAdminNav
+    >
+      <div className="space-y-6">
         <Button
           variant="outline"
           size="icon"
           onClick={() => navigate("/admin/teachers")}
-          className="mb-8"
+          className="mb-2"
           data-testid="button-back-teachers"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -301,7 +306,6 @@ export default function AdminTeacherDetail() {
           </Card>
         )}
       </div>
-      </div>
-    </div>
+    </AcademyShell>
   );
 }

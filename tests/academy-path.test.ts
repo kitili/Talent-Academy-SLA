@@ -4,6 +4,7 @@ import {
   ACADEMY_TERMS,
   batchHoldingCourse,
   parseDeadline,
+  deadlineLocalValue,
   batchIsComplete,
   cohortIsComplete,
   moveBatchOrder,
@@ -16,7 +17,7 @@ describe("academy path", () => {
   it("names cohort, batch, and course as different things", () => {
     assert.match(ACADEMY_TERMS.cohort.body, /group of teachers/i);
     assert.match(ACADEMY_TERMS.batch.body, /step inside a cohort/i);
-    assert.match(ACADEMY_TERMS.course.body, /trainer can add a course/i);
+    assert.match(ACADEMY_TERMS.course.body, /admin adds a course/i);
     assert.match(ACADEMY_TERMS.course.body, /Only an admin adds cohorts and batches/i);
   });
 
@@ -78,5 +79,7 @@ describe("one course per batch and optional deadlines", () => {
     assert.equal(parseDeadline("not a date"), null);
     assert.equal(parseDeadline(undefined), null);
     assert.equal(parseDeadline("2026-11-01T10:00:00.000Z")?.toISOString(), "2026-11-01T10:00:00.000Z");
+    assert.equal(deadlineLocalValue(null), "");
+    assert.match(deadlineLocalValue("2026-11-01T10:00:00.000Z"), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
   });
 });

@@ -242,6 +242,7 @@ export interface IStorage {
   getQuizAudienceMap(quizIds: string[]): Promise<Record<string, string[]>>;
   deleteAssignedQuiz(id: string): Promise<boolean>;
   updateAssignedQuizQuestions(quizId: string, questions: QuizQuestion[]): Promise<AssignedQuiz>;
+  updateAssignedQuiz(quizId: string, updates: { dueDate?: Date | null }): Promise<AssignedQuiz | undefined>;
   resetTeacherQuizAttempts(quizId: string, teacherId: string): Promise<void>;
 
   // Open-ended review operations
@@ -1418,6 +1419,15 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .update(assignedQuizzes)
       .set({ questions: questions as any })
+      .where(eq(assignedQuizzes.id, quizId))
+      .returning();
+    return result;
+  }
+
+  async updateAssignedQuiz(quizId: string, updates: { dueDate?: Date | null }): Promise<AssignedQuiz | undefined> {
+    const [result] = await db
+      .update(assignedQuizzes)
+      .set(updates)
       .where(eq(assignedQuizzes.id, quizId))
       .returning();
     return result;
@@ -3442,6 +3452,20 @@ export class DatabaseStorage implements IStorage {
 
   async getWrittenAssignments(batchId: string) {
     return db.select().from(writtenAssignments).where(eq(writtenAssignments.batchId, batchId)).orderBy(desc(writtenAssignments.createdAt));
+  }
+
+  async getWrittenAssignment(id: string) {
+    const [row] = await db.select().from(writtenAssignments).where(eq(writtenAssignments.id, id));
+    return row;
+  }
+
+  async updateWrittenAssignment(id: string, updates: { dueDate?: Date | null }) {
+    const [row] = await db
+      .update(writtenAssignments)
+      .set(updates)
+      .where(eq(writtenAssignments.id, id))
+      .returning();
+    return row;
   }
 
   async getWrittenAssignmentsForTeacher(teacherId: string) {

@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Users, ClipboardCheck, BarChart3, GraduationCap, Megaphone, Calendar, FileText, Upload } from "lucide-react";
 import { learningStatus, staffWatchLabel } from "@shared/learningStatus";
+import { deadlineLocalValue, parseDeadline } from "@shared/academyPath";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 export default function CohortWorkspace() {
@@ -25,6 +26,7 @@ export default function CohortWorkspace() {
   const [workInstructions, setWorkInstructions] = useState("");
   const [workDue, setWorkDue] = useState("");
   const [openWorkId, setOpenWorkId] = useState<string | null>(null);
+  const [dueDrafts, setDueDrafts] = useState<Record<string, string>>({});
   const [markDrafts, setMarkDrafts] = useState<Record<string, { score: string; comment: string }>>({});
   const [eventTitle, setEventTitle] = useState("");
   const [eventType, setEventType] = useState("session");
@@ -151,18 +153,31 @@ export default function CohortWorkspace() {
       const res = await apiRequest("POST", `/api/batches/${batchId}/assignments`, {
         title: workTitle,
         instructions: workInstructions,
+        kind: "assessment",
         dueDate: workDue || null,
       });
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Written work assigned" });
+      toast({ title: "Assessment assigned" });
       setWorkTitle("");
       setWorkInstructions("");
       setWorkDue("");
       queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
     },
     onError: () => toast({ title: "Could not assign work", variant: "destructive" }),
+  });
+
+  const saveWorkDue = useMutation({
+    mutationFn: async ({ id, dueDate }: { id: string; dueDate: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/batches/${batchId}/assignments/${id}`, { dueDate });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Deadline saved" });
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
+    },
+    onError: () => toast({ title: "Could not save the deadline", variant: "destructive" }),
   });
 
   const createEvent = useMutation({
@@ -241,7 +256,7 @@ export default function CohortWorkspace() {
             <TabsTrigger value="graduates"><GraduationCap className="h-4 w-4 mr-2" />Graduates</TabsTrigger>
             <TabsTrigger value="announce"><Megaphone className="h-4 w-4 mr-2" />Announce</TabsTrigger>
             <TabsTrigger value="calendar"><Calendar className="h-4 w-4 mr-2" />Calendar</TabsTrigger>
-            <TabsTrigger value="work"><FileText className="h-4 w-4 mr-2" />Work</TabsTrigger>
+            <TabsTrigger value="work"><FileText className="h-4 w-4 mr-2" />Assessments</TabsTrigger>
             <TabsTrigger value="import"><Upload className="h-4 w-4 mr-2" />Import</TabsTrigger>
           </TabsList>
 
@@ -395,27 +410,48 @@ export default function CohortWorkspace() {
           <TabsContent value="work" className="space-y-3 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Assign written work</CardTitle>
-                <CardDescription>Besides quizzes — essays, lesson plans, reflections with a due date.</CardDescription>
+                <CardTitle>Assign an assessment</CardTitle>
+                <CardDescription>Besides quizzes — written assessments with a due date.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input placeholder="Title" value={workTitle} onChange={(e) => setWorkTitle(e.target.value)} />
                 <Textarea placeholder="Instructions" value={workInstructions} onChange={(e) => setWorkInstructions(e.target.value)} />
                 <Input type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} />
                 <Button disabled={!workTitle.trim() || !workInstructions.trim() || createWork.isPending} onClick={() => createWork.mutate()}>
-                  Assign work
+                  Assign assessment
                 </Button>
               </CardContent>
             </Card>
-            {assignments.length === 0 ? (
-              <Empty text="No written assignments in this cohort yet." />
-            ) : assignments.map((item: any) => (
+            {assignments.filter((item: any) => item.kind === "assessment").length === 0 ? (
+              <Empty text="No assessments in this cohort yet." />
+            ) : assignments.filter((item: any) => item.kind === "assessment").map((item: any) => (
               <Card key={item.id} className="sl-rise">
                 <CardHeader className="py-4">
                   <CardTitle className="text-base">{item.title}</CardTitle>
                   <CardDescription>
                     {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}
                   </CardDescription>
+                  <div className="flex flex-wrap items-end gap-2 pt-2">
+                    <Input
+                      type="datetime-local"
+                      value={dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate)}
+                      onChange={(event) => setDueDrafts((drafts) => ({ ...drafts, [item.id]: event.target.value }))}
+                      data-testid={`input-work-deadline-${item.id}`}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={saveWorkDue.isPending}
+                      onClick={() => {
+                        const draft = dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate);
+                        const due = parseDeadline(draft);
+                        saveWorkDue.mutate({ id: item.id, dueDate: due ? due.toISOString() : null });
+                      }}
+                      data-testid={`button-save-work-deadline-${item.id}`}
+                    >
+                      Save deadline
+                    </Button>
+                  </div>
                   <Button
                     size="sm"
                     variant={openWorkId === item.id ? "default" : "outline"}

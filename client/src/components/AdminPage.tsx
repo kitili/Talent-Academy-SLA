@@ -1,16 +1,23 @@
 import type { ReactNode } from "react";
-import { SceneBackdrop, type SceneName } from "@/components/SceneBackdrop";
-import { AdminNav } from "@/components/AdminNav";
+import { useAuth } from "@/hooks/use-auth";
+import { AcademyShell } from "@/components/AcademyShell";
+import type { SceneName } from "@/components/SceneBackdrop";
+import { deskName } from "@shared/deskName";
 
 /** The page chrome for an admin list. Inside the People tabs it adds nothing. */
-export function AdminPage({ embedded = false, scene, children }: { embedded?: boolean; scene: SceneName; children: ReactNode }) {
+export function AdminPage({ embedded = false, scene, title, children }: { embedded?: boolean; scene: SceneName; title?: string; children: ReactNode }) {
+  const { user, logoutMutation } = useAuth();
   if (embedded) return <>{children}</>;
   return (
-    <SceneBackdrop scene={scene}>
-      <AdminNav />
-      <div className="p-4 sm:p-6 md:p-8">
-        <div className="sl-sheet sl-frame">{children}</div>
-      </div>
-    </SceneBackdrop>
+    <AcademyShell
+      scene={scene}
+      title={title || "Silverleaf Academy"}
+      subtitle="Admin desk"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      showAdminNav
+    >
+      {children}
+    </AcademyShell>
   );
 }

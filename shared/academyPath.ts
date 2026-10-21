@@ -15,7 +15,7 @@ export const ACADEMY_TERMS = {
   },
   course: {
     title: "Course",
-    body: "The lessons taught in a batch. An admin or a trainer can add a course. Only an admin adds cohorts and batches.",
+    body: "The lessons taught in a batch. An admin adds a course on the Cohorts page, then places it on a batch. Only an admin adds cohorts and batches.",
   },
 } as const;
 
@@ -91,4 +91,12 @@ export function parseDeadline(value: unknown): Date | null {
   if (typeof value === "string" && !value.trim()) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Local datetime-local value for an existing deadline so the trainer can change it. */
+export function deadlineLocalValue(value?: string | Date | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }

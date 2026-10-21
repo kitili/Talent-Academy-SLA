@@ -15,6 +15,8 @@ describe("teacher desk split", () => {
     assert.match(page, /tab === "quiz"/);
     assert.match(page, /PracticeShelf/);
     assert.match(page, /card-home-goals/);
+    assert.match(page, /card-reflect-goals/);
+    assert.match(page, /goals.length > 0/);
     assert.match(page, /card-feedback/);
     assert.match(page, /button-send-feedback/);
     assert.equal(page.includes('tab === "home" || tab === "work"'), false);
