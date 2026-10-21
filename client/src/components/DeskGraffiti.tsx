@@ -1,98 +1,51 @@
 import { useAuth } from "@/hooks/use-auth";
-import logoMark from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { wallLabel } from "@shared/deskName";
 
-/** Username for the wall. Emails keep the part before @ so the tag stays short. */
-function wallName(user: { username?: string | null; email?: string | null }) {
-  const username = (user.username || "").trim();
-  const handle = username.includes("@") ? username.split("@")[0] : username;
-  if (handle) return handle;
-  const local = (user.email || "").split("@")[0]?.trim();
-  return local || "Silverleaf";
-}
-
-/** The navy square drops out; the leaf is the watermark. */
-function LogoWash({
-  className,
-  color,
-  blend,
-}: {
-  className?: string;
-  color: string;
-  blend: "screen" | "multiply";
-}) {
-  const mask = `url("${logoMark}")`;
+/** The academy leaf: three stacked tips and a thin stem. */
+function LeafMark({ className }: { className: string }) {
   return (
-    <div
-      aria-hidden="true"
-      className={className}
-      style={{
-        backgroundColor: color,
-        mixBlendMode: blend,
-        WebkitMaskImage: mask,
-        maskImage: mask,
-        WebkitMaskRepeat: "no-repeat",
-        maskRepeat: "no-repeat",
-        WebkitMaskSize: "contain",
-        maskSize: "contain",
-        WebkitMaskPosition: "center",
-        maskPosition: "center",
-        maskMode: "luminance",
-      }}
-    />
+    <svg viewBox="0 0 72 96" className={className} aria-hidden="true" fill="currentColor">
+      <path d="M36 4 62 30 36 24 10 30Z" />
+      <path d="M36 28 64 58 36 50 8 58Z" />
+      <path d="M36 54 60 88 36 78 12 88Z" />
+      <path d="M36 10v74" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
+    </svg>
   );
 }
 
-function WallTag({
-  name,
-  className,
-  color,
-  blend,
-  opacity,
-}: {
-  name: string;
-  className: string;
-  color: string;
-  blend: "screen" | "multiply";
-  opacity: number;
-}) {
-  return (
-    <p
-      className={className}
-      style={{
-        writingMode: "vertical-rl",
-        fontFamily: '"Segoe Print", "Comic Sans MS", "Marker Felt", cursive',
-        fontSize: "clamp(0.7rem, 3.2vw, 2.05rem)",
-        letterSpacing: "0.32em",
-        color,
-        mixBlendMode: blend,
-        opacity,
-      }}
-    >
-      {name}
-    </p>
-  );
-}
-
-/** Faint silver-leaf mark and the signed-in name, sitting on the photo behind the desks. */
+/** A quiet leaf and the signed-in name on the photo behind the desks. */
 export function DeskGraffiti() {
   const { user } = useAuth();
   if (!user) return null;
-  const name = wallName(user as { username?: string | null; email?: string | null });
-  const left = "absolute left-[1vw] top-[34vh] max-h-[58vh] select-none overflow-hidden";
-  const right = "absolute right-[1vw] top-[16vh] max-h-[52vh] select-none overflow-hidden";
-  const leafLeft = "absolute left-[1vw] top-[12vh] h-[7.2vw] w-[7.2vw] max-h-[120px] max-w-[120px]";
-  const leafRight = "absolute bottom-[8vh] right-[1vw] h-[6.2vw] w-[6.2vw] max-h-[104px] max-w-[104px] rotate-[8deg]";
+  const name = wallLabel(user as {
+    name?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    username?: string | null;
+    email?: string | null;
+  });
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true" data-testid="desk-graffiti">
-      <LogoWash className={`${leafLeft} opacity-80`} color="#f7f9fc" blend="screen" />
-      <LogoWash className={`${leafLeft} opacity-40`} color="#16315f" blend="multiply" />
-      <LogoWash className={`${leafRight} opacity-70`} color="#f7f9fc" blend="screen" />
-      <LogoWash className={`${leafRight} opacity-35`} color="#16315f" blend="multiply" />
-      <WallTag name={name} className={left} color="#ffffff" blend="screen" opacity={0.7} />
-      <WallTag name={name} className={left} color="#16315f" blend="multiply" opacity={0.42} />
-      <WallTag name={name} className={right} color="#ffffff" blend="screen" opacity={0.58} />
-      <WallTag name={name} className={right} color="#16315f" blend="multiply" opacity={0.34} />
+    <div
+      className="pointer-events-none fixed inset-0 z-0 overflow-hidden text-[#16315f] dark:text-[#f3f6fb]"
+      aria-hidden="true"
+      data-testid="desk-graffiti"
+    >
+      <LeafMark className="absolute left-6 top-[9vh] h-[4.75rem] w-14 opacity-[0.1] sm:left-10 sm:h-[5.5rem] sm:w-16 dark:opacity-[0.13]" />
+      <LeafMark className="absolute bottom-[7vh] right-6 h-[3.75rem] w-11 rotate-[10deg] opacity-[0.08] sm:right-10 sm:h-[4.5rem] sm:w-14 dark:opacity-[0.11]" />
+      <p
+        data-testid="desk-graffiti-name"
+        className="absolute left-4 top-[29vh] max-h-[46vh] select-none overflow-hidden whitespace-nowrap font-serif text-[0.72rem] font-medium tracking-[0.2em] opacity-[0.14] sm:left-7 sm:text-[0.82rem] dark:opacity-[0.18]"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        {name}
+      </p>
+      <p
+        className="absolute right-4 top-[20vh] max-h-[38vh] select-none overflow-hidden whitespace-nowrap font-serif text-[0.68rem] font-medium tracking-[0.26em] opacity-[0.09] sm:right-7 sm:text-[0.78rem] dark:opacity-[0.13]"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        Silverleaf
+      </p>
     </div>
   );
 }

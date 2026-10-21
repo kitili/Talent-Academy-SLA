@@ -31,6 +31,7 @@ import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/Pag
 import { DeskMail } from "@/components/DeskMail";
 import { SceneBackdrop } from "@/components/SceneBackdrop";
 import { PlaceBanner, PlaceCover } from "@/components/PlaceArt";
+import { deskName } from "@shared/deskName";
 
 function TeacherAudience({
   teachers,
@@ -812,7 +813,7 @@ export default function TrainerBatches() {
           </div>
           <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
             <div className="text-xs sm:text-sm text-white/90 hidden md:block truncate max-w-[200px]" data-testid="text-user-info">
-              {user?.username}
+              {user ? deskName(user) : ""}
             </div>
             <TourButton onClick={tour.replay} testId="button-trainer-tour" />
             <Button
@@ -908,7 +909,7 @@ export default function TrainerBatches() {
         <section className="mb-4 overflow-hidden rounded-2xl shadow-md" data-testid="trainer-welcome">
           <div className="bg-gradient-to-r from-[#9b3d55] via-[#c47b2b] to-[#0f7a6c] px-4 py-4 text-white">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">For you today</p>
-            <p className="text-xl font-semibold">Hello{user?.username ? `, ${user.username}` : ""}</p>
+            <p className="text-xl font-semibold">Hello{user ? `, ${deskName(user)}` : ""}</p>
             {(desk?.encouragement || deskError) && (
               <p className="mt-1 max-w-2xl text-sm text-white/95" data-testid="trainer-encouragement">
                 {desk?.encouragement || "You make it safe for a teacher to try again."}
@@ -1234,7 +1235,7 @@ export default function TrainerBatches() {
                           }
                         : null
                     }
-                    selfLabel={user?.username || "Trainer"}
+                    selfLabel={user ? deskName(user) : "Trainer"}
                   />
                 </TabsContent>
 

@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AcademyShell } from "@/components/AcademyShell";
 import { BatchApprovalHistory } from "@/components/BatchApprovalHistory";
 import { ACADEMY_TERMS, nextBatchName } from "@shared/academyPath";
+import { deskName } from "@shared/deskName";
 
 const STEP_TONES = [
   { chip: "bg-[#1d4e89]", wash: "bg-[#e7f0fa]", edge: "border-[#1d4e89]/30" },
@@ -337,7 +338,7 @@ export default function AdminBatches() {
   const cohortCount = data?.cohorts.length ?? 0;
 
   return (
-    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Academy path" userLabel={user?.username} showAdminNav>
+    <AcademyShell scene="hall" title="Silverleaf Academy" subtitle="Academy path" userLabel={user ? deskName(user) : undefined} showAdminNav>
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate("/admin")} className="mb-4" data-testid="button-back-admin">
           <ArrowLeft className="h-4 w-4 mr-2" />
