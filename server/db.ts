@@ -215,6 +215,14 @@ export async function ensureWrittenAssignmentTables() {
         );
       END IF;
     END $$;
+    CREATE TABLE IF NOT EXISTS trainer_encouragements (
+      trainer_id varchar NOT NULL,
+      day date NOT NULL,
+      message text NOT NULL,
+      PRIMARY KEY (trainer_id, day)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_trainer_encouragement_message
+      ON trainer_encouragements (message);
     CREATE TABLE IF NOT EXISTS desk_messages (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       from_id varchar NOT NULL,

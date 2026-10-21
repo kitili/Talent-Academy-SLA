@@ -42,6 +42,7 @@ import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import { loadAttendanceLists } from "./attendanceBoard";
+import { encouragementFor } from "./trainerEncouragement";
 import multer from "multer";
 
 const packageUpload = multer({
@@ -4963,7 +4964,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/trainer/desk", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const trainerId = req.user?.role === "trainer" ? req.user.id : undefined;
-      res.json(await storage.getTrainerDesk(trainerId));
+      const desk = await storage.getTrainerDesk(trainerId);
+      let encouragement = "";
+      try {
+        if (req.user?.id) encouragement = await encouragementFor(req.user.id);
+      } catch (error) {
+        console.error("Encouragement unavailable:", error);
+      }
+      res.json({ ...desk, encouragement });
     } catch (error) {
       console.error("Error getting trainer desk:", error);
       res.status(500).json({ error: "Internal server error" });

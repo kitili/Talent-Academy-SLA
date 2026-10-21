@@ -9,6 +9,7 @@ import {
   quizVisibleToTeacher,
   summarizeTrainerDesk,
 } from "../shared/trainerDesk.ts";
+import { encouragementCandidate, hallDay } from "../shared/encouragement.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
@@ -79,6 +80,35 @@ describe("exam shape", () => {
   });
 });
 
+describe("daily encouragement", () => {
+  it("changes with the local day in Dar es Salaam", () => {
+    assert.equal(hallDay(new Date("2026-10-21T20:30:00Z")), "2026-10-21");
+    assert.equal(hallDay(new Date("2026-10-21T21:30:00Z")), "2026-10-22");
+  });
+
+  it("gives a trainer the same words all day, and new words to each person and each day", () => {
+    const day = "2026-10-21";
+    const first = encouragementCandidate({ trainerId: "amina", day, used: [] }, 0);
+    assert.equal(encouragementCandidate({ trainerId: "amina", day, used: [] }, 0), first);
+    const other = encouragementCandidate({ trainerId: "paul", day, used: [first] }, 0);
+    const tomorrow = encouragementCandidate({ trainerId: "amina", day: "2026-10-22", used: [first] }, 0);
+    assert.notEqual(other, first);
+    assert.notEqual(tomorrow, first);
+    assert.equal(first.includes("cohort"), false);
+    assert.equal(first.toLowerCase().includes("quiz"), false);
+    assert.equal(first.toLowerCase().includes("attendance"), false);
+
+    const used: string[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < 80; i += 1) {
+      const line = encouragementCandidate({ trainerId: `trainer-${i}`, day, used }, 0);
+      assert.equal(seen.has(line), false);
+      seen.add(line);
+      used.push(line);
+    }
+  });
+});
+
 describe("trainer desk wiring", () => {
   it("scopes analytics to the signed-in trainer and assigns exams to chosen teachers", () => {
     const storage = read("server/storage.ts");
@@ -93,6 +123,11 @@ describe("trainer desk wiring", () => {
     assert.match(routes, /\/open-exam/);
     assert.match(routes, /teacherIds/);
     assert.match(trainer, /data-testid="trainer-kpis"/);
+    assert.match(trainer, /data-testid="trainer-encouragement"/);
+    assert.match(trainer, /desk\?\.encouragement/);
+    assert.equal(trainer.includes("laid out in colour"), false);
+    assert.match(read("server/routes.ts"), /encouragementFor/);
+    assert.match(read("server/trainerEncouragement.ts"), /trainer_encouragements/);
     assert.match(trainer, /button-upload-exam/);
     assert.match(trainer, /check-quiz-teacher-/);
     assert.match(teacher, /teacher\/exams\//);

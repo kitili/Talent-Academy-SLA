@@ -195,7 +195,7 @@ export default function TrainerBatches() {
   const { data: batches = [] } = useQuery<any[]>({
     queryKey: ["/api/batches"],
   });
-  const { data: desk } = useQuery<any>({
+  const { data: desk, isError: deskError } = useQuery<any>({
     queryKey: ["/api/trainer/desk"],
   });
   const filteredBatches = filterByQuery(batches, listQuery, (batch) => `${batch.name || ""}`);
@@ -906,14 +906,14 @@ export default function TrainerBatches() {
           }
         />
         <section className="mb-4 overflow-hidden rounded-2xl shadow-md" data-testid="trainer-welcome">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-[#9b3d55] via-[#c47b2b] to-[#0f7a6c] px-4 py-4 text-white">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">Today in the hall</p>
-              <p className="text-xl font-semibold">Hello{user?.username ? `, ${user.username}` : ""}</p>
-            </div>
-            <p className="max-w-md text-sm text-white/90">
-              Cohorts, teachers, quizzes, and attendance are laid out in colour so the busy parts are easy to spot.
-            </p>
+          <div className="bg-gradient-to-r from-[#9b3d55] via-[#c47b2b] to-[#0f7a6c] px-4 py-4 text-white">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">For you today</p>
+            <p className="text-xl font-semibold">Hello{user?.username ? `, ${user.username}` : ""}</p>
+            {(desk?.encouragement || deskError) && (
+              <p className="mt-1 max-w-2xl text-sm text-white/95" data-testid="trainer-encouragement">
+                {desk?.encouragement || "You make it safe for a teacher to try again."}
+              </p>
+            )}
           </div>
           <div className="flex h-2">
             <span className="flex-1 bg-[#1d4e89]" />
