@@ -3,7 +3,7 @@ import { teachers, users, type Teacher, type User } from "@shared/schema";
 import { hashPassword, comparePasswords } from "./auth";
 import { db, hasDatabaseUrl } from "./db";
 import { storage } from "./storage";
-import { pruneExtraDesksOnce } from "./deskRoster";
+import { pruneExtraDesksOnce, removeInactiveDesks } from "./deskRoster";
 import { TEST_LOGINS, type TestLogin } from "./testLogins";
 
 async function ensureStaff(login: TestLogin) {
@@ -143,4 +143,5 @@ export async function ensureAllTestLogins() {
     await ensureTestLogin(login);
   }
   await pruneExtraDesksOnce();
+  await removeInactiveDesks();
 }
