@@ -20,6 +20,10 @@ export const pool = new Pool(
       },
 );
 
+pool.on("error", (error) => {
+  console.error("Database pool error:", error.message);
+});
+
 export const db = drizzle({ client: pool, schema });
 
 export function hasDatabaseUrl() {

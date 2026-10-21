@@ -119,7 +119,12 @@ export default function UnifiedAuth() {
         signal: AbortSignal.timeout(20000),
       });
 
-      const data = await response.json();
+      let data: { message?: string; multiRole?: boolean; roles?: MultiRoleOption[]; role?: Role } = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { message: "The academy could not start. Try again in a moment." };
+      }
 
       if (response.ok) {
         // Check if multiple roles are available
@@ -155,7 +160,7 @@ export default function UnifiedAuth() {
       } else {
         toast({
           variant: "destructive",
-          title: "Incorrect password",
+          title: response.status >= 500 ? "Sign-in unavailable" : "Incorrect password",
           description: data.message || "Invalid username or password",
         });
       }
