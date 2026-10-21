@@ -33,6 +33,7 @@ import TeacherCertificates from "@/pages/teacher-certificates";
 import TeacherCertificateView from "@/pages/teacher-certificate-view";
 import EmergencyReset from "@/pages/emergency-reset";
 import NotFound from "@/pages/not-found";
+import { DeskGraffiti } from "@/components/DeskGraffiti";
 
 function Router() {
   return (
@@ -81,6 +82,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <DeskGraffiti />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

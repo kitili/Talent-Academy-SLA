@@ -18,13 +18,13 @@ export function SceneBackdrop({ scene, veil = "photo", children }: { scene: Scen
       <img
         src={SCENE_PHOTOS[scene]}
         alt=""
-        className={`pointer-events-none fixed inset-0 -z-10 h-full w-full object-cover object-center ${veil === "light" ? "opacity-25" : ""}`}
+        className={`pointer-events-none fixed inset-0 z-0 h-full w-full object-cover object-center ${veil === "light" ? "opacity-25" : ""}`}
         decoding="async"
       />
       {veil === "light" && (
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[#f7f3ea]/80 dark:bg-[#10182a]/90" />
+        <div className="pointer-events-none fixed inset-0 z-0 bg-[#f7f3ea]/80 dark:bg-[#10182a]/90" />
       )}
-      {children}
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }
