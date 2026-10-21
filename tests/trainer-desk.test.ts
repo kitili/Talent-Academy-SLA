@@ -93,6 +93,12 @@ describe("trainer desk wiring", () => {
     assert.match(routes, /\/open-exam/);
     assert.match(routes, /teacherIds/);
     assert.match(trainer, /data-testid="trainer-kpis"/);
+    assert.match(trainer, /data-testid="trainer-sidebar"/);
+    assert.match(trainer, /trainer-nav-\$\{item\.id\}/);
+    assert.match(trainer, /id: "assignments"/);
+    assert.match(trainer, /id: "assessments"/);
+    assert.match(trainer, /id: "quizzes"/);
+    assert.equal(trainer.includes("Adult teachers"), false);
     assert.match(trainer, /button-upload-exam/);
     assert.match(trainer, /check-quiz-teacher-/);
     assert.match(teacher, /teacher\/exams\//);

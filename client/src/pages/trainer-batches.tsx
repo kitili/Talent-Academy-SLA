@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -20,12 +20,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
-import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, Home, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar, Upload, Star } from "lucide-react";
+import { Users, Plus, Trash2, LogOut, Award, BookOpen, CheckCircle, TrendingUp, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar, Upload, Star, Sparkles, Layers, PenLine, ScrollText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CohortMedals } from "@/components/CohortMedals";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { TRAINER_TOUR } from "@shared/guidedTour";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
+import { isWritingExam } from "@shared/trainerDesk";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
 import { DeskMail } from "@/components/DeskMail";
@@ -67,62 +68,186 @@ function TeacherAudience({
   );
 }
 
+const TRAINER_NAV = [
+  { id: "desk", label: "Desk", icon: Sparkles, wash: "#fff4df", ink: "#8a5a12", live: "#c4842a" },
+  { id: "cohorts", label: "Cohorts", icon: Layers, wash: "#e8eef8", ink: "#1d3f73", live: "#1d4e89" },
+  { id: "teachers", label: "Teachers", icon: Users, wash: "#e7f6f2", ink: "#0d6b5c", live: "#0f7a6c" },
+  { id: "assignments", label: "Assignments", icon: PenLine, wash: "#fde8ef", ink: "#9b3d55", live: "#c45b78" },
+  { id: "assessments", label: "Assessments", icon: ScrollText, wash: "#fff1e0", ink: "#9a5b16", live: "#e09a3e" },
+  { id: "quizzes", label: "Quizzes", icon: Award, wash: "#efe8fb", ink: "#5b3d8a", live: "#7c5cbf" },
+  { id: "progress", label: "Progress", icon: TrendingUp, wash: "#e7f7e4", ink: "#2f6b32", live: "#3d8b45" },
+  { id: "attendance", label: "Attendance", icon: ClipboardCheck, wash: "#e6f3fb", ink: "#1d5f86", live: "#2f7eae" },
+  { id: "schedule", label: "Schedule", icon: Calendar, wash: "#f8eee6", ink: "#8a4b2f", live: "#c47b2b" },
+  { id: "certificates", label: "Certificates", icon: FileText, wash: "#f8e9f4", ink: "#8a3d6b", live: "#b85c8a" },
+] as const;
+
+function TrainerSideNav({
+  tab,
+  onTab,
+}: {
+  tab: string;
+  onTab: (tab: string) => void;
+}) {
+  return (
+    <nav
+      aria-label="Trainer pages"
+      data-testid="trainer-sidebar"
+      data-tour="trainer-tools"
+      className="lg:sticky lg:top-24 lg:w-56 shrink-0"
+    >
+      <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+        {TRAINER_NAV.map((item) => {
+          const active = tab === item.id;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={active ? "page" : undefined}
+              data-testid={`trainer-nav-${item.id}`}
+              onClick={() => onTab(item.id)}
+              className="flex min-w-[9.5rem] items-center gap-2 rounded-2xl px-2.5 py-2 text-left text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 lg:min-w-0"
+              style={active
+                ? { background: item.live, color: "#fffaf4" }
+                : { background: item.wash, color: item.ink }}
+            >
+              <span
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl"
+                style={{ background: active ? "rgba(255,255,255,0.28)" : "#fff" }}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              {item.label}
+            </button>
+          );
+        })}
+        <Link
+          href="/courses"
+          data-testid="button-trainer-courses"
+          data-tour="trainer-courses"
+          className="flex min-w-[9.5rem] items-center gap-2 rounded-2xl bg-[#e7eefc] px-2.5 py-2 text-sm font-semibold text-[#243e86] shadow-sm lg:min-w-0"
+        >
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-white"><BookOpen className="h-4 w-4" /></span>
+          Courses
+        </Link>
+        <Link
+          href="/approvals"
+          data-testid="button-trainer-approvals"
+          className="flex min-w-[9.5rem] items-center gap-2 rounded-2xl bg-[#e8f6ea] px-2.5 py-2 text-sm font-semibold text-[#24633a] shadow-sm lg:min-w-0"
+        >
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-white"><CheckCircle className="h-4 w-4" /></span>
+          Approvals
+        </Link>
+      </div>
+    </nav>
+  );
+}
+
 function TrainerKpis({
   desk,
   onOpen,
-  onSelectCohort,
 }: {
   desk: any;
   onOpen: (tab: string) => void;
-  onSelectCohort: (cohortId: string) => void;
 }) {
   const stats = [
-    { id: "cohorts", label: "Cohorts", value: desk?.cohortCount ?? 0, tab: "teachers" },
-    { id: "teachers", label: "Teachers", value: desk?.teacherCount ?? 0, tab: "teachers" },
-    { id: "progress", label: "Progress", value: desk?.progressPercent == null ? "—" : `${desk.progressPercent}%`, tab: "progress" },
-    { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "quizzes" },
-    { id: "papers", label: "Paper exams", value: desk?.paperExams ?? 0, tab: "quizzes" },
-    { id: "attendance", label: "Attendance", value: desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`, tab: "attendance" },
-    { id: "certificates", label: "Certificates", value: desk?.certificateCount ?? 0, tab: "certificates" },
-    { id: "schedule", label: "Upcoming", value: desk?.upcomingEvents ?? 0, tab: "schedule" },
+    { id: "cohorts", label: "Cohorts", value: desk?.cohortCount ?? 0, tab: "cohorts", wash: "#e8eef8", ink: "#1d4e89" },
+    { id: "teachers", label: "Teachers", value: desk?.teacherCount ?? 0, tab: "teachers", wash: "#e7f6f2", ink: "#0f7a6c" },
+    { id: "progress", label: "Progress", value: desk?.progressPercent == null ? "—" : `${desk.progressPercent}%`, tab: "progress", wash: "#e7f7e4", ink: "#2f6b32" },
+    { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "quizzes", wash: "#efe8fb", ink: "#5b3d8a" },
+    { id: "papers", label: "Assessments", value: desk?.paperExams ?? 0, tab: "assessments", wash: "#fff1e0", ink: "#9a5b16" },
+    { id: "attendance", label: "Attendance", value: desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`, tab: "attendance", wash: "#e6f3fb", ink: "#1d5f86" },
+    { id: "certificates", label: "Certificates", value: desk?.certificateCount ?? 0, tab: "certificates", wash: "#f8e9f4", ink: "#8a3d6b" },
+    { id: "schedule", label: "Upcoming", value: desk?.upcomingEvents ?? 0, tab: "schedule", wash: "#f8eee6", ink: "#8a4b2f" },
   ];
   return (
-    <div className="mb-4 space-y-3" data-testid="trainer-kpis">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div data-testid="trainer-kpis">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((stat) => (
           <button
             key={stat.id}
             type="button"
             onClick={() => onOpen(stat.tab)}
-            className="rounded-xl border bg-white px-3 py-2 text-left text-[#17233c] dark:bg-[#162033] dark:text-[#f6f1e8]"
+            className="rounded-2xl px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5"
+            style={{ background: stat.wash, color: stat.ink }}
             data-testid={`trainer-kpi-${stat.id}`}
           >
-            <span className="block text-xs uppercase tracking-wide opacity-70">{stat.label}</span>
-            <span className="block text-xl font-semibold">{stat.value}</span>
+            <span className="block text-xs font-semibold uppercase tracking-wide opacity-80">{stat.label}</span>
+            <span className="mt-1 block text-2xl font-semibold">{stat.value}</span>
           </button>
         ))}
       </div>
-      {(desk?.cohorts || []).length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(desk.cohorts as any[]).map((cohort) => (
-            <button
-              key={cohort.id}
-              type="button"
-              onClick={() => onSelectCohort(cohort.id)}
-              className="rounded-xl border bg-white px-3 py-2 text-left text-[#17233c] dark:bg-[#162033] dark:text-[#f6f1e8]"
-              data-testid={`trainer-cohort-${cohort.id}`}
-            >
-              <span className="block font-medium">{cohort.name}</span>
-              <span className="block text-xs opacity-70">
-                {cohort.teacherCount || 0} teachers
-                {(cohort.batches || []).length > 0
-                  ? ` · ${(cohort.batches as any[]).map((batch) => batch.name).join(", ")}`
-                  : ""}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+    </div>
+  );
+}
+
+function AssignmentDesk({ batchId, batchName }: { batchId: string; batchName: string }) {
+  const { toast } = useToast();
+  const [title, setTitle] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [due, setDue] = useState("");
+  const { data: assignments = [] } = useQuery<any[]>({
+    queryKey: ["/api/batches", batchId, "assignments"],
+  });
+  const create = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/batches/${batchId}/assignments`, {
+        title,
+        instructions,
+        dueDate: due || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
+      setTitle("");
+      setInstructions("");
+      setDue("");
+      toast({ title: "Assignment added", description: `${batchName} can see it in My work.` });
+    },
+    onError: (error: Error) => toast({ title: "Could not add the assignment", description: error.message, variant: "destructive" }),
+  });
+  return (
+    <div className="space-y-4" data-testid="trainer-assignments">
+      <div className="rounded-2xl p-4" style={{ background: "#fde8ef", color: "#9b3d55" }}>
+        <p className="text-lg font-semibold">Written assignments</p>
+        <p className="mt-1 text-sm">Essays, lesson plans, and reflections for {batchName}. Quizzes and paper exams live on their own tabs.</p>
+      </div>
+      <Card className="border-[#c45b78]/30">
+        <CardHeader>
+          <CardTitle className="text-base">New assignment</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} data-testid="input-assignment-title" />
+          <Textarea placeholder="What should they hand in?" value={instructions} onChange={(e) => setInstructions(e.target.value)} data-testid="input-assignment-instructions" />
+          <Input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} data-testid="input-assignment-due" />
+          <Button
+            disabled={!title.trim() || !instructions.trim() || create.isPending}
+            onClick={() => create.mutate()}
+            data-testid="button-create-assignment"
+            className="bg-[#c45b78] hover:bg-[#9b3d55]"
+          >
+            {create.isPending ? "Adding..." : "Assign"}
+          </Button>
+        </CardContent>
+      </Card>
+      {assignments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No written assignments in this cohort yet.</p>
+      ) : assignments.map((item: any) => (
+        <Card key={item.id} className="border-[#fde8ef]">
+          <CardHeader className="py-4">
+            <CardTitle className="text-base">{item.title}</CardTitle>
+            <CardDescription>
+              {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}
+            </CardDescription>
+          </CardHeader>
+          {item.instructions && (
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{item.instructions}</p>
+            </CardContent>
+          )}
+        </Card>
+      ))}
     </div>
   );
 }
@@ -146,7 +271,7 @@ export default function TrainerBatches() {
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("teachers");
+  const [activeTab, setActiveTab] = useState("desk");
 
   const [teacherId, setTeacherId] = useState("");
   const [teacherSearch, setTeacherSearch] = useState("");
@@ -762,55 +887,6 @@ export default function TrainerBatches() {
               {user?.username}
             </div>
             <TourButton onClick={tour.replay} testId="button-trainer-tour" />
-            <Button
-              variant="secondary"
-              size="sm"
-              asChild
-              data-testid="button-trainer-courses"
-              data-tour="trainer-courses"
-              className="hidden sm:flex bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              <Link href="/courses">
-                <BookOpen className="mr-2 h-4 w-4" />
-                Courses
-              </Link>
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              asChild
-              data-testid="button-trainer-approvals"
-              className="hidden md:flex bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              <Link href="/approvals">
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Approvals
-              </Link>
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              asChild
-              data-testid="button-home"
-              className="hidden sm:flex bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              <Link href="/">
-                <Home className="mr-2 h-4 w-4" />
-                Home
-              </Link>
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              asChild
-              data-testid="button-home-mobile"
-              className="sm:hidden h-8 w-8 bg-white/10 hover:bg-white/20 text-white border-white/20"
-              aria-label="Home"
-            >
-              <Link href="/">
-                <Home className="h-4 w-4" />
-              </Link>
-            </Button>
             <NotificationBell />
             <div className="text-white">
               <ThemeToggle />
@@ -840,85 +916,77 @@ export default function TrainerBatches() {
       </header>
 
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 py-6">
-        <PlaceBanner
-          place="hall"
-          title="Your cohorts"
-          subtitle={
-            (batches.some((batch: any) => batch.track === "secondary") && !batches.some((batch: any) => batch.track === "primary")
-              ? "Secondary trainers. These teachers will teach Form I."
-              : batches.some((batch: any) => batch.track === "primary") && !batches.some((batch: any) => batch.track === "secondary")
-                ? "Primary trainers. Playgroup through Standard 7."
-                : "Adult teachers, grouped by the class they will teach.")
-            + " You add courses. An admin adds the batches inside a cohort."
-          }
-        />
-        <TrainerKpis
-          desk={desk}
-          onOpen={(tab) => {
-            if (!selectedBatch && batches[0]) setSelectedBatch(batches[0]);
-            setActiveTab(tab);
-          }}
-          onSelectCohort={(cohortId) => {
-            const match = batches.find((batch: any) => batch.id === cohortId);
-            if (match) {
-              setSelectedBatch(match);
-              setActiveTab("teachers");
-            }
-          }}
-        />
-        {/* Two-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-300px)]">
-          {/* Left Sidebar - Batch List */}
-          <div className="lg:col-span-1 border rounded-lg bg-card overflow-hidden flex flex-col" data-tour="trainer-batches">
-            <div className="p-4 border-b space-y-2">
-              <h3 className="font-semibold">Your Batches</h3>
-              <p className="text-xs text-muted-foreground mt-1">{filteredBatches.length} total</p>
-              <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search cohorts" />
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-2">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <TrainerSideNav
+            tab={activeTab}
+            onTab={(tab) => {
+              setActiveTab(tab);
+              if (tab !== "desk" && !selectedBatch && batches[0]) setSelectedBatch(batches[0]);
+            }}
+          />
+          <div className="min-w-0 flex-1 space-y-4">
+            {activeTab === "desk" && (
+              <>
+                <PlaceBanner place="hall" title="Your desk" />
+                <TrainerKpis
+                  desk={desk}
+                  onOpen={(tab) => {
+                    if (!selectedBatch && batches[0]) setSelectedBatch(batches[0]);
+                    setActiveTab(tab);
+                  }}
+                />
+              </>
+            )}
+            {activeTab === "cohorts" && (
+              <div className="space-y-3" data-tour="trainer-batches">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-[#1d4e89]">Cohorts</h2>
+                    <p className="text-sm text-muted-foreground">{filteredBatches.length} on this desk</p>
+                  </div>
+                  <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search cohorts" />
+                </div>
                 {batches.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground text-sm">
+                  <div className="rounded-2xl border bg-card p-6 text-center text-sm text-muted-foreground">
                     <PlaceCover place="hall" className="mb-3 h-28 rounded-xl" />
-                    <Users className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                    No batches assigned to you yet
+                    No cohorts on this desk yet
                   </div>
                 ) : (
-                  batchPager.slice.map((batch: any) => (
-                    <button
-                      key={batch.id}
-                      onClick={() => {
-                        setSelectedBatch(batch);
-                        setActiveTab("teachers");
-                      }}
-                      className={`w-full text-left p-3 rounded-lg transition-colors border ${
-                        selectedBatch?.id === batch.id
-                          ? "bg-primary/10 border-primary text-foreground"
-                          : "bg-muted/30 border-transparent hover:bg-muted/50 text-foreground"
-                      }`}
-                      data-testid={`button-batch-${batch.id}`}
-                    >
-                      <PlaceCover place="hall" className="mb-2 h-16 rounded-lg" />
-                      <p className="font-semibold text-sm truncate">{batch.name}</p>
-                      {batch.track && (
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
-                          {batch.track === "secondary" ? "Secondary" : "Primary"}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {batch.teacherCount || 0} teachers
-                      </p>
-                    </button>
-                  ))
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {batchPager.slice.map((batch: any, index: number) => {
+                      const tone = ["#1d4e89", "#0f7a6c", "#c45b78", "#7c5cbf", "#c47b2b", "#2f7eae"][index % 6];
+                      const selected = selectedBatch?.id === batch.id;
+                      return (
+                        <button
+                          key={batch.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedBatch(batch);
+                            setActiveTab("teachers");
+                          }}
+                          className="rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5"
+                          style={{ borderColor: selected ? tone : "transparent", boxShadow: selected ? `0 0 0 2px ${tone}` : undefined }}
+                          data-testid={`button-batch-${batch.id}`}
+                        >
+                          <span className="mb-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ background: tone }}>
+                            {batch.teacherCount || 0} teachers
+                          </span>
+                          <p className="font-semibold text-[#17233c]">{batch.name}</p>
+                          {batch.track && (
+                            <p className="mt-1 text-xs font-medium uppercase tracking-wide" style={{ color: tone }}>
+                              {batch.track === "secondary" ? "Secondary" : "Primary"}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 <PageStrip page={batchPager.page} pages={batchPager.pages} setPage={batchPager.setPage} />
               </div>
-            </ScrollArea>
-          </div>
-
-          {/* Right Panel - Batch Details */}
-          {selectedBatch ? (
-            <div className="lg:col-span-3 border rounded-lg bg-card overflow-hidden flex flex-col">
+            )}
+          {activeTab !== "desk" && activeTab !== "cohorts" && (selectedBatch ? (
+            <div className="border rounded-2xl bg-card overflow-hidden flex flex-col min-h-[28rem]">
               {/* Header */}
               <div className="p-4 border-b flex justify-between items-start">
                 <div className="flex-1">
@@ -951,34 +1019,30 @@ export default function TrainerBatches() {
                 </div>
               </div>
 
-              {/* Tabs */}
+              <div className="flex gap-2 overflow-x-auto border-b px-4 py-3">
+                {batches.map((batch: any) => {
+                  const selected = selectedBatch?.id === batch.id;
+                  return (
+                    <button
+                      key={batch.id}
+                      type="button"
+                      onClick={() => setSelectedBatch(batch)}
+                      className="shrink-0 rounded-full px-3 py-1 text-sm font-medium"
+                      style={selected
+                        ? { background: "#1d4e89", color: "#fffaf4" }
+                        : { background: "#e8eef8", color: "#1d3f73" }}
+                      data-testid={`button-batch-${batch.id}`}
+                    >
+                      {batch.name}
+                    </button>
+                  );
+                })}
+              </div>
+
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
-                <TabsList className="grid w-full grid-cols-6 flex-shrink-0 rounded-none border-b" data-tour="trainer-tools">
-                  <TabsTrigger value="teachers" data-testid="tab-teachers">
-                    <Users className="mr-1 h-4 w-4" />
-                    <span className="hidden sm:inline">Teachers</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="quizzes" data-testid="tab-quizzes">
-                    <Award className="mr-1 h-4 w-4" />
-                    <span className="hidden sm:inline">Quizzes</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="progress" data-testid="tab-progress">
-                    <TrendingUp className="mr-1 h-4 w-4" />
-                    <span className="hidden sm:inline">Progress</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="attendance" data-testid="tab-attendance">
-                    <ClipboardCheck className="mr-1 h-4 w-4" />
-                    <span className="hidden sm:inline">Attendance</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="schedule" data-testid="tab-schedule">
-                    <Calendar className="mr-1 h-4 w-4" />
-                    <span className="hidden sm:inline">Schedule</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="certificates" data-testid="tab-certificates">
-                    <FileText className="mr-1 h-4 w-4" />
-                    <span className="hidden sm:inline">Certs</span>
-                  </TabsTrigger>
-                </TabsList>
+                <TabsContent value="assignments" className="flex-1 overflow-y-auto p-4">
+                  <AssignmentDesk batchId={selectedBatch.id} batchName={selectedBatch.name} />
+                </TabsContent>
 
                 {/* Teachers Tab */}
                 <TabsContent value="teachers" className="space-y-4 flex-1 overflow-y-auto p-4">
@@ -1165,7 +1229,7 @@ export default function TrainerBatches() {
                 {/* Quizzes Tab */}
                 <TabsContent value="quizzes" className="space-y-4 flex-1 overflow-y-auto p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="text-lg font-semibold">Assigned Quizzes</h3>
+                    <h3 className="text-lg font-semibold">Lesson quizzes</h3>
                     <div className="flex flex-wrap gap-2">
                       <Dialog open={assignCheckpointQuizOpen} onOpenChange={setAssignCheckpointQuizOpen}>
                         <DialogTrigger asChild>
@@ -1354,89 +1418,15 @@ export default function TrainerBatches() {
                           </div>
                         </DialogContent>
                       </Dialog>
-                      <Dialog open={writeExamOpen} onOpenChange={(open) => { setWriteExamOpen(open); if (!open) clearExamForm(); }}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline" data-testid="button-write-exam">
-                            <FileText className="mr-2 h-4 w-4" />
-                            Write exam
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Write an exam</DialogTitle>
-                            <DialogDescription>Teachers open this as a document and write their answers beside it.</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="open-exam-title">Title</Label>
-                              <Input id="open-exam-title" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} data-testid="input-open-exam-title" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="open-exam-prompt">Exam paper</Label>
-                              <Textarea id="open-exam-prompt" value={examPrompt} onChange={(e) => setExamPrompt(e.target.value)} placeholder="Write the questions they will see." data-testid="input-open-exam-prompt" />
-                            </div>
-                            <TeacherAudience teachers={batchDetails?.teachers || []} selected={quizTeacherIds} onChange={setQuizTeacherIds} />
-                            <Button
-                              onClick={() => writeExamMutation.mutate()}
-                              disabled={!quizTitle.trim() || !examPrompt.trim() || writeExamMutation.isPending}
-                              data-testid="button-submit-open-exam"
-                            >
-                              {writeExamMutation.isPending ? "Assigning..." : "Assign exam"}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog open={uploadExamOpen} onOpenChange={(open) => { setUploadExamOpen(open); if (!open) clearExamForm(); }}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" data-testid="button-upload-exam">
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload paper
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Upload a paper exam</DialogTitle>
-                            <DialogDescription>Teachers see the paper on one side and write answers on the other.</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="paper-exam-title">Title</Label>
-                              <Input id="paper-exam-title" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} data-testid="input-paper-exam-title" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="paper-exam-file">Paper</Label>
-                              <Input
-                                id="paper-exam-file"
-                                type="file"
-                                accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.webp"
-                                onChange={(e) => setPaperFile(e.target.files?.[0] || null)}
-                                data-testid="input-exam-file"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="paper-exam-prompt">Note on the paper (optional)</Label>
-                              <Textarea id="paper-exam-prompt" value={examPrompt} onChange={(e) => setExamPrompt(e.target.value)} placeholder="Leave blank to ask them to answer the uploaded paper." />
-                            </div>
-                            <TeacherAudience teachers={batchDetails?.teachers || []} selected={quizTeacherIds} onChange={setQuizTeacherIds} />
-                            <Button
-                              onClick={() => uploadExamMutation.mutate()}
-                              disabled={!quizTitle.trim() || !paperFile || uploadExamMutation.isPending}
-                              data-testid="button-submit-paper-exam"
-                            >
-                              {uploadExamMutation.isPending ? "Uploading..." : "Assign paper"}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
                     </div>
                   </div>
-                  {assignedQuizzes.length === 0 ? (
+                  {assignedQuizzes.filter((quiz: any) => !isWritingExam(quiz)).length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No quizzes assigned yet
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {assignedQuizzes.map((quiz: any) => (
+                      {assignedQuizzes.filter((quiz: any) => !isWritingExam(quiz)).map((quiz: any) => (
                         <Card
                           key={quiz.id}
                           className="cursor-pointer hover:shadow-md transition-shadow"
@@ -1573,6 +1563,113 @@ export default function TrainerBatches() {
                 </TabsContent>
 
                 {/* Progress Tab */}
+                <TabsContent value="assessments" className="space-y-4 flex-1 overflow-y-auto p-4">
+                  <div className="rounded-2xl p-4" style={{ background: "#fff1e0", color: "#9a5b16" }}>
+                    <p className="text-lg font-semibold">Assessments</p>
+                    <p className="mt-1 text-sm">Paper exams and written exams. Lesson quizzes stay on Quizzes.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Dialog open={writeExamOpen} onOpenChange={(open) => { setWriteExamOpen(open); if (!open) clearExamForm(); }}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" data-testid="button-write-exam">
+                          <FileText className="mr-2 h-4 w-4" />
+                          Write exam
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Write an exam</DialogTitle>
+                          <DialogDescription>Teachers open this as a document and write their answers beside it.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="open-exam-title">Title</Label>
+                            <Input id="open-exam-title" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} data-testid="input-open-exam-title" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="open-exam-prompt">Exam paper</Label>
+                            <Textarea id="open-exam-prompt" value={examPrompt} onChange={(e) => setExamPrompt(e.target.value)} placeholder="Write the questions they will see." data-testid="input-open-exam-prompt" />
+                          </div>
+                          <TeacherAudience teachers={batchDetails?.teachers || []} selected={quizTeacherIds} onChange={setQuizTeacherIds} />
+                          <Button
+                            onClick={() => writeExamMutation.mutate()}
+                            disabled={!quizTitle.trim() || !examPrompt.trim() || writeExamMutation.isPending}
+                            data-testid="button-submit-open-exam"
+                          >
+                            {writeExamMutation.isPending ? "Assigning..." : "Assign exam"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={uploadExamOpen} onOpenChange={(open) => { setUploadExamOpen(open); if (!open) clearExamForm(); }}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" data-testid="button-upload-exam" className="bg-[#e09a3e] hover:bg-[#9a5b16]">
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload paper
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Upload a paper exam</DialogTitle>
+                          <DialogDescription>Teachers see the paper on one side and write answers on the other.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="paper-exam-title">Title</Label>
+                            <Input id="paper-exam-title" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} data-testid="input-paper-exam-title" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="paper-exam-file">Paper</Label>
+                            <Input
+                              id="paper-exam-file"
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.webp"
+                              onChange={(e) => setPaperFile(e.target.files?.[0] || null)}
+                              data-testid="input-exam-file"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="paper-exam-prompt">Note on the paper (optional)</Label>
+                            <Textarea id="paper-exam-prompt" value={examPrompt} onChange={(e) => setExamPrompt(e.target.value)} placeholder="Leave blank to ask them to answer the uploaded paper." />
+                          </div>
+                          <TeacherAudience teachers={batchDetails?.teachers || []} selected={quizTeacherIds} onChange={setQuizTeacherIds} />
+                          <Button
+                            onClick={() => uploadExamMutation.mutate()}
+                            disabled={!quizTitle.trim() || !paperFile || uploadExamMutation.isPending}
+                            data-testid="button-submit-paper-exam"
+                          >
+                            {uploadExamMutation.isPending ? "Uploading..." : "Assign paper"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  {assignedQuizzes.filter((quiz: any) => isWritingExam(quiz)).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No assessments in this cohort yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {assignedQuizzes.filter((quiz: any) => isWritingExam(quiz)).map((quiz: any) => (
+                        <Card key={quiz.id} data-testid={`card-assessment-${quiz.id}`}>
+                          <CardContent className="flex items-center justify-between gap-3 py-4">
+                            <div>
+                              <p className="font-semibold">{quiz.title}</p>
+                              <p className="text-sm text-muted-foreground">{quiz.paperUrl ? "Uploaded paper" : "Written exam"}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteQuizMutation.mutate(quiz.id)}
+                              data-testid={`button-delete-quiz-${quiz.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
                 <TabsContent value="progress" className="space-y-4 flex-1 overflow-y-auto p-4">
                   <h3 className="text-lg font-semibold">Cohort overview</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
@@ -2047,13 +2144,14 @@ export default function TrainerBatches() {
               </Tabs>
             </div>
           ) : (
-            <div className="lg:col-span-3 border rounded-lg bg-card flex items-center justify-center">
+            <div className="flex min-h-[18rem] items-center justify-center rounded-2xl border bg-card">
               <div className="text-center">
                 <Users className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">Select a batch to view details</p>
+                <p className="text-muted-foreground">Open Cohorts and choose one.</p>
               </div>
             </div>
-          )}
+          ))}
+          </div>
         </div>
       </main>
 
