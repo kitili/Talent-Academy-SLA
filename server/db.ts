@@ -104,6 +104,10 @@ export async function ensureWrittenAssignmentTables() {
     ALTER TABLE batches ADD COLUMN IF NOT EXISTS quizzes_status varchar NOT NULL DEFAULT 'open';
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS due_date timestamp;
+    ALTER TABLE teacher_quiz_attempts ADD COLUMN IF NOT EXISTS open_ended_pending boolean DEFAULT false;
+    ALTER TABLE teacher_quiz_attempts ADD COLUMN IF NOT EXISTS final_passed boolean;
+    ALTER TABLE quiz_cache ADD COLUMN IF NOT EXISTS approved boolean NOT NULL DEFAULT false;
+    ALTER TABLE quiz_cache ADD COLUMN IF NOT EXISTS approved_at timestamp;
     ALTER TABLE courses ADD COLUMN IF NOT EXISTS objectives text;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS pass_mark integer NOT NULL DEFAULT 80;
     ALTER TABLE assigned_quizzes ADD COLUMN IF NOT EXISTS shuffle_questions varchar NOT NULL DEFAULT 'yes';

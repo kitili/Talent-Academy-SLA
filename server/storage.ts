@@ -1472,7 +1472,7 @@ export class DatabaseStorage implements IStorage {
     const quizzes = await db
       .select()
       .from(assignedQuizzes)
-      .where(sqlOp`${assignedQuizzes.batchId} = ANY(${batchIds})`);
+      .where(inArray(assignedQuizzes.batchId, batchIds));
     const quizIds = quizzes.map(q => q.id);
     if (quizIds.length === 0) return [];
 
@@ -1482,7 +1482,7 @@ export class DatabaseStorage implements IStorage {
       .from(openEndedReviews)
       .where(
         and(
-          sqlOp`${openEndedReviews.assignedQuizId} = ANY(${quizIds})`,
+          inArray(openEndedReviews.assignedQuizId, quizIds),
           sqlOp`${openEndedReviews.passed} IS NULL`
         )
       );
