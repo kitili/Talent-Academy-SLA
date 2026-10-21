@@ -26,6 +26,7 @@ import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStat
 import { CohortMedals } from "@/components/CohortMedals";
 import type { Medal } from "@shared/cohortMedals";
 import { PageStrip, usePager } from "@/components/PageStrip";
+import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 const TEACHER_TABS = [
   { id: "home", label: "Home" },
@@ -65,7 +66,6 @@ function TeacherSideTabs({ tab, onTab }: { tab: TeacherTab; onTab: (next: Teache
     </nav>
   );
 }
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 function TeacherPathCard() {
   const { data: path } = useQuery<any>({
