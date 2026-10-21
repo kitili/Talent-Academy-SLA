@@ -167,6 +167,20 @@ export async function ensureWrittenAssignmentTables() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set varchar NOT NULL DEFAULT 'yes';
     ALTER TABLE teachers ADD COLUMN IF NOT EXISTS username varchar;
     ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password_set varchar NOT NULL DEFAULT 'yes';
+    ALTER TABLE written_assignments ADD COLUMN IF NOT EXISTS file_url text;
+    ALTER TABLE written_assignments ADD COLUMN IF NOT EXISTS file_name varchar;
+    ALTER TABLE written_assignments ADD COLUMN IF NOT EXISTS kind varchar NOT NULL DEFAULT 'assignment';
+    CREATE TABLE IF NOT EXISTS trainer_attendance (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      trainer_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      batch_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      date timestamp NOT NULL,
+      status varchar NOT NULL DEFAULT 'present',
+      marked_by varchar REFERENCES users(id),
+      notes text,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_trainer_attendance_unique ON trainer_attendance(trainer_id, batch_id, date);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_teachers_username_lower ON teachers (LOWER(username));
     DO $$
     BEGIN

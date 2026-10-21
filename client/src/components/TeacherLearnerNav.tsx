@@ -1,16 +1,17 @@
 import { useLocation } from "wouter";
-import { BookOpen, GraduationCap, Home } from "lucide-react";
+import { BookOpen, ClipboardCheck, GraduationCap, Home } from "lucide-react";
 
 export function TeacherLearnerNav() {
   const [location, navigate] = useLocation();
   const items = [
     { href: "/teacher/dashboard", label: "Home", icon: Home },
-    { href: "/teacher/dashboard#my-learning", label: "My learning", icon: BookOpen },
+    { href: "/teacher/dashboard#my-learning", label: "Learning", icon: BookOpen },
+    { href: "/teacher/dashboard#my-work", label: "Work", icon: ClipboardCheck },
     { href: "/teacher/certificates", label: "Certificates", icon: GraduationCap },
   ];
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur sm:hidden">
-      <div className="grid grid-cols-3">
+    <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-[#102448]/10 bg-white/95 backdrop-blur sm:hidden">
+      <div className="grid grid-cols-4">
         {items.map((item) => {
           const Icon = item.icon;
           const active = item.href.startsWith("/teacher/certificates")

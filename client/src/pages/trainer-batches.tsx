@@ -186,6 +186,11 @@ export default function TrainerBatches() {
   const [writeExamOpen, setWriteExamOpen] = useState(false);
   const [uploadExamOpen, setUploadExamOpen] = useState(false);
   const [examPrompt, setExamPrompt] = useState("");
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [taskKind, setTaskKind] = useState<"assignment" | "assessment">("assignment");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskNote, setTaskNote] = useState("");
+  const [taskFile, setTaskFile] = useState<File | null>(null);
 
   const { data: batches = [] } = useQuery<any[]>({
     queryKey: ["/api/batches"],
@@ -578,6 +583,54 @@ export default function TrainerBatches() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const { data: cohortTasks = [] } = useQuery<any[]>({
+    queryKey: ["/api/batches", selectedBatch?.id, "assignments"],
+    enabled: !!selectedBatch?.id && activeTab === "quizzes",
+  });
+
+  const uploadTaskMutation = useMutation({
+    mutationFn: async () => {
+      if (!taskTitle.trim()) throw new Error("Give the work a title");
+      let fileUrl: string | null = null;
+      let fileName: string | null = null;
+      if (taskFile) {
+        const ticket = await apiRequest("POST", "/api/objects/upload");
+        const { uploadURL } = await ticket.json();
+        const put = await fetch(uploadURL, {
+          method: "PUT",
+          body: taskFile,
+          credentials: "include",
+          headers: taskFile.type ? { "Content-Type": taskFile.type } : undefined,
+        });
+        if (!put.ok) throw new Error("The file did not upload");
+        fileUrl = uploadURL;
+        fileName = taskFile.name;
+      }
+      const response = await apiRequest("POST", `/api/batches/${selectedBatch?.id}/assignments`, {
+        title: taskTitle,
+        instructions: taskNote,
+        fileUrl,
+        fileName,
+        kind: taskKind,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "assignments"] });
+      toast({
+        title: taskKind === "assessment" ? "Assessment uploaded" : "Assignment uploaded",
+        description: "Teachers open it on Work, not with their quizzes.",
+      });
+      setTaskOpen(false);
+      setTaskTitle("");
+      setTaskNote("");
+      setTaskFile(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not upload", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1423,13 +1476,59 @@ export default function TrainerBatches() {
                               disabled={!quizTitle.trim() || !paperFile || uploadExamMutation.isPending}
                               data-testid="button-submit-paper-exam"
                             >
-                              {uploadExamMutation.isPending ? "Uploading..." : "Assign paper"}
-                            </Button>
+                            {uploadExamMutation.isPending ? "Uploading..." : "Assign paper"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{taskKind === "assessment" ? "Upload an assessment" : "Upload an assignment"}</DialogTitle>
+                          <DialogDescription>This goes to the teacher Work page. It is not a quiz.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="task-title">Title</Label>
+                            <Input id="task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} data-testid="input-task-title" />
                           </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="task-note">What they should do</Label>
+                            <Textarea id="task-note" value={taskNote} onChange={(event) => setTaskNote(event.target.value)} data-testid="input-task-note" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="task-file">File</Label>
+                            <Input id="task-file" type="file" onChange={(event) => setTaskFile(event.target.files?.[0] || null)} data-testid="input-task-file" />
+                          </div>
+                          <Button
+                            onClick={() => uploadTaskMutation.mutate()}
+                            disabled={!taskTitle.trim() || uploadTaskMutation.isPending}
+                            data-testid="button-submit-task"
+                          >
+                            {uploadTaskMutation.isPending ? "Uploading..." : "Give it to the cohort"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Button size="sm" variant="outline" data-testid="button-upload-assignment" onClick={() => { setTaskKind("assignment"); setTaskOpen(true); }}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload assignment
+                    </Button>
+                    <Button size="sm" variant="outline" data-testid="button-upload-assessment" onClick={() => { setTaskKind("assessment"); setTaskOpen(true); }}>
+                      <ClipboardCheck className="mr-2 h-4 w-4" />
+                      Upload assessment
+                    </Button>
                   </div>
+                  {cohortTasks.length > 0 && (
+                    <div className="mt-3 space-y-1" data-testid="trainer-task-list">
+                      {cohortTasks.map((task: any) => (
+                        <p key={task.id} className="text-sm text-muted-foreground">
+                          {task.kind === "assessment" ? "Assessment" : "Assignment"} · {task.title}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
                   {assignedQuizzes.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No quizzes assigned yet

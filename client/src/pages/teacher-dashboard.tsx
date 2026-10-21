@@ -24,6 +24,7 @@ import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import { CohortMedals } from "@/components/CohortMedals";
+import { PracticeShelf } from "@/components/PracticeShelf";
 import type { Medal } from "@shared/cohortMedals";
 import { PageStrip, usePager } from "@/components/PageStrip";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
@@ -32,6 +33,7 @@ const TEACHER_TABS = [
   { id: "home", label: "Home" },
   { id: "learning", label: "Learning" },
   { id: "work", label: "Work" },
+  { id: "quiz", label: "Quiz" },
   { id: "progress", label: "Progress" },
   { id: "reflect", label: "Reflect" },
   { id: "messages", label: "Messages" },
@@ -41,8 +43,8 @@ type TeacherTab = (typeof TEACHER_TABS)[number]["id"];
 
 function TeacherSideTabs({ tab, onTab }: { tab: TeacherTab; onTab: (next: TeacherTab) => void }) {
   return (
-    <nav aria-label="Teacher pages" data-testid="teacher-sidebar" className="lg:sticky lg:top-24 lg:w-44 shrink-0">
-      <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+    <nav aria-label="Teacher pages" data-testid="teacher-sidebar" className="lg:sticky lg:top-24 lg:w-48 shrink-0">
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-[#102448]/10 bg-white p-2 dark:border-white/10 dark:bg-[#162033] lg:flex-col lg:overflow-visible">
         {TEACHER_TABS.map((item) => {
           const active = tab === item.id;
           return (
@@ -52,10 +54,10 @@ function TeacherSideTabs({ tab, onTab }: { tab: TeacherTab; onTab: (next: Teache
               aria-current={active ? "page" : undefined}
               data-testid={`teacher-tab-${item.id}`}
               onClick={() => onTab(item.id)}
-              className={`rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition ${
+              className={`border-b-2 px-3 py-2 text-left text-sm whitespace-nowrap ${
                 active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-card text-foreground hover:bg-muted"
+                  ? "border-[#c4842a] font-semibold text-[#17233c] dark:text-[#f6f1e8]"
+                  : "border-transparent font-medium text-[#243044] hover:border-[#c4842a]/40 dark:text-[#d7deea]"
               }`}
             >
               {item.label}
@@ -178,6 +180,8 @@ export default function TeacherDashboard() {
   const [reflectionRating, setReflectionRating] = useState(0);
   const [satisfactionScore, setSatisfactionScore] = useState(0);
   const [satisfactionCourseId, setSatisfactionCourseId] = useState("");
+  const [feedbackNote, setFeedbackNote] = useState("");
+  const [feedbackScore, setFeedbackScore] = useState(0);
   const [workDrafts, setWorkDrafts] = useState<Record<string, string>>({});
 
   const { logoutMutation } = useAuth();
@@ -340,6 +344,26 @@ export default function TeacherDashboard() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const sendFeedback = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/satisfaction-scores", {
+        type: "teacher_feedback",
+        targetId: "academy",
+        targetType: "academy",
+        score: feedbackScore,
+        comment: feedbackNote,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Feedback sent", description: "An admin can read this with the other ratings." });
+      setFeedbackNote("");
+      setFeedbackScore(0);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Could not send feedback", description: error.message, variant: "destructive" });
     },
   });
 
@@ -668,15 +692,15 @@ export default function TeacherDashboard() {
         </Card>
         )}
 
-        {(tab === "home" || tab === "work") && (
+        {tab === "quiz" && (
         <Card className="sl-rise" data-testid="card-teacher-exams">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              Your exams
+              Quizzes
             </CardTitle>
             <CardDescription>
-              Quizzes your trainer assigned to you. A paper opens beside the document where you write.
+              Quizzes stay on this page. Learning materials are on Learning, and assignments are on Work.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -702,6 +726,8 @@ export default function TeacherDashboard() {
           </CardContent>
         </Card>
         )}
+
+        {tab === "learning" && <PracticeShelf />}
 
         {tab === "learning" && medalRows.length > 0 && (
           <Card className="sl-rise" data-testid="card-teacher-medals">
@@ -811,7 +837,7 @@ export default function TeacherDashboard() {
                 <FileText className="h-5 w-5 text-primary" />
                 My work
               </CardTitle>
-              <CardDescription>Written assignments besides quizzes</CardDescription>
+              <CardDescription>Assignments and assessments your trainer uploaded. Quizzes stay on the Quiz page.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {myWork.length === 0 ? (
@@ -822,7 +848,13 @@ export default function TeacherDashboard() {
                 return (
                   <div key={id} className="space-y-2">
                     <p className="font-medium">{item.title}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#c47b2b]">{item.kind === "assessment" ? "Assessment" : "Assignment"}</p>
                     <p className="text-sm text-muted-foreground">{item.instructions}</p>
+                    {(item.file_url || item.fileUrl) && (
+                      <a className="text-sm font-medium text-primary underline" href={item.file_url || item.fileUrl} target="_blank" rel="noreferrer">
+                        Open {item.file_name || item.fileName || "the file"}
+                      </a>
+                    )}
                     {item.due_date || item.dueDate ? (
                       <p className="text-xs text-muted-foreground">Due {new Date(item.due_date || item.dueDate).toLocaleString()}</p>
                     ) : null}
@@ -1316,7 +1348,36 @@ export default function TeacherDashboard() {
 
         {tab === "reflect" && (
         <>
-        <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
+        <Card className="border-[#1d4e89]/20 bg-[#f7f9fc] text-[#17233c]" data-testid="card-feedback">
+          <CardHeader>
+            <CardTitle>Feedback</CardTitle>
+            <CardDescription className="text-[#3a4a60]">Tell the academy how this week of learning felt. This is not a quiz and not an assignment.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Button key={n} type="button" size="sm" variant={feedbackScore === n ? "default" : "outline"} onClick={() => setFeedbackScore(n)} data-testid={`button-feedback-score-${n}`}>
+                  {n}
+                </Button>
+              ))}
+            </div>
+            <Textarea
+              value={feedbackNote}
+              onChange={(event) => setFeedbackNote(event.target.value)}
+              placeholder="What should we keep, and what should change?"
+              rows={4}
+              data-testid="input-feedback"
+            />
+            <Button
+              disabled={feedbackScore < 1 || !feedbackNote.trim() || sendFeedback.isPending}
+              onClick={() => sendFeedback.mutate()}
+              data-testid="button-send-feedback"
+            >
+              {sendFeedback.isPending ? "Sending…" : "Send feedback"}
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="border-[#102448]/10 bg-white text-[#17233c]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
@@ -1372,8 +1433,11 @@ export default function TeacherDashboard() {
           </Card>
         )}
 
-        {/* Goals & Action Items */}
-        <Card className="shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/50 rounded-xl">
+        </>
+        )}
+
+        {tab === "home" && (
+        <Card className="border-[#c4842a]/30 bg-white text-[#17233c]" data-testid="card-home-goals">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
@@ -1448,7 +1512,6 @@ export default function TeacherDashboard() {
             </div>
           </CardContent>
         </Card>
-        </>
         )}
           </div>
         </div>

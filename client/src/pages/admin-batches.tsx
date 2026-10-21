@@ -527,6 +527,10 @@ export default function AdminBatches() {
                   {batches.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No batches in this cohort yet. The first one will be Batch One.</p>
                   ) : (
+                    <>
+                    <p className="text-sm text-[#243044]" data-testid={`cohort-week-note-${cohort.id}`}>
+                      One cohort. {batches.length === 7 ? "Seven batches, one for each step of the week." : `${batches.length} ${batches.length === 1 ? "batch" : "batches"}.`} Each batch carries the courses a teacher works through that week.
+                    </p>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl bg-[#102448]/[0.04] px-3 py-3" data-testid={`batch-order-${cohort.id}`}>
                       {batches.map((batch, index) => (
                         <div key={batch.id} className="flex items-center gap-2">
@@ -538,6 +542,7 @@ export default function AdminBatches() {
                         </div>
                       ))}
                     </div>
+                    </>
                   )}
                   <div className="space-y-3">
                     {batches.map((batch, index) => {
@@ -551,10 +556,12 @@ export default function AdminBatches() {
                           <span className={`absolute left-0 top-3 flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm ${tone.chip}`}>
                             {index + 1}
                           </span>
-                          <div className={`rounded-xl border p-3 space-y-2 ${tone.wash} ${tone.edge}`}>
+                          <div className={`rounded-xl border p-3 space-y-2 ${tone.wash} ${tone.edge}`} data-testid={`week-batch-${batch.id}`}>
                             <div className="flex items-start justify-between gap-2">
                               <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#c47b2b]">Week {index + 1}</p>
                                 <p className="font-medium text-[#102448]">{batch.name}</p>
+                                <p className="text-xs text-[#3a4a60]">Courses in this batch are the lessons a teacher does this week.</p>
                                 {batch.description && <p className="text-sm text-muted-foreground">{batch.description}</p>}
                               </div>
                               <div className="flex gap-1">

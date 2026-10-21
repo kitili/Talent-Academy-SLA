@@ -120,6 +120,7 @@ export function buildActivityStatements(scope: ActivityScope, batchIds: string[]
       ...del("trainer_stars", "teacher_id", scope.teacherIds),
       ...del("course_repetitions", "teacher_id", scope.teacherIds),
       ...del("attendance_records", "teacher_id", scope.teacherIds),
+      ...del("trainer_attendance", "trainer_id", scope.trainerIds),
       ...del("deck_file_progress", "user_id", scope.trainerIds),
       ...del("user_content_progress", "user_id", scope.trainerIds),
     );
@@ -187,6 +188,7 @@ export function buildActivityStatements(scope: ActivityScope, batchIds: string[]
         ...del("scheduled_events", "batch_id", batchIds),
         ...del("alert_rules", "batch_id", batchIds),
         ...del("attendance_records", "batch_id", batchIds),
+        ...del("trainer_attendance", "batch_id", batchIds),
         ...del("teacher_course_completion", "batch_id", batchIds),
         ...del("trainer_stars", "batch_id", batchIds),
         ...del("course_repetitions", "batch_id", batchIds),

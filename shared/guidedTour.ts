@@ -67,6 +67,11 @@ export const ADMIN_TOUR: TourStep[] = [
     target: "admin-nav-teachers",
   },
   {
+    title: "Attendance",
+    body: "The attendance list for teachers and for trainers. You can mark who was present, late, absent, or excused.",
+    target: "admin-nav-attendance",
+  },
+  {
     title: "Cohorts",
     body: "A cohort is the group of teachers. A batch is a step inside that cohort, and each cohort can have a different number. Courses are the lessons on a batch, placed here rather than on their own tab. A batch can hold more than one teacher, and a cohort can hold more than one trainer. You add the batches, place the courses, assign the trainers, and open or close the cohort and its quizzes.",
     target: "admin-nav-cohorts",
@@ -88,7 +93,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Pictures",
-    body: "Each picture opens the same place as its name in the navbar: Approvals, Trainers, Teachers, Cohorts, and Analytics.",
+    body: "Each picture opens the same place as its name in the navbar: Approvals, Trainers, Teachers, Cohorts, Attendance, and Analytics.",
     target: "admin-pictures",
   },
   {

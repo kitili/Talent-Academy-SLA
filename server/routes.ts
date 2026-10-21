@@ -25,6 +25,7 @@ import {
   mapApprovalHistoryRow,
 } from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
+import { isAttendanceStatus } from "@shared/attendanceDesk";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
@@ -5858,6 +5859,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/attendance", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const teachers = await db.execute(sql`
+        SELECT t.id, t.name, t.email, ar.status, ar.date, b.name AS batch_name
+        FROM teachers t
+        LEFT JOIN LATERAL (
+          SELECT status, date, batch_id
+          FROM attendance_records
+          WHERE teacher_id = t.id
+          ORDER BY date DESC
+          LIMIT 1
+        ) ar ON true
+        LEFT JOIN batches b ON b.id = ar.batch_id
+        WHERE COALESCE(t.approval_status, 'approved') <> 'inactive'
+        ORDER BY t.name
+      `);
+      const trainers = await db.execute(sql`
+        SELECT u.id, u.username, u.email, ta.status, ta.date, b.name AS batch_name
+        FROM users u
+        LEFT JOIN LATERAL (
+          SELECT status, date, batch_id
+          FROM trainer_attendance
+          WHERE trainer_id = u.id
+          ORDER BY date DESC
+          LIMIT 1
+        ) ta ON true
+        LEFT JOIN batches b ON b.id = ta.batch_id
+        WHERE u.role = 'trainer' AND COALESCE(u.approval_status, 'approved') <> 'inactive'
+        ORDER BY u.username
+      `);
+      const cohorts = await db.execute(sql`SELECT id, name FROM batches ORDER BY name`);
+      const asPerson = (row: any, role: "teacher" | "trainer") => ({
+        id: row.id,
+        name: row.name || row.username,
+        role,
+        detail: row.email || row.username || "",
+        batchName: row.batch_name || null,
+        status: row.status || null,
+        date: row.date ? new Date(row.date).toISOString() : null,
+      });
+      res.json({
+        teachers: teachers.rows.map((row) => asPerson(row, "teacher")),
+        trainers: trainers.rows.map((row) => asPerson(row, "trainer")),
+        cohorts: cohorts.rows,
+      });
+    } catch (error) {
+      console.error("Error loading admin attendance:", error);
+      res.status(500).json({ error: "Could not load attendance" });
+    }
+  });
+
+  app.post("/api/admin/attendance", isAuthenticated, isStrictAdmin, async (req, res) => {
+    try {
+      const { role, personId, batchId, date, status } = req.body || {};
+      if ((role !== "teacher" && role !== "trainer") || !personId || !batchId || !date || !isAttendanceStatus(status)) {
+        return res.status(400).json({ error: "Choose a teacher or trainer, a cohort, a date, and a status." });
+      }
+      const attendanceDate = new Date(`${date}T00:00:00.000Z`);
+      if (Number.isNaN(attendanceDate.getTime())) {
+        return res.status(400).json({ error: "That date is not valid." });
+      }
+      if (role === "teacher") {
+        await storage.upsertAttendanceRecord({
+          teacherId: personId,
+          batchId,
+          date: attendanceDate,
+          status,
+          markedBy: req.user!.id,
+          notes: null,
+        });
+      } else {
+        await db.execute(sql`
+          INSERT INTO trainer_attendance (trainer_id, batch_id, date, status, marked_by)
+          VALUES (${personId}, ${batchId}, ${attendanceDate}, ${status}, ${req.user!.id})
+          ON CONFLICT (trainer_id, batch_id, date)
+          DO UPDATE SET status = EXCLUDED.status, marked_by = EXCLUDED.marked_by
+        `);
+      }
+      res.json({ saved: true });
+    } catch (error) {
+      console.error("Error saving admin attendance:", error);
+      res.status(500).json({ error: "Could not save attendance" });
+    }
+  });
+
   // Get own attendance (teacher auth)
   app.get("/api/teacher/attendance", isTeacherAuthenticated, async (req, res) => {
     try {
@@ -6252,14 +6338,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batch = await storage.getBatch(req.params.batchId);
       if (!batch) return res.status(404).json({ error: "Batch not found" });
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
-      const { title, instructions, dueDate } = req.body;
-      if (!title || !instructions) return res.status(400).json({ error: "title and instructions are required" });
+      const { title, instructions, dueDate, fileUrl, fileName, kind } = req.body;
+      const assignmentKind = kind === "assessment" ? "assessment" : "assignment";
+      if (!title || (!instructions && !fileUrl)) return res.status(400).json({ error: "title and instructions are required" });
       const assignment = await storage.createWrittenAssignment({
         batchId: batch.id,
         title,
-        instructions,
+        instructions: instructions || (assignmentKind === "assessment" ? "Open the assessment and write your answers." : "Open the assignment and write your answers."),
         dueDate: dueDate ? new Date(dueDate) : null,
         createdBy: req.user!.id,
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        kind: assignmentKind,
       });
       notifyBatchTeachers(
         batch.id,

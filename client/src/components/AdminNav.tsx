@@ -8,6 +8,7 @@ export const ADMIN_LINKS = [
   { href: "/admin/trainers", label: "Trainers", test: "trainers" },
   { href: "/admin/teachers", label: "Teachers", test: "teachers" },
   { href: "/admin/batches", label: "Cohorts", test: "cohorts" },
+  { href: "/admin/attendance", label: "Attendance", test: "attendance" },
   { href: "/admin/analytics", label: "Analytics", test: "analytics" },
 ] as const;
 
@@ -24,7 +25,7 @@ export function AdminNav({ embedded = false, flow = false }: { embedded?: boolea
           : `border-b border-[#102448]/10 bg-[#fffaf4] text-[#17233c] dark:border-white/10 dark:bg-[#162033] dark:text-[#f6f1e8] ${flow ? "" : "sticky top-0 z-40"}`
       }
     >
-      <div className={`${adminFrame} flex flex-wrap items-center gap-x-6 gap-y-2 py-3`}>
+      <div className={`${adminFrame} flex flex-wrap items-center gap-x-6 gap-y-2 py-2`}>
         {ADMIN_LINKS.map((link) => {
           const active = link.href === "/admin"
             ? location === "/admin"
@@ -35,10 +36,10 @@ export function AdminNav({ embedded = false, flow = false }: { embedded?: boolea
               href={link.href}
               data-testid={`admin-nav-${link.test}`}
               data-tour={`admin-nav-${link.test}`}
-              className={`shrink-0 border-b-2 pb-0.5 text-[15px] ${
+              className={`shrink-0 border-b-2 px-1 py-2 text-[15px] ${
                 active
                   ? "border-[#c4842a] font-semibold text-[#17233c] dark:text-[#f6f1e8]"
-                  : "border-transparent font-medium text-[#243044] hover:text-[#17233c] dark:text-[#d7deea] dark:hover:text-[#f6f1e8]"
+                  : "border-transparent font-medium text-[#243044] hover:border-[#c4842a]/40 hover:text-[#17233c] dark:text-[#d7deea] dark:hover:text-[#f6f1e8]"
               }`}
             >
               {link.label}

@@ -813,6 +813,19 @@ export const attendanceRecords = pgTable("attendance_records", {
   index("idx_attendance_batch_date").on(table.batchId, table.date),
 ]);
 
+export const trainerAttendance = pgTable("trainer_attendance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trainerId: varchar("trainer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
+  date: timestamp("date").notNull(),
+  status: varchar("status").notNull().default("present"),
+  markedBy: varchar("marked_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_trainer_attendance_unique").on(table.trainerId, table.batchId, table.date),
+]);
+
 export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({
   id: true,
   createdAt: true,
@@ -959,6 +972,9 @@ export const writtenAssignments = pgTable("written_assignments", {
   instructions: text("instructions").notNull(),
   dueDate: timestamp("due_date"),
   createdBy: varchar("created_by").references(() => users.id),
+  fileUrl: text("file_url"),
+  fileName: varchar("file_name"),
+  kind: varchar("kind").notNull().default("assignment"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

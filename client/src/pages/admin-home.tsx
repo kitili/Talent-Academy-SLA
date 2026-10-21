@@ -202,6 +202,7 @@ export default function AdminHome() {
             { href: "/admin/trainers", title: "Trainers", test: "button-go-trainers", place: "hall" as PlaceName },
             { href: "/admin/teachers", title: "Teachers", test: "button-go-teachers", place: "garden" as PlaceName },
             { href: "/admin/batches", title: "Cohorts", test: "button-go-batches", place: "classroom" as PlaceName },
+            { href: "/admin/attendance", title: "Attendance", test: "button-go-attendance", place: "hall" as PlaceName },
             { href: "/admin/analytics", title: "Analytics", test: "button-go-analytics", place: "library" as PlaceName },
           ].map((item) => (
             <button
