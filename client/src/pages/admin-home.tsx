@@ -222,7 +222,7 @@ export default function AdminHome() {
           ))}
         </div>
 
-        <AttendanceBoard />
+        <AttendanceBoard variant="compact" />
 
         <div className="flex flex-wrap items-center gap-3">
           <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
