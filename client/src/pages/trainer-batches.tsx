@@ -653,13 +653,14 @@ export default function TrainerBatches() {
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 py-6">
         <PlaceBanner
           place="hall"
-          title="Training batches"
+          title="Your cohorts"
           subtitle={
-            batches.some((batch: any) => batch.track === "secondary") && !batches.some((batch: any) => batch.track === "primary")
+            (batches.some((batch: any) => batch.track === "secondary") && !batches.some((batch: any) => batch.track === "primary")
               ? "Secondary trainers. These teachers will teach Form I."
               : batches.some((batch: any) => batch.track === "primary") && !batches.some((batch: any) => batch.track === "secondary")
                 ? "Primary trainers. Playgroup through Standard 7."
-                : "Adult teachers, grouped by the class they will teach."
+                : "Adult teachers, grouped by the class they will teach.")
+            + " You add courses. An admin adds the batches inside a cohort."
           }
         />
         <div className="mb-4">

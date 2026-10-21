@@ -322,7 +322,7 @@ export default function AdminHome() {
             { href: "/approvals", title: "Approvals", text: "People waiting to come in", icon: CheckCircle, test: "button-go-approvals", place: "classroom" as PlaceName },
             { href: "/admin/trainers", title: "Trainers", text: "Approvals and accounts", icon: Award, test: "button-go-trainers", place: "hall" as PlaceName },
             { href: "/admin/teachers", title: "Teachers", text: "Progress and files viewed", icon: Users, test: "button-go-teachers", place: "garden" as PlaceName },
-            { href: "/admin/batches", title: "Cohorts", text: "Rooms, quizzes, and certificates", icon: Layers, test: "button-go-batches", place: "classroom" as PlaceName },
+            { href: "/admin/batches", title: "Cohorts", text: "Cohorts, batches, and courses in one place", icon: Layers, test: "button-go-batches", place: "classroom" as PlaceName },
             { href: "/admin/analytics", title: "Analytics", text: "How the academy is moving", icon: BarChart3, test: "button-go-analytics", place: "library" as PlaceName },
             { href: "/courses", title: "Courses", text: "Modules and lesson files", icon: FileText, test: "button-go-courses", place: "lessons" as PlaceName },
           ].map((item) => (

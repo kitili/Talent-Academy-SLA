@@ -17,7 +17,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Where to go next",
-    body: "Handover is the three-week staff plan. Approvals lets people in. Trainers and Teachers are the accounts. Cohorts are the rooms. Analytics is the gradebook. Courses is where you add modules and lesson files.",
+    body: "Handover is the three-week staff plan. Approvals lets people in. Trainers and Teachers are the accounts. Cohorts is one place to add cohorts, the batches inside them, and courses. Analytics is the gradebook. Courses is where you add modules and lesson files.",
     target: "admin-nav",
   },
   {
@@ -48,7 +48,7 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "What stays with admin",
-    body: "You can approve a new teacher and reset that teacher's password. You cannot create an admin, clear the academy, or open another trainer's cohort.",
+    body: "You can add a course, approve a new teacher, and reset that teacher's password. You cannot add a cohort or a batch, create an admin, clear the academy, or open another trainer's cohort.",
   },
 ];
 

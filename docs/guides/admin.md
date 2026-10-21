@@ -26,15 +26,15 @@ Four counts sit under that: trainers, teachers, courses, and active people. If s
 | Approvals | Let a waiting trainer or teacher in, or turn them away. |
 | Trainers | Create a trainer account. A trainer you create here is approved at once. Open a trainer to see that account. |
 | Teachers | Create a teacher account, already approved. Open a teacher to see progress and files viewed. |
-| Cohorts | Every batch, not only one trainer’s. Each card says Primary or Secondary. Assign the trainer who will coach that batch, or clear the assignment. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
+| Cohorts | One place for three different things. A **cohort** is the group of teachers. A **batch** is a step inside that cohort, and each cohort can have a different number. A **course** is the lessons on a batch. Set how many cohorts a teacher finishes. You add cohorts, batches, and courses here. A trainer can add courses only. Open the cohort room for roster, written work, calendar, quizzes, and certificates. |
 | Analytics | The gradebook for the whole academy: completion, quizzes, attendance, reflections, and course ratings. |
 | Courses | The same curriculum the trainers use. Keep a course on draft while you edit it. Publish it when teachers should see it. Add modules and lesson files. Plan each module as Introduction, Competence development, Design, then Realisation. |
 
 ## D. The job only you do
 
-A trainer sees only their own batches. You see all of them, and you are the person who puts a trainer on a batch. Until you do that, the trainer’s desk stays empty.
+A trainer sees only their own cohorts. You see all of them, and you are the person who puts a trainer on a cohort. Until you do that, the trainer’s desk stays empty.
 
-You can also create trainer accounts. A trainer cannot create another trainer or an admin.
+You add cohorts and the batches inside them. A trainer cannot. A trainer can add a course, and so can you. You can also create trainer accounts. A trainer cannot create another trainer or an admin.
 
 ## E. Start fresh
 

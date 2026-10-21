@@ -377,10 +377,17 @@ export default function CoursesList() {
 
       <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6 sm:mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold">Training Courses</h2>
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold">Training Courses</h2>
+            {isTrainer && !isAdmin && (
+              <p className="text-sm text-muted-foreground mt-1" data-testid="text-trainer-course-role">
+                You add courses. An admin adds cohorts and the batches inside them.
+              </p>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
           <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search courses" />
-          {isAdmin && (
+          {(isAdmin || isTrainer) && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
                 <Button data-testid="button-add-course">
@@ -528,27 +535,27 @@ export default function CoursesList() {
                           <ChevronRight className="h-5 w-5" />
                         </Button>
 
+                        {(isAdmin || isTrainer) && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleEdit(course)}
+                            data-testid={`button-edit-course-${course.id}`}
+                            className="h-9 w-9"
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </Button>
+                        )}
                         {isAdmin && (
-                          <>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleEdit(course)}
-                              data-testid={`button-edit-course-${course.id}`}
-                              className="h-9 w-9"
-                            >
-                              <Pencil className="h-5 w-5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteId(course.id)}
-                              data-testid={`button-delete-course-${course.id}`}
-                              className="h-9 w-9 hover:text-destructive"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </Button>
-                          </>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setDeleteId(course.id)}
+                            data-testid={`button-delete-course-${course.id}`}
+                            className="h-9 w-9 hover:text-destructive"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
                         )}
 
                       </>

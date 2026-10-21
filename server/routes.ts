@@ -28,6 +28,7 @@ import { normalizeManualQuestions } from "./quizService";
 import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
+import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import multer from "multer";
 
 const packageUpload = multer({
@@ -2322,8 +2323,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete a batch
-  app.delete("/api/batches/:batchId", isAuthenticated, isTrainer, async (req, res) => {
+  // Delete a cohort. Only an admin adds or removes cohorts.
+  app.delete("/api/batches/:batchId", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!batch) {
@@ -6189,6 +6190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Internal server error" });
     }
   });
+
+  registerAcademyPathRoutes(app, isAuthenticated, isAdmin, isTeacherAuthenticated);
 
   const httpServer = createServer(app);
   return httpServer;
