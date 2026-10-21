@@ -124,6 +124,15 @@ export async function ensureWrittenAssignmentTables() {
     DROP INDEX IF EXISTS idx_teacher_certificate_unique;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_certificate_kind
       ON teacher_certificates(teacher_id, batch_id, course_id, kind);
+    CREATE TABLE IF NOT EXISTS trainer_stars (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      teacher_id varchar NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+      batch_id varchar NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+      awarded_by varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      note text,
+      created_at timestamp DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_trainer_star_unique ON trainer_stars(teacher_id, batch_id);
     CREATE TABLE IF NOT EXISTS academy_settings (
       id varchar PRIMARY KEY,
       cohorts_required integer NOT NULL DEFAULT 1,

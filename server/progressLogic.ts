@@ -18,7 +18,10 @@ export function moduleIsComplete(progress?: ModuleProgress): boolean {
   return (progress.total || 0) > 0 && (progress.completed || 0) >= (progress.total || 0);
 }
 
-export function applyModuleLocks<T extends ModuleWeek>(weeks: T[]): Array<T & { locked: boolean }> {
+export function applyModuleLocks<T extends ModuleWeek>(
+  weeks: T[],
+  checkedCourseIds: string[] = [],
+): Array<T & { locked: boolean }> {
   const courseOrder: string[] = [];
   for (const week of weeks) {
     const key = week.courseId || week.courseName || "";
@@ -40,9 +43,10 @@ export function applyModuleLocks<T extends ModuleWeek>(weeks: T[]): Array<T & { 
     modulesByCourse.set(key, list);
   }
 
+  const checked = new Set(checkedCourseIds);
   const courseComplete = new Map<string, boolean>();
   for (const [key, list] of modulesByCourse) {
-    courseComplete.set(key, list.every(week => moduleIsComplete(week.progress)));
+    courseComplete.set(key, checked.has(key) || list.every(week => moduleIsComplete(week.progress)));
   }
 
   const previousByCourse = new Map<string, T>();

@@ -47,6 +47,7 @@ export const OPS_TABLES: { table: string; area: OpsAreaId; label: string }[] = [
   { table: "teacher_quiz_regenerations", area: "learning", label: "Quiz retakes" },
   { table: "open_ended_reviews", area: "learning", label: "Written-answer reviews" },
   { table: "teacher_course_completion", area: "learning", label: "Course finished records" },
+  { table: "trainer_stars", area: "learning", label: "Stars a trainer gives in a cohort" },
   { table: "course_repetitions", area: "learning", label: "Repeated courses" },
   { table: "attendance_records", area: "classroom", label: "Attendance" },
   { table: "scheduled_events", area: "classroom", label: "Calendar events" },
