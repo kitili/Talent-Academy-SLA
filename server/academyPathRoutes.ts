@@ -11,7 +11,7 @@ import {
   teacherCourseCompletion,
   users,
 } from "@shared/schema";
-import { ACADEMY_TERMS, normalizeCohortsRequired, pathSummary } from "@shared/academyPath";
+import { ACADEMY_TERMS, moveBatchOrder, nextBatchName, normalizeCohortsRequired, pathSummary, sortBatches } from "@shared/academyPath";
 
 const SETTINGS_ID = "path";
 
@@ -41,7 +41,7 @@ async function stepsForCohort(cohortId: string) {
     .innerJoin(courses, eq(cohortBatchCourses.courseId, courses.id))
     .where(inArray(cohortBatchCourses.cohortBatchId, steps.map((step) => step.id)))
     .orderBy(asc(cohortBatchCourses.orderIndex));
-  return steps.map((step) => ({
+  return sortBatches(steps).map((step) => ({
     id: step.id,
     name: step.name,
     description: step.description,
@@ -50,6 +50,12 @@ async function stepsForCohort(cohortId: string) {
       .filter((link) => link.cohortBatchId === step.id)
       .map((link) => ({ id: link.courseId, name: link.courseName })),
   }));
+}
+
+async function writeBatchOrder(ids: string[]) {
+  for (let index = 0; index < ids.length; index += 1) {
+    await db.update(cohortBatches).set({ orderIndex: index }).where(eq(cohortBatches.id, ids[index]));
+  }
 }
 
 async function loadTree() {
@@ -142,17 +148,15 @@ export function registerAcademyPathRoutes(
 
   app.post("/api/admin/academy-path/cohorts/:cohortId/batches", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const name = String(req.body?.name || "").trim();
-      if (!name) return res.status(400).json({ error: "Batch name is required" });
       const cohort = await storage.getBatch(req.params.cohortId);
       if (!cohort) return res.status(404).json({ error: "Cohort not found" });
-      const existing = await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, cohort.id));
-      const orderIndex = existing.reduce((max, step) => Math.max(max, step.orderIndex), -1) + 1;
+      const existing = sortBatches(await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, cohort.id)));
+      const name = String(req.body?.name || "").trim() || nextBatchName(existing.length);
       const [created] = await db.insert(cohortBatches).values({
         cohortId: cohort.id,
         name,
         description: req.body?.description ? String(req.body.description) : null,
-        orderIndex,
+        orderIndex: existing.length,
       }).returning();
       res.status(201).json(created);
     } catch (error) {
@@ -184,7 +188,8 @@ export function registerAcademyPathRoutes(
       if (!existing) return res.status(404).json({ error: "Batch not found" });
       const links = await db.select().from(cohortBatchCourses).where(eq(cohortBatchCourses.cohortBatchId, existing.id));
       await db.delete(cohortBatches).where(eq(cohortBatches.id, existing.id));
-      const siblings = await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, existing.cohortId));
+      const siblings = sortBatches(await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, existing.cohortId)));
+      await writeBatchOrder(siblings.map((row) => row.id));
       const siblingIds = siblings.map((row) => row.id);
       for (const link of links) {
         const stillUsed = siblingIds.length === 0 ? [] : await db.select().from(cohortBatchCourses).where(and(
@@ -199,6 +204,21 @@ export function registerAcademyPathRoutes(
     } catch (error) {
       console.error("Error deleting batch:", error);
       res.status(500).json({ error: "Failed to remove the batch" });
+    }
+  });
+
+  app.patch("/api/admin/academy-path/batches/:batchId/order", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const direction = req.body?.direction === "later" ? "later" : "earlier";
+      const [existing] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
+      if (!existing) return res.status(404).json({ error: "Batch not found" });
+      const siblings = sortBatches(await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, existing.cohortId)));
+      const order = moveBatchOrder(siblings.map((row) => row.id), existing.id, direction);
+      await writeBatchOrder(order);
+      res.json({ order });
+    } catch (error) {
+      console.error("Error reordering batch:", error);
+      res.status(500).json({ error: "Failed to reorder the batch" });
     }
   });
 
