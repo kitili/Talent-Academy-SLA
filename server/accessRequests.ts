@@ -55,11 +55,11 @@ function splitName(name: string) {
 export function registerAccessRequestRoutes(app: Express) {
   app.post("/api/access-requests", loginRateLimit, async (req, res) => {
     try {
+      const parsed = parseAccessRequest(req.body);
+      if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       if (!hasDatabaseUrl()) {
         return res.status(503).json({ message: "Requests need the academy database." });
       }
-      const parsed = parseAccessRequest(req.body);
-      if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       const { hashPassword } = await import("./auth");
       const lockedPassword = await hashPassword(randomBytes(24).toString("hex"));
 
@@ -133,11 +133,11 @@ export function registerAccessRequestRoutes(app: Express) {
 
   app.post("/api/access-requests/password", loginRateLimit, async (req, res) => {
     try {
+      const parsed = parsePasswordSetup(req.body);
+      if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       if (!hasDatabaseUrl()) {
         return res.status(503).json({ message: "Password setup needs the academy database." });
       }
-      const parsed = parsePasswordSetup(req.body);
-      if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       const account = parsed.role === "teacher"
         ? await teacherByIdentifier(parsed.identifier)
         : await staffByIdentifier(parsed.identifier);
