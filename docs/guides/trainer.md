@@ -1,6 +1,6 @@
 # Trainer walkthrough
 
-You train adult teachers. The pictures of children are the pupils those teachers will teach. You only see the cohorts an admin assigned to you. You can add courses. An admin adds cohorts and the batches inside them.
+You train the teachers. The pictures of children are the pupils those teachers will teach. You only see the cohorts an admin assigned to you. You can add courses. An admin adds cohorts and the batches inside them.
 
 Primary trainers cover playgroup through Standard 7. Secondary trainers cover Form I.
 

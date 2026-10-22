@@ -132,7 +132,7 @@ export const TRAINER_TOUR: TourStep[] = [
 export const TEACHER_TOUR: TourStep[] = [
   {
     title: "Teacher desk",
-    body: "This is your learning home. You are an adult teacher preparing to teach young pupils. The tour walks the places you use after you sign in on the Teacher tab.",
+    body: "This is your learning home. The tour walks the places you use after you sign in on the Teacher tab.",
   },
   {
     title: "Continue learning",

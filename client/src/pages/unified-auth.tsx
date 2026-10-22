@@ -307,22 +307,19 @@ export default function UnifiedAuth() {
       value: "admin",
       icon: Shield,
       title: "Admin",
-      description: "System administrator",
-      gradient: "from-primary to-primary"
+      description: "Academy",
     },
     {
       value: "trainer",
       icon: Users,
       title: "Trainer",
-      description: "Coaching adult teachers",
-      gradient: "from-primary to-primary"
+      description: "Cohorts",
     },
     {
       value: "teacher",
       icon: GraduationCap,
       title: "Teacher",
-      description: "Adult teacher in training",
-      gradient: "from-primary to-primary"
+      description: "Lessons",
     }
   ];
 
@@ -337,15 +334,15 @@ export default function UnifiedAuth() {
   const getRoleDescription = (role: Role) => {
     switch (role) {
       case 'admin': return 'Full system access and user management';
-      case 'trainer': return 'Coach batches of adult teachers';
-      case 'teacher': return 'Prepare to teach young pupils';
+      case 'trainer': return 'Leads cohorts and assessments';
+      case 'teacher': return 'Takes courses and quizzes';
     }
   };
 
   const scenes: Record<Role, { src: string; line: string; place: PlaceName }> = {
     admin: { src: "/bg-library.jpg", line: "The library is open", place: "library" },
     trainer: { src: "/bg-hall.jpg", line: "The hall is open", place: "hall" },
-    teacher: { src: "/bg-garden.jpg", line: "For adult teachers", place: "garden" },
+    teacher: { src: "/bg-garden.jpg", line: "The garden is open", place: "garden" },
   };
   const scene = scenes[loginRole];
 
@@ -394,7 +391,7 @@ export default function UnifiedAuth() {
       </Dialog>
 
       <div className="relative z-10 flex min-h-screen items-end justify-center px-4 py-6 sm:items-center">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
           <Card className="w-full rounded-[1.75rem] border-0 bg-white/95 text-center shadow-2xl backdrop-blur">
               <CardHeader className="pb-2 pt-6 text-center">
                 <div className="mb-3 flex items-center justify-center gap-3">
@@ -422,7 +419,7 @@ export default function UnifiedAuth() {
                     </div>
                     <form onSubmit={mode === "request" ? handleRequest : mode === "password" ? handleCreatePassword : handleLogin} className="space-y-4 sm:space-y-6">
                       {/* Role Selection Cards */}
-                      <div className={`grid gap-2 ${mode === "sign-in" ? "grid-cols-3" : "grid-cols-2"}`}>
+                      <div className={`grid items-stretch gap-3 ${mode === "sign-in" ? "grid-cols-3" : "grid-cols-2"}`}>
                         {roleCards.filter((role) => mode === "sign-in" || role.value !== "admin").map((role) => {
                           const isSelected = loginRole === role.value;
                           const place = scenes[role.value as Role].place;
@@ -432,14 +429,14 @@ export default function UnifiedAuth() {
                               type="button"
                               onClick={() => setLoginRole(role.value as Role)}
                               data-testid={`radio-${role.value}`}
-                              className={`overflow-hidden rounded-2xl border text-left transition ${
-                                isSelected ? "border-[#102448] ring-2 ring-[#102448]" : "border-transparent hover:border-[#102448]/30"
-                              }`}
+                              className={`sl-sign-role ${isSelected ? "sl-sign-role-live" : ""}`}
                             >
-                              <img src={PLACES[place]} alt="" className="h-16 w-full object-cover sm:h-20" />
-                              <span className={`block px-2 py-1.5 text-center ${isSelected ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`}>
-                                <span className="block text-sm font-semibold">{role.title}</span>
-                                <span className="mt-0.5 block text-[10px] leading-tight opacity-80">{role.description}</span>
+                              <span className="sl-sign-role-frame">
+                                <img src={PLACES[place]} alt="" />
+                              </span>
+                              <span className="sl-sign-role-copy">
+                                <span className="block text-sm font-semibold leading-none">{role.title}</span>
+                                <span className="mt-1 block text-[11px] leading-none opacity-80">{role.description}</span>
                               </span>
                             </button>
                           );

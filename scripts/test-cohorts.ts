@@ -1,6 +1,6 @@
 /**
  * Practice cohorts for the documented test desks.
- * The people enrolled here are adult teachers preparing to teach young pupils.
+ * The people enrolled here are teachers preparing for the classroom.
  * Passwords are the documented test passwords and are never printed.
  */
 import { LEARNING_BATCHES, cohortName, stageById } from "../shared/tanzaniaPath";

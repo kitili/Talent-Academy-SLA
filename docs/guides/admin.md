@@ -1,6 +1,6 @@
 # Admin walkthrough
 
-You run the academy. Trainers coach the adult teachers. You decide who those trainers are, which batch they own, and when the whole school needs one message.
+You run the academy. Trainers coach the teachers. You decide who those trainers are, which batch they own, and when the whole school needs one message.
 
 Sign in on the Admin tab. The first visit starts a tour. **Tour** in the header plays it again. The tour points at each control in the top bar, then each navbar name, and leaves that control clear so you can read it while the page moves.
 

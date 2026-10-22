@@ -34,6 +34,8 @@ describe("admin desk", () => {
     const auth = read("client/src/pages/unified-auth.tsx");
     assert.match(auth, /\/bg-library.jpg/);
     assert.match(auth, /PLACES\[place\]/);
+    assert.match(auth, /sl-sign-role/);
+    assert.equal(auth.toLowerCase().includes("adult teacher"), false);
     assert.equal(home.includes("LearningPath"), false);
     assert.equal(home.includes("Total Trainers"), false);
     assert.equal(home.includes('href: "/courses"'), false);

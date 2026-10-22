@@ -1021,6 +1021,57 @@ body {
   padding: 1.25rem 1.4rem;
 }
 
+.sl-sign-role {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(16, 36, 72, 0.12);
+  background: #fffaf4;
+  text-align: left;
+  box-shadow: 0 8px 20px hsl(220 30% 10% / 0.08);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.sl-sign-role:hover {
+  transform: translateY(-2px);
+  border-color: rgba(16, 36, 72, 0.28);
+}
+.sl-sign-role-live {
+  border-color: #102448;
+  box-shadow: 0 0 0 2px #102448;
+}
+.sl-sign-role-frame {
+  display: block;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #d7cbb8;
+}
+.sl-sign-role-frame img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.sl-sign-role-copy {
+  display: flex;
+  min-height: 3.4rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 0.4rem;
+  color: #102448;
+  background: #f4eadc;
+}
+.sl-sign-role-live .sl-sign-role-copy {
+  background: #102448;
+  color: #fffaf4;
+}
+
 .sl-place-tile img {
   height: 7.5rem;
   width: 100%;

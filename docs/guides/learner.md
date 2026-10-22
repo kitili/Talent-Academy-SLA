@@ -1,6 +1,6 @@
 # Teacher guide
 
-You are an adult teacher in training. The classrooms in the pictures are the pupils you are preparing to teach. Sign in on the Teacher tab. **Tour** replays the short tour.
+You are a teacher in training. The classrooms in the pictures are the pupils you are preparing to teach. Sign in on the Teacher tab. **Tour** replays the short tour.
 
 You only see your own batch, your own courses, and your own marks.
 
