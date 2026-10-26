@@ -90,7 +90,7 @@ describe("lesson quiz grading on the server", () => {
     assert.equal(result.questions, KEY);
   });
 
-  it("passes a teacher who gives the stored answers at today's 70% mark", () => {
+  it("passes a teacher who gives the stored answers", () => {
     const result = gradeLessonQuiz({ cached: APPROVED, answers: { q1: "4", q2: "False", q3: "9", q4: "x" }, staff: false });
     assert.ok(!("error" in result));
     assert.equal(result.graded.passed, true);
@@ -185,7 +185,8 @@ describe("route wiring (text contract)", () => {
   it("the module quiz read projects questions for anyone but staff, and its assigned-quiz fallback is staff-only", () => {
     const body = handler('app.get("/api/training-weeks/:weekId/files/:fileId/quiz"');
     assert.match(body, /const isAdminOrTrainer = !req\.teacherId && /);
-    assert.match(body, /isAdminOrTrainer \? cachedQuiz\.questions : learnerQuestions\(cachedQuiz\.questions\)/);
+    // lessonQuizForViewer returns learnerQuestions for anyone but staff (tests/unit/quiz/learner-projection.test.ts).
+    assert.match(body, /const view = lessonQuizForViewer\(cachedQuiz, isAdminOrTrainer\);/);
     const fallback = body.indexOf("if (!isAdminOrTrainer) {");
     assert.ok(fallback > 0 && fallback < body.indexOf(".from(assignedQuizzes)"), "fallback is not behind the staff check");
   });
@@ -202,11 +203,12 @@ describe("route wiring (text contract)", () => {
     }
   });
 
-  it("every teacher read of an assigned quiz strips the answers", () => {
+  it("every teacher read of an assigned quiz strips the answers until no retake is left", () => {
     assert.match(handler('app.get("/api/assigned-quizzes/:quizId", isTeacherAuthenticated'), /questions: learnerQuestions\(questions\)/);
     assert.match(handler('app.get("/api/teacher/quizzes"'), /\.\.\.learnerQuiz\(quiz\)/);
-    assert.match(handler('app.get("/api/assigned-quizzes/:quizId/attempts"'), /quiz: quiz \? learnerQuiz\(quiz\) : quiz/);
-    assert.match(handler('app.get("/api/teacher/quiz-attempts"'), /quiz: quiz \? learnerQuiz\(quiz\) : null/);
+    // Attempt reads reveal answers only after a pass or the last attempt (Track B; attemptQuizView in tests/unit/quiz/).
+    assert.match(handler('app.get("/api/assigned-quizzes/:quizId/attempts"'), /quiz: quiz \? attemptQuizView\(quiz, standing\) : quiz/);
+    assert.match(handler('app.get("/api/teacher/quiz-attempts"'), /quiz: quiz \? attemptQuizView\(quiz, standing\) : null/);
     assert.match(handler('app.post("/api/assigned-quizzes/:quizId/submit"'), /review: answerReview\(quiz\.questions, answers, passed === "yes"\)/);
   });
 

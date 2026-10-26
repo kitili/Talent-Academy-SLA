@@ -9,7 +9,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars } from "@shared/schema";
+import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars, contentItems } from "@shared/schema";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
@@ -27,7 +27,7 @@ import {
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
 import { parseDeadline } from "@shared/academyPath";
-import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, refusal } from "@shared/constants";
+import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, QUIZ_ATTEMPTS, refusal } from "@shared/constants";
 import { trainerMayEditCourse } from "./scope";
 import { cohortsInScope, trainerCohortCounts } from "./cohortRoster";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
@@ -39,9 +39,9 @@ import { sanitizeLessonHtml } from "./htmlSanitize";
 import { signFileGrant, verifyFileGrant } from "./fileGrant";
 import { passMarkOf, shuffleQuestions } from "./quizDelivery";
 import { isWritingExam } from "@shared/trainerDesk";
-import { blockAssignedQuiz, blockTeacherWeekQuiz } from "./cohortGate";
+import { blockAssignedQuiz, blockCourseEdit, blockTeacherWeekQuiz, editableModule } from "./cohortGate";
 import { normalizeManualQuestions } from "./quizService";
-import { answerReview, gradeLessonQuiz, learnerQuiz, learnerQuestions, teacherMayCheckCourse } from "./learnerQuiz";
+import { answerReview, assignedQuizStanding, attemptQuizView, gradeLessonQuiz, isLiveLessonQuiz, learnerQuiz, learnerQuestions, lessonQuizForViewer, teacherMayCheckCourse } from "./learnerQuiz";
 import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
@@ -1123,6 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/training-weeks", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const validated = insertTrainingWeekSchema.parse(req.body);
+      if (await blockCourseEdit(res, req.user, validated.courseId)) return;
       const week = await storage.createTrainingWeek(validated);
       res.json(week);
     } catch (error) {
@@ -1134,10 +1135,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update a training week (admin only)
   app.patch("/api/training-weeks/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableModule(res, req.user, req.params.id)) return;
       const validated = updateTrainingWeekSchema.parse({
         ...req.body,
         id: req.params.id,
       });
+      // Moving a module to another course needs that course in scope too.
+      if (validated.courseId !== undefined && await blockCourseEdit(res, req.user, validated.courseId)) return;
       const week = await storage.updateTrainingWeek(validated);
       if (!week) {
         return res.status(404).json({ error: "Training week not found" });
@@ -1152,6 +1156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a training week (admin only)
   app.delete("/api/training-weeks/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableModule(res, req.user, req.params.id)) return;
       // 🗑️ CACHE INVALIDATION: Delete all cached quizzes for this week
       await storage.deleteCachedQuizzesForWeek(req.params.id);
       console.log(`[CACHE] Invalidated all quiz caches for week: ${req.params.id}`);
@@ -1196,7 +1201,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Insert at new position (newPosition - 1 for 0-based indexing)
       weeks.splice(newPosition - 1, 0, weekToMove);
 
-      // Renumber all weeks sequentially
+      // Renumber all weeks sequentially. Every module whose number changes must be on a course the caller may edit (D2).
+      const changed = weeks.filter((week, index) => week.weekNumber !== index + 1);
+      for (const courseId of Array.from(new Set(changed.map((week) => week.courseId)))) {
+        if (await blockCourseEdit(res, req.user, courseId)) return;
+      }
       const updatePromises = weeks.map((week, index) => 
         storage.updateTrainingWeek({
           id: week.id,
@@ -1251,8 +1260,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/training-weeks/:id/import-package", isAuthenticated, isTrainer, packageUpload.single("package"), async (req, res) => {
     try {
-      const week = await storage.getTrainingWeek(req.params.id);
-      if (!week) return res.status(404).json({ error: "Week not found" });
+      const week = await editableModule(res, req.user, req.params.id);
+      if (!week) return;
       const file = (req as any).file as { buffer?: Buffer; originalname?: string } | undefined;
       if (!file?.buffer) return res.status(400).json({ error: "Upload a .zip package" });
       const imported = lessonFromPackage(file.buffer, file.originalname || "package.zip");
@@ -1283,8 +1292,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!youtubeId) {
         return res.status(400).json({ error: "Paste a YouTube watch, share, or embed link." });
       }
-      const week = await storage.getTrainingWeek(req.params.id);
-      if (!week) return res.status(404).json({ error: "Training week not found" });
+      const week = await editableModule(res, req.user, req.params.id);
+      if (!week) return;
       const newFile = {
         id: randomUUID(),
         fileName: title,
@@ -1315,11 +1324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[UPLOAD DEBUG] Processing ${files.length} files for week ${req.params.id}`);
 
-      const week = await storage.getTrainingWeek(req.params.id);
-      if (!week) {
-        console.log("[UPLOAD DEBUG] Week not found:", req.params.id);
-        return res.status(404).json({ error: "Training week not found" });
-      }
+      const week = await editableModule(res, req.user, req.params.id);
+      if (!week) return;
 
       // Process each file and add to the existing deck files
       const newDeckFiles = await Promise.all(files.map(async file => {
@@ -1360,8 +1366,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[UPLOAD DEBUG] Database updated successfully");
       
-      // 🚀 PRE-CACHE: Generate quiz questions in background (non-blocking)
-      // Admin gets instant response, students get instant quiz delivery later
+      // 🚀 PRE-CACHE: Generate quiz drafts in background (non-blocking)
+      // Each draft is saved unapproved; Fellows see it only after a trainer or admin approves it (D5)
       setImmediate(async () => {
         try {
           const { generateSingleFileQuiz } = await import('./quizService');
@@ -1384,7 +1390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 weekId: req.params.id,
                 deckFileId: file.id,
                 questions,
-                approved: true,
+                approved: false,
               });
 
               const cacheTime = Date.now() - cacheStartTime;
@@ -1410,10 +1416,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id, fileId } = req.params;
 
-      const week = await storage.getTrainingWeek(id);
-      if (!week) {
-        return res.status(404).json({ error: "Training week not found" });
-      }
+      const week = await editableModule(res, req.user, id);
+      if (!week) return;
 
       const currentDeckFiles = week.deckFiles || [];
       const updatedDeckFiles = currentDeckFiles.filter(file => file.id !== fileId);
@@ -1444,10 +1448,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid request: fileIds array required" });
       }
 
-      const week = await storage.getTrainingWeek(id);
-      if (!week) {
-        return res.status(404).json({ error: "Training week not found" });
-      }
+      const week = await editableModule(res, req.user, id);
+      if (!week) return;
 
       const currentDeckFiles = week.deckFiles || [];
       
@@ -1644,6 +1646,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Content Items API - for LMS-style course content
 
+  /** A content item's module, when the caller may edit it (D2). Otherwise answers 404 or 403 and returns null. */
+  async function editableContentItem(req: Request, res: Response) {
+    const [item] = await db.select({ weekId: contentItems.weekId }).from(contentItems).where(eq(contentItems.id, req.params.id));
+    if (!item) {
+      res.status(404).json({ error: "Content item not found" });
+      return null;
+    }
+    return editableModule(res, req.user, item.weekId);
+  }
+
   // Get all content items for a week with user progress (authenticated users)
   app.get("/api/training-weeks/:weekId/content", isAuthenticated, async (req, res) => {
     try {
@@ -1661,6 +1673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a content item (admin only)
   app.post("/api/training-weeks/:weekId/content", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableModule(res, req.user, req.params.weekId)) return;
       const item = await storage.createContentItem({ ...req.body, weekId: req.params.weekId });
       res.json(item);
     } catch (error) {
@@ -1672,6 +1685,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update a content item (admin only)
   app.patch("/api/content-items/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableContentItem(req, res)) return;
+      // Moving an item to another module needs that module in scope too.
+      if (req.body?.weekId && !await editableModule(res, req.user, String(req.body.weekId))) return;
       const item = await storage.updateContentItem(req.params.id, req.body);
       if (!item) {
         return res.status(404).json({ error: "Content item not found" });
@@ -1686,6 +1702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a content item (admin only)
   app.delete("/api/content-items/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableContentItem(req, res)) return;
       const success = await storage.deleteContentItem(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Content item not found" });
@@ -1941,11 +1958,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[FILE-QUIZ] Starting quiz generation for file:", req.params.fileId);
       const { weekId, fileId } = req.params;
       const { numQuestions = 5, force = false } = req.body;
-      
-      const week = await storage.getTrainingWeek(weekId);
-      if (!week) {
-        return res.status(404).json({ error: "Training week not found" });
-      }
+
+      const week = await editableModule(res, req.user, weekId);
+      if (!week) return;
 
       const file = week.deckFiles?.find(f => f.id === fileId);
       if (!file) {
@@ -1961,6 +1976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             questions: cachedQuiz.questions.slice(0, numQuestions),
             cached: true,
+            approved: cachedQuiz.approved,
           });
         }
       } else {
@@ -1982,17 +1998,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Save to cache for future instant retrieval
       console.log(`[FILE-QUIZ] 💾 About to save ${questions.length} questions to cache for weekId=${weekId}, fileId=${fileId}`);
+      // A draft: Fellows see it only after a trainer or admin approves it (D5).
       const savedQuiz = await storage.saveCachedQuiz({
         weekId,
         deckFileId: fileId,
         questions,
-        approved: true,
+        approved: false,
       });
       console.log(`[FILE-QUIZ] ✅ Successfully saved quiz, cached questions count:`, savedQuiz.questions.length);
 
       const totalTime = Date.now() - startTime;
       console.log(`[FILE-QUIZ] ✅ Generated and cached ${questions.length} questions in ${totalTime}ms`);
-      res.json({ questions, cached: false });
+      res.json({ questions, cached: false, approved: false });
     } catch (error) {
       console.error("[FILE-QUIZ] Error:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate quiz" });
@@ -2026,6 +2043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { weekId, fileId } = req.params;
       const { questions } = req.body;
       if (!Array.isArray(questions)) return res.status(400).json({ error: "questions must be an array" });
+      if (!await editableModule(res, req.user, weekId)) return;
       let updated = await storage.updateCachedQuizQuestions(weekId, fileId, questions);
       if (!updated) {
         updated = await storage.saveCachedQuiz({
@@ -2045,6 +2063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/training-weeks/:weekId/files/:fileId/quiz/approve", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { weekId, fileId } = req.params;
+      if (!await editableModule(res, req.user, weekId)) return;
       const updated = await storage.approveCachedQuiz(weekId, fileId);
       if (!updated) return res.status(404).json({ error: "No quiz found for this file" });
       res.json({ success: true, approved: true });
@@ -2086,7 +2105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               numQuestions: 10,
               openEndedCount: 2,
             });
-            await storage.saveCachedQuiz({ weekId: item.weekId, deckFileId: item.fileId, questions, approved: true });
+            await storage.saveCachedQuiz({ weekId: item.weekId, deckFileId: item.fileId, questions, approved: false });
             console.log(`[BULK-GEN] ✅ Generated quiz for ${item.fileName}`);
           } catch (err) {
             console.error(`[BULK-GEN] ❌ Failed for ${item.fileName}:`, err);
@@ -2101,11 +2120,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Force-regenerate quiz for a file (admin — bypasses cache)
-  app.post("/api/training-weeks/:weekId/files/:fileId/regenerate-quiz-admin", isAuthenticated, async (req, res) => {
+  app.post("/api/training-weeks/:weekId/files/:fileId/regenerate-quiz-admin", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { weekId, fileId } = req.params;
-      const week = await storage.getTrainingWeek(weekId);
-      if (!week) return res.status(404).json({ error: "Week not found" });
+      const week = await editableModule(res, req.user, weekId);
+      if (!week) return;
       const file = week.deckFiles?.find(f => f.id === fileId);
       if (!file) return res.status(404).json({ error: "File not found" });
 
@@ -2121,8 +2140,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         numQuestions: 10,
         openEndedCount: 2,
       });
-      await storage.saveCachedQuiz({ weekId, deckFileId: fileId, questions, approved: true });
-      res.json({ success: true, questionCount: questions.length });
+      await storage.saveCachedQuiz({ weekId, deckFileId: fileId, questions, approved: false });
+      res.json({ success: true, questionCount: questions.length, approved: false });
     } catch (error) {
       console.error("[ADMIN-REGEN] Error:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Failed to regenerate quiz" });
@@ -2139,13 +2158,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.body?.answers || typeof req.body.answers !== 'object') {
         return res.status(400).json({ error: "Invalid quiz submission" });
       }
-      if (await blockTeacherWeekQuiz(res, teacherId, weekId)) return;
 
       // Defensive check: Verify the file belongs to this week
       const week = await storage.getTrainingWeek(weekId);
       if (!week) {
         return res.status(404).json({ error: "Training week not found" });
       }
+      // A teacher needs an open cohort for the course and an unlocked module (C3, C5).
+      if (await blockTeacherWeekQuiz(res, teacherId, week)) return;
       const fileExists = week.deckFiles?.some(f => f.id === fileId);
       if (!fileExists) {
         return res.status(400).json({ error: "File does not belong to this training week" });
@@ -2246,16 +2266,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdminOrTrainer = !req.teacherId && !!(req.user && (req.user.role === 'admin' || req.user.role === 'trainer'));
       const cachedQuiz = await storage.getCachedQuiz(weekId, fileId);
       if (cachedQuiz && cachedQuiz.questions.length > 0) {
-        // Teachers can only access approved quizzes; admins/trainers can always preview
-        if (!isAdminOrTrainer && !cachedQuiz.approved) {
+        // Teachers get an approved quiz without answers, or nothing; admins/trainers can always preview.
+        const view = lessonQuizForViewer(cachedQuiz, isAdminOrTrainer);
+        if (!view) {
           console.log(`[FILE-QUIZ] ⏳ Quiz not yet approved for teachers`);
           res.status(404).json({ error: "No quiz available for this file" });
           return;
         }
         console.log(`[FILE-QUIZ] ✅ Found cached quiz with ${cachedQuiz.questions.length} questions`);
-        // Teachers get questions without answers; submit-quiz grades on the server.
-        const questions = isAdminOrTrainer ? cachedQuiz.questions : learnerQuestions(cachedQuiz.questions);
-        res.json({ questions, approved: cachedQuiz.approved });
+        res.json(view);
         return;
       }
 
@@ -3119,17 +3138,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       const passMark = passMarkOf((quiz as { passMark?: number }).passMark);
-      const hasPassedAttempt = existingAttempts.some(
-        (attempt) => (attempt.score / attempt.totalQuestions) * 100 >= passMark
-      );
+      const standing = assignedQuizStanding(existingAttempts, passMark);
 
-      if (hasPassedAttempt) {
+      if (standing.hasPassed) {
         return res.status(400).json({ error: "Quiz already passed. Retakes are not allowed after passing." });
       }
 
-      // Check if teacher has exhausted all 3 attempts
-      if (existingAttempts.length >= 3) {
-        return res.status(400).json({ error: "Maximum of 3 attempts reached for this quiz." });
+      // Check if teacher has exhausted every attempt
+      if (!standing.canRetake) {
+        return res.status(400).json({ error: `Maximum of ${QUIZ_ATTEMPTS} attempts reached for this quiz.` });
       }
 
       // Calculate score — only MCQ/true_false questions count for auto-scoring
@@ -3240,10 +3257,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalQuestions,
         mcqTotal,
         passed: passed === "yes",
-        openEndedPending: hasOpenEnded && percentage >= 80,
+        openEndedPending: hasOpenEnded && percentage >= passMark,
         percentage,
         attemptNumber,
-        remainingAttempts: 3 - attemptNumber,
+        remainingAttempts: Math.max(0, QUIZ_ATTEMPTS - attemptNumber),
         review: answerReview(quiz.questions, answers, passed === "yes"),
       });
     } catch (error) {
@@ -3266,7 +3283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batchTeachersData.map(async (t: any) => {
           const attempts = await storage.getTeacherQuizAttemptsByQuiz(t.id, req.params.quizId);
           const passed = attempts.some((a: any) => a.passed === "yes");
-          const exhausted = attempts.length >= 3 && !passed;
+          const exhausted = attempts.length >= QUIZ_ATTEMPTS && !passed;
           return {
             teacherId: t.id,
             teacherName: t.name,
@@ -3296,20 +3313,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get quiz details for enrichment
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       
-      // Calculate quiz status
-      const hasPassed = attempts.some(a => (a.score / a.totalQuestions) * 100 >= 80);
-      const attemptsUsed = attempts.length;
-      const canRetake = !hasPassed && attemptsUsed < 3;
-      const shouldShowAnswers = hasPassed || attemptsUsed >= 3;
-      
+      // Calculate quiz status at the quiz's own pass mark; answers show only once no retake is left.
+      const standing = assignedQuizStanding(attempts, passMarkOf(quiz?.passMark));
+
       res.json({
         attempts,
-        quiz: quiz ? learnerQuiz(quiz) : quiz,
-        hasPassed,
-        attemptsUsed,
-        remainingAttempts: Math.max(0, 3 - attemptsUsed),
-        canRetake,
-        shouldShowAnswers,
+        quiz: quiz ? attemptQuizView(quiz, standing) : quiz,
+        hasPassed: standing.hasPassed,
+        attemptsUsed: standing.attemptsUsed,
+        remainingAttempts: standing.remainingAttempts,
+        canRetake: standing.canRetake,
+        shouldShowAnswers: standing.showAnswers,
       });
     } catch (error) {
       console.error("Error fetching attempts:", error);
@@ -3337,14 +3351,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/quiz-attempts", isTeacherAuthenticated, async (req, res) => {
     try {
       const attempts = await storage.getAllTeacherQuizAttempts(req.teacherId!);
-      
-      // Enrich with quiz details
+
+      // Enrich with quiz details; answers show only once no retake is left on that quiz.
       const enrichedAttempts = await Promise.all(
         attempts.map(async (attempt) => {
           const quiz = await storage.getAssignedQuiz(attempt.assignedQuizId);
+          const standing = assignedQuizStanding(
+            attempts.filter((other) => other.assignedQuizId === attempt.assignedQuizId),
+            passMarkOf(quiz?.passMark),
+          );
           return {
             ...attempt,
-            quiz: quiz ? learnerQuiz(quiz) : null,
+            quiz: quiz ? attemptQuizView(quiz, standing) : null,
           };
         })
       );
@@ -3957,9 +3975,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result: Record<string, { passed: boolean; hasPassed: boolean; attempts: number; quizExists: boolean }> = {};
 
       for (const file of week.deckFiles) {
-        // Check quiz_cache — does a quiz exist for this file?
+        // Check quiz_cache — does an approved quiz exist for this file? A draft does not count for a teacher.
         const cached = await storage.getCachedQuiz(weekId, file.id);
-        const quizExists = !!(cached && cached.questions.length > 0);
+        const quizExists = isLiveLessonQuiz(cached);
         const passed = await storage.hasPassedFileQuiz(weekId, file.id, teacherId);
         const contentAttempts = await storage.getAllTeacherContentQuizAttemptsForFile(teacherId, weekId, file.id);
         result[file.id] = { passed, hasPassed: passed, attempts: contentAttempts.length, quizExists };

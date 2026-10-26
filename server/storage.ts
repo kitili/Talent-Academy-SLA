@@ -1004,6 +1004,10 @@ export class DatabaseStorage implements IStorage {
     return cached;
   }
 
+  /**
+   * Saves a quiz draft for a lesson file, replacing any quiz it had. Every save is unapproved (D5):
+   * only `approveCachedQuiz`, called by a person, makes a quiz visible to teachers.
+   */
   async saveCachedQuiz(cache: InsertQuizCache): Promise<QuizCache> {
     // First, delete any existing quiz for this week/file combo to handle updates
     await db
@@ -1018,7 +1022,7 @@ export class DatabaseStorage implements IStorage {
     // Then insert the new one
     const [cached] = await db
       .insert(quizCache)
-      .values(cache as any)
+      .values({ ...cache, approved: false, approvedAt: null } as any)
       .returning();
     
     console.log(`[STORAGE] 💾 Cached quiz saved for weekId=${cache.weekId}, fileId=${cache.deckFileId}, questions=${cached.questions.length}`);

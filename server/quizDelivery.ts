@@ -1,4 +1,5 @@
 import type { QuizQuestion } from "@shared/schema";
+import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT } from "@shared/constants";
 
 export function shuffleList<T>(items: T[]) {
   const copy = [...items];
@@ -16,7 +17,7 @@ export function shuffleQuestions(questions: QuizQuestion[]) {
   }));
 }
 
-export function passMarkOf(value: unknown, fallback = 80) {
+export function passMarkOf(value: unknown, fallback = ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT) {
   const mark = Number(value);
   if (!Number.isFinite(mark)) return fallback;
   return Math.min(100, Math.max(1, Math.round(mark)));

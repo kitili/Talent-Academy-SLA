@@ -5,7 +5,7 @@ import posthog from "posthog-js";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, GripVertical, X, ZoomIn, ZoomOut, Eye } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, GripVertical, X, ZoomIn, ZoomOut, Eye, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -13,7 +13,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ProfileSettingsDialog } from "@/components/ProfileSettingsDialog";
 import { LogOut } from "lucide-react";
 import logoImage from "@assets/image_1760460046116.png";
-import type { Course, TrainingWeek } from "@shared/schema";
+import type { Course, QuizQuestion, TrainingWeek } from "@shared/schema";
+import { ACADEMY_TERMS } from "@shared/academyPath";
+import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import type { UploadResult } from "@uppy/core";
 import { FilePreview } from "@/components/FilePreview";
 import { PlaceBanner } from "@/components/PlaceArt";
@@ -51,14 +53,27 @@ import {
 
 // ─── Sortable File Item (must be defined outside parent component) ───────────
 
+/** `GET /api/training-weeks/:weekId/quiz-status`: each lesson file's cached quiz, with its answers (staff only). */
+type QuizStatus = Record<string, { generated: boolean; questionCount: number; approved: boolean; questions?: QuizQuestion[] }>;
+
+const NO_QUESTIONS: QuizQuestion[] = [];
+
+/** What the quiz button says: Fellows take a quiz only once a person has approved it (D5). */
+function quizLabel(quiz?: { generated: boolean; approved: boolean }) {
+  if (!quiz?.generated) return "No quiz";
+  return quiz.approved ? "Quiz approved" : "Quiz draft";
+}
+
 interface SortableFileItemProps {
   file: { id: string; fileName: string; fileUrl: string; fileSize: number };
   weekId: string;
+  quiz?: { generated: boolean; approved: boolean };
   onView: () => void;
   onDelete: () => void;
+  onEditQuiz: () => void;
 }
 
-function SortableFileItem({ file, onView, onDelete }: SortableFileItemProps) {
+function SortableFileItem({ file, quiz, onView, onDelete, onEditQuiz }: SortableFileItemProps) {
   const {
     attributes,
     listeners,
@@ -99,6 +114,16 @@ function SortableFileItem({ file, onView, onDelete }: SortableFileItemProps) {
         <Button
           variant="ghost"
           size="sm"
+          onClick={onEditQuiz}
+          title={`Review, edit and approve the quiz ${ACADEMY_TERMS.learner.title}s take on this file`}
+          data-testid={`button-edit-quiz-${file.id}`}
+        >
+          <ListChecks className="h-4 w-4 mr-1" />
+          <span className={`text-xs ${quiz?.generated && !quiz.approved ? "text-amber-600" : ""}`}>{quizLabel(quiz)}</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onView}
           data-testid={`button-view-${file.id}`}
         >
@@ -135,6 +160,7 @@ interface SortableWeekItemProps {
   onFileDragStart: (event: DragStartEvent) => void;
   onFileDragEnd: (event: DragEndEvent, weekId: string) => void;
   onSaveField: (weekId: string, field: string, value: string, onSuccess?: () => void) => void;
+  onEditQuiz: (weekId: string, file: { id: string; fileName: string }) => void;
 }
 
 function SortableWeekItem({
@@ -153,8 +179,13 @@ function SortableWeekItem({
   onFileDragStart,
   onFileDragEnd,
   onSaveField,
+  onEditQuiz,
 }: SortableWeekItemProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
+  const { data: quizStatus } = useQuery<QuizStatus>({
+    queryKey: [`/api/training-weeks/${week.id}/quiz-status`],
+    enabled: isAdmin && (week.deckFiles?.length ?? 0) > 0,
+  });
   const [editValue, setEditValue] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const { toast } = useToast();
@@ -450,6 +481,8 @@ function SortableWeekItem({
                               key={file.id}
                               file={file}
                               weekId={week.id}
+                              quiz={quizStatus?.[file.id]}
+                              onEditQuiz={() => onEditQuiz(week.id, { id: file.id, fileName: file.fileName })}
                               onView={() => {
                                 onViewFile({ url: file.fileUrl, name: file.fileName });
                                 posthog.capture("admin_file_previewed", { weekId: week.id, fileId: file.id, fileName: file.fileName });
@@ -514,6 +547,7 @@ export default function CourseWeeks() {
   const [numPages, setNumPages] = useState(0);
   const [documentLoadError, setDocumentLoadError] = useState(false);
   const [convertedUrl, setConvertedUrl] = useState<string | null>(null);
+  const [editQuiz, setEditQuiz] = useState<{ weekId: string; fileId: string; fileName: string } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -583,6 +617,13 @@ export default function CourseWeeks() {
     queryKey: ["/api/courses", courseId, "weeks"],
     enabled: !!courseId,
   });
+
+  // The quiz being reviewed: trainers approve their own courses' quizzes here (D5); the server checks the course is theirs.
+  const { data: editQuizStatus, isLoading: isLoadingEditQuiz } = useQuery<QuizStatus>({
+    queryKey: [`/api/training-weeks/${editQuiz?.weekId}/quiz-status`],
+    enabled: isTrainer && !!editQuiz,
+  });
+  const editQuizEntry = editQuiz ? editQuizStatus?.[editQuiz.fileId] : undefined;
 
   const createWeekMutation = useMutation({
     mutationFn: async () => {
@@ -797,7 +838,7 @@ export default function CourseWeeks() {
           <PlaceBanner
             place="lessons"
             title={isLoadingCourse ? "Course" : course?.name || "Course"}
-            subtitle={course?.description || "Course, then module, then lesson. A lesson is finished when every required quiz is passed."}
+            subtitle={course?.description || `Course, then module, then lesson file. ${ACADEMY_TERMS.lessonFile.body}`}
           />
           <p className="text-xs text-muted-foreground" data-testid="lesson-stages">
             Plan each module as Introduction, Competence development, Design, then Realisation.
@@ -850,6 +891,7 @@ export default function CourseWeeks() {
                     onFileDragStart={handleFileDragStart}
                     onFileDragEnd={handleFileDragEnd}
                     onSaveField={onSaveField}
+                    onEditQuiz={(weekId, file) => setEditQuiz({ weekId, fileId: file.id, fileName: file.fileName })}
                   />
                 ))}
               </Accordion>
@@ -889,11 +931,27 @@ export default function CourseWeeks() {
                 onFileDragStart={handleFileDragStart}
                 onFileDragEnd={handleFileDragEnd}
                 onSaveField={onSaveField}
+                onEditQuiz={(weekId, file) => setEditQuiz({ weekId, fileId: file.id, fileName: file.fileName })}
               />
             ))}
           </Accordion>
         )}
       </main>
+
+      {isTrainer && editQuiz && !isLoadingEditQuiz && (
+        <FileQuizEditDialog
+          open={!!editQuiz}
+          onClose={() => setEditQuiz(null)}
+          weekId={editQuiz.weekId}
+          fileId={editQuiz.fileId}
+          fileName={editQuiz.fileName}
+          initialQuestions={editQuizEntry?.questions ?? NO_QUESTIONS}
+          approved={editQuizEntry?.approved ?? false}
+          onQuizStatusChange={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/training-weeks/${editQuiz.weekId}/quiz-status`] });
+          }}
+        />
+      )}
 
       {deleteWeekId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
