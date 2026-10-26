@@ -63,9 +63,10 @@ screen can keep showing an old state after a change. For each action, say what e
   `dist/api.js`, served by the function `api/index.ts`. Lesson files go to Vercel Blob.
 - **Environments:** production on Vercel, and local development. There is no staging. Local `.env` points at the
   same Neon database as production, so local work against it is production work.
-- **Start-up writes:** every server start creates missing tables and columns, resets the test logins, and deletes
-  inactive accounts (`server/app.ts`, `server/deskRoster.ts`). A plan that touches accounts or schema says how this
-  interacts with it.
+- **Start-up writes:** every server start creates missing tables and columns, resets the test logins, and runs the
+  one-time desk prune only if its `app_flags` row `desk_roster_v2` is missing (`server/app.ts`,
+  `server/deskRoster.ts`). It keeps inactive accounts. A plan that touches accounts or schema says how this interacts
+  with it.
 - **Deploy order:** a schema change reaches the database before code that reads it. With one database and a
   start-up schema guard, say which of the two adds the column.
 

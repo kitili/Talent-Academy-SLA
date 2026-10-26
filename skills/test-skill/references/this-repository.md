@@ -53,5 +53,6 @@ None yet. Tests build their own inputs inline.
   2026-10-26). Match line breaks with `\r?\n`. See `docs/_learnings/newline-anchored-matching-fails-only-on-windows.md`.
 - **One live database.** The local `.env` points at the same Neon database the live site uses. Server start-up
   (`server/app.ts`) writes to it: it creates missing tables and columns (`server/schemaGuard.ts`), resets the test
-  logins, and `removeInactiveDesks()` (`server/deskRoster.ts`) deletes every account marked inactive with the rows
-  that hang on it. Never load `.env` into a test run, and never start the server from a test.
+  logins, and runs the one-time desk prune (`pruneExtraDesksOnce()`, `server/deskRoster.ts`) only if its `app_flags`
+  row `desk_roster_v2` is missing. It keeps inactive accounts (`tests/inactive-desks.test.ts`). Never load `.env` into
+  a test run, and never start the server from a test.
