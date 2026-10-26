@@ -213,10 +213,11 @@ describe("route wiring (text contract)", () => {
   });
 
   it("course complete and its dashboard flag use the same rule", () => {
-    assert.match(handler('app.post("/api/teacher/courses/:courseId/complete"'), /if \(!await teacherMayCheckCourse\(storage, courseId, teacherId\)\) \{/);
+    // Track C replaced the lesson-quiz rule with C3 (computeCourseCompletion); tests/unit/progress pins it.
+    assert.match(handler('app.post("/api/teacher/courses/:courseId/complete"'), /const completion = await computeCourseCompletion\(teacherId, courseId\);/);
     const weeks = handler('app.get("/api/teacher/assigned-weeks"');
-    assert.match(weeks, /teacherMayCheckCourse\(storage, nextId, teacherId\)/);
-    assert.match(weeks, /canCheckComplete: [^\n]*quizzesPassed\.get\(nextId!\) === true/);
+    assert.match(weeks, /const next = await nextCourseCompletion\(teacherId, path\.nextToCheck, readers\);/);
+    assert.match(weeks, /canCheckComplete: [^\n]*next\?\.complete === true/);
   });
 
   it("teacher result screens take correctness from the submit response, not a local key", () => {
