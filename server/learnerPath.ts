@@ -245,8 +245,11 @@ export async function cohortPath(
     if (!course || course.publishStatus === "draft") continue;
     const courseModules = [...await readers.modulesForCourse(courseId) as PathModuleRow[]]
       .sort((a, b) => (a.weekNumber || 0) - (b.weekNumber || 0));
+    // A caller that needs only the locks up to one course skips the files of earlier courses already
+    // marked complete: a `completed` row opens the next course whatever its modules show.
+    const locksOnly = untilCourseId !== undefined && courseId !== untilCourseId && checked.includes(courseId);
     for (const mod of courseModules) {
-      const files = await lessonFileStates(teacherId, mod, readers);
+      const files = locksOnly ? [] : await lessonFileStates(teacherId, mod, readers);
       modules.push({
         ...mod,
         weekNumber: mod.weekNumber || 0,

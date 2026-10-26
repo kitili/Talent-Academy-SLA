@@ -56,6 +56,17 @@ test('the content route refuses a module whose course is locked by step order', 
     assert.equal(open.ok, true)
 })
 
+test('a course marked complete opens the next without its files being read again', async () => {
+    const readers = readersFor(base({ checked: [placedLast] }))
+    const progressForModule = readers.progressForModule
+    readers.progressForModule = async (teacherId, moduleId) => {
+        if (moduleId === 'b1') throw new Error('the checked course was read')
+        return progressForModule(teacherId, moduleId)
+    }
+    const access = await teacherModuleAccess('t1', { id: 'a1', courseId: placedFirst }, readers)
+    assert.equal(access.ok, true)
+})
+
 test('the content route refuses a Fellow in no open cohort that holds the course, and a draft course', async () => {
     const notEnrolled = await teacherModuleAccess('t1', { id: 'b1', courseId: placedLast }, readersFor(base({ enrolledIn: {} })))
     assert.equal(!notEnrolled.ok && notEnrolled.refusal.body.code, 'NOT_ENROLLED')
