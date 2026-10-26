@@ -44,7 +44,7 @@ import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
-import { certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
+import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
 import multer from "multer";
@@ -4544,16 +4544,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // A trainer reaches a cohort's certificate rows only when they run the cohort (C4, N6); an admin reaches every cohort.
   // Sends the 404 or 403 itself and returns false when the caller may not.
   async function certificateCohortAllowed(req: Request, res: Response, batchId: string) {
-    const batch = await storage.getBatch(batchId);
-    if (!batch) {
-      res.status(404).json({ error: "Cohort not found" });
-      return false;
-    }
-    if (!staffCanAccessBatch(req.user, batch)) {
-      res.status(403).json({ error: "Access denied" });
-      return false;
-    }
-    return true;
+    const access = await certificateCohortAccess(req.user, batchId);
+    if (access === "missing") res.status(404).json({ error: "Cohort not found" });
+    if (access === "denied") res.status(403).json({ error: "Access denied" });
+    return access === "allowed";
   }
 
   // Get certificate template for batch

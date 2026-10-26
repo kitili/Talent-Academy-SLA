@@ -2,8 +2,8 @@
  * Who may receive which certificate (D4). Certificates stay manual: an admin issues them, and the server refuses
  * - a course certificate unless C3 (`computeCourseCompletion`) says the course is complete;
  * - a Fellowship or Advanced (graduation) certificate unless the academy path is done (`pathSummary(...).done`).
- * Both are recomputed from progress rows. The stored `teacher_course_completion` flag is never read, because the
- * course skip (finding 1) may have set it. The readers are an argument, so tests drive the rules with rows in memory.
+ * Both are recomputed from progress rows. The stored course completion row is never read, because the course skip
+ * (finding 1) may have marked it complete. The readers are an argument, so tests drive the rules with rows in memory.
  */
 import { pathSummary, type PathCohort } from "@shared/academyPath";
 import { PATH_INCOMPLETE_REFUSAL } from "@shared/certificateDesigns";
@@ -16,7 +16,25 @@ import {
   type CompletionReaders,
   type CourseCompletion,
 } from "./completion";
+import { trainerOwnsBatch } from "./access";
 import { storageScopeReaders, type ScopeCohort, type ScopeReaders, type StepRow } from "./scope";
+
+type CohortOwner = { trainerId?: string | null; trainerIds?: string[] | null };
+
+/**
+ * Whether the caller may read or change a cohort's certificate rows (C4, N6): an admin reaches every cohort, a
+ * trainer only the cohorts they run. A missing cohort is its own answer, so the route sends 404 and never treats
+ * "no cohort" as "any staff may" (`staffCanAccessBatch(user, undefined)` would).
+ */
+export async function certificateCohortAccess(
+  user: Parameters<typeof trainerOwnsBatch>[0],
+  batchId: string,
+  getBatch: (id: string) => Promise<CohortOwner | undefined> = async (id) => (await import("./storage")).storage.getBatch(id),
+): Promise<"allowed" | "missing" | "denied"> {
+  const batch = await getBatch(batchId);
+  if (!batch) return "missing";
+  return trainerOwnsBatch(user, batch) ? "allowed" : "denied";
+}
 
 export type EligibilityReaders = CompletionReaders & Pick<ScopeReaders, "teacherCohorts" | "cohortSteps"> & {
   /** `academy_settings.cohorts_required` for the path, or null when no admin has saved it. */
