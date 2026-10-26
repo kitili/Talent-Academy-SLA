@@ -331,7 +331,8 @@ export function courseCheckRefusal(input: {
   if (path.nextToCheck !== courseId) {
     return { status: 400, body: { error: path.nextToCheck ? "Finish the course before this one first" : "Every course in this cohort is already complete" } };
   }
-  if (path.modules.some((mod) => mod.courseId === courseId && mod.locked)) {
+  // The course's first module carries the course lock (the course before it is not complete).
+  if (path.modules.find((mod) => mod.courseId === courseId)?.locked) {
     return refuse(403, "MODULE_LOCKED", { locked: true });
   }
   if (!completion.complete) return refuse(400, "COURSE_INCOMPLETE");
