@@ -9,8 +9,19 @@ only `skills/handoff-skill/references/this-repository.md` and `skills/orchestrat
 no code moved, so the evidence below holds). Every track branches from `feat/improvements` and merges back into it.
 `main` stays production and takes a merge only with the steering engineer's go-ahead.
 
-Decisions taken: none. D1 to D12 below wait on the steering engineer (gich2009), after the orchestrator's review.
-Nothing is built. No SQL was run; no live data was read; the server was not started.
+**Approved, 2026-10-26, by the steering engineer (gich2009), with three amendments.** Merged into
+`feat/improvements` at `ce1ca23`. Nothing is built yet.
+- **D1 to D12: approved as recommended.**
+- **Amendment 1, D13 added and decided: learners are called "Fellow"** in every screen and guide (see D13).
+- **Amendment 2, acceptance runs on a Neon branch first.** The full acceptance list runs against a Neon branch
+  (a copy of production, `.env.design`) with the local app, before `feat/improvements` merges into `main`. Production
+  gets only a short read-only smoke check after deploy (see *Acceptance Criteria*). Phase 0 also runs on that branch.
+- **Amendment 3, a hotfix from `main` closes the two worst live gaps now** (Track H): answers sent to teachers with
+  server trust in them, and the course skip at 0%. It ships to production ahead of the tracks, with the engineer's
+  go-ahead, and merges into `feat/improvements` before Layer 2 starts.
+
+Before approval: D1 to D12 were proposed by the worker and reviewed by the orchestrator. No SQL was run; no live data
+was read; the server was not started.
 
 Verification run while writing this plan: reading code at `71c4782` only. `npm install` was not run in this worktree,
 so no test or typecheck ran (the plan changes no code). File name: the brief asked for `plan.md`; the plan skill's
@@ -326,6 +337,13 @@ graph, except where noted.
   `shared/practiceLessons.ts` if nothing else reads them. Today the shelf shows one early-years list to every track.
 - Alternative: keep it, labelled "Extra reading (not part of your course)", and show it only to the playgroup track.
 
+**D13. What learners are called.** Added at approval; decided 2026-10-26 by the steering engineer.
+- **Decided: "Fellow".** Every screen, sign-in frame, tour and guide says Fellow where it means the learner today
+  ("Teacher"). It matches Analytics, the ops docs, the `fellow_*` tables and the fellowship certificates. "Trainer"
+  stays for the academy coach. Tables, routes and code identifiers keep `teacher` (as D1 keeps table names); the word
+  lives in `ACADEMY_TERMS` (C6) as `learner: "Fellow"`. Track 0 adds the term; Track G changes the copy and guides; a
+  track that touches a learner-facing string in its own files uses the term.
+
 ## Scope
 
 In scope: findings 1-25, the start-up deletion, and N1-N7, under the recommended decisions. Out of scope: design
@@ -346,7 +364,7 @@ track stops and reports.
 | C3 | `computeCourseCompletion(teacherId, courseId) → { totalModules, doneModules, complete }`, from progress rows, quiz-cache approval and quiz passes, using C2 | `server/completion.ts` (new) | C (the sync writer, `complete`, locks), D (certificate check), C's report SQL mirrors it |
 | C4 | Trainer scope (D8): pure `trainerOwnsBatch` and its SQL twin in `storage.getAllBatches` | `server/access.ts`, `server/storage.ts` method `getAllBatches` (Track 0 owns this one method) | B, C, D, E |
 | C5 | Resolvers: `trainerCohortIds(trainerId)`, `trainerMayEditCourse(user, courseId)` (D2: admin, or the course is placed on a cohort in scope), `teacherCohortsForCourse(teacherId, courseId)` (open cohorts only), `cohortCourseOrder(cohortId)` (D1: step `order_index`, then course `order_index` inside the step, then unplaced courses by `assigned_at`) | `server/scope.ts` (new) | B, C, D, E |
-| C6 | Naming (D1): `ACADEMY_TERMS` with `cohort`, `step`, `course`, `module`, `lessonFile` | `shared/academyPath.ts` (existing; updated, not copied) | C, E, G |
+| C6 | Naming (D1, D13): `ACADEMY_TERMS` with `cohort`, `step`, `course`, `module`, `lessonFile`, `learner` ("Fellow") | `shared/academyPath.ts` (existing; updated, not copied) | C, E, G |
 | C7 | New refusals: `{ error, code }` with `code` one of `NOT_ENROLLED`, `MODULE_LOCKED`, `COURSE_INCOMPLETE`, `NOT_YOUR_COURSE`, `QUIZ_NOT_APPROVED`, `ADMIN_ONLY`, each with the sentence a user sees | `shared/constants.ts` (`REFUSALS`) | B, C, D, E, and the client pages that show them |
 | C8 | Cross-track call signatures that stay fixed: `storage.syncTeacherCourseCompletion(teacherId, courseId)` (B calls it; C owns its body); `storage.getCachedQuiz(weekId, fileId)` (C reads `approved`; B owns it) | unchanged files | B, C |
 
@@ -565,6 +583,37 @@ Model: **Opus** (role checks).
 - Depends on: Track 0 (C6 terms, C1 numbers). It merges **last**, after B to E, so the guides describe what merged.
 - Tests: the text contracts above stay green; `npm run test:docs`. Grep that no page still imports a deleted file.
 
+**Track H — Hotfix from `main`: quiz answers and the course skip (findings 1, 2; N2, N3).** Added at approval
+(amendment 3). Model: **Opus** (quiz scoring and a production deploy).
+- Branch: `hotfix/quiz-answers-and-skip`, cut from `main` (`origin/main`, `335c100`). It merges into `main` with the
+  engineer's go-ahead (Vercel then deploys it), and the same branch merges into `feat/improvements` before Layer 2
+  starts, so B and C build on it. It keeps today's 70% pass mark; D3's 80% ships with the full rollout.
+- Fixes, smallest change that closes the gap:
+  - Teachers never receive `correctAnswer` or explanations from `GET /api/training-weeks/:weekId/files/:fileId/quiz`
+    or `GET /api/assigned-quizzes/:quizId`. Staff still do. Whatever the teacher's result screen needs after a submit
+    comes back in the submit response, computed on the server.
+  - Module-quiz submit scores the teacher's `answers` against the approved cached quiz on the server and ignores any
+    `questions` in the body.
+  - `POST .../generate-quiz` becomes staff-only, so a teacher can neither read a cached quiz through it nor trigger a
+    draft. The three teacher content quiz routes with no client caller (content `generate-quiz`, `submit-quiz`,
+    `regenerate-quiz`) are deleted.
+  - `teacherMayTakeQuiz([])` refuses (N3).
+  - `POST /api/teacher/courses/:courseId/complete` refuses unless every lesson file in the course that has an approved
+    quiz has a passing attempt by that teacher. Files without an approved quiz do not block (today's escape hatch,
+    and D6's direction). `canCheckComplete` uses the same rule, so the button shows only when the server would accept.
+- Owns: the handlers named above in `server/routes.ts` (in B's and C's regions, before they start), `server/cohortAccess.ts`,
+  a new `server/learnerQuiz.ts` if a pure helper is needed (B absorbs it later), the client pages that read the
+  answers (`client/src/components/FileQuizDialog.tsx`, the assigned-exam page), and its tests. It does not touch Track
+  0's files (`server/progressLogic.ts`, `server/access.ts`, `shared/academyPath.ts`, `storage.getAllBatches`); it
+  calls `scoreQuizSubmission` as it is.
+- Tests: `main` has no kit runner, so its tests go in `tests/*.test.ts` and the `test` script list, in the older
+  style: a learner projection with no `correctAnswer`; a forged body scored against the cache (fails with the cache
+  lookup removed); the complete rule at 0 of N and N of N (fails with the check removed). The `package.json` test line
+  conflicts with `feat/improvements` at merge; the orchestrator keeps both. On `main`,
+  `tests/admin-certificates.test.ts` fails on Windows checkouts (fixed on `feat/improvements` by `71c4782`); that is
+  pre-existing.
+- Acceptance: on the Neon branch, by the orchestrator, before the engineer is asked to merge into `main`.
+
 ### Dependency Graph
 
 ```
@@ -576,8 +625,11 @@ Layer 3 (integration):        orchestrator merges B, C, D, E in any order,
                               then G last; full suite, typecheck, build
 ```
 
-- **First parallel layer: Track 0, Track A and Track F.** A and F share no file with 0 or with each other.
-- Layer 2 starts once Track 0 is merged into `feat/improvements`: B, C, D and E in parallel, under region ownership.
+- **First parallel layer: Track 0, Track A, Track F and Track H (the hotfix, from `main`).** A and F share no file
+  with 0 or with each other. H edits B's and C's regions before they start, and none of Track 0's files; the two meet
+  only in the `routes.ts` import block, which the orchestrator resolves at merge.
+- Layer 2 starts once Track 0 **and Track H** are merged into `feat/improvements`: B, C, D and E in parallel, under
+  region ownership.
   G starts drafting at the same time and merges last.
 - Strict fallback (one owner per file): 0 → B → C → E → D in sequence for `routes.ts` and `storage.ts`, with A, F and G
   in parallel throughout. B goes first because it closes the largest live gap. C follows, then E, because C's lock
@@ -718,10 +770,12 @@ desk shows after each action; behaviour against live rows.
   the orchestrator's full suite, typecheck and build.
 - **Deploy order.** One service, one database, no staging. Under the recommended decisions there is no migration, so
   the order is:
-  1. The engineer runs Phase 0 and records the results.
-  2. If an alternative needing a migration was chosen: preflight, up, read-back in the Neon SQL editor.
-  3. Merge `feat/improvements` into `main`, and Vercel deploys.
-  4. Acceptance on production with the test logins (below).
+  1. The engineer runs Phase 0 on the Neon branch and records the results. Track H has already shipped on its own
+     go-ahead.
+  2. The orchestrator runs the full acceptance list on the Neon branch (amendment 2).
+  3. No migration is needed under the approved decisions.
+  4. With the engineer's go-ahead, merge `feat/improvements` into `main`, and Vercel deploys.
+  5. The read-only smoke check on production (below).
 - **What users notice at deploy.** The pass mark moves to 80% (D3). The skip button shows only when a course is
   done. Lesson files with no approved quiz can be completed by reading them (D6). AI drafts wait for approval (D5), so
   a file uploaded after deploy has no quiz until someone approves one. Teachers with a mixed session sign in again
@@ -776,8 +830,12 @@ desk shows after each action; behaviour against live rows.
 
 ## Acceptance Criteria
 
-On production after deploy, with the test logins (admin, `trainer1`, `teacher@test.com`). Each check is read from the
-row, not from the screen:
+Amendment 2: the full list below runs **on a Neon branch of production** (`.env.design`, the local app on port 5001),
+on `feat/improvements` after G merges, before the merge into `main`. After deploy, production gets only a read-only
+smoke check: each desk loads for the three test logins, `GET .../quiz` as a teacher has no `correctAnswer`, and the
+skip button is absent on a course at 0%. No forged request or certificate issue runs on production.
+
+With the test logins (admin, `trainer1`, `teacher@test.com`). Each check is read from the row, not from the screen:
 - Teacher on a course at 0%: no skip button. A hand-made `POST .../complete` returns 400 `COURSE_INCOMPLETE`, and no
   `teacher_course_completion` row is marked `completed`.
 - Teacher posts a forged module-quiz body with every answer "correct": the attempt row's score matches the cached quiz,
@@ -793,8 +851,7 @@ row, not from the screen:
 - An admin issues a course certificate for a teacher who has not finished: refused with a sentence, and no
   `teacher_certificates` row.
 
-Acceptance writes rows for `teacher@test.com` on production. "Clear previous activity" resets them afterwards, if
-wanted.
+Acceptance writes rows for `teacher@test.com` on the Neon branch only. The branch is discarded afterwards.
 
 ## Simplest Design And What Was Cut
 
