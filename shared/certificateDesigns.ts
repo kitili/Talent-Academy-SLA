@@ -27,9 +27,19 @@ export function isCertificateDesignId(value: string): value is CertificateDesign
   return value === "fellowship" || value === "advanced";
 }
 
+/** A course certificate names the course and nothing else (D4b): the topic list describes the fellowship, not each course. */
 export function courseCompletionBody(courseName: string) {
-  return `In recognition of successfully completing ${courseName}, which covered; Culture of Achievement, Lesson Planning, Lesson Delivery, Silverleaf Promises. Congratulations!`;
+  return `In recognition of successfully completing ${courseName}. Congratulations!`;
 }
+
+/**
+ * The refusal a Fellowship or Advanced certificate gets while the academy path is not done (D4). It has the
+ * `{ error, code }` shape of C7, but C7's `REFUSALS` has no code for it yet.
+ */
+export const PATH_INCOMPLETE_REFUSAL = {
+  error: "This Fellow has not finished the academy path. Fellowship and Advanced certificates need every cohort the path asks for.",
+  code: "PATH_INCOMPLETE",
+} as const;
 
 export function wordingForIssue(
   design: CertificateDesignId,

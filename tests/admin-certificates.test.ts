@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,5 +33,28 @@ describe("admin academy certificates", () => {
     assert.match(storage, /issueAcademyCertificate/);
     assert.match(storage, /syncTeacherCourseCompletion\(teacherId, courseId\);\r?\n    return null;/);
     assert.equal(read("client/src/pages/teacher-certificate-view.tsx").includes("canEdit = false"), true);
+  });
+
+  it("says Fellow, lists who is ready as the server computes it, and shows the server's refusal sentence (D4, D13)", () => {
+    const page = read("client/src/pages/admin-certificates.tsx");
+    const designs = read("shared/certificateDesigns.ts");
+    assert.match(page, /<Label>Fellow<\/Label>/);
+    assert.equal(page.includes("<Label>Teacher</Label>"), false);
+    assert.match(page, /queryKey: \["\/api\/admin\/certificates\/eligible"\]/);
+    assert.match(page, /data-testid="text-certificate-refusal"/);
+    assert.match(page, /setRefusalText\(error\.message\)/);
+    assert.match(page, /data\?\.error/);
+    // D4b: the course wording names the course; the topic list stays only on Fellowship and Advanced.
+    const courseBody = designs.slice(designs.indexOf("export function courseCompletionBody"), designs.indexOf("export const PATH_INCOMPLETE_REFUSAL"));
+    assert.match(courseBody, /successfully completing \$\{courseName\}\. Congratulations!/);
+    assert.equal(courseBody.includes("Culture of Achievement"), false);
+  });
+
+  it("drops the two certificate pages nothing linked to", () => {
+    const app = read("client/src/App.tsx");
+    assert.equal(app.includes("admin-certificate-approval"), false);
+    assert.equal(app.includes("admin-certificate-view"), false);
+    assert.equal(existsSync(join(root, "client/src/pages/admin-certificate-approval.tsx")), false);
+    assert.equal(existsSync(join(root, "client/src/pages/admin-certificate-view.tsx")), false);
   });
 });
