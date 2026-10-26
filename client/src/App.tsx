@@ -20,7 +20,6 @@ import TrainerBatches from "@/pages/trainer-batches";
 import TrainerTeacherContentHistory from "@/pages/trainer-teacher-content-history";
 import Approvals from "@/pages/approvals";
 import AdminHome from "@/pages/admin-home";
-import AdminHandover from "@/pages/admin-handover";
 import AdminPeople from "@/pages/admin-people";
 import AdminTrainerDetail from "@/pages/admin-trainer-detail";
 import AdminTeacherDetail from "@/pages/admin-teacher-detail";
@@ -32,7 +31,6 @@ import AdminBatches from "@/pages/admin-batches";
 import AdminAttendance from "@/pages/admin-attendance";
 import TeacherCertificates from "@/pages/teacher-certificates";
 import TeacherCertificateView from "@/pages/teacher-certificate-view";
-import EmergencyReset from "@/pages/emergency-reset";
 import NotFound from "@/pages/not-found";
 import { DeskGraffiti } from "@/components/DeskGraffiti";
 
@@ -64,11 +62,9 @@ function Router() {
       <ProtectedRoute path="/admin/analytics" component={AdminAnalytics} />
       <ProtectedRoute path="/admin/batches" component={AdminBatches} />
       <ProtectedRoute path="/admin/attendance" component={AdminAttendance} />
-      <ProtectedRoute path="/admin/handover" component={AdminHandover} />
       <ProtectedRoute path="/admin" component={AdminHome} />
       <Route path="/auth" component={UnifiedAuth} />
       <Route path="/login" component={UnifiedAuth} />
-      <Route path="/emergency-reset" component={EmergencyReset} />
       <Route path="/teacher/dashboard" component={TeacherDashboard} />
       <Route path="/teacher/exams/:quizId" component={TeacherExam} />
       <Route path="/teacher/certificates" component={TeacherCertificates} />

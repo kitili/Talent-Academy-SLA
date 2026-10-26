@@ -24,7 +24,6 @@ import { DeskMail } from "@/components/DeskMail";
 import { ModuleScene } from "@/components/ModuleScene";
 import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
 import { CohortMedals } from "@/components/CohortMedals";
-import { PracticeShelf } from "@/components/PracticeShelf";
 import type { Medal } from "@shared/cohortMedals";
 import { PageStrip, usePager } from "@/components/PageStrip";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
@@ -691,7 +690,7 @@ export default function TeacherDashboard() {
               Quizzes
             </CardTitle>
             <CardDescription>
-              Quizzes stay on this page. Learning materials are on Learning, and assessments are on Work.
+              Exams your trainer assigns are here. Your course modules are on Learning, and written work is on Work.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -718,8 +717,6 @@ export default function TeacherDashboard() {
           </CardContent>
         </Card>
         )}
-
-        {tab === "learning" && <PracticeShelf />}
 
         {tab === "learning" && medalRows.length > 0 && (
           <Card className="sl-rise" data-testid="card-teacher-medals">
