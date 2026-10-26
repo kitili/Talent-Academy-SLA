@@ -127,7 +127,7 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "What stays with admin",
-    body: "You can approve a new Fellow and reset that Fellow's password. You edit the modules, lesson files and quizzes of the courses on your cohorts. You cannot add or delete a course, add a cohort or a step, create an admin, clear the academy, or open another trainer's cohort.",
+    body: "You can approve a new Fellow. You edit the modules, lesson files and quizzes of the courses on your cohorts. You cannot add or delete a course, add a cohort or a step, create an admin, clear the academy, or open another trainer's cohort.",
   },
 ];
 
@@ -148,7 +148,7 @@ export const TEACHER_TOUR: TourStep[] = [
   },
   {
     title: "Your progress",
-    body: "Level, quizzes, average score, attendance, modules, and reflections sit on the Progress tab. Calendar and written work are on the Work tab.",
+    body: "Level, quizzes, average score, modules, and reflections sit on the Progress tab. Calendar and written work are on the Work tab.",
     target: "teacher-progress",
   },
   {
