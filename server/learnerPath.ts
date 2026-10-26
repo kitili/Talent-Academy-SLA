@@ -57,7 +57,7 @@ export function mergeContentProgress(existing: ContentProgressWrite | null | und
 }
 
 /** What "mark read" writes: with no approved quiz the file is done (D6); with one, it is only viewed. */
-export function markReadProgress(hasApprovedQuiz: boolean, now: Date): ContentProgressWrite {
+export function markReadProgress(hasApprovedQuiz: boolean, now: Date): { status: string; viewedAt: Date; completedAt?: Date } {
   return hasApprovedQuiz
     ? { status: "viewed", viewedAt: now }
     : { status: "completed", viewedAt: now, completedAt: now };
@@ -142,10 +142,10 @@ export function mergeCourseCompletion(existing: CourseCompletionWrite | null | u
 }
 
 /** What the sync writes from C3: completed only when every module is complete; never for an empty course. */
-export function completionRowFor(result: { totalModules: number; doneModules: number; complete: boolean }, now: Date): CourseCompletionWrite {
+export function completionRowFor(result: { totalModules: number; doneModules: number; complete: boolean }, now: Date) {
   return {
     status: result.complete ? "completed" : "in_progress",
-    completedAt: result.complete ? now : null,
+    completedAt: result.complete ? now : (null as Date | null),
     totalWeeks: result.totalModules,
     completedWeeks: result.doneModules,
   };
@@ -262,7 +262,7 @@ export async function cohortPath(
   }
   const open = cohortIsOpen(cohort);
   const locked = applyModuleLocks(modules, checked).map((mod) => ({ ...mod, locked: mod.locked || !open }));
-  const courseIds = [...new Set(locked.map((mod) => mod.courseId))];
+  const courseIds = Array.from(new Set(locked.map((mod) => mod.courseId)));
   return { modules: locked as PathModule[], courseIds, checked, nextToCheck: open ? nextCourseToCheck(courseIds, checked) : null };
 }
 
@@ -442,6 +442,41 @@ export function cohortQuizSignals(input: {
   };
 }
 
+export type TeacherAttempts = {
+  moduleAttempts: Array<{ weekId: string; passed: string }>;
+  examAttempts: Array<{ batchId: string | null; passed: string }>;
+};
+
+/** Every quiz attempt of a Fellow: module quizzes (both attempt tables) and trainer exams with their cohort. */
+export async function readTeacherAttempts(teacherId: string): Promise<TeacherAttempts> {
+  const { db } = await import("./db");
+  const { assignedQuizzes, quizAttempts, teacherContentQuizAttempts, teacherQuizAttempts } = await import("@shared/schema");
+  const { eq, or } = await import("drizzle-orm");
+  const [fileRows, contentRows, examRows] = await Promise.all([
+    db.select({ weekId: quizAttempts.weekId, passed: quizAttempts.passed })
+      .from(quizAttempts)
+      .where(or(eq(quizAttempts.teacherId, teacherId), eq(quizAttempts.userId, teacherId))),
+    db.select({ weekId: teacherContentQuizAttempts.weekId, passed: teacherContentQuizAttempts.passed })
+      .from(teacherContentQuizAttempts)
+      .where(eq(teacherContentQuizAttempts.teacherId, teacherId)),
+    db.select({ batchId: assignedQuizzes.batchId, passed: teacherQuizAttempts.passed })
+      .from(teacherQuizAttempts)
+      .innerJoin(assignedQuizzes, eq(teacherQuizAttempts.assignedQuizId, assignedQuizzes.id))
+      .where(eq(teacherQuizAttempts.teacherId, teacherId)),
+  ]);
+  return { moduleAttempts: [...fileRows, ...contentRows], examAttempts: examRows };
+}
+
+/** `cohortQuizSignals` for one Fellow in one cohort, over the modules on their path there. */
+export async function cohortQuizSignalsFor(
+  teacherId: string,
+  cohortId: string,
+  modules: Array<{ id: string }>,
+  read: (teacherId: string) => Promise<TeacherAttempts> = readTeacherAttempts,
+) {
+  return cohortQuizSignals({ cohortId, moduleIds: new Set(modules.map((mod) => mod.id)), ...await read(teacherId) });
+}
+
 /**
  * A Fellow's course figures in one cohort, by the path rule: the courses that count are the ones on the
  * path (published, with modules), and a course is done when its row is `completed` or C3 says complete.
@@ -451,7 +486,9 @@ export function cohortCourseFigures(path: { courseIds: string[]; checked: string
     const modules = path.modules.filter((mod) => mod.courseId === courseId);
     const doneModules = modules.filter((mod) => moduleIsComplete(mod.progress)).length;
     const complete = path.checked.includes(courseId) || (modules.length > 0 && doneModules === modules.length);
+    const started = complete || modules.some((mod) => mod.files.some((file) => file.done));
     return {
+      started,
       courseId,
       courseName: modules[0]?.courseName || "Course",
       status: complete ? "completed" : "in_progress",
@@ -462,8 +499,10 @@ export function cohortCourseFigures(path: { courseIds: string[]; checked: string
   });
   const completedCount = courses.filter((course) => course.status === "completed").length;
   return {
-    courses,
+    courses: courses.map(({ started, ...course }) => course),
     completedCount,
+    inProgressCount: courses.filter((course) => course.started && course.status !== "completed").length,
+    notStartedCount: courses.filter((course) => !course.started).length,
     overallPercentage: courses.length > 0 ? Math.round((completedCount / courses.length) * 100) : 0,
   };
 }
