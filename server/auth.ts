@@ -44,6 +44,26 @@ function sessionCookieClearOptions() {
   };
 }
 
+type SessionIdentity = { user: SelectUser } | { teacherId: string };
+
+// One identity per session: every sign-in starts a new session, so a staff user and a teacher never share one.
+// Passport's login also regenerates, but the teacher path does not go through passport.
+export async function startSession(req: Request, identity: SessionIdentity) {
+  await new Promise<void>((resolve, reject) => {
+    req.session.regenerate((err) => (err ? reject(err) : resolve()));
+  });
+  if ("user" in identity) {
+    await new Promise<void>((resolve, reject) => {
+      req.login(identity.user, (err) => (err ? reject(err) : resolve()));
+    });
+    return;
+  }
+  (req.session as any).teacherId = identity.teacherId;
+  await new Promise<void>((resolve, reject) => {
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+}
+
 export function endSession(req: Request, res: Response) {
   if ((req.session as any)?.teacherId) {
     delete (req.session as any).teacherId;
@@ -182,7 +202,7 @@ export function setupAuth(app: Express) {
   });
 
   // Multi-role aware login endpoint
-  app.post("/api/login", loginRateLimit, async (req, res, next) => {
+  app.post("/api/login", loginRateLimit, async (req, res) => {
     try {
       const username = String(req.body.username || "").trim();
       const password = String(req.body.password || "").trim();
@@ -196,18 +216,13 @@ export function setupAuth(app: Express) {
       if (!testLogin && hasDatabaseUrl()) {
         const account = await findApprovedAccount(username, password, requestedRole);
         if (account?.user) {
-          req.login(account.user, (err) => {
-            if (err) return next(err);
-            const { password: _, ...userWithoutPassword } = account.user!;
-            res.status(200).json(userWithoutPassword);
-          });
+          await startSession(req, { user: account.user });
+          const { password: _, ...userWithoutPassword } = account.user;
+          res.status(200).json(userWithoutPassword);
           return;
         }
         if (account?.teacher) {
-          (req.session as any).teacherId = account.teacher.id;
-          await new Promise<void>((resolve, reject) => {
-            req.session.save((err) => (err ? reject(err) : resolve()));
-          });
+          await startSession(req, { teacherId: account.teacher.id });
           const { password: _, ...teacherWithoutPassword } = account.teacher;
           res.status(200).json({ ...teacherWithoutPassword, role: "teacher" });
           return;
@@ -238,18 +253,13 @@ export function setupAuth(app: Express) {
       const { ensureTestLogin } = await import("./ensureTestLogins");
       const ready = await ensureTestLogin(testLogin);
       if (ready.user) {
-        req.login(ready.user, (err) => {
-          if (err) return next(err);
-          const { password: _, ...userWithoutPassword } = ready.user!;
-          res.status(200).json(userWithoutPassword);
-        });
+        await startSession(req, { user: ready.user });
+        const { password: _, ...userWithoutPassword } = ready.user;
+        res.status(200).json(userWithoutPassword);
         return;
       }
       if (ready.teacher) {
-        (req.session as any).teacherId = ready.teacher.id;
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => (err ? reject(err) : resolve()));
-        });
+        await startSession(req, { teacherId: ready.teacher.id });
         const { password: _, ...teacherWithoutPassword } = ready.teacher;
         res.status(200).json({ ...teacherWithoutPassword, role: "teacher" });
         return;
@@ -267,7 +277,7 @@ export function setupAuth(app: Express) {
   });
 
   // Role selection endpoint - finalizes login after multi-role verification
-  app.post("/api/login/select", async (req, res, next) => {
+  app.post("/api/login/select", async (req, res) => {
     try {
       const { roleId, role } = req.body;
       
@@ -310,16 +320,8 @@ export function setupAuth(app: Express) {
           return res.status(404).json({ message: "Teacher not found" });
         }
         
-        (req.session as any).teacherId = teacher.id;
+        await startSession(req, { teacherId: teacher.id });
         const { password: _, ...teacherWithoutPassword } = teacher;
-        
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-        
         res.status(200).json({ ...teacherWithoutPassword, role: 'teacher' });
       } else {
         // Admin/Trainer login
@@ -328,11 +330,9 @@ export function setupAuth(app: Express) {
           return res.status(404).json({ message: "User not found" });
         }
         
-        req.login(user, (err) => {
-          if (err) return next(err);
-          const { password: _, ...userWithoutPassword } = user;
-          res.status(200).json(userWithoutPassword);
-        });
+        await startSession(req, { user });
+        const { password: _, ...userWithoutPassword } = user;
+        res.status(200).json(userWithoutPassword);
       }
 
     } catch (error: any) {

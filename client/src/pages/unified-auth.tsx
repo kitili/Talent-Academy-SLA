@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import { homeForRole, persistSessionUser, readSessionUser } from "@/lib/sessionUser";
+import { homeForRole, persistSessionUser, signInRedirect } from "@/lib/sessionUser";
 import { Shield, GraduationCap, Users, Mail } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { PLACES, type PlaceName } from "@/components/PlaceArt";
@@ -30,7 +30,7 @@ const SilverleafLogo = ({ className = "w-12 h-12" }: { className?: string }) => 
 
 export default function UnifiedAuth() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   
   // Login state
@@ -51,11 +51,11 @@ export default function UnifiedAuth() {
   const [selectingRole, setSelectingRole] = useState(false);
 
   useEffect(() => {
-    const signedIn = user || readSessionUser();
-    if (signedIn?.role && !showRolePicker) {
-      setLocation(homeForRole(signedIn.role));
+    const redirect = signInRedirect({ answered: !isLoading, user });
+    if (redirect && !showRolePicker) {
+      setLocation(redirect);
     }
-  }, [user, showRolePicker, setLocation]);
+  }, [user, isLoading, showRolePicker, setLocation]);
 
   useEffect(() => {
     const raw = localStorage.getItem(DESK_REQUEST_KEY);

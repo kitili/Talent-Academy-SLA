@@ -3,8 +3,7 @@ import { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { loginRateLimit } from "./security";
 import { hasDatabaseUrl } from "./db";
-import { endSession } from "./auth";
-import { findApprovedAccount } from "./auth";
+import { endSession, findApprovedAccount, startSession } from "./auth";
 import { matchTestLogin, TEACHER_PASSWORD } from "./testLogins";
 import { signInBlock } from "./accessRequests";
 
@@ -35,10 +34,7 @@ export function setupTeacherAuth(app: Express) {
       if (!testLogin && hasDatabaseUrl()) {
         const account = await findApprovedAccount(identifier, password, "teacher");
         if (account?.teacher) {
-          (req.session as any).teacherId = account.teacher.id;
-          await new Promise<void>((resolve, reject) => {
-            req.session.save((err) => (err ? reject(err) : resolve()));
-          });
+          await startSession(req, { teacherId: account.teacher.id });
           const { password: _, ...teacherWithoutPassword } = account.teacher;
           res.status(200).json(teacherWithoutPassword);
           return;
@@ -66,10 +62,7 @@ export function setupTeacherAuth(app: Express) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      (req.session as any).teacherId = ready.teacher.id;
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => (err ? reject(err) : resolve()));
-      });
+      await startSession(req, { teacherId: ready.teacher.id });
 
       const { password: _, ...teacherWithoutPassword } = ready.teacher;
       res.status(200).json(teacherWithoutPassword);
@@ -79,6 +72,7 @@ export function setupTeacherAuth(app: Express) {
     }
   });
 
+  // The client logs out with /api/logout alone; this stays for bundles loaded before that change.
   app.post("/api/teacher/logout", (req, res) => {
     endSession(req, res);
   });
