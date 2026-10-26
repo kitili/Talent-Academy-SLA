@@ -792,7 +792,7 @@ export default function CourseWeeks() {
           </div>
           <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
             <ProfileSettingsDialog
-              userType={user?.role === "trainer" ? "trainer" : "admin"}
+              userType="admin"
               currentEmail={user?.email || undefined}
             />
             <div className="text-white">
