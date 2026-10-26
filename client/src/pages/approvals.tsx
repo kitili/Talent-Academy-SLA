@@ -86,7 +86,7 @@ export default function ApprovalsPage() {
     },
     onSuccess: (data: any) => {
       toast({
-        title: "Teacher approved",
+        title: "Fellow approved",
         description: data.message,
       });
       const pendingKey = isAdmin ? "/api/admin/pending-teachers" : "/api/trainer/pending-teachers";
@@ -95,7 +95,7 @@ export default function ApprovalsPage() {
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Failed to approve teacher",
+        title: "Failed to approve Fellow",
         description: error.message || "An error occurred",
       });
     },
@@ -130,7 +130,7 @@ export default function ApprovalsPage() {
     },
     onSuccess: (data: any) => {
       toast({
-        title: "Teacher dismissed",
+        title: "Fellow dismissed",
         description: data.message,
       });
       const pendingKey = isAdmin ? "/api/admin/pending-teachers" : "/api/trainer/pending-teachers";
@@ -139,7 +139,7 @@ export default function ApprovalsPage() {
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Failed to dismiss teacher",
+        title: "Failed to dismiss Fellow",
         description: error.message || "An error occurred",
       });
     },
@@ -181,7 +181,7 @@ export default function ApprovalsPage() {
               Pending Trainers
             </CardTitle>
             <CardDescription>
-              Trainer requests from the sign-in page. Sign them in, then they create their own password.
+              Trainer requests from the sign-in page. Approve them, then they create their own password.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -222,7 +222,7 @@ export default function ApprovalsPage() {
                         data-testid={`button-approve-admin-${admin.id}`}
                       >
                         <CheckCircle className="w-4 h-4" />
-                        Sign them in
+                        Approve
                       </Button>
                       <Button
                         variant="destructive"
@@ -247,20 +247,20 @@ export default function ApprovalsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <GraduationCap className="w-5 h-5" />
-            Pending Teachers
+            Pending Fellows
           </CardTitle>
           <CardDescription>
-            Teacher requests from the sign-in page. Sign them in, then they create their own password.
+            Fellow requests from the sign-in page. Approve them, then they create their own password.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {teachersLoading ? (
             <div className="text-center py-8 text-muted-foreground">
-              Loading pending teachers...
+              Loading pending Fellows...
             </div>
           ) : pendingTeachers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No pending teacher approvals
+              No pending Fellow approvals
             </div>
           ) : (
             <div className="space-y-4">
@@ -294,7 +294,7 @@ export default function ApprovalsPage() {
                       data-testid={`button-approve-teacher-${teacher.id}`}
                     >
                       <CheckCircle className="w-4 h-4" />
-                      Sign them in
+                      Approve
                     </Button>
                     <Button
                       variant="destructive"

@@ -48,8 +48,8 @@ export function deskState(account: { approvalStatus?: string | null; passwordSet
 }
 
 export function signInMessage(state: DeskState) {
-  if (state === "pending") return "An admin still needs to sign this desk in. You can create a password after that.";
-  if (state === "needs_password") return "Your desk is signed in. Create your password, then sign in with it.";
+  if (state === "pending") return "An admin still needs to approve this desk. You can create a password after that.";
+  if (state === "needs_password") return "Your desk is approved. Create your password, then sign in with it.";
   if (state === "rejected") return "This request was turned away.";
   if (state === "inactive") return "This desk is inactive.";
   return null;

@@ -3,29 +3,22 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PRACTICE_LESSONS } from "../shared/practiceLessons.ts";
 import { attendanceCounts, isAttendanceStatus } from "../shared/attendanceDesk.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 describe("teacher desk split", () => {
-  it("keeps materials, assignments, and quizzes on different pages", () => {
+  it("keeps assignments and quizzes on different pages, with no practice shelf", () => {
     const page = read("client/src/pages/teacher-dashboard.tsx");
     assert.match(page, /tab === "quiz"/);
-    assert.match(page, /PracticeShelf/);
+    assert.equal(page.includes("PracticeShelf"), false);
     assert.match(page, /card-home-goals/);
     assert.match(page, /card-reflect-goals/);
     assert.match(page, /goals.length > 0/);
     assert.match(page, /card-feedback/);
     assert.match(page, /button-send-feedback/);
     assert.equal(page.includes('tab === "home" || tab === "work"'), false);
-  });
-
-  it("offers practice lessons a teacher can read", () => {
-    assert.equal(PRACTICE_LESSONS.length >= 3, true);
-    assert.equal(new Set(PRACTICE_LESSONS.map((lesson) => lesson.id)).size, PRACTICE_LESSONS.length);
-    assert.match(PRACTICE_LESSONS[0].body, /not an assignment/i);
   });
 });
 

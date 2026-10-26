@@ -31,11 +31,12 @@ describe("role boundaries", () => {
 });
 
 describe("trainer tour", () => {
-  it("shows cohorts, teachers, and what stays with admin", () => {
+  it("shows cohorts, Fellows, and what stays with admin", () => {
     const text = TRAINER_TOUR.map((step) => `${step.title} ${step.body}`).join(" ");
     assert.ok(text.includes("cohort"));
-    assert.ok(text.includes("Teachers"));
-    assert.ok(text.includes("You cannot add a course"));
+    assert.ok(text.includes("Fellow"));
+    assert.equal(/teacher/i.test(text), false);
+    assert.ok(text.includes("You cannot add or delete a course"));
     assert.equal(TRAINER_TOUR.some((step) => step.target === "trainer-batches"), true);
     assert.equal(text.toLowerCase().includes("trainer123"), false);
   });
