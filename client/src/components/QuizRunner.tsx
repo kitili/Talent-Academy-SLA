@@ -14,7 +14,6 @@ export interface QuizQuestion {
   question: string;
   type: "multiple_choice" | "true_false" | "open_ended";
   options?: string[];
-  correctAnswer?: string;
   timeLimit?: number;
 }
 
@@ -28,6 +27,8 @@ export interface QuizResult {
   attemptNumber: number;
   remainingAttempts: number;
   answers: Record<string, string>;
+  // Graded on the server; correct answers come back only after a pass.
+  review?: Array<{ id: string; correct: boolean | null; correctAnswer?: string }>;
 }
 
 interface QuizRunnerProps {
@@ -182,8 +183,9 @@ export function QuizRunner({ questions, quizId, attemptNumber, onComplete, onClo
           <div className="space-y-3 max-h-72 overflow-y-auto">
             {questions.map((q, idx) => {
               const given = result.answers[q.id] ?? "";
-              const correct = q.correctAnswer ?? "";
-              const isCorrect = q.type === "open_ended" ? null : given === correct;
+              const reviewed = result.review?.find((item) => item.id === q.id);
+              const correct = reviewed?.correctAnswer ?? "";
+              const isCorrect = q.type === "open_ended" ? null : reviewed?.correct === true;
 
               return (
                 <div key={q.id} className="border rounded p-3 text-sm space-y-1">

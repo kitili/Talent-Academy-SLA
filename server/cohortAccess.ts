@@ -28,9 +28,9 @@ export function quizStoppedReason(
   return null;
 }
 
-/** A teacher can take a course quiz when at least one of their cohorts for it is open. */
+/** A teacher can take a course quiz when at least one of their cohorts for it is open. In no cohort for the course, they cannot. */
 export function teacherMayTakeQuiz(batches: CohortGate[]): string | null {
-  if (batches.length === 0) return null;
+  if (batches.length === 0) return "You are not in a cohort for this course";
   if (batches.some((batch) => quizStoppedReason(batch) === null)) return null;
   return quizStoppedReason(batches[0]);
 }
