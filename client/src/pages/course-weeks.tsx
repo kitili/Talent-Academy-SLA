@@ -838,7 +838,7 @@ export default function CourseWeeks() {
           <PlaceBanner
             place="lessons"
             title={isLoadingCourse ? "Course" : course?.name || "Course"}
-            subtitle={course?.description || "Course, then module, then lesson. A lesson is finished when every required quiz is passed."}
+            subtitle={course?.description || `Course, then module, then lesson file. ${ACADEMY_TERMS.lessonFile.body}`}
           />
           <p className="text-xs text-muted-foreground" data-testid="lesson-stages">
             Plan each module as Introduction, Competence development, Design, then Realisation.

@@ -4,8 +4,8 @@ import type { QuizQuestion } from "@shared/schema";
 import { QUIZ_ATTEMPTS, refusal, type RefusalCode } from "@shared/constants";
 import { scoreQuizSubmission } from "./progressLogic";
 import { quizStoppedReason, teacherMayTakeQuiz, type CohortGate } from "./cohortAccess";
-import { cohortCourseOrder, teacherCohortsForCourse } from "./scope";
-import { computeCourseCompletion, storageCompletionReaders, type CompletionModule } from "./completion";
+import { cohortCourseOrder, storageScopeReaders, teacherCohortsForCourse, type ScopeReaders } from "./scope";
+import { computeCourseCompletion, storageCompletionReaders, type CompletionModule, type CompletionReaders } from "./completion";
 
 type StoredQuestion = {
   id: string;
@@ -179,15 +179,26 @@ export type QuizGateReaders = {
   modulesDone(teacherId: string, courseId: string, modules?: CompletionModule[]): Promise<boolean>;
 };
 
-export const storageQuizGateReaders: QuizGateReaders = {
-  cohortsForCourse: (teacherId, courseId) => teacherCohortsForCourse(teacherId, courseId),
-  courseOrder: (cohortId) => cohortCourseOrder(cohortId),
-  modulesForCourse: (courseId) => storageCompletionReaders.modulesForCourse(courseId),
-  async modulesDone(teacherId, courseId, modules) {
-    const readers = modules ? { ...storageCompletionReaders, modulesForCourse: async () => modules } : storageCompletionReaders;
-    return (await computeCourseCompletion(teacherId, courseId, readers)).complete;
-  },
-};
+/**
+ * The gate's readers over C5 and C3. "These modules are done" is C3 run over just those modules, so a
+ * module counts as done by exactly the rule that completes a course; nothing here re-states it.
+ */
+export function quizGateReaders(
+  completion: CompletionReaders = storageCompletionReaders,
+  scope: ScopeReaders = storageScopeReaders,
+): QuizGateReaders {
+  return {
+    cohortsForCourse: (teacherId, courseId) => teacherCohortsForCourse(teacherId, courseId, scope),
+    courseOrder: (cohortId) => cohortCourseOrder(cohortId, scope),
+    modulesForCourse: (courseId) => completion.modulesForCourse(courseId),
+    async modulesDone(teacherId, courseId, modules) {
+      const readers = modules ? { ...completion, modulesForCourse: async () => modules } : completion;
+      return (await computeCourseCompletion(teacherId, courseId, readers)).complete;
+    },
+  };
+}
+
+export const storageQuizGateReaders: QuizGateReaders = quizGateReaders();
 
 /**
  * Whether a teacher may submit this module's quiz. Refused with NOT_ENROLLED when no open cohort of
