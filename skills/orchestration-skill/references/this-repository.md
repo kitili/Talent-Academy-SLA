@@ -4,8 +4,10 @@ The project-specific half of `skills/orchestration-skill/SKILL.md`.
 
 ## Where things live
 
-- **Working branch:** `main`, on `origin` (`github.com/kitili/Talent-Academy-SLA`). Older agent branches named
-  `cursor/*` sit on the remote; they are not the working branch.
+- **Working branch:** `feat/improvements`. Tasks branch from it and merge into it. `main` is production
+  (`origin/main` on `github.com/kitili/Talent-Academy-SLA`, deployed by Vercel); `feat/improvements` merges into
+  `main` only with the steering engineer's go-ahead. Older agent branches named `cursor/*` sit on the remote; they are
+  not the working branch.
 - **Worktrees:** `.claude/worktrees/<task>/`, one per task, on its own branch from the working branch's `HEAD`
   (gitignored).
 - **Plans:** `plans/`. **Handoffs:** `handoff/`. **Deferred work:** `tasks/`.
@@ -54,4 +56,5 @@ worktree or links `node_modules` from the main checkout; unlink that link before
 
 ## Moving a fix to `qa` here
 
-There is no `qa` or staging branch. Fixes land on `main`, which is what ships.
+There is no `qa` or staging branch. Work lands on `feat/improvements`; a fix production needs sooner is built from
+`main` and merged into both, as `SKILL.md` describes, with the steering engineer's go-ahead.

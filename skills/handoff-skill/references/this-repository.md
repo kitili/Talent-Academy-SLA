@@ -17,7 +17,7 @@ Run these in the main checkout and paste what they show, not what you remember:
 ```bash
 git status --short
 git log --oneline -10
-git log --oneline origin/main..main
+git log --oneline origin/main..feat/improvements
 git worktree list
 git branch --list
 node scripts/test-needed.mjs
@@ -37,7 +37,7 @@ leftover `node` processes with `Get-Process node` in PowerShell and end the ones
 - **One database.** Local `.env` and production share one Neon database. Write down anything run against it this
   session: a local server start (it creates schema, resets test logins and deletes inactive accounts), a script under
   `scripts/` or `server/migrations/`, or `npm run db:push`.
-- **No staging.** `main` is what ships. Say whether `main` is ahead of `origin/main`, and whether that is waiting on
-  the engineer's approval.
+- **No staging.** `main` is what ships; work happens on `feat/improvements`. Say how far `feat/improvements` is
+  ahead of `origin/main`, whether it is pushed, and whether a merge into `main` is waiting on the engineer's approval.
 - **Known type errors.** `npm run typecheck` reported 46 errors in app code on 2026-10-26 (none in tests or scripts).
   Give the count, so the reader can tell a new error from an old one.
