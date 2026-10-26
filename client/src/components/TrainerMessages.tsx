@@ -11,7 +11,7 @@ type Teacher = { id: string; name: string };
 
 const isUnread = (notice: Notice) => notice.isRead === "false" || notice.isRead === false;
 
-/** Every message that reaches the trainer, from any part of the system, and a note to a teacher. */
+/** Every message that reaches the trainer, from any part of the system, and a note to a Fellow. */
 export function TrainerMessages({
   teachers,
   expandedId,
@@ -85,10 +85,10 @@ export function TrainerMessages({
       </Card>
       <div className="space-y-3">
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Write to a teacher</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-base">Write to a Fellow</CardTitle></CardHeader>
           <CardContent>
             {teachers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No teachers in this batch yet.</p>
+              <p className="text-sm text-muted-foreground">No Fellows in this cohort yet.</p>
             ) : (
               <select
                 className="w-full rounded-md border bg-background px-2 py-2 text-sm"

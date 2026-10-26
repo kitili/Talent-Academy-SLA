@@ -57,7 +57,7 @@ export default function TrainerTeacherContentHistory() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">
-              Teacher Content History
+              Fellow Content History
             </h1>
             <p className="text-muted-foreground">
               View all attempts, regenerations, and progress

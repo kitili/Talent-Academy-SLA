@@ -178,7 +178,7 @@ export default function AdminHome() {
           ) : (
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[#243044] dark:text-[#d7deea]" data-tour="admin-stats">
               <span><strong className="text-[#17233c] dark:text-[#f6f1e8]">{stats?.totalTrainers || 0}</strong> trainers</span>
-              <span><strong className="text-[#17233c] dark:text-[#f6f1e8]">{stats?.totalTeachers || 0}</strong> teachers</span>
+              <span><strong className="text-[#17233c] dark:text-[#f6f1e8]">{stats?.totalTeachers || 0}</strong> Fellows</span>
             </div>
           )}
         </div>
@@ -192,7 +192,7 @@ export default function AdminHome() {
           >
             <p className="font-semibold text-[#17233c] dark:text-[#f6f1e8]">Needs attention</p>
             <p className="text-sm text-[#243044] dark:text-[#d7deea] mt-1">
-              {(stats?.pendingTrainers || 0)} trainer{(stats?.pendingTrainers || 0) === 1 ? "" : "s"} and {(stats?.pendingTeachers || 0)} teacher{(stats?.pendingTeachers || 0) === 1 ? "" : "s"} waiting for approval.
+              {(stats?.pendingTrainers || 0)} trainer{(stats?.pendingTrainers || 0) === 1 ? "" : "s"} and {(stats?.pendingTeachers || 0)} Fellow{(stats?.pendingTeachers || 0) === 1 ? "" : "s"} waiting for approval.
             </p>
           </button>
         )}
@@ -240,7 +240,7 @@ export default function AdminHome() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="notice-message">Message</Label>
-                  <Input id="notice-message" value={noticeMessage} onChange={(e) => setNoticeMessage(e.target.value)} placeholder="Trainers and teachers will see this on their desk." />
+                  <Input id="notice-message" value={noticeMessage} onChange={(e) => setNoticeMessage(e.target.value)} placeholder="Trainers and Fellows will see this on their desk." />
                 </div>
               </div>
               <DialogFooter>
@@ -324,7 +324,7 @@ export default function AdminHome() {
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <p className="text-sm text-muted-foreground">
-                  Tick each area on its own, then tick the trainers or teachers it applies to.
+                  Tick each area on its own, then tick the trainers or Fellows it applies to.
                   Everyone else keeps their work. Type CLEAR ACTIVITY to confirm.
                 </p>
                 <div className="space-y-2">
@@ -354,7 +354,7 @@ export default function AdminHome() {
                     id="person-query"
                     value={personQuery}
                     onChange={(e) => setPersonQuery(e.target.value)}
-                    placeholder="Find a trainer or teacher"
+                    placeholder="Find a trainer or Fellow"
                     data-testid="input-fresh-person"
                   />
                   <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-2">
@@ -375,7 +375,7 @@ export default function AdminHome() {
                           onCheckedChange={() => toggleId(freshTeachers, teacher.id, setFreshTeachers)}
                           data-testid={`check-teacher-${teacher.id}`}
                         />
-                        <span>{teacher.name} <span className="text-muted-foreground">teacher</span></span>
+                        <span>{teacher.name} <span className="text-muted-foreground">Fellow</span></span>
                       </label>
                     ))}
                     {visibleTrainers.length + visibleTeachers.length === 0 && (

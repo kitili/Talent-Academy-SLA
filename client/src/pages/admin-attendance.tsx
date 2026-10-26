@@ -90,7 +90,7 @@ export default function AdminAttendance() {
   return (
     <AcademyShell
       title="Attendance"
-      subtitle="Teachers and trainers"
+      subtitle="Fellows and trainers"
       userLabel={user?.username}
       onLogout={() => logoutMutation.mutate()}
       showAdminNav
@@ -100,7 +100,7 @@ export default function AdminAttendance() {
         <BackButton fallback="/admin" label="Back" />
         <div className="grid grid-cols-3 gap-3">
           {[
-            ["Teachers", counts.teachers],
+            ["Fellows", counts.teachers],
             ["Trainers", counts.trainers],
             ["Marked present or late", counts.present],
           ].map(([label, value]) => (
@@ -118,7 +118,7 @@ export default function AdminAttendance() {
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <select className="rounded-md border border-[#d7deea] bg-white px-2 py-2 text-sm" value={role} onChange={(event) => { setRole(event.target.value as "teacher" | "trainer"); setPersonId(""); }} data-testid="select-attendance-role">
-              <option value="teacher">Teacher</option>
+              <option value="teacher">Fellow</option>
               <option value="trainer">Trainer</option>
             </select>
             <select className="rounded-md border border-[#d7deea] bg-white px-2 py-2 text-sm" value={personId} onChange={(event) => setPersonId(event.target.value)} data-testid="select-attendance-person">
@@ -150,7 +150,7 @@ export default function AdminAttendance() {
         <AttendanceBoard />
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <PeopleList title="Teachers" rows={data?.teachers || []} testId="attendance-teachers" />
+          <PeopleList title="Fellows" rows={data?.teachers || []} testId="attendance-teachers" />
           <PeopleList title="Trainers" rows={data?.trainers || []} testId="attendance-trainers" />
         </div>
       </div>

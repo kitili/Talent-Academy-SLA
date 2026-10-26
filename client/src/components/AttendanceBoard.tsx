@@ -124,7 +124,7 @@ function CohortRates({ trainers }: { trainers: TrainerRow[] }) {
                 formatter={(value: number) => [`${value}%`, "Attendance"]}
                 labelFormatter={(label, payload) => {
                   const row = payload?.[0]?.payload;
-                  return row ? `${label} · ${row.marked} marks · ${row.teachers} teachers` : label;
+                  return row ? `${label} · ${row.marked} marks · ${row.teachers} Fellows` : label;
                 }}
               />
               <Bar dataKey="rate" fill="#1d4e89" radius={[0, 4, 4, 0]} barSize={18} />
@@ -187,7 +187,7 @@ export function AttendanceBoard({ variant = "full" }: { variant?: "compact" | "f
         <div>
           <h2 className="text-lg font-semibold text-[#17233c] dark:text-[#f6f1e8]">Attendance</h2>
           <p className="text-sm text-muted-foreground">
-            {marked ? `${marked} marks across ${teachers.length} approved teachers.` : "No attendance marked yet."}
+            {marked ? `${marked} marks across ${teachers.length} approved Fellows.` : "No attendance marked yet."}
           </p>
         </div>
         {variant === "compact" && (
@@ -209,9 +209,9 @@ export function AttendanceBoard({ variant = "full" }: { variant?: "compact" | "f
           <CohortRates trainers={trainers} />
           <div className="grid gap-4 lg:grid-cols-2">
             <PeopleTable
-              title="Teachers"
-              head={["Teacher", "Present", "Late", "Absent", "Excused", "Rate"]}
-              empty="No approved teachers yet."
+              title="Fellows"
+              head={["Fellow", "Present", "Late", "Absent", "Excused", "Rate"]}
+              empty="No approved Fellows yet."
               rows={teachers.map((teacher) => ({
                 id: teacher.id,
                 cells: [teacher.name, teacher.present, teacher.late, teacher.absent, teacher.excused, rateLabel(teacher.rate, teacher.marked)],

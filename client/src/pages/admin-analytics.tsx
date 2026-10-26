@@ -337,7 +337,7 @@ export default function AdminAnalytics() {
       return apiRequest("DELETE", `/api/batches/${batchId}/courses/${courseId}`);
     },
     onSuccess: () => {
-      toast({ title: "Course removed from batch" });
+      toast({ title: "Course removed from cohort" });
       queryClient.invalidateQueries({ queryKey: ["/api/batches", expandedBatchId, "courses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics/batches"] });
     },
@@ -533,13 +533,13 @@ export default function AdminAnalytics() {
     mutationFn: async (teacherId: string) =>
       apiRequest("DELETE", `/api/admin/dismiss-teacher/${teacherId}`),
     onSuccess: () => {
-      toast({ title: "Success", description: "Teacher has been removed." });
+      toast({ title: "Success", description: "Fellow has been removed." });
       setUserToManage(null);
       setShowManageTeachers(false);
       window.location.reload();
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to remove teacher.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to remove Fellow.", variant: "destructive" });
     },
   });
 
@@ -563,13 +563,13 @@ export default function AdminAnalytics() {
     mutationFn: async (teacherId: string) =>
       apiRequest("POST", `/api/admin/restrict-teacher/${teacherId}`),
     onSuccess: () => {
-      toast({ title: "Success", description: "Teacher has been restricted." });
+      toast({ title: "Success", description: "Fellow has been restricted." });
       setUserToManage(null);
       setShowManageTeachers(false);
       window.location.reload();
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to restrict teacher.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to restrict Fellow.", variant: "destructive" });
     },
   });
 
@@ -593,13 +593,13 @@ export default function AdminAnalytics() {
     mutationFn: async (teacherId: string) =>
       apiRequest("POST", `/api/admin/unrestrict-teacher/${teacherId}`),
     onSuccess: () => {
-      toast({ title: "Success", description: "Teacher has been unrestricted." });
+      toast({ title: "Success", description: "Fellow has been unrestricted." });
       setUserToManage(null);
       setShowManageTeachers(false);
       window.location.reload();
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to unrestrict teacher.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to unrestrict Fellow.", variant: "destructive" });
     },
   });
 
@@ -632,14 +632,14 @@ export default function AdminAnalytics() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Batch created successfully." });
+      toast({ title: "Success", description: "Cohort created successfully." });
       setShowCreateBatch(false);
       setNewBatchName("");
       setNewBatchDescription("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics/batches"] });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to create batch.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to create cohort.", variant: "destructive" });
     },
   });
 
@@ -650,13 +650,13 @@ export default function AdminAnalytics() {
       return response;
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Batch deleted successfully." });
+      toast({ title: "Success", description: "Cohort deleted successfully." });
       setShowDeleteBatchConfirm(false);
       setBatchToDelete(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics/batches"] });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to delete batch.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to delete cohort.", variant: "destructive" });
     },
   });
 
@@ -674,19 +674,19 @@ export default function AdminAnalytics() {
       const response = await apiRequest("POST", `/api/batches/${batchId}/teachers`, body);
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to add teacher");
+        throw new Error(data.error || "Failed to add Fellow");
       }
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Teacher added to batch" });
+      toast({ title: "Fellow added to cohort" });
       setTeacherIdInput("");
       setAddTeacherOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/batches", expandedBatchId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics/batches"] });
     },
     onError: (error: any) => {
-      toast({ title: "Could not add teacher", description: error.message || "Failed to add teacher.", variant: "destructive" });
+      toast({ title: "Could not add Fellow", description: error.message || "Failed to add Fellow.", variant: "destructive" });
     },
   });
 
@@ -695,12 +695,12 @@ export default function AdminAnalytics() {
       await apiRequest("DELETE", `/api/batches/${batchId}/teachers/${teacherId}`);
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Teacher removed from batch." });
+      toast({ title: "Success", description: "Fellow removed from cohort." });
       queryClient.invalidateQueries({ queryKey: ["/api/batches", expandedBatchId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics/batches"] });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to remove teacher.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to remove Fellow.", variant: "destructive" });
     },
   });
 
@@ -791,7 +791,7 @@ export default function AdminAnalytics() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 border rounded-lg">
-                    <div className="text-sm text-muted-foreground">Batches Created</div>
+                    <div className="text-sm text-muted-foreground">Cohorts Created</div>
                     <div className="text-2xl font-bold">{(trainersAnalytics as TrainerAnalytics)?.batchCount || 0}</div>
                   </div>
                   <div className="p-4 border rounded-lg">
@@ -873,7 +873,7 @@ export default function AdminAnalytics() {
               <div className="mb-4 flex items-end justify-between gap-3 flex-wrap">
                 <div>
                   <h2 className="text-lg font-semibold">Academy</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Teachers, cohorts, quizzes, attendance, and ratings</p>
+                  <p className="text-sm text-muted-foreground mt-1">Fellows, cohorts, quizzes, attendance, and ratings</p>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => navigate("/admin/batches")} data-testid="button-open-cohort-admin">
                   Manage cohorts
@@ -928,7 +928,7 @@ export default function AdminAnalytics() {
                     value={pipelineData?.totalCandidates ?? 0}
                     icon={Users}
                     color="blue"
-                    subtitle="Enrolled teachers"
+                    subtitle="Enrolled Fellows"
                   />
                   <KPICard
                     label="Gender Split"
@@ -1112,7 +1112,7 @@ export default function AdminAnalytics() {
                                 <p className="font-bold text-lg">{course.completionPercentage ?? 0}%</p>
                               </div>
                               <div>
-                                <p className="text-xs text-muted-foreground mb-1">Teachers</p>
+                                <p className="text-xs text-muted-foreground mb-1">Fellows</p>
                                 <p className="font-bold text-lg">{course.enrolledTeachers ?? 0}</p>
                               </div>
                               <div>
@@ -1150,13 +1150,13 @@ export default function AdminAnalytics() {
               <div>
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Cohort & Batch Management
+                  Cohort Management
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">Manage batches, teachers, quizzes, progress, and certificates</p>
+                <p className="text-sm text-muted-foreground mt-1">Manage cohorts, Fellows, quizzes, progress, and certificates</p>
               </div>
               <Button size="sm" onClick={() => setShowCreateBatch(true)} data-testid="button-new-batch">
                 <Plus className="w-4 h-4 mr-2" />
-                New Batch
+                New Cohort
               </Button>
             </div>
 
@@ -1168,7 +1168,7 @@ export default function AdminAnalytics() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Batch</TableHead>
+                          <TableHead>Cohort</TableHead>
                           <TableHead>Trainer</TableHead>
                           <TableHead className="text-center">Enrolled</TableHead>
                           <TableHead className="text-center">Completion %</TableHead>
@@ -1248,7 +1248,7 @@ export default function AdminAnalytics() {
               {/* Left Panel - Batch List */}
               <div className="lg:col-span-1 border rounded-lg bg-card flex flex-col" style={{ maxHeight: "calc(100vh - 300px)" }}>
                 <div className="p-3 border-b">
-                  <h3 className="font-semibold text-sm">Batches</h3>
+                  <h3 className="font-semibold text-sm">Cohorts</h3>
                   <p className="text-xs text-muted-foreground mt-1">{Array.isArray(batchesAnalytics) ? batchesAnalytics.length : 0} total</p>
                 </div>
                 <ScrollArea className="flex-1">
@@ -1275,7 +1275,7 @@ export default function AdminAnalytics() {
                             <BatchStatusBadge status={batch.status === "at-risk" ? "at-risk" : "on-track"} />
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {batch.teacherCount || 0} teachers
+                            {batch.teacherCount || 0} Fellows
                             {typeof batch.completionPercentage === "number" ? ` · ${batch.completionPercentage}% complete` : ""}
                             {batch.completedCount ? ` · ${batch.completedCount} finished` : ""}
                           </p>
@@ -1289,9 +1289,9 @@ export default function AdminAnalytics() {
                     ) : (
                       <div className="text-center py-8 text-muted-foreground text-sm">
                         <Users className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                        No batches yet
+                        No cohorts yet
                         <Button size="sm" className="mt-3 w-full" onClick={() => setShowCreateBatch(true)} data-testid="button-create-first-batch">
-                          Create First Batch
+                          Create First Cohort
                         </Button>
                       </div>
                     )}
@@ -1410,7 +1410,7 @@ export default function AdminAnalytics() {
                       <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none border-b">
                         <TabsTrigger value="teachers" data-testid="tab-batch-teachers">
                           <Users className="mr-2 h-4 w-4" />
-                          Teachers
+                          Fellows
                         </TabsTrigger>
                         <TabsTrigger value="quizzes" data-testid="tab-batch-quizzes">
                           <Award className="mr-2 h-4 w-4" />
@@ -1429,7 +1429,7 @@ export default function AdminAnalytics() {
                       {/* Teachers Tab */}
                       <TabsContent value="teachers" className="space-y-4 flex-1 overflow-y-auto p-4">
                         <div className="flex justify-between items-center">
-                          <h3 className="text-base font-semibold">Enrolled Teachers</h3>
+                          <h3 className="text-base font-semibold">Enrolled Fellows</h3>
                           <Dialog open={addTeacherOpen} onOpenChange={setAddTeacherOpen}>
                             <Button size="sm" onClick={() => setAddTeacherOpen(true)} data-testid="button-add-teacher">
                               <Plus className="mr-2 h-4 w-4" />
@@ -1437,12 +1437,12 @@ export default function AdminAnalytics() {
                             </Button>
                             <DialogContent>
                               <DialogHeader>
-                                <DialogTitle>Add Teacher to {currentBatch?.name}</DialogTitle>
-                                <DialogDescription>Search by Teacher ID, name, or email address</DialogDescription>
+                                <DialogTitle>Add Fellow to {currentBatch?.name}</DialogTitle>
+                                <DialogDescription>Search by Fellow ID, name, or email address</DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div className="space-y-2">
-                                  <Label htmlFor="admin-teacher-search">Teacher ID, Name, or Email</Label>
+                                  <Label htmlFor="admin-teacher-search">Fellow ID, Name, or Email</Label>
                                   <Input
                                     id="admin-teacher-search"
                                     data-testid="input-teacher-id"
@@ -1457,7 +1457,7 @@ export default function AdminAnalytics() {
                                     }}
                                   />
                                   <p className="text-xs text-muted-foreground">
-                                    Enter a numeric ID, full name, or email — the system will find the right teacher automatically.
+                                    Enter a numeric ID, full name, or email — the system will find the right Fellow automatically.
                                   </p>
                                 </div>
                                 <Button
@@ -1472,7 +1472,7 @@ export default function AdminAnalytics() {
                                   disabled={!teacherIdInput.trim() || addTeacherToBatchMutation.isPending}
                                   data-testid="button-submit-teacher"
                                 >
-                                  {addTeacherToBatchMutation.isPending ? "Adding..." : "Add Teacher"}
+                                  {addTeacherToBatchMutation.isPending ? "Adding..." : "Add Fellow"}
                                 </Button>
                               </div>
                             </DialogContent>
@@ -1480,7 +1480,7 @@ export default function AdminAnalytics() {
                         </div>
                         {batchWithTeachers?.teachers?.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
-                            No teachers enrolled in this batch yet
+                            No Fellows enrolled in this cohort yet
                           </div>
                         ) : (
                           <div className="space-y-2">
@@ -1494,7 +1494,7 @@ export default function AdminAnalytics() {
                                   <div className="min-w-0">
                                     <p className="font-semibold">{teacher.name || teacher.email}</p>
                                     <p className="text-sm text-muted-foreground">
-                                      Teacher ID: {teacher.teacherId || teacher.id} {teacher.email && `\u2022 ${teacher.email}`}
+                                      Fellow ID: {teacher.teacherId || teacher.id} {teacher.email && `\u2022 ${teacher.email}`}
                                     </p>
                                     <div className="flex flex-wrap gap-1 mt-2">
                                       {completedCourses.length === 0 && inProgressCourses.length === 0 ? (
@@ -1519,7 +1519,7 @@ export default function AdminAnalytics() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
-                                      if (confirm(`Remove ${teacher.name || teacher.email} from this batch?`)) {
+                                      if (confirm(`Remove ${teacher.name || teacher.email} from this cohort?`)) {
                                         removeTeacherFromBatchMutation.mutate({
                                           batchId: expandedBatchId,
                                           teacherId: teacher.id,
@@ -1660,7 +1660,7 @@ export default function AdminAnalytics() {
 
                       {/* Progress Tab */}
                       <TabsContent value="progress" className="space-y-4 flex-1 overflow-y-auto p-4">
-                        <h3 className="text-base font-semibold">Teacher Progress</h3>
+                        <h3 className="text-base font-semibold">Fellow Progress</h3>
                         {isLoadingProgress ? (
                           <div className="text-center py-8 text-muted-foreground">Loading progress...</div>
                         ) : batchProgress.length === 0 ? (
@@ -1801,7 +1801,7 @@ export default function AdminAnalytics() {
                               </div>
                               <div className="space-y-4">
                                 <p className="text-sm text-foreground">This certificate is proudly presented to</p>
-                                <p className="text-2xl font-bold text-primary">Teacher Name</p>
+                                <p className="text-2xl font-bold text-primary">Fellow Name</p>
                               </div>
                               <div className="bg-primary/5 p-4 rounded-lg">
                                 <p className="text-xs leading-relaxed text-foreground italic">
@@ -1838,7 +1838,7 @@ export default function AdminAnalytics() {
                 <div className="lg:col-span-3 border rounded-lg bg-card flex items-center justify-center">
                   <div className="text-center">
                     <Users className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">Select a batch to view details</p>
+                    <p className="text-muted-foreground">Select a cohort to view details</p>
                   </div>
                 </div>
               )}
@@ -1904,7 +1904,7 @@ export default function AdminAnalytics() {
                       <GraduationCap className="w-4 h-4" />
                       Course Completion
                     </CardTitle>
-                    <CardDescription>Which courses are complete, which teachers finished them, and overall completion %</CardDescription>
+                    <CardDescription>Which courses are complete, which Fellows finished them, and overall completion %</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {courseCompletionData.length > 0 ? (
@@ -1913,9 +1913,9 @@ export default function AdminAnalytics() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Course</TableHead>
-                              <TableHead>Batch</TableHead>
+                              <TableHead>Cohort</TableHead>
                               <TableHead className="text-center">Completion</TableHead>
-                              <TableHead>Teachers who completed</TableHead>
+                              <TableHead>Fellows who completed</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1973,7 +1973,7 @@ export default function AdminAnalytics() {
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <Target className="w-4 h-4" />
-                      Course / Module Coverage by Teacher
+                      Course / Module Coverage by Fellow
                     </CardTitle>
                     <CardDescription>Modules completed vs total modules in assigned courses (one-day courses count as one module)</CardDescription>
                   </CardHeader>
@@ -2108,7 +2108,7 @@ export default function AdminAnalytics() {
                       <Ban className="w-4 h-4 text-red-500" />
                       Disqualification Rate by Cohort
                     </CardTitle>
-                    <CardDescription>Percentage of fellows disqualified per batch</CardDescription>
+                    <CardDescription>Percentage of fellows disqualified per cohort</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {disqualificationData?.byBatch?.length > 0 ? (
@@ -2239,7 +2239,7 @@ export default function AdminAnalytics() {
                       <Award className="w-4 h-4" />
                       Quiz Performance by Cohort
                     </CardTitle>
-                    <CardDescription>Pass rates and average scores per batch</CardDescription>
+                    <CardDescription>Pass rates and average scores per cohort</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {quizPerformanceData?.perCohort?.length > 0 ? (
@@ -2310,7 +2310,7 @@ export default function AdminAnalytics() {
                       <BookOpen className="w-4 h-4" />
                       Course Assignments by Trainers
                     </CardTitle>
-                    <CardDescription>Which trainers assigned which courses to batches</CardDescription>
+                    <CardDescription>Which trainers assigned which courses to cohorts</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {courseAssignmentData && courseAssignmentData.length > 0 ? (
@@ -2320,7 +2320,7 @@ export default function AdminAnalytics() {
                             <TableRow>
                               <TableHead>Trainer</TableHead>
                               <TableHead>Course</TableHead>
-                              <TableHead>Batch</TableHead>
+                              <TableHead>Cohort</TableHead>
                               <TableHead>Assigned Date</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -2356,7 +2356,7 @@ export default function AdminAnalytics() {
               </h2>
               <p className="text-sm text-muted-foreground mt-1">Candidate demographics and diversity breakdown</p>
               <p className="text-xs text-muted-foreground mt-1 bg-muted/40 rounded px-2 py-1 inline-block">
-                ℹ️ Data sourced from teacher profile information (gender, location, qualification, employment status) provided at registration. Incomplete profiles show as "Not Specified" / "Unknown".
+                ℹ️ Data sourced from Fellow profile information (gender, location, qualification, employment status) provided at registration. Incomplete profiles show as "Not Specified" / "Unknown".
               </p>
             </div>
 
@@ -2373,7 +2373,7 @@ export default function AdminAnalytics() {
                 <CardContent className="py-12 text-center">
                   <MapPin className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground font-medium">No demographic data available</p>
-                  <p className="text-sm text-muted-foreground mt-1">Demographics will appear as teachers fill in their profile information</p>
+                  <p className="text-sm text-muted-foreground mt-1">Demographics will appear as Fellows fill in their profile information</p>
                 </CardContent>
               </Card>
             ) : (
@@ -2520,7 +2520,7 @@ export default function AdminAnalytics() {
                 <Activity className="w-5 h-5" />
                 Performance Analytics
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">Completion trends, at-risk identification, and batch comparison</p>
+              <p className="text-sm text-muted-foreground mt-1">Completion trends, at-risk identification, and cohort comparison</p>
             </div>
 
             {loadingPerformance ? (
@@ -2537,7 +2537,7 @@ export default function AdminAnalytics() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Completion Rate Trends</CardTitle>
-                    <CardDescription>Monthly completion rates across all batches</CardDescription>
+                    <CardDescription>Monthly completion rates across all cohorts</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {performanceData?.completionRateTrends?.length > 0 ? (
@@ -2579,7 +2579,7 @@ export default function AdminAnalytics() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Name</TableHead>
-                              <TableHead>Batch</TableHead>
+                              <TableHead>Cohort</TableHead>
                               <TableHead className="text-center">Completion</TableHead>
                               <TableHead className="text-center">Last Active</TableHead>
                               <TableHead className="text-center">Status</TableHead>
@@ -2622,8 +2622,8 @@ export default function AdminAnalytics() {
                 {/* Batch Comparison */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Batch Comparison</CardTitle>
-                    <CardDescription>Average completion rates across batches</CardDescription>
+                    <CardTitle className="text-base">Cohort Comparison</CardTitle>
+                    <CardDescription>Average completion rates across cohorts</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {performanceData?.batchComparison?.length > 0 ? (
@@ -2644,7 +2644,7 @@ export default function AdminAnalytics() {
                         </BarChart>
                       </ChartContainer>
                     ) : (
-                      <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">No batch comparison data yet</div>
+                      <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">No cohort comparison data yet</div>
                     )}
                   </CardContent>
                 </Card>
@@ -2662,7 +2662,7 @@ export default function AdminAnalytics() {
                       <Users className="w-5 h-5" />
                       People Overview
                     </CardTitle>
-                    <CardDescription className="mt-1">Trainers and teachers with activity metrics</CardDescription>
+                    <CardDescription className="mt-1">Trainers and Fellows with activity metrics</CardDescription>
                   </div>
                   <Button size="sm" onClick={() => setShowAddUser(true)} data-testid="button-add-user">
                     <UserPlus className="w-4 h-4 mr-2" />
@@ -2680,7 +2680,7 @@ export default function AdminAnalytics() {
                         Trainers ({totalTrainers})
                       </TabsTrigger>
                       <TabsTrigger value="teachers" data-testid="tab-teachers">
-                        Teachers ({totalTeachers})
+                        Fellows ({totalTeachers})
                       </TabsTrigger>
                     </TabsList>
 
@@ -2701,7 +2701,7 @@ export default function AdminAnalytics() {
                                     <p className="font-semibold text-sm">{trainer.name || trainer.username || trainer.email}</p>
                                     <p className="text-xs text-muted-foreground mt-1">{trainer.email}</p>
                                   </div>
-                                  <Badge variant="outline" className="text-xs">{trainer.batchCount || 0} batches</Badge>
+                                  <Badge variant="outline" className="text-xs">{trainer.batchCount || 0} cohorts</Badge>
                                 </div>
                                 <p className="text-xs text-muted-foreground">{trainer.courseCount || 0} courses assigned</p>
                               </button>
@@ -2739,7 +2739,7 @@ export default function AdminAnalytics() {
                                   <Badge variant="outline" className="text-xs">{teacher.courseCount || 0} courses</Badge>
                                 </div>
                                 <div className="flex items-center justify-between gap-2">
-                                  <p className="text-xs text-muted-foreground">{teacher.teacherNumber ? `ID ${teacher.teacherNumber}` : "Teacher"}</p>
+                                  <p className="text-xs text-muted-foreground">{teacher.teacherNumber ? `ID ${teacher.teacherNumber}` : "Fellow"}</p>
                                   <Badge variant={teacher.risk === "at-risk" ? "destructive" : "outline"} className="text-xs">
                                     {teacher.risk === "at-risk" ? "At risk" : "On track"}
                                   </Badge>
@@ -2750,10 +2750,10 @@ export default function AdminAnalytics() {
                       ) : (
                         <div className="text-center py-8">
                           <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                          <p className="text-muted-foreground font-medium">No teachers</p>
-                          <p className="text-sm text-muted-foreground mt-1">Teachers will appear here once they are approved</p>
+                          <p className="text-muted-foreground font-medium">No Fellows</p>
+                          <p className="text-sm text-muted-foreground mt-1">Fellows will appear here once they are approved</p>
                           <Button size="sm" className="mt-4" data-testid="button-invite-teacher" onClick={() => { setNewUserRole("teacher"); setShowAddUser(true); }}>
-                            Add teacher
+                            Add Fellow
                           </Button>
                         </div>
                       )}
@@ -2786,7 +2786,7 @@ export default function AdminAnalytics() {
                     data-testid="button-manage-teachers"
                   >
                     <Users className="w-4 h-4 mr-2" />
-                    Manage Teachers
+                    Manage Fellows
                   </Button>
                 </CardContent>
               </Card>
@@ -2837,7 +2837,7 @@ export default function AdminAnalytics() {
                 </div>
                 {selectedUser.role === "trainer" && (
                   <div className="p-3 bg-muted/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Batches</p>
+                    <p className="text-xs text-muted-foreground mb-1">Cohorts</p>
                     <p className="font-semibold">{selectedUser.batchCount || 0}</p>
                   </div>
                 )}
@@ -2931,7 +2931,7 @@ export default function AdminAnalytics() {
                   >
                     <div>
                       <p className="font-semibold text-sm">{trainer.email}</p>
-                      <p className="text-xs text-muted-foreground">{trainer.batchCount || 0} batches</p>
+                      <p className="text-xs text-muted-foreground">{trainer.batchCount || 0} cohorts</p>
                     </div>
                     <div className="flex gap-2">
                       {trainer.approvalStatus === "restricted" ? (
@@ -2993,9 +2993,9 @@ export default function AdminAnalytics() {
       <Dialog open={showManageTeachers} onOpenChange={setShowManageTeachers}>
         <DialogContent className="max-w-2xl max-h-96 overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Manage Teachers</DialogTitle>
+            <DialogTitle>Manage Fellows</DialogTitle>
           </DialogHeader>
-          <DialogDescription>Restrict, unrestrict, or remove teachers from the system</DialogDescription>
+          <DialogDescription>Restrict, unrestrict, or remove Fellows from the system</DialogDescription>
 
           <div className="space-y-2">
             {Array.isArray(allUsers) && allUsers.filter((u: any) => u.role === "teacher").length > 0 ? (
@@ -3061,7 +3061,7 @@ export default function AdminAnalytics() {
                   </div>
                 ))
             ) : (
-              <p className="text-muted-foreground text-center py-4">No teachers to manage</p>
+              <p className="text-muted-foreground text-center py-4">No Fellows to manage</p>
             )}
           </div>
         </DialogContent>
@@ -3338,7 +3338,7 @@ export default function AdminAnalytics() {
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Quiz Attempts</DialogTitle>
-            <DialogDescription>{selectedTeacherForAttempts?.teacher?.name || selectedTeacherForAttempts?.teacherName || "Teacher"}</DialogDescription>
+            <DialogDescription>{selectedTeacherForAttempts?.teacher?.name || selectedTeacherForAttempts?.teacherName || "Fellow"}</DialogDescription>
           </DialogHeader>
           {teacherAttempts.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-4">No quiz attempts found</p>
@@ -3370,15 +3370,15 @@ export default function AdminAnalytics() {
       <Dialog open={showCreateBatch} onOpenChange={setShowCreateBatch}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Batch</DialogTitle>
-            <DialogDescription>Create a batch to group teachers and assign courses</DialogDescription>
+            <DialogTitle>Create New Cohort</DialogTitle>
+            <DialogDescription>Create a cohort to group Fellows and assign courses</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="batchName">Batch Name</Label>
+              <Label htmlFor="batchName">Cohort Name</Label>
               <Input
                 id="batchName"
-                placeholder="Enter batch name"
+                placeholder="Enter cohort name"
                 value={newBatchName}
                 onChange={(e) => setNewBatchName(e.target.value)}
                 data-testid="input-new-batch-name"
@@ -3388,7 +3388,7 @@ export default function AdminAnalytics() {
               <Label htmlFor="batchDescription">Description (optional)</Label>
               <Input
                 id="batchDescription"
-                placeholder="Enter batch description"
+                placeholder="Enter cohort description"
                 value={newBatchDescription}
                 onChange={(e) => setNewBatchDescription(e.target.value)}
                 data-testid="input-new-batch-description"
@@ -3414,7 +3414,7 @@ export default function AdminAnalytics() {
                 if (!newBatchName.trim()) {
                   toast({
                     title: "Error",
-                    description: "Please enter a batch name.",
+                    description: "Please enter a cohort name.",
                     variant: "destructive"
                   });
                   return;
@@ -3427,7 +3427,7 @@ export default function AdminAnalytics() {
               disabled={createBatchMutation.isPending}
               data-testid="button-confirm-create-batch"
             >
-              {createBatchMutation.isPending ? "Creating..." : "Create Batch"}
+              {createBatchMutation.isPending ? "Creating..." : "Create Cohort"}
             </Button>
           </div>
         </DialogContent>
@@ -3437,9 +3437,9 @@ export default function AdminAnalytics() {
       <Dialog open={showDeleteBatchConfirm} onOpenChange={setShowDeleteBatchConfirm}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Batch</DialogTitle>
+            <DialogTitle>Delete Cohort</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this batch? This action cannot be undone and will remove all teacher assignments and course assignments for this batch.
+              Are you sure you want to delete this cohort? This action cannot be undone and will remove all Fellow assignments and course assignments for this cohort.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 pt-4">
@@ -3465,7 +3465,7 @@ export default function AdminAnalytics() {
               disabled={deleteBatchMutation.isPending}
               data-testid="button-confirm-delete-batch"
             >
-              {deleteBatchMutation.isPending ? "Deleting..." : "Delete Batch"}
+              {deleteBatchMutation.isPending ? "Deleting..." : "Delete Cohort"}
             </Button>
           </div>
         </DialogContent>
@@ -3476,7 +3476,7 @@ export default function AdminAnalytics() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
-            <DialogDescription>Create a new admin, trainer, or teacher account</DialogDescription>
+            <DialogDescription>Create a new admin, trainer, or Fellow account</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -3518,7 +3518,7 @@ export default function AdminAnalytics() {
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="teacher">Teacher</SelectItem>
+                  <SelectItem value="teacher">Fellow</SelectItem>
                   <SelectItem value="trainer">Trainer</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
@@ -3601,7 +3601,7 @@ export default function AdminAnalytics() {
               Submitted Reflections
             </DialogTitle>
             <DialogDescription>
-              {allReflections.length} reflection{allReflections.length !== 1 ? "s" : ""} submitted across all batches
+              {allReflections.length} reflection{allReflections.length !== 1 ? "s" : ""} submitted across all cohorts
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 pr-2">
