@@ -3672,7 +3672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const enrolled = await storage.getTeachersInBatch(batch.id);
       const teacher = enrolled.find((row) => row.id === req.params.teacherId);
-      if (!teacher) return res.status(404).json({ error: "That teacher is not in this cohort" });
+      if (!teacher) return res.status(404).json({ error: "That Fellow is not in this cohort" });
       const [existing] = await db
         .select()
         .from(trainerStars)
