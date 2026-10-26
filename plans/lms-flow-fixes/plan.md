@@ -2,7 +2,8 @@
 
 ## Status
 
-**Plan only. Not started.** Written 2026-10-26 by worker `flow-fix-plan` on branch `claude/flow-fix-plan-f58e81`,
+**Plan only. Not started.** Commits on this branch: `36d7561`, `bb240de`, `8715d16` (WIP parts), then the final
+commit. Written 2026-10-26 by worker `flow-fix-plan` on branch `claude/flow-fix-plan-f58e81`,
 base `71c4782`. The working branch is now `feat/improvements` (at `991c551`, one commit past `71c4782` that changes
 only `skills/handoff-skill/references/this-repository.md` and `skills/orchestration-skill/references/this-repository.md`;
 no code moved, so the evidence below holds). Every track branches from `feat/improvements` and merges back into it.
@@ -429,8 +430,9 @@ keeping both sides: the import block at the top of `routes.ts`, and the `IStorag
 - Depends on: nothing. Layer 1.
 - Tests: `tests/unit/auth/one-identity-per-session.test.ts`. It drives the login handlers with a fake session object
   and asserts that a teacher login after a staff login leaves no passport user, and the reverse. It must fail with
-  `regenerate` removed. Also run the text contracts that read `unified-auth.tsx` and `server/auth.ts`
-  (`tests/access-request.test.ts` and others that grep them) and keep them green with `\r?\n`.
+  `regenerate` removed. Also run the text contracts that read `unified-auth.tsx` or `server/auth.ts`
+  (`tests/access-request.test.ts`, `tests/admin-desk.test.ts`, `tests/attendance-board.test.ts` at `71c4782`) and keep
+  them green with `\r?\n`.
 - Not covered by a test: the browser back-navigation case. Acceptance checks it by hand (*Acceptance Criteria*).
 
 **Track B — Quiz integrity (findings 2, 8, 11; N2, N3; part of 6).** Model: **Opus** (quiz scoring, role checks,
@@ -688,7 +690,7 @@ out.
 
 ## Test Plan
 
-Tests planned for phase 2, per track, are listed under *Tasks*. Across all of them:
+Tests planned for phase 2, per track, are listed under *Task Boundaries → Tracks*. Across all of them:
 - New tests live in `tests/unit/<area>/` and run under `node scripts/run-node-tests.mjs unit`. The older
   `tests/*.test.ts` files that a track changes stay in the `test` script list.
 - Route handlers call `storage` and `db` directly, so none can be driven yet
@@ -833,8 +835,9 @@ on the server (it already refuses; G removes only its page).
 - The guides are the product's intent where they agree with each other. Where they disagree with each other (who
   creates courses), D2 decides.
 - Live counts (findings 15 and 16) behave as the code says. Phase 0 checks this.
-- No other client (no mobile app, no script) calls the routes this plan deletes. A grep of `client/src`, `scripts/`
-  and `server/` found none. Logs were not checked.
+- No other client (no mobile app, no script) calls the routes this plan deletes. Greps of `client/src`, `scripts/`
+  and `server/` (outside `routes.ts`) found no caller of the teacher content quiz routes, course assign, or the bulk
+  certificate route other than the pages named here. Vercel request logs were not checked.
 - `feat/improvements` gains no code commits in these files before the tracks branch. If it does, Track 0 re-checks the
   line anchors.
 
