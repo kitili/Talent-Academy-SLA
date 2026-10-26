@@ -19,8 +19,8 @@ Use desk mail when one Fellow needs a private reply. Use a cohort note when the 
 | --- | --- |
 | Joining a cohort | The Fellow gets a notice: "You're in". |
 | Calendar | The trainer adds a session or a deadline. The Fellow sees it on **My calendar** and gets a bell notice. |
-| Quiz result | The quiz screen shows the Fellow the result, and the correct answers only after a pass. For a quiz or exam the trainer assigned, a second miss sends a notice, "Quiz needs another try", and three misses end the attempts until the trainer resets them. The trainer sees the same pass or fail on **Progress**. |
-| Progress and attendance | The trainer marks attendance and reads the course percent. The Fellow sees the same percent and their own attendance. Nobody types a message. |
+| Quiz result | The quiz screen shows the Fellow the result and which answers were right. It shows the correct answers only after a pass, or, for an exam the trainer assigned, after the last attempt. For a quiz or exam the trainer assigned, a second miss sends a notice, "Quiz needs another try", and three misses end the attempts until the trainer resets them. The trainer sees the same pass or fail on **Progress**. |
+| Progress and attendance | The trainer marks attendance and reads the course percent. The Fellow sees the same percent. The Fellow desk does not show attendance yet. Nobody types a message. |
 | Certificates | An admin issues a certificate after a course is complete. The Fellow opens it from **Certificates**. The trainer sees the issued ones under **Graduates** in the cohort room. |
 | Reflection | The Fellow writes it on their desk. Admin analytics can read it. It does not appear on the trainer's cohort page. |
 | Course rating | The Fellow scores the course. That score goes to analytics, not into a thread with the trainer. |

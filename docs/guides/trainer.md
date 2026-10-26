@@ -49,7 +49,7 @@ Draft courses stay hidden from Fellows. Published courses appear on their desk o
 
 ## E. Let someone in
 
-**Approvals** accepts a new Fellow. You cannot create an admin, clear the academy, reset anyone's password, or open another trainer's cohort. An admin puts you on a cohort.
+**Approvals** accepts a new Fellow. You cannot create an admin, clear the academy, or open another trainer's cohort. The trainer desk has no password reset; ask an admin. An admin puts you on a cohort.
 
 ## F. Certificates
 
