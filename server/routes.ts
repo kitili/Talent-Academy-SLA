@@ -44,6 +44,7 @@ import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
+import { certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
 import multer from "multer";
@@ -4540,9 +4541,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== CERTIFICATE MANAGEMENT ====================
+  // A trainer reaches a cohort's certificate rows only when they run the cohort (C4, N6); an admin reaches every cohort.
+  // Sends the 404 or 403 itself and returns false when the caller may not.
+  async function certificateCohortAllowed(req: Request, res: Response, batchId: string) {
+    const batch = await storage.getBatch(batchId);
+    if (!batch) {
+      res.status(404).json({ error: "Cohort not found" });
+      return false;
+    }
+    if (!staffCanAccessBatch(req.user, batch)) {
+      res.status(403).json({ error: "Access denied" });
+      return false;
+    }
+    return true;
+  }
+
   // Get certificate template for batch
   app.get("/api/batches/:batchId/certificate-template", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const template = await storage.getBatchCertificateTemplate(req.params.batchId);
       res.json(template || null);
     } catch (error) {
@@ -4554,6 +4571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upsert certificate template (admin or trainer)
   app.post("/api/batches/:batchId/certificate-template", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const { courseId, appreciationText, adminName1, adminName2 } = req.body;
       const template = await storage.upsertBatchCertificateTemplate({
         batchId: req.params.batchId,
@@ -4573,6 +4591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Approve certificate template (admin only)
   app.post("/api/batches/:batchId/certificate-template/approve", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const template = await storage.approveBatchCertificateTemplate(req.params.batchId, req.user!.id);
       if (!template) return res.status(404).json({ error: "Template not found" });
       res.json(template);
@@ -4597,6 +4616,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Who may receive which certificate, by the rules the issue route applies (D4): the academy path for Fellowship and
+  // Advanced, every module of a course for a course certificate. Recomputed from progress, never from stored flags.
+  app.get("/api/admin/certificates/eligible", isAuthenticated, isStrictAdmin, async (_req, res) => {
+    try {
+      res.json(await listEligibleFellows(await loadEligibilityRows()));
+    } catch (error) {
+      console.error("Error listing certificate eligibility:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/admin/certificates/issue", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const { isCertificateDesignId } = await import("@shared/certificateDesigns");
@@ -4611,6 +4641,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (occasion === "course" && !courseId) {
         return res.status(400).json({ error: "courseId is required for course completion certificates" });
       }
+      if (!(await storage.getTeacher(teacherId))) return res.status(404).json({ error: "Teacher not found" });
+      if (occasion === "course" && !(await storage.getCourse(courseId!))) return res.status(404).json({ error: "Course not found" });
+      // D4: a course certificate needs every module of the course; Fellowship and Advanced need the academy path done.
+      const refused = await certificateRefusal({ teacherId, occasion, courseId });
+      if (refused) return res.status(400).json(refused);
       const cert = await storage.issueAcademyCertificate({
         teacherId,
         design,
@@ -4624,35 +4659,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const status = message === "Teacher not found" || message === "Course not found" ? 404 : 500;
       console.error("Error issuing academy certificate:", error);
       res.status(status).json({ error: message === "Teacher not found" || message === "Course not found" ? message : "Internal server error" });
-    }
-  });
-
-  // Generate certificates for completed teachers in batch-course (admin only)
-  app.post("/api/batches/:batchId/courses/:courseId/generate-certificates", isAuthenticated, isStrictAdmin, async (req, res) => {
-    try {
-      const completedTeachers = await storage.getCompletedTeachersForBatchCourse(req.params.batchId, req.params.courseId);
-      const course = await storage.getCourse(req.params.courseId);
-
-      if (!course) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-
-      const generatedCerts = await Promise.all(
-        completedTeachers.map((teacher) =>
-          storage.issueAcademyCertificate({
-            teacherId: teacher.id,
-            design: "fellowship",
-            occasion: "course",
-            courseId: req.params.courseId,
-            batchId: req.params.batchId,
-          })
-        )
-      );
-
-      res.json({ count: generatedCerts.length, certificates: generatedCerts });
-    } catch (error) {
-      console.error("Error generating certificates:", error);
-      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -4687,6 +4693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get certificates for batch (admin or trainer)
   app.get("/api/batches/:batchId/certificates", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const certs = await storage.getCertificatesForBatch(req.params.batchId);
       res.json(certs);
     } catch (error) {
@@ -4695,20 +4702,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get certificate by ID (admin/trainer can view any, teacher can view their own)
+  // Get certificate by ID: an admin sees any; a trainer sees it when the Fellow is in a cohort they run (C4)
   app.get("/api/certificates/:certId", isAuthenticated, async (req, res) => {
     try {
       const cert = await storage.getTeacherCertificateById(req.params.certId);
       if (!cert) {
         return res.status(404).json({ error: "Certificate not found" });
       }
-      
-      // Check access: admin/trainer can see any, teacher can only see their own
-      const user = req.user as Express.User;
-      if (user.role === "teacher" && cert.teacherId !== user.id) {
+      if (!(await teacherRecordAllowed(req, cert.teacherId))) {
         return res.status(403).json({ error: "Access denied" });
       }
-      
       res.json(cert);
     } catch (error) {
       console.error("Error getting certificate:", error);

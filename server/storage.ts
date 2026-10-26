@@ -295,7 +295,6 @@ export interface IStorage {
   // Teacher course completion operations
   getTeacherCourseCompletion(teacherId: string, courseId: string, batchId: string): Promise<TeacherCourseCompletion | undefined>;
   upsertTeacherCourseCompletion(completion: Partial<InsertTeacherCourseCompletion> & { teacherId: string; courseId: string; batchId: string }): Promise<TeacherCourseCompletion>;
-  getCompletedTeachersForBatchCourse(batchId: string, courseId: string): Promise<Teacher[]>;
   syncTeacherCourseCompletion(teacherId: string, courseId: string): Promise<void>;
   refreshTeacherReportCard(teacherId: string): Promise<TeacherReportCard>;
   
@@ -1919,22 +1918,6 @@ export class DatabaseStorage implements IStorage {
       totalQuizzesPassed: totalPassed,
       averageScore,
     });
-  }
-
-  async getCompletedTeachersForBatchCourse(batchId: string, courseId: string): Promise<Teacher[]> {
-    const results = await db
-      .select({ teacher: teachers })
-      .from(teacherCourseCompletion)
-      .innerJoin(teachers, eq(teacherCourseCompletion.teacherId, teachers.id))
-      .where(
-        and(
-          eq(teacherCourseCompletion.batchId, batchId),
-          eq(teacherCourseCompletion.courseId, courseId),
-          eq(teacherCourseCompletion.status, "completed")
-        )
-      );
-    
-    return results.map(r => r.teacher);
   }
 
   // Certificate template operations
