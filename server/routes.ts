@@ -27,6 +27,7 @@ import {
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
 import { parseDeadline } from "@shared/academyPath";
+import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT } from "@shared/constants";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
@@ -87,7 +88,7 @@ function isStrictAdmin(req: Request, res: Response, next: NextFunction) {
 
 function staffCanAccessBatch(
   user?: Express.User,
-  batch?: { trainerId?: string | null; createdBy?: string | null } | null,
+  batch?: { trainerId?: string | null; trainerIds?: string[] | null } | null,
 ) {
   if (batch === undefined) return isAcademyStaff(user);
   return trainerOwnsBatch(user, batch);
@@ -184,7 +185,7 @@ async function saveWritingExam(
     paperUrl: body.paperUrl || null,
     paperName: body.paperName || null,
     numQuestions: 1,
-    passMark: 80,
+    passMark: ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT,
     questions: [{ id: randomUUID(), type: "open_ended", question: prompt }],
     assignedBy,
     dueDate: parseDeadline(body.dueDate),

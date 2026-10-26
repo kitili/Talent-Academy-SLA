@@ -11,9 +11,10 @@ import {
   teachersWhoCompletedEachCourse,
   formatCourseProgress,
 } from "../server/progressLogic.ts";
+import { COURSE_COMPLETE_PERCENT, MODULE_QUIZ_PASS_PERCENT } from "../shared/constants.ts";
 
 describe("Taleemabad feedback: quiz scoring", () => {
-  it("passes when 70% of graded questions are correct and ignores unanswered open-ended", () => {
+  it("scores 3 of 4 graded questions as 75% against the module pass mark and ignores open-ended", () => {
     const questions = [
       { id: "q1", type: "multiple_choice", correctAnswer: "A" },
       { id: "q2", type: "multiple_choice", correctAnswer: "B" },
@@ -30,7 +31,7 @@ describe("Taleemabad feedback: quiz scoring", () => {
     });
     assert.equal(result.score, 3);
     assert.equal(result.totalQuestions, 4);
-    assert.equal(result.passed, true);
+    assert.equal(result.passed, 75 >= MODULE_QUIZ_PASS_PERCENT);
     assert.equal(result.percentage, 75);
   });
 
@@ -52,7 +53,7 @@ describe("Taleemabad feedback: quiz scoring", () => {
     assert.equal(result.totalQuestions, 2);
   });
 
-  it("fails when graded score is below 70%", () => {
+  it("fails when graded score is below the module pass mark", () => {
     const questions = [
       { id: "q1", type: "multiple_choice", correctAnswer: "A" },
       { id: "q2", type: "multiple_choice", correctAnswer: "B" },
@@ -131,7 +132,7 @@ describe("Taleemabad feedback: cohort status and coverage", () => {
     assert.equal(moduleCoveragePercentage(1, 2), 50);
     assert.equal(isCourseComplete(1, 1), true);
     assert.equal(isCourseComplete(0, 1), false);
-    assert.equal(isCourseComplete(9, 10), true);
+    assert.equal(isCourseComplete(9, 10), 90 >= COURSE_COMPLETE_PERCENT);
   });
 
   it("lists which teachers completed each course", () => {

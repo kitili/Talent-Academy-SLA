@@ -1,3 +1,5 @@
+import { COURSE_COMPLETE_PERCENT, MODULE_QUIZ_PASS_PERCENT } from "@shared/constants";
+
 export type ModuleProgress = {
   percentage?: number;
   total?: number;
@@ -11,6 +13,16 @@ export type ModuleWeek = {
   progress?: ModuleProgress;
 };
 
+/**
+ * A lesson file is done when its approved quiz is passed. With no approved quiz, it is done once the
+ * teacher marks it read, so missing trainer work never blocks the teacher (D6).
+ */
+export function fileIsDone(file: { hasApprovedQuiz: boolean; quizPassed: boolean; markedRead: boolean }): boolean {
+  if (file.quizPassed) return true;
+  return !file.hasApprovedQuiz && file.markedRead;
+}
+
+/** A module is complete when every lesson file is done. A module with no lesson file is complete (D6). */
 export function moduleIsComplete(progress?: ModuleProgress): boolean {
   if (!progress) return false;
   if ((progress.total ?? -1) === 0) return true;
@@ -79,10 +91,13 @@ export function moduleCoveragePercentage(completedModules: number, totalModules:
   return Math.round((completedModules / totalModules) * 1000) / 10;
 }
 
+/**
+ * A course is complete at COURSE_COMPLETE_PERCENT of its modules (D4). Count every module, with or
+ * without lesson files. A course with no modules is not complete: there is nothing to finish.
+ */
 export function isCourseComplete(completedModules: number, totalModules: number): boolean {
   if (totalModules <= 0) return false;
-  const pct = Math.round((completedModules / totalModules) * 100);
-  return completedModules >= totalModules || pct >= 90;
+  return completedModules * 100 >= totalModules * COURSE_COMPLETE_PERCENT;
 }
 
 export type NamedCourseCompletion = {
@@ -130,7 +145,7 @@ export function scoreQuizSubmission(
   const totalGraded = graded.length;
   const passed = totalGraded === 0
     ? openEnded.length > 0 && openEndedAnswered === openEnded.length
-    : correct >= Math.ceil(totalGraded * 0.7);
+    : correct * 100 >= totalGraded * MODULE_QUIZ_PASS_PERCENT;
   const totalQuestions = totalGraded > 0 ? totalGraded : questions.length;
   const score = totalGraded > 0 ? correct : openEndedAnswered;
   const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
