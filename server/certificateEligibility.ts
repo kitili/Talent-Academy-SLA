@@ -214,7 +214,7 @@ export async function listEligibleFellows(rows: EligibilityRows): Promise<Eligib
     const courseDone = courseCompletionOnce(fellow.id, readers);
     const path = await academyPathStatus(fellow.id, readers, courseDone);
     const cohortIds = new Set((await readers.teacherCohorts(fellow.id)).map((cohort) => cohort.id));
-    const courseIds = [...new Set(rows.placements.filter((row) => cohortIds.has(row.cohortId)).map((row) => row.courseId))]
+    const courseIds = Array.from(new Set(rows.placements.filter((row) => cohortIds.has(row.cohortId)).map((row) => row.courseId)))
       .filter((courseId) => courseNames.has(courseId));
     const courses: EligibleCourse[] = [];
     for (const courseId of courseIds) {
@@ -313,7 +313,9 @@ export async function loadEligibilityRows(): Promise<EligibilityRows> {
         .filter((link) => link.cohortBatchId === step.id)
         .map((link) => ({ courseId: link.courseId, orderIndex: link.orderIndex })),
     })),
-    modules: modules.map((mod) => ({ id: mod.id, courseId: mod.courseId, deckFiles: mod.deckFiles as CompletionModule["deckFiles"] })),
+    // A module with no course belongs to no certificate.
+    modules: modules.flatMap((mod) =>
+      mod.courseId ? [{ id: mod.id, courseId: mod.courseId, deckFiles: mod.deckFiles as CompletionModule["deckFiles"] }] : []),
     progress,
     approvedQuizzes,
     passedAttempts: [
