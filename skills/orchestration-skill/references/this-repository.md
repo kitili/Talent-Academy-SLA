@@ -19,7 +19,7 @@ The project-specific half of `skills/orchestration-skill/SKILL.md`.
 - Reset to `<sha>` before any edit if you are not on it.
 - Stay inside the files this brief names; commit to your own branch; never push, stash, or switch another checkout.
 - **Never load `.env` and never start the server.** `.env` points at the live database, and server start-up writes to
-  it (schema, test logins, and deleting inactive accounts).
+  it (schema, test logins, and the one-time desk prune if its flag row is missing).
 - Long runs go in the background, logged under the worktree's `tmp/`.
 - Commit a "(WIP)" checkpoint after each step of edits and before any long run.
 - Run the focused tests for what you changed, for example `npx tsx --test tests/<file>.test.ts` or

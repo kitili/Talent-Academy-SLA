@@ -35,8 +35,8 @@ leftover `node` processes with `Get-Process node` in PowerShell and end the ones
 ## This repository's traps to carry into every handoff
 
 - **One database.** Local `.env` and production share one Neon database. Write down anything run against it this
-  session: a local server start (it creates schema, resets test logins and deletes inactive accounts), a script under
-  `scripts/` or `server/migrations/`, or `npm run db:push`.
+  session: a local server start (it creates schema, resets test logins and runs the one-time desk prune if its flag
+  row is missing), a script under `scripts/` or `server/migrations/`, or `npm run db:push`.
 - **No staging.** `main` is what ships; work happens on `feat/improvements`. Say how far `feat/improvements` is
   ahead of `origin/main`, whether it is pushed, and whether a merge into `main` is waiting on the engineer's approval.
 - **Known type errors.** `npm run typecheck` reported 46 errors in app code on 2026-10-26 (none in tests or scripts).

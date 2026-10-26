@@ -63,8 +63,8 @@ up runs. Say that the target is the production database, since there is no other
 
 ## Traps Recorded Here
 
-- Server start-up writes to the database: it adds schema, resets the test logins, and `removeInactiveDesks()`
-  (`server/deskRoster.ts`) deletes every inactive trainer or teacher with the rows that hang on them. Starting a
-  local server with `.env` loaded is a production write.
+- Server start-up writes to the database: it adds schema, resets the test logins, and runs `pruneExtraDesksOnce()`
+  (`server/deskRoster.ts`) only if its flag row is missing. It keeps inactive accounts. Starting a local server with
+  `.env` loaded is a production write.
 - `pruneExtraDesksOnce()` ran a one-time cleanup keyed by the `app_flags` row `desk_roster_v2`. Deleting that row
   would run it again and remove every trainer but `trainer1` and every teacher but `teacher@test.com`.
