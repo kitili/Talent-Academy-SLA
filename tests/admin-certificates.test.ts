@@ -31,7 +31,7 @@ describe("admin academy certificates", () => {
     assert.match(routes, /\/api\/admin\/certificates\/issue/);
     assert.match(routes, /isStrictAdmin/);
     assert.match(storage, /issueAcademyCertificate/);
-    assert.match(storage, /syncTeacherCourseCompletion\(teacherId, courseId\);\n    return null;/);
+    assert.match(storage, /syncTeacherCourseCompletion\(teacherId, courseId\);\r?\n    return null;/);
     assert.equal(read("client/src/pages/teacher-certificate-view.tsx").includes("canEdit = false"), true);
   });
 });

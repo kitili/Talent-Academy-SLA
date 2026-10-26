@@ -39,5 +39,5 @@ leftover `node` processes with `Get-Process node` in PowerShell and end the ones
   `scripts/` or `server/migrations/`, or `npm run db:push`.
 - **No staging.** `main` is what ships. Say whether `main` is ahead of `origin/main`, and whether that is waiting on
   the engineer's approval.
-- **Known red test.** `tests/admin-certificates.test.ts` failed on Windows checkouts on 2026-10-26 (a `\n` match
-  against CRLF source). Say whether it is still red, so the reader does not chase it as new.
+- **Known type errors.** `npm run typecheck` reported 46 errors in app code on 2026-10-26 (none in tests or scripts).
+  Give the count, so the reader can tell a new error from an old one.
