@@ -1233,11 +1233,12 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(batchTeachers, eq(batches.id, batchTeachers.batchId))
       .groupBy(batches.id);
     
+    // Trainer scope (D8), the SQL twin of trainerOwnsBatch in server/access.ts: trainer_id or a
+    // cohort_trainers row. created_by grants nothing.
     if (trainerId) {
       return await query.where(
         or(
           eq(batches.trainerId, trainerId),
-          eq(batches.createdBy, trainerId),
           sqlOp`exists (select 1 from cohort_trainers where cohort_id = ${batches.id} and trainer_id = ${trainerId})`,
         ),
       );

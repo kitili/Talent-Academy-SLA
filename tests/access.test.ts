@@ -11,13 +11,13 @@ describe("role boundaries", () => {
     assert.equal(isAcademyStaff(null), false);
   });
 
-  it("lets a trainer open only cohorts assigned to them", () => {
+  it("lets a trainer open only cohorts assigned to them, not cohorts they only created", () => {
     const trainer = { id: "t1", role: "trainer" };
     const own = { trainerId: "t1", createdBy: "admin" };
     const created = { trainerId: null, createdBy: "t1" };
     const other = { trainerId: "t2", createdBy: "admin" };
     assert.equal(trainerOwnsBatch(trainer, own), true);
-    assert.equal(trainerOwnsBatch(trainer, created), true);
+    assert.equal(trainerOwnsBatch(trainer, created), false);
     assert.equal(trainerOwnsBatch(trainer, other), false);
     assert.equal(trainerOwnsBatch(trainer, null), false);
     assert.equal(trainerOwnsBatch(trainer, { trainerId: "t2", createdBy: "admin", trainerIds: ["t1"] }), true);
