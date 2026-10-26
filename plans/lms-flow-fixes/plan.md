@@ -581,3 +581,272 @@ Layer 3 (integration):        orchestrator merges B, C, D, E in any order,
   in parallel throughout. B goes first because it closes the largest live gap. C follows, then E, because C's lock
   reads E-region data only through Track 0 resolvers. D goes last because it reads everyone's rules.
 - The only cross-track call that crosses regions is C8, and its signatures are frozen.
+
+## Data Boundary And Security
+
+These are the gaps that exist today, at `71c4782`, in production.
+
+| Gap | Real today? | Who can reach it | What it writes or reads | Closed by |
+| --- | --- | --- | --- | --- |
+| Course skip (finding 1) | **Yes.** | Any teacher, from the dashboard button, at 0%. | Writes a `teacher_course_completion` row marked `completed`. That row unlocks the next course, counts on the academy path, earns a medal, and is what the bulk certificate route reads. | C (refusal), D (certificates recompute), D10 (report on old rows) |
+| Client-sent quiz answers (finding 2) | **Yes.** | Any signed-in teacher, with a hand-made request, for any module, even outside their cohorts (N3). | Writes a passing attempt and `completed` progress for the file, then runs completion sync. The answers are also readable before the attempt: module quiz `GET`, assigned quiz `GET`, and the generate route on a cache hit, including unapproved quizzes. | B |
+| Teacher-triggered AI generation (N2) | **Yes.** | Any teacher, with a hand-made request. | Pays for an OpenAI draft. With `force`, replaces the trainer's quiz and marks it approved. | B |
+| Unowned course edit or delete (finding 6) | **Yes, at the API.** No trainer screen calls it. | Any trainer session. | `DELETE` cascades to modules, completion rows and certificates for that course (`shared/schema.ts:605, 665`). Module, file and quiz edits for any course are also reachable from CourseWeeks by id. | E (courses), B (modules, files, quizzes) |
+| Start-up account deletion | **Yes, as a standing hazard.** It runs on every cold start. Today it finds only rows the one-time prune marked, so the next run deletes nothing new unless someone marks a desk inactive. | Any deploy or cold start, and any local start with `.env`. | Hard-deletes users and teachers, and the rows keyed on them. | F |
+| Two identities in one session (N1) | **Yes.** | Anyone who signs in as a teacher without logging out a staff session on the same browser, or the reverse. | Not an escalation across people: both identities belong to whoever signed in. But a shared classroom browser can hand a trainer session to the next teacher. | A |
+| Cross-cohort reads (N4, N6) | **Yes.** | Teachers: module content and discussions by id. Trainers: any cohort's certificates. | Reads only. | C, D |
+
+Access-control changes, including ones that grant nothing new:
+- Trainers lose: course `PATCH`/`DELETE`, course assign, edits to modules, files and quizzes outside their cohorts'
+  courses, reads of other cohorts' certificates, and cohorts they reached only through `created_by` (D8).
+- Trainers gain: quiz approval on their own cohorts' courses, from their own screen. The server already allows it
+  everywhere today, so the change narrows it (D5).
+- Teachers lose: AI generation, unapproved quizzes, answers before submitting, quizzes and content for courses outside
+  their open cohorts, and the course skip.
+- Admins: unchanged, except that certificate issue now refuses an incomplete course.
+
+The enforcement point for each rule is the Express route. Client gates (`canCheckComplete`, module locks, the hidden
+Delete button) mirror it and are never the only check. See `docs/_learnings/a-signed-in-check-is-not-a-write-gate.md`
+and `docs/_learnings/a-client-lock-that-mirrors-one-server-rule-fires-the-others-writes.md`.
+
+Existing helpers reused by this plan, checked against the findings above (checklist 2):
+- `trainerOwnsBatch` and `staffCanAccessBatch`: reused, but D8 narrows their rule first (Track 0).
+- `teacherRecordAllowed`: reused for certificate reads. It loops `getAllBatches(trainerId)`, so it follows C4.
+- `teacherMayTakeQuiz`: **not safe as is.** It allows an empty list (N3); B changes it.
+- `moduleIsComplete`, `isCourseComplete`, `scoreQuizSubmission`: reused as the C2 home after Track 0 changes them.
+- `blockAssignedQuiz`, `passMarkOf`: reused unchanged.
+
+## Migrations
+
+Under the recommended decisions, **no schema change.** No column, table or constraint is added. Each alternative
+that needs one is named here so the engineer sees the cost:
+- D2 alternative: `courses.created_by varchar references users(id)`.
+- D9 alternative: `batch_teachers.source varchar not null default 'trainer'`, with a CHECK on (`step`, `trainer`).
+
+If either is chosen, its files go in `migrations/lms-flow-fixes/` in the migrations skill's file set (preflight, up,
+down, postflight). Agents write them; the engineer applies them in the Neon SQL editor. The up runs **before** the
+deploy that reads the column. `server/schemaGuard.ts` adds any column `shared/schema.ts` names at start-up, so a deploy
+that names the column also creates it, without the CHECK or backfill. The migration must therefore run first and be
+idempotent.
+
+D10 (Track C) writes `migrations/lms-flow-fixes/completion-rule-report.preflight.sql`, which is read-only: it lists
+`teacher_course_completion` rows marked `completed` that fail the rule. The optional
+`completion-rule-repair.apply.sql` is written and **not applied**. Both are checked with
+`node scripts/database/check-sql-catalog-qualification.mjs migrations/lms-flow-fixes`.
+
+### Phase 0: read-only probe (the engineer runs it; ships no code)
+
+Run in the Neon SQL editor before phase 2 starts. This plan did not run these queries. Record the results here with
+the date.
+
+```sql
+-- Q1. Completion rows marked complete that the stored counts do not support (impact of finding 1; D10)
+SELECT count(*) FROM public.teacher_course_completion
+WHERE status = 'completed' AND (total_weeks = 0 OR completed_weeks < total_weeks);
+
+-- Q2. Quiz approval state today (D5)
+SELECT approved, count(*) FROM public.quiz_cache GROUP BY approved;
+
+-- Q3. Lesson files with no approved quiz (impact of D6)
+SELECT count(*) FROM public.training_weeks w
+CROSS JOIN LATERAL jsonb_array_elements(COALESCE(w.deck_files, '[]'::jsonb)) AS f(file)
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.quiz_cache q
+  WHERE q.week_id = w.id AND q.deck_file_id = f.file->>'id' AND q.approved
+);
+
+-- Q4. Cohorts a trainer reaches only through created_by (D8; findings 15, 16)
+SELECT b.id, b.name, u.username FROM public.batches b
+JOIN public.users u ON u.id = b.created_by AND u.role = 'trainer'
+WHERE b.trainer_id IS DISTINCT FROM b.created_by
+  AND NOT EXISTS (SELECT 1 FROM public.cohort_trainers ct WHERE ct.cohort_id = b.id AND ct.trainer_id = b.created_by);
+
+-- Q5. Inactive desks now, and the one-time prune flag (D7)
+SELECT role, count(*) FROM public.users WHERE approval_status = 'inactive' GROUP BY role;
+SELECT count(*) FROM public.teachers WHERE approval_status = 'inactive';
+SELECT key, value, created_at FROM public.app_flags WHERE key = 'desk_roster_v2';
+
+-- Q6. Sessions holding both a staff user and a teacher (N1)
+SELECT count(*) FROM public.sessions
+WHERE sess ? 'passport' AND sess->'passport' ? 'user' AND sess ? 'teacherId';
+
+-- Q7. Cohort and step names that use the other level's word (finding 4)
+SELECT 'cohort' AS level, name FROM public.batches WHERE name ~* '^(batch|week)'
+UNION ALL SELECT 'step', name FROM public.cohort_batches WHERE name ~* '^(cohort|week)';
+
+-- Q8. Teachers enrolled in a cohort with no assigned trainer (finding 16)
+SELECT b.id, b.name, count(bt.teacher_id) AS teachers FROM public.batches b
+JOIN public.batch_teachers bt ON bt.batch_id = b.id
+WHERE b.trainer_id IS NULL AND NOT EXISTS (SELECT 1 FROM public.cohort_trainers ct WHERE ct.cohort_id = b.id)
+GROUP BY b.id, b.name;
+```
+
+How the results change the plan: if Q4 is not empty, the D8 recommendation waits on those assignments. If Q3 is
+large, D6's recommendation matters more than its alternative. A large Q1 sharpens D10. If Q6 is not empty, A's deploy
+leaves those sessions as they are until they log out; clearing them is an engineer's call, because it signs everyone
+out.
+
+## Test Plan
+
+Tests planned for phase 2, per track, are listed under *Tasks*. Across all of them:
+- New tests live in `tests/unit/<area>/` and run under `node scripts/run-node-tests.mjs unit`. The older
+  `tests/*.test.ts` files that a track changes stay in the `test` script list.
+- Route handlers call `storage` and `db` directly, so none can be driven yet
+  (`skills/test-skill/references/this-repository.md`). Each track therefore puts the rule in a pure or injected function
+  the route calls, and tests that function with rows in memory. A text contract only proves the route calls the
+  function, and says so. A fake `storage` module for handler tests is cut (see *Cut*).
+- Every refusal test is run once with its check removed, and must fail (checklist 7;
+  `docs/_learnings/a-refusal-test-that-passes-when-the-refusal-is-gone.md`). The worker reports that it did this.
+- Text contracts match line breaks with `\r?\n`.
+- No test touches the database, loads `.env` or starts the server.
+- Workers run their focused tests and `npm run typecheck`. The baseline is 46 errors in app code, so a worker reports
+  the count before and after and adds none. The orchestrator runs the full `npm test`, `npm run typecheck` and
+  `npm run build` once on `feat/improvements` after G merges. The build is needed because the client and server
+  bundles change.
+
+Not covered by any automated test, and checked at acceptance instead: the browser session cases (A); what each
+desk shows after each action; behaviour against live rows.
+
+## Rollout Plan
+
+- **Branches.** Every track branches from `feat/improvements` (after Track 0 has merged, for B to E and G) and
+  merges back into it. `main` stays production. It takes one merge of `feat/improvements` only after the steering
+  engineer says go.
+- **Order on `feat/improvements`.** Track 0, A and F as they finish. Then B, C, D and E in any order. Then G. Then
+  the orchestrator's full suite, typecheck and build.
+- **Deploy order.** One service, one database, no staging. Under the recommended decisions there is no migration, so
+  the order is:
+  1. The engineer runs Phase 0 and records the results.
+  2. If an alternative needing a migration was chosen: preflight, up, read-back in the Neon SQL editor.
+  3. Merge `feat/improvements` into `main`, and Vercel deploys.
+  4. Acceptance on production with the test logins (below).
+- **What users notice at deploy.** The pass mark moves to 80% (D3). The skip button shows only when a course is
+  done. Lesson files with no approved quiz can be completed by reading them (D6). AI drafts wait for approval (D5), so
+  a file uploaded after deploy has no quiz until someone approves one. Teachers with a mixed session sign in again
+  only when they next log out (A). Inactive desks stop disappearing (D7).
+- **Version skew.** For a few minutes, browsers can run the old bundle against the new server. The old
+  `FileQuizDialog` sends `{ questions, answers }`; the new server ignores `questions` and scores the same cached quiz,
+  so the result is the same. The old dashboard may show the skip button; the server refuses it with a sentence. The
+  old trainer desk may show Delete, which already fails today.
+- **Rollback.** Revert the merge on `main` and redeploy. There is no schema change, so reverting the code is a full
+  rollback of behaviour. Rows written in the meantime (attempts, completion rows, approvals) stay, and they are valid
+  under both versions.
+- **Start-up writes during rollout.** Every cold start still runs `ensureAllTestLogins` (the test-login reset stays).
+  Until F is deployed, `removeInactiveDesks` still runs.
+
+## Risks And Guardrails
+
+- The pass mark change is felt by teachers mid-course. Mitigation: the engineer decides D3 knowingly, and the guide and
+  dialog say the number.
+- D5 makes a new lesson file quiz-less until approved. With D6, teachers are not blocked, but they skip the quiz.
+  Mitigation: the trainer desk lists files waiting for approval.
+- Region ownership of `routes.ts` and `storage.ts` can still conflict at the hot spots. Mitigation: the orchestrator
+  merges one track at a time and runs that track's focused tests after each merge, or uses the strict fallback order.
+- Recomputing completion on every `complete` and certificate request adds queries per module. Today the counts are
+  tens of modules per course, so this is acceptable. If it is not, cache per request, not across requests.
+- D8 can hide a cohort from a trainer who reached it through `created_by`. Mitigation: Phase 0 Q4 first.
+
+## Hazards From docs/_learnings
+
+- `one-rule-many-layers.md`: each rule here has several copies. The pass mark has five (`progressLogic.ts:133`,
+  `routes.ts:1877`, `:3225`, `:3281`, `FileQuizDialog.tsx:457, 673`). Completion has five (`moduleIsComplete`,
+  `isCourseComplete`, `syncTeacherCourseCompletion`, the inline percentages in `assigned-weeks` and the content route,
+  and `courseCompleted` in `academyPathRoutes.ts:131`). Trainer scope has four (`access.ts`, the `getAllBatches` SQL,
+  `routes.ts:4413`, `routes.ts:4567`). Track 0 collapses each into one home, and each track greps for the old copies
+  before it calls a rule fixed.
+- `a-signed-in-check-is-not-a-write-gate.md`: `isTrainer` and `isAuthenticatedAny` are role checks, not scope checks.
+  Every write route in B, C, D and E names the row that ties the id to the caller (C5).
+- `a-client-lock-that-mirrors-one-server-rule-fires-the-others-writes.md`: the dashboard's `canCheckComplete` and
+  module locks mirror the server, and the server content route mirrored only part of the rule (N4). The server
+  enforces all of it, and the client only reads server flags.
+- `a-count-made-in-the-ui-from-a-projection-cannot-match-the-servers.md`: findings 15 and 22, and the dashboard's
+  `courseChecked ? 100 : percent`. The server sends the number, and the page draws it.
+- `an-approval-the-model-can-write-is-not-an-approval.md`: AI drafts saved `approved: true` (D5).
+- `a-promise-on-a-consent-screen-outlives-the-code-that-made-it.md`: "Inactive desks stay folded below" against
+  start-up deletion (D7), and "Your trainer can reply here" (D11).
+- `a-documented-entry-point-can-be-unreachable.md`: findings 21 and 24.
+- `a-refusal-test-that-passes-when-the-refusal-is-gone.md` and `a-test-that-reads-source-as-text-cannot-guard-a-move.md`:
+  see *Test Plan*.
+- `newline-anchored-matching-fails-only-on-windows.md` and `a-docs-only-change-can-fail-the-suite.md`: G's guide edits
+  and every text contract.
+- `removing-a-worktree-follows-its-links-into-the-main-checkout.md`: workers that link `node_modules` unlink it before
+  the worktree is removed.
+
+## Acceptance Criteria
+
+On production after deploy, with the test logins (admin, `trainer1`, `teacher@test.com`). Each check is read from the
+row, not from the screen:
+- Teacher on a course at 0%: no skip button. A hand-made `POST .../complete` returns 400 `COURSE_INCOMPLETE`, and no
+  `teacher_course_completion` row is marked `completed`.
+- Teacher posts a forged module-quiz body with every answer "correct": the attempt row's score matches the cached quiz,
+  not the body. `GET .../quiz` has no `correctAnswer` anywhere in the response.
+- Teacher calls generate: 403, and no new `quiz_cache` row.
+- `trainer1` sends `PATCH /api/courses/:id`: 403, and the course row is unchanged. `trainer1` approves a quiz on a
+  course placed on their cohort: 200, and the row has `approved = true`.
+- Admin saves a step's teachers: a teacher `trainer1` added by hand is still in `batch_teachers`.
+- People, the trainer desk and Analytics show the same cohort count for `trainer1`.
+- Sign in as trainer, then as teacher on the same browser, without logging out: the teacher desk shows, and
+  `/api/user` answers with the teacher. Log out, press Back: the sign-in page stays.
+- After a cold start, Phase 0 Q5's counts have not dropped.
+- An admin issues a course certificate for a teacher who has not finished: refused with a sentence, and no
+  `teacher_certificates` row.
+
+Acceptance writes rows for `teacher@test.com` on production. "Clear previous activity" resets them afterwards, if
+wanted.
+
+## Simplest Design And What Was Cut
+
+The design adds three small files (`shared/constants.ts`, `server/completion.ts`, `server/scope.ts`), each justified
+under *Shared Contracts*. It adds no table, column, service, queue, flag or dependency. Everything else edits routes
+and pages that exist. Cut, and why that is safe:
+- **Table renames** (D1-C). The UI words carry the model, and the mapping is written once. Nothing reads table names
+  except code.
+- **`courses.created_by`** (D2 alternative). Scope comes from placements, which already exist.
+- **`batch_teachers.source`** (D9 alternative). Enrolment only grows on a step save, and removal stays explicit.
+- **Automatic certificates** (D4 alternative). Admins issue today. The server check removes the risk that made
+  automation attractive.
+- **A trainer discussion view** (D11 alternative). The copy is made true instead. Future improvement.
+- **A repair of historical completion rows** (D10). The rows no longer earn anything, and the report keeps the choice
+  with the engineer.
+- **Splitting `routes.ts` into modules.** Region ownership gets the parallelism without an unrelated refactor.
+- **A fake `storage` for route-handler tests.** The rules move into functions the routes call, and those are tested.
+  The wiring is guarded by text contracts, with that limit stated.
+- **The legacy staff week quiz** (`routes.ts:1813, 1858`). Staff only, and no teacher can reach it.
+- **A feature flag for the new rules.** One deploy, no staging, and a clean code rollback. A flag would have to cover
+  four tracks' rules at once, and would ship the old gaps while off.
+
+## Out Of Scope
+
+Design feedback (its own track); analytics screens other than the counts in finding 15; a trainer Courses screen;
+bulk changes to cohort or step names (Q7 lists them for the admin to rename in the UI); `/api/emergency-admin-reset`
+on the server (it already refuses; G removes only its page).
+
+## Future Improvements
+
+- A trainer view of module discussions with replies (D11 alternative).
+- An explicit, consent-gated admin action to delete inactive desks (D7).
+- Route-handler tests over a fake `storage` module, which would let the text contracts go.
+- Retiring `pruneExtraDesksOnce` and its `app_flags` row once nobody needs the history.
+
+## Assumptions
+
+- The guides are the product's intent where they agree with each other. Where they disagree with each other (who
+  creates courses), D2 decides.
+- Live counts (findings 15 and 16) behave as the code says. Phase 0 checks this.
+- No other client (no mobile app, no script) calls the routes this plan deletes. A grep of `client/src`, `scripts/`
+  and `server/` found none. Logs were not checked.
+- `feat/improvements` gains no code commits in these files before the tracks branch. If it does, Track 0 re-checks the
+  line anchors.
+
+## What This Plan's Guards Do Not Cover (checklist 12)
+
+- Route wiring is proven by text contracts, not by driving the handler. A route that calls the right function with a
+  wrong id would pass.
+- Q6 sessions with two identities stay until they log out. A does not clear them.
+- Rows written by the skip before deploy stay `completed` (D10). They unlock the next course for that teacher, but they
+  no longer earn a certificate.
+- `GET /api/courses/:courseId/weeks` and `GET /api/courses/:id` remain readable by any staff, for any course
+  (draft-aware). That is accepted as staff-wide read.
+- `/api/files/proxy`, `/convert-to-html`, `/convert-to-pdf` and `/objects/*` were not reviewed for scope. They are
+  outside these findings, but they serve lesson files.
+- Analytics routes outside finding 15 were not re-checked for the D8 rule.
