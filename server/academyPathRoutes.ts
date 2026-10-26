@@ -15,6 +15,7 @@ import {
   teachers,
   users,
 } from "@shared/schema";
+import { enrolmentsToAdd } from "./cohortRoster";
 import { ACADEMY_TERMS, batchHoldingCourse, moveBatchOrder, nextBatchName, normalizeCohortsRequired, pathSummary, sortBatches } from "@shared/academyPath";
 
 const SETTINGS_ID = "path";
@@ -190,16 +191,16 @@ export function registerAcademyPathRoutes(
       res.status(201).json(created);
     } catch (error) {
       console.error("Error creating batch:", error);
-      res.status(500).json({ error: "Failed to add a batch" });
+      res.status(500).json({ error: "Failed to add a step" });
     }
   });
 
   app.patch("/api/admin/academy-path/batches/:batchId", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const [existing] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
-      if (!existing) return res.status(404).json({ error: "Batch not found" });
+      if (!existing) return res.status(404).json({ error: "Step not found" });
       const name = req.body?.name !== undefined ? String(req.body.name).trim() : existing.name;
-      if (!name) return res.status(400).json({ error: "Batch name is required" });
+      if (!name) return res.status(400).json({ error: "Step name is required" });
       const [updated] = await db.update(cohortBatches).set({
         name,
         description: req.body?.description !== undefined ? (req.body.description ? String(req.body.description) : null) : existing.description,
@@ -207,14 +208,14 @@ export function registerAcademyPathRoutes(
       res.json(updated);
     } catch (error) {
       console.error("Error updating batch:", error);
-      res.status(500).json({ error: "Failed to update the batch" });
+      res.status(500).json({ error: "Failed to update the step" });
     }
   });
 
   app.delete("/api/admin/academy-path/batches/:batchId", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const [existing] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
-      if (!existing) return res.status(404).json({ error: "Batch not found" });
+      if (!existing) return res.status(404).json({ error: "Step not found" });
       const links = await db.select().from(cohortBatchCourses).where(eq(cohortBatchCourses.cohortBatchId, existing.id));
       await db.delete(cohortBatches).where(eq(cohortBatches.id, existing.id));
       const siblings = sortBatches(await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, existing.cohortId)));
@@ -232,7 +233,7 @@ export function registerAcademyPathRoutes(
       res.sendStatus(204);
     } catch (error) {
       console.error("Error deleting batch:", error);
-      res.status(500).json({ error: "Failed to remove the batch" });
+      res.status(500).json({ error: "Failed to remove the step" });
     }
   });
 
@@ -240,14 +241,14 @@ export function registerAcademyPathRoutes(
     try {
       const direction = req.body?.direction === "later" ? "later" : "earlier";
       const [existing] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
-      if (!existing) return res.status(404).json({ error: "Batch not found" });
+      if (!existing) return res.status(404).json({ error: "Step not found" });
       const siblings = sortBatches(await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, existing.cohortId)));
       const order = moveBatchOrder(siblings.map((row) => row.id), existing.id, direction);
       await writeBatchOrder(order);
       res.json({ order });
     } catch (error) {
       console.error("Error reordering batch:", error);
-      res.status(500).json({ error: "Failed to reorder the batch" });
+      res.status(500).json({ error: "Failed to reorder the step" });
     }
   });
 
@@ -255,7 +256,7 @@ export function registerAcademyPathRoutes(
     try {
       const courseId = String(req.body?.courseId || "");
       const [step] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
-      if (!step) return res.status(404).json({ error: "Batch not found" });
+      if (!step) return res.status(404).json({ error: "Step not found" });
       const course = await storage.getCourse(courseId);
       if (!course) return res.status(404).json({ error: "Course not found" });
       const held = batchHoldingCourse(await stepsForCohort(step.cohortId), course.id);
@@ -278,7 +279,7 @@ export function registerAcademyPathRoutes(
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (/duplicate|unique/i.test(message)) {
-        return res.status(409).json({ error: "That course is already on this batch" });
+        return res.status(409).json({ error: "That course is already on this step" });
       }
       console.error("Error adding course to batch:", error);
       res.status(500).json({ error: "Failed to add the course" });
@@ -288,7 +289,7 @@ export function registerAcademyPathRoutes(
   app.delete("/api/admin/academy-path/batches/:batchId/courses/:courseId", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const [step] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
-      if (!step) return res.status(404).json({ error: "Batch not found" });
+      if (!step) return res.status(404).json({ error: "Step not found" });
       await db.delete(cohortBatchCourses).where(and(
         eq(cohortBatchCourses.cohortBatchId, step.id),
         eq(cohortBatchCourses.courseId, req.params.courseId),
@@ -338,29 +339,35 @@ export function registerAcademyPathRoutes(
   app.put("/api/admin/academy-path/batches/:batchId/teachers", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const [step] = await db.select().from(cohortBatches).where(eq(cohortBatches.id, req.params.batchId));
-      if (!step) return res.status(404).json({ error: "Batch not found" });
+      if (!step) return res.status(404).json({ error: "Step not found" });
       const teacherIds = [...new Set((Array.isArray(req.body?.teacherIds) ? req.body.teacherIds : []).map((id: unknown) => String(id)))];
       if (teacherIds.length > 0) {
         const known = await db.select({ id: teachers.id }).from(teachers).where(inArray(teachers.id, teacherIds));
         if (known.length !== teacherIds.length) {
-          return res.status(400).json({ error: "Choose teachers from the teacher list" });
+          return res.status(400).json({ error: "Choose Fellows from the Fellow list" });
         }
       }
+      const stepBefore = await db
+        .select({ teacherId: cohortBatchTeachers.teacherId })
+        .from(cohortBatchTeachers)
+        .where(eq(cohortBatchTeachers.cohortBatchId, step.id));
       await db.delete(cohortBatchTeachers).where(eq(cohortBatchTeachers.cohortBatchId, step.id));
       if (teacherIds.length > 0) {
         await db.insert(cohortBatchTeachers).values(teacherIds.map((teacherId) => ({ cohortBatchId: step.id, teacherId })));
       }
-      const siblingSteps = await db.select({ id: cohortBatches.id }).from(cohortBatches).where(eq(cohortBatches.cohortId, step.cohortId));
-      const enrolled = siblingSteps.length === 0
-        ? []
-        : await db
-            .select({ teacherId: cohortBatchTeachers.teacherId })
-            .from(cohortBatchTeachers)
-            .where(inArray(cohortBatchTeachers.cohortBatchId, siblingSteps.map((row) => row.id)));
-      const cohortTeacherIds = [...new Set(enrolled.map((row) => row.teacherId))];
-      await db.delete(batchTeachers).where(eq(batchTeachers.batchId, step.cohortId));
-      if (cohortTeacherIds.length > 0) {
-        await db.insert(batchTeachers).values(cohortTeacherIds.map((teacherId) => ({ batchId: step.cohortId, teacherId })));
+      // D9: a step save adds the Fellows it newly ticks to the cohort and never removes an enrolment.
+      // Taking a Fellow out of the cohort is the roster's Remove.
+      const enrolled = await db
+        .select({ teacherId: batchTeachers.teacherId })
+        .from(batchTeachers)
+        .where(eq(batchTeachers.batchId, step.cohortId));
+      const toEnrol = enrolmentsToAdd({
+        stepBefore: stepBefore.map((row) => row.teacherId),
+        stepAfter: teacherIds,
+        enrolled: enrolled.map((row) => row.teacherId),
+      });
+      if (toEnrol.length > 0) {
+        await db.insert(batchTeachers).values(toEnrol.map((teacherId) => ({ batchId: step.cohortId, teacherId }))).onConflictDoNothing();
       }
       res.json({ teacherIds });
     } catch (error) {

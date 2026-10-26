@@ -166,10 +166,10 @@ export default function AdminBatches() {
       await apiRequest("PUT", `/api/admin/academy-path/batches/${batchId}/teachers`, { teacherIds });
     },
     onSuccess: () => {
-      toast({ title: "Teachers updated" });
+      toast({ title: "Fellows updated" });
       refresh();
     },
-    onError: (error: Error) => fail(error, "Could not save the teachers"),
+    onError: (error: Error) => fail(error, "Could not save the Fellows"),
   });
 
   const accessMutation = useMutation({
@@ -201,10 +201,10 @@ export default function AdminBatches() {
     },
     onSuccess: (_data, { cohortId }) => {
       setBatchName((current) => ({ ...current, [cohortId]: "" }));
-      toast({ title: "Batch added" });
+      toast({ title: "Step added" });
       refresh();
     },
-    onError: (error: Error) => fail(error, "Could not add the batch"),
+    onError: (error: Error) => fail(error, "Could not add the step"),
   });
 
   const moveBatch = useMutation({
@@ -212,7 +212,7 @@ export default function AdminBatches() {
       await apiRequest("PATCH", `/api/admin/academy-path/batches/${batchId}/order`, { direction });
     },
     onSuccess: () => refresh(),
-    onError: (error: Error) => fail(error, "Could not reorder the batch"),
+    onError: (error: Error) => fail(error, "Could not reorder the step"),
   });
 
   const updateBatch = useMutation({
@@ -224,10 +224,10 @@ export default function AdminBatches() {
     },
     onSuccess: () => {
       setEditingBatch(null);
-      toast({ title: "Batch updated" });
+      toast({ title: "Step updated" });
       refresh();
     },
-    onError: (error: Error) => fail(error, "Could not update the batch"),
+    onError: (error: Error) => fail(error, "Could not update the step"),
   });
 
   const removeBatch = useMutation({
@@ -235,10 +235,10 @@ export default function AdminBatches() {
       await apiRequest("DELETE", `/api/admin/academy-path/batches/${id}`);
     },
     onSuccess: () => {
-      toast({ title: "Batch removed" });
+      toast({ title: "Step removed" });
       refresh();
     },
-    onError: (error: Error) => fail(error, "Could not remove the batch"),
+    onError: (error: Error) => fail(error, "Could not remove the step"),
   });
 
   const addCourseToBatch = useMutation({
@@ -246,7 +246,7 @@ export default function AdminBatches() {
       await apiRequest("POST", `/api/admin/academy-path/batches/${batchId}/courses`, { courseId });
     },
     onSuccess: () => {
-      toast({ title: "Course placed on the batch" });
+      toast({ title: "Course placed on the step" });
       refresh();
     },
     onError: (error: Error) => fail(error, "Could not add the course"),
@@ -257,7 +257,7 @@ export default function AdminBatches() {
       await apiRequest("DELETE", `/api/admin/academy-path/batches/${batchId}/courses/${courseId}`);
     },
     onSuccess: () => {
-      toast({ title: "Course removed from the batch" });
+      toast({ title: "Course removed from the step" });
       refresh();
     },
     onError: (error: Error) => fail(error, "Could not remove the course"),
@@ -334,9 +334,9 @@ export default function AdminBatches() {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 p-5 sm:p-6">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f3d7b0]">Academy path</p>
-              <h1 className="text-3xl font-bold mt-1 mb-2">Cohorts, batches, and courses</h1>
+              <h1 className="text-3xl font-bold mt-1 mb-2">Cohorts, steps, and courses</h1>
               <p className="text-white/80 max-w-2xl">
-                Batches follow each other: Batch One, then Batch Two, and onward. You add the cohorts, the batches, and the courses.
+                Steps follow each other: Step One, then Step Two, and onward. You add the cohorts, the steps, and the courses.
               </p>
             </div>
             <Button onClick={() => setCohortOpen(true)} className="bg-[#c47b2b] text-white hover:bg-[#a86722]" data-testid="button-add-cohort">
@@ -350,7 +350,7 @@ export default function AdminBatches() {
       <div className="grid gap-4 md:grid-cols-3 mb-6">
         {([
           ["cohort", "border-t-[#1d4e89]", "bg-[#e7f0fa] text-[#1d4e89]"],
-          ["batch", "border-t-[#c47b2b]", "bg-[#fff3e4] text-[#8a5414]"],
+          ["step", "border-t-[#c47b2b]", "bg-[#fff3e4] text-[#8a5414]"],
           ["course", "border-t-[#0f7a6c]", "bg-[#e5f5f2] text-[#0f7a6c]"],
         ] as const).map(([key, edge, chip]) => (
           <Card key={key} className={`border-t-4 ${edge}`} data-testid={`card-term-${key}`}>
@@ -380,7 +380,7 @@ export default function AdminBatches() {
               <Card className="p-8 text-center">
                 <Layers className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                 <h3 className="font-semibold mb-1">No cohorts yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">Add the first group of teachers. Then add the batches they will go through.</p>
+                <p className="text-sm text-muted-foreground mb-4">Add the first group of Fellows. Then add the steps they will go through.</p>
                 <Button onClick={() => setCohortOpen(true)}>Add cohort</Button>
               </Card>
             ) : data?.cohorts.map((cohort) => {
@@ -420,7 +420,7 @@ export default function AdminBatches() {
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => {
-                        if (window.confirm(`Remove the cohort "${cohort.name}"? Teachers in it lose that room.`)) removeCohort.mutate(cohort.id);
+                        if (window.confirm(`Remove the cohort "${cohort.name}"? Fellows in it lose that room.`)) removeCohort.mutate(cohort.id);
                       }} data-testid={`button-delete-cohort-${cohort.id}`}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -480,11 +480,11 @@ export default function AdminBatches() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {batches.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No batches in this cohort yet. The first one will be Batch One.</p>
+                    <p className="text-sm text-muted-foreground">No steps in this cohort yet. The first one will be {nextBatchName(0)}.</p>
                   ) : (
                     <>
                     <p className="text-sm text-[#243044]" data-testid={`cohort-week-note-${cohort.id}`}>
-                      One cohort. {batches.length === 7 ? "Seven batches, one for each step of the week." : `${batches.length} ${batches.length === 1 ? "batch" : "batches"}.`} Each batch carries the courses a teacher works through that week.
+                      One cohort, {batches.length} {batches.length === 1 ? "step" : "steps"}. Each step carries the courses a Fellow works through, in this order.
                     </p>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl bg-[#102448]/[0.04] px-3 py-3" data-testid={`batch-order-${cohort.id}`}>
                       {batches.map((batch, index) => (
@@ -514,9 +514,9 @@ export default function AdminBatches() {
                           <div className={`rounded-xl border p-3 space-y-2 ${tone.wash} ${tone.edge}`} data-testid={`week-batch-${batch.id}`}>
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-[#c47b2b]">Week {index + 1}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#c47b2b]">{ACADEMY_TERMS.step.title} {index + 1}</p>
                                 <p className="font-medium text-[#102448]">{batch.name}</p>
-                                <p className="text-xs text-[#3a4a60]">These courses are taught in week {index + 1}, and in no other week.</p>
+                                <p className="text-xs text-[#3a4a60]">These courses sit in step {index + 1}, and in no other step.</p>
                                 {batch.description && <p className="text-sm text-muted-foreground">{batch.description}</p>}
                               </div>
                               <div className="flex gap-1">
@@ -530,7 +530,7 @@ export default function AdminBatches() {
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                                 <Button size="icon" variant="ghost" onClick={() => {
-                                  if (window.confirm(`Remove batch "${batch.name}" from this cohort?`)) removeBatch.mutate(batch.id);
+                                  if (window.confirm(`Remove step "${batch.name}" from this cohort?`)) removeBatch.mutate(batch.id);
                                 }} data-testid={`button-delete-batch-${batch.id}`}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -551,7 +551,7 @@ export default function AdminBatches() {
                                 </Badge>
                               ))}
                               {batch.courses.length === 0 && (
-                                <span className="text-xs text-muted-foreground">No course on this batch yet.</span>
+                                <span className="text-xs text-muted-foreground">No course on this step yet.</span>
                               )}
                             </div>
                             {available.length > 0 && (
@@ -560,7 +560,7 @@ export default function AdminBatches() {
                                 onValueChange={(courseId) => addCourseToBatch.mutate({ batchId: batch.id, courseId })}
                               >
                                 <SelectTrigger className="bg-white" data-testid={`select-course-${batch.id}`}>
-                                  <SelectValue placeholder="Add a course to this batch" />
+                                  <SelectValue placeholder="Add a course to this step" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {available.map((course) => (
@@ -570,10 +570,13 @@ export default function AdminBatches() {
                               </Select>
                             )}
                             <div className="pt-1" data-testid={`teachers-${batch.id}`}>
-                              <p className="mb-2 text-sm font-medium">Teachers in this batch</p>
+                              <p className="mb-1 text-sm font-medium">Fellows in this step</p>
+                              <p className="mb-2 text-xs text-[#3a4a60]" data-testid={`step-roster-note-${batch.id}`}>
+                                Ticking a Fellow also adds them to the cohort. Unticking takes them off this step only; they stay in the cohort. To take a Fellow out of the cohort, use Remove on the cohort roster in Analytics.
+                              </p>
                               <div className="flex max-h-36 flex-wrap gap-x-4 gap-y-2 overflow-y-auto">
                                 {(data?.teachers || []).length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">No active teachers yet.</p>
+                                  <p className="text-sm text-muted-foreground">No active Fellows yet.</p>
                                 ) : (data?.teachers || []).map((teacher) => {
                                   const selected = (batch.teachers || []).some((row) => row.id === teacher.id);
                                   return (
@@ -661,7 +664,7 @@ export default function AdminBatches() {
                 Courses
               </CardTitle>
               <CardDescription>
-                Add a course here, then place it on a batch. A batch can hold more than one teacher.
+                Add a course here, then place it on a step. A step can hold more than one Fellow.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -723,7 +726,7 @@ export default function AdminBatches() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add a cohort</DialogTitle>
-            <DialogDescription>This is the group. You will add its batches next. They do not have to match any other cohort.</DialogDescription>
+            <DialogDescription>This is the group. You will add its steps next. They do not have to match any other cohort.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -798,7 +801,7 @@ export default function AdminBatches() {
       <Dialog open={!!editingBatch} onOpenChange={(open) => !open && setEditingBatch(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit batch</DialogTitle>
+            <DialogTitle>Edit step</DialogTitle>
           </DialogHeader>
           {editingBatch && (
             <div className="space-y-3">

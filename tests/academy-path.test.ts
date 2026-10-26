@@ -51,11 +51,13 @@ describe("academy path", () => {
     assert.equal(batchIsComplete({ id: "empty", courses: [] }), false);
   });
 
-  it("keeps batches in order from Batch One through Batch Five", () => {
+  it("keeps steps in order from Step One through Step Five", () => {
     assert.deepEqual(
       [0, 1, 2, 3, 4].map(nextBatchName),
-      ["Batch One", "Batch Two", "Batch Three", "Batch Four", "Batch Five"],
+      ["Step One", "Step Two", "Step Three", "Step Four", "Step Five"],
     );
+    assert.equal(nextBatchName(10), "Step 11");
+    assert.equal("batch" in ACADEMY_TERMS, false, "the deprecated batch term is gone");
     const ids = ["a", "b", "c", "d", "e"];
     assert.deepEqual(moveBatchOrder(ids, "c", "earlier"), ["a", "c", "b", "d", "e"]);
     assert.deepEqual(moveBatchOrder(ids, "a", "earlier"), ids);

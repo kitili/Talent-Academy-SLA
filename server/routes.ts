@@ -27,7 +27,9 @@ import {
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
 import { parseDeadline } from "@shared/academyPath";
-import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT } from "@shared/constants";
+import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, refusal } from "@shared/constants";
+import { trainerMayEditCourse } from "./scope";
+import { cohortsInScope, trainerCohortCounts } from "./cohortRoster";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
 import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
@@ -4175,21 +4177,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/trainers", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const allTrainers = await db.select().from(users).where(eq(users.role, "trainer")).orderBy(users.createdAt);
-      const allBatches = await storage.getAllBatches();
-      const trainersData = allTrainers.map((trainer: any) => {
-        const cohortCount = allBatches.filter((batch: any) => batch.createdBy === trainer.id || batch.trainerId === trainer.id).length;
-        return {
-          id: trainer.id,
-          username: trainer.username,
-          email: trainer.email,
-          role: trainer.role,
-          approvalStatus: trainer.approvalStatus,
-          createdAt: trainer.createdAt,
-          lastLogin: trainer.lastLogin,
-          progress: cohortCount > 0 ? 100 : 0,
-          filesCompleted: cohortCount,
-        };
-      });
+      // D8: the cohorts a trainer runs, by C4, the rule the desk and the route guard use.
+      const cohortCounts = await trainerCohortCounts(allTrainers.map((trainer) => trainer.id));
+      const trainersData = allTrainers.map((trainer: any) => ({
+        id: trainer.id,
+        username: trainer.username,
+        email: trainer.email,
+        role: trainer.role,
+        approvalStatus: trainer.approvalStatus,
+        createdAt: trainer.createdAt,
+        lastLogin: trainer.lastLogin,
+        cohortCount: cohortCounts[trainer.id] || 0,
+      }));
       
       res.json(trainersData);
     } catch (error) {
@@ -4209,11 +4208,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { password, ...sanitized } = trainer;
-      const trainerBatches = (await storage.getAllBatches()).filter(
-        (batch: any) => batch.createdBy === id || batch.trainerId === id,
-      );
+      const trainerBatches = await storage.getAllBatches(id);
       res.json({
         ...sanitized,
+        cohortCount: trainerBatches.length,
         progress: trainerBatches.length > 0 ? 100 : 0,
         filesCompleted: trainerBatches.length,
         completedLessons: trainerBatches.map((batch: any) => batch.name),
@@ -4329,13 +4327,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(batches, eq(batchCourses.batchId, batches.id))
         .where(eq(batchCourses.courseId, courseId));
       
-      // Filter by user permissions (admin sees all, trainer only sees their own)
-      let results = batchesWithCourse.map(r => r.batch);
-      if (req.user!.role !== "admin") {
-        results = results.filter(b => b.createdBy === req.user!.id);
-      }
-      
-      res.json(results);
+      // Admins see every cohort; a trainer sees the cohorts they run (C4).
+      res.json(await cohortsInScope(req.user, batchesWithCourse.map((row) => row.batch)));
     } catch (error) {
       console.error("Error getting batches for course:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -4363,7 +4356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update course (admin only)
-  app.patch("/api/courses/:id", isAuthenticated, isTrainer, async (req, res) => {
+  app.patch("/api/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const course = await storage.updateCourse(req.params.id, req.body);
       if (!course) return res.status(404).json({ error: "Course not found" });
@@ -4375,7 +4368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete course (admin only)
-  app.delete("/api/courses/:id", isAuthenticated, isTrainer, async (req, res) => {
+  app.delete("/api/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const success = await storage.deleteCourse(req.params.id);
       if (!success) return res.status(404).json({ error: "Course not found" });
@@ -4386,45 +4379,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign course to batch (trainer)
-  app.post("/api/courses/:courseId/assign", isAuthenticated, isTrainer, async (req, res) => {
-    try {
-      const { targetId, targetType } = req.body;
-      const { courseId } = req.params;
-
-      if (!targetId || targetType !== "batch") {
-        return res.status(400).json({ error: "Invalid request: targetId and targetType='batch' required" });
-      }
-
-      const batch = await storage.getBatch(targetId);
-      if (!batch) return res.status(404).json({ error: "Batch not found" });
-
-      const assignment = await storage.assignCourseToBatch({
-        batchId: targetId,
-        courseId,
-        assignedBy: req.user!.id,
-      });
-      await recordAudit({
-        actorId: req.user!.id,
-        actorRole: req.user!.role,
-        action: "course_assigned",
-        targetType: "batch",
-        targetId: targetId,
-        metadata: { courseId },
-      });
-      res.json(assignment);
-    } catch (error) {
-      console.error("Error assigning course:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  // Reorder weeks for a course (admin only)
+  // Reorder the modules of a course: an admin, or a trainer whose cohort holds the course (D2)
   app.post("/api/courses/:courseId/weeks/reorder", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { weekId, newPosition } = req.body;
       const { courseId } = req.params;
-      
+      if (!(await trainerMayEditCourse(req.user, courseId))) {
+        return res.status(403).json(refusal("NOT_YOUR_COURSE"));
+      }
+
       if (!weekId || typeof newPosition !== 'number') {
         return res.status(400).json({ error: "Invalid request: weekId and newPosition required" });
       }

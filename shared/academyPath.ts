@@ -30,14 +30,6 @@ export const ACADEMY_TERMS = {
     title: "Fellow",
     body: "A learner in the academy. Fellows join cohorts, work through the courses in order and take the quizzes.",
   },
-  /**
-   * @deprecated The old word for a step, kept only until `client/src/pages/admin-batches.tsx`
-   * reads `step` (Track E). Do not add readers.
-   */
-  batch: {
-    title: "Batch",
-    body: "One step inside a cohort. Each cohort has its own list, so one cohort can have two batches and another can have five. A batch can hold more than one teacher.",
-  },
 } as const;
 
 export type PathCourse = { id: string; completed?: boolean };
@@ -52,11 +44,14 @@ export function normalizeCohortsRequired(value: unknown, fallback = 1) {
 
 const BATCH_WORDS = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 
-/** The next step name, so a cohort reads Batch One, Batch Two, and onward. */
+/**
+ * The next step name, so a cohort reads Step One, Step Two, and onward (D1). Steps named before D1
+ * keep their stored "Batch" names until an admin renames them.
+ */
 export function nextBatchName(existingCount: number) {
   const number = Math.max(0, Math.floor(existingCount)) + 1;
   const word = BATCH_WORDS[number - 1] || String(number);
-  return `Batch ${word}`;
+  return `${ACADEMY_TERMS.step.title} ${word}`;
 }
 
 export function sortBatches<T extends { id: string; orderIndex: number }>(batches: T[]): T[] {

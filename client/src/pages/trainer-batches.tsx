@@ -47,7 +47,7 @@ function DeadlineField({ id, value, onChange }: { id: string; value: string; onC
     <div className="space-y-2">
       <Label htmlFor={id}>Deadline</Label>
       <Input id={id} type="datetime-local" value={value} onChange={(event) => onChange(event.target.value)} data-testid={`input-${id}`} />
-      <p className="text-xs text-muted-foreground">Optional. Teachers see this date beside the work.</p>
+      <p className="text-xs text-muted-foreground">Optional. Fellows see this date beside the work.</p>
     </div>
   );
 }
@@ -107,9 +107,9 @@ function TeacherAudience({
     <>
     <div className="space-y-2" data-testid="quiz-audience">
       <Label>Who sits this</Label>
-      <p className="text-xs text-muted-foreground">Tick teachers to assign it only to them. Leave every box empty to give it to the whole cohort.</p>
+      <p className="text-xs text-muted-foreground">Tick Fellows to assign it only to them. Leave every box empty to give it to the whole cohort.</p>
       {teachers.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No teachers in this cohort yet.</p>
+        <p className="text-xs text-muted-foreground">No Fellows in this cohort yet.</p>
       ) : (
         <div className="max-h-36 space-y-2 overflow-y-auto">
           {teachers.map((teacher) => (
@@ -121,7 +121,7 @@ function TeacherAudience({
                 }}
                 data-testid={`check-quiz-teacher-${teacher.id}`}
               />
-              {teacher.name || teacher.email || "Teacher"}
+              {teacher.name || teacher.email || "Fellow"}
             </label>
           ))}
         </div>
@@ -204,7 +204,7 @@ function TrainerKpis({
 }) {
   const stats = [
     { id: "cohorts", label: "Cohorts", value: desk?.cohortCount ?? 0, tab: "cohorts", wash: "#e8eef8", ink: "#1d4e89" },
-    { id: "teachers", label: "Teachers", value: desk?.teacherCount ?? 0, tab: "progress", wash: "#e7f6f2", ink: "#0f7a6c" },
+    { id: "teachers", label: "Fellows", value: desk?.teacherCount ?? 0, tab: "progress", wash: "#e7f6f2", ink: "#0f7a6c" },
     { id: "progress", label: "Progress", value: desk?.progressPercent == null ? "—" : `${desk.progressPercent}%`, tab: "progress", wash: "#e7f7e4", ink: "#2f6b32" },
     { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "assessments", wash: "#efe8fb", ink: "#5b3d8a" },
     { id: "papers", label: "Assessments", value: desk?.paperExams ?? 0, tab: "assessments", wash: "#fff1e0", ink: "#9a5b16" },
@@ -468,14 +468,14 @@ export default function TrainerBatches() {
       const response = await apiRequest("POST", `/api/batches/${batchId}/teachers`, body);
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to add teacher");
+        throw new Error(data.error || "Failed to add the Fellow");
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id] });
-      toast({ title: "Success", description: "Teacher added to batch" });
+      toast({ title: "Success", description: "Fellow added to the cohort" });
       posthog.capture("teacher_added_to_batch", { batchId: selectedBatch?.id });
       setTeacherId("");
     },
@@ -492,7 +492,7 @@ export default function TrainerBatches() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id] });
-      toast({ title: "Success", description: `Added ${data.added} teacher${data.added !== 1 ? "s" : ""}${data.skipped > 0 ? `, ${data.skipped} already enrolled` : ""}` });
+      toast({ title: "Success", description: `Added ${data.added} Fellow${data.added !== 1 ? "s" : ""}${data.skipped > 0 ? `, ${data.skipped} already enrolled` : ""}` });
       setAddTeacherOpen(false);
       setSelectedTeacherIds([]);
       setTeacherSearch("");
@@ -524,7 +524,7 @@ export default function TrainerBatches() {
     onSuccess: (_, { batchId, teacherId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id] });
-      toast({ title: "Success", description: "Teacher removed from batch" });
+      toast({ title: "Success", description: "Fellow removed from the cohort" });
       posthog.capture("teacher_removed_from_batch", { batchId, teacherId });
     },
     onError: (error: Error) => {
@@ -727,7 +727,7 @@ export default function TrainerBatches() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "quizzes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
-      toast({ title: "Exam assigned", description: "Teachers can write it on their desk." });
+      toast({ title: "Exam assigned", description: "Fellows can write it on their desk." });
       setWriteExamOpen(false);
       clearExamForm();
     },
@@ -768,7 +768,7 @@ export default function TrainerBatches() {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "assignments"] });
       toast({
         title: "Assessment uploaded",
-        description: "Teachers open it on Work, not with their quizzes.",
+        description: "Fellows open it on Work, not with their quizzes.",
       });
       setTaskOpen(false);
       setTaskTitle("");
@@ -807,7 +807,7 @@ export default function TrainerBatches() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", selectedBatch?.id, "quizzes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
-      toast({ title: "Paper exam assigned", description: "Teachers open the paper beside their answers." });
+      toast({ title: "Paper exam assigned", description: "Fellows open the paper beside their answers." });
       setUploadExamOpen(false);
       clearExamForm();
     },
@@ -852,29 +852,11 @@ export default function TrainerBatches() {
       await apiRequest("POST", `/api/assigned-quizzes/${quizId}/reset-teacher/${teacherId}`);
     },
     onSuccess: () => {
-      toast({ title: "Attempts reset", description: "Teacher can now retake the quiz." });
+      toast({ title: "Attempts reset", description: "The Fellow can now retake the quiz." });
       refetchQuizAttempts();
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to reset attempts.", variant: "destructive" });
-    },
-  });
-
-  const deleteBatchMutation = useMutation({
-    mutationFn: async (batchId: string) => {
-      await apiRequest("DELETE", `/api/batches/${batchId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/batches"] });
-      toast({ title: "Success", description: "Batch deleted successfully" });
-      setSelectedBatch(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
@@ -1005,7 +987,7 @@ export default function TrainerBatches() {
                     <p className="text-xl font-semibold">Hello{user ? `, ${deskName(user)}` : ""}</p>
                     {(desk?.encouragement || deskError) && (
                       <p className="mt-1 max-w-2xl text-sm text-white/95" data-testid="trainer-encouragement">
-                        {desk?.encouragement || "You make it safe for a teacher to try again."}
+                        {desk?.encouragement || "You make it safe for a Fellow to try again."}
                       </p>
                     )}
                   </div>
@@ -1099,19 +1081,6 @@ export default function TrainerBatches() {
                 >
                   Open cohort room
                 </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    if (confirm(`Are you sure you want to delete the batch "${selectedBatch.name}"? This will remove all teachers and quizzes.`)) {
-                      deleteBatchMutation.mutate(selectedBatch.id);
-                    }
-                  }}
-                  data-testid={`button-delete-batch-${selectedBatch.id}`}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
                 </div>
               </div>
 
@@ -1140,7 +1109,7 @@ export default function TrainerBatches() {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Upload an assessment</DialogTitle>
-                      <DialogDescription>This goes to the teacher Work page. It is not a quiz.</DialogDescription>
+                      <DialogDescription>This goes to the Fellow Work page. It is not a quiz.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div className="space-y-2">
@@ -1188,7 +1157,7 @@ export default function TrainerBatches() {
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Write an exam</DialogTitle>
-                          <DialogDescription>Teachers open this as a document and write their answers beside it.</DialogDescription>
+                          <DialogDescription>Fellows open this as a document and write their answers beside it.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="space-y-2">
@@ -1220,7 +1189,7 @@ export default function TrainerBatches() {
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Upload a paper exam</DialogTitle>
-                          <DialogDescription>Teachers see the paper on one side and write answers on the other.</DialogDescription>
+                          <DialogDescription>Fellows see the paper on one side and write answers on the other.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="space-y-2">
@@ -1308,7 +1277,7 @@ export default function TrainerBatches() {
                               <Input
                                 id="quiz-title"
                                 data-testid="input-quiz-title"
-                                placeholder="e.g., Week 1 module quiz"
+                                placeholder="e.g., Module 1 quiz"
                                 value={quizTitle}
                                 onChange={(e) => setQuizTitle(e.target.value)}
                               />
@@ -1324,10 +1293,10 @@ export default function TrainerBatches() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="week-select">Select Week</Label>
+                              <Label htmlFor="week-select">Select module</Label>
                               <Select value={selectedWeek} onValueChange={setSelectedWeek}>
                                 <SelectTrigger id="week-select" data-testid="select-week">
-                                  <SelectValue placeholder="Choose a week..." />
+                                  <SelectValue placeholder="Choose a module..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {weeks.map((week: any) => (
@@ -1423,10 +1392,10 @@ export default function TrainerBatches() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="file-week-select">Select Week</Label>
+                              <Label htmlFor="file-week-select">Select module</Label>
                               <Select value={selectedWeek} onValueChange={setSelectedWeek}>
                                 <SelectTrigger id="file-week-select" data-testid="select-file-week">
-                                  <SelectValue placeholder="Choose a week..." />
+                                  <SelectValue placeholder="Choose a module..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {weeks.map((week: any) => (
@@ -1508,7 +1477,7 @@ export default function TrainerBatches() {
                                     {quiz.paperUrl ? "Paper" : quiz.weekId ? "Module" : "Written"}
                                   </Badge>
                                   <Badge variant="secondary" className="text-xs flex-shrink-0">
-                                    {quiz.teacherIds?.length ? `${quiz.teacherIds.length} teachers` : "Whole cohort"}
+                                    {quiz.teacherIds?.length ? `${quiz.teacherIds.length} Fellows` : "Whole cohort"}
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1">
@@ -1525,7 +1494,7 @@ export default function TrainerBatches() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  title="View teacher attempts"
+                                  title="View Fellow attempts"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedQuizForAttempts(quiz);
@@ -1663,18 +1632,18 @@ export default function TrainerBatches() {
                     })()}
                   </div>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Teacher progress</h3>
+                    <h3 className="text-lg font-semibold">Fellow progress</h3>
                     <Dialog open={addTeacherOpen} onOpenChange={setAddTeacherOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm" data-testid="button-add-teacher">
                           <Plus className="mr-2 h-4 w-4" />
-                          Add teachers
+                          Add Fellows
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
-                          <DialogTitle>Add Teachers to {selectedBatch?.name}</DialogTitle>
-                          <DialogDescription>Search by Teacher ID, name, or email. Select one or more teachers to add at once.</DialogDescription>
+                          <DialogTitle>Add Fellows to {selectedBatch?.name}</DialogTitle>
+                          <DialogDescription>Search by Fellow ID, name, or email. Select one or more Fellows to add at once.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                           {/* Quick add by ID/email/name */}
@@ -1712,7 +1681,7 @@ export default function TrainerBatches() {
                             <div className="relative">
                               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                               <Input
-                                placeholder="Search teachers..."
+                                placeholder="Search Fellows..."
                                 value={teacherSearch}
                                 onChange={(e) => setTeacherSearch(e.target.value)}
                                 className="pl-8"
@@ -1721,7 +1690,7 @@ export default function TrainerBatches() {
                             <ScrollArea className="h-48 border rounded-md">
                               <div className="p-2 space-y-1">
                                 {searchedTeachers.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground text-center py-4">No teachers found</p>
+                                  <p className="text-sm text-muted-foreground text-center py-4">No Fellows found</p>
                                 ) : (
                                   searchedTeachers.map((t: any) => {
                                     const alreadyEnrolled = batchDetails?.teachers?.some((bt: any) => bt.id === t.id);
@@ -1806,7 +1775,7 @@ export default function TrainerBatches() {
                               <Button variant="ghost" size="sm" title="Disqualify Fellow" className="text-red-500 hover:text-red-700" onClick={() => { setDisqualifyTeacher(teacher); setDisqualifyDialogOpen(true); }} data-testid={`button-disqualify-teacher-${teacher.id}`}>
                                 <Ban className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" title="Remove from batch" onClick={() => { if (confirm(`Remove ${teacher.name} from this batch?`)) removeTeacherMutation.mutate({ batchId: selectedBatch.id, teacherId: teacher.id }); }} data-testid={`button-remove-teacher-${teacher.id}`}>
+                              <Button variant="ghost" size="sm" title="Remove from cohort" onClick={() => { if (confirm(`Remove ${teacher.name} from this cohort?`)) removeTeacherMutation.mutate({ batchId: selectedBatch.id, teacherId: teacher.id }); }} data-testid={`button-remove-teacher-${teacher.id}`}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1880,7 +1849,7 @@ export default function TrainerBatches() {
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Mark Attendance</CardTitle>
-                      <CardDescription>Select a date and record attendance for all enrolled teachers</CardDescription>
+                      <CardDescription>Select a date and record attendance for all enrolled Fellows</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-center gap-3">
@@ -1895,7 +1864,7 @@ export default function TrainerBatches() {
                       </div>
 
                       {(batchDetails?.teachers || []).length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No teachers enrolled in this batch.</p>
+                        <p className="text-sm text-muted-foreground">No Fellows enrolled in this cohort.</p>
                       ) : (
                         <div className="space-y-2">
                           {/* Quick select all buttons */}
@@ -1955,7 +1924,7 @@ export default function TrainerBatches() {
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Attendance Summary</CardTitle>
-                      <CardDescription>Cumulative attendance rates for all teachers in this batch</CardDescription>
+                      <CardDescription>Cumulative attendance rates for all Fellows in this cohort</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {batchAttendanceSummary.length === 0 ? (
@@ -1984,7 +1953,7 @@ export default function TrainerBatches() {
 
                 {/* Schedule Tab */}
                 <TabsContent value="schedule" className="space-y-4 flex-1 overflow-y-auto p-4">
-                  <h3 className="text-lg font-semibold">Batch Schedule</h3>
+                  <h3 className="text-lg font-semibold">Cohort schedule</h3>
 
                   {/* Add Event */}
                   <Card>
@@ -1999,7 +1968,7 @@ export default function TrainerBatches() {
                             type="text"
                             value={newEventTitle}
                             onChange={(e) => setNewEventTitle(e.target.value)}
-                            placeholder="e.g. Week 3 Session"
+                            placeholder="e.g. Session 3"
                             className="w-full border rounded px-3 py-1.5 text-sm bg-background"
                           />
                         </div>
@@ -2115,13 +2084,13 @@ export default function TrainerBatches() {
       <Dialog open={quizAttemptsOpen} onOpenChange={setQuizAttemptsOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Teacher Attempts — {selectedQuizForAttempts?.title}</DialogTitle>
+            <DialogTitle>Fellow attempts — {selectedQuizForAttempts?.title}</DialogTitle>
             <DialogDescription>
-              Reset a teacher's attempts to let them retake the quiz.
+              Reset a Fellow's attempts to let them retake the quiz.
             </DialogDescription>
           </DialogHeader>
           {quizTeacherAttempts.length === 0 ? (
-            <p className="text-center py-6 text-muted-foreground text-sm">No teachers have attempted this quiz yet.</p>
+            <p className="text-center py-6 text-muted-foreground text-sm">No Fellows have attempted this quiz yet.</p>
           ) : (
             <div className="space-y-2">
               {quizTeacherAttempts.map((t: any) => (
@@ -2280,6 +2249,15 @@ export default function TrainerBatches() {
                           <span className="ml-2 font-semibold">{attempt.attemptNumber}</span>
                         </div>
                       </div>
+                      {attempt.quiz?.weekId && selectedTeacher?.id && (
+                        <Link
+                          href={`/trainer/teachers/${selectedTeacher.id}/weeks/${attempt.quiz.weekId}/content-history`}
+                          className="mt-3 inline-block text-sm font-medium text-primary underline"
+                          data-testid={`link-content-history-${attempt.id}`}
+                        >
+                          Lesson file history for this module
+                        </Link>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -2348,7 +2326,7 @@ export default function TrainerBatches() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-red-600">Disqualify {disqualifyTeacher?.name}</DialogTitle>
-            <DialogDescription>This action will mark the fellow as disqualified from this batch. Please provide a reason.</DialogDescription>
+            <DialogDescription>This action will mark the Fellow as disqualified from this cohort. Please provide a reason.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

@@ -68,7 +68,7 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Teacher updated" });
+      toast({ title: "Fellow updated" });
       setEditTeacher(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
     },
@@ -80,7 +80,7 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
       await apiRequest("DELETE", `/api/admin/dismiss-teacher/${id}`);
     },
     onSuccess: () => {
-      toast({ title: "Teacher removed" });
+      toast({ title: "Fellow removed" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
     },
     onError: (error: Error) => toast({ title: "Remove failed", description: error.message, variant: "destructive" }),
@@ -93,8 +93,8 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
     },
     onSuccess: () => {
       toast({
-        title: "Teacher Created",
-        description: "The teacher has been added successfully.",
+        title: "Fellow added",
+        description: "The Fellow has been added.",
       });
       setIsDialogOpen(false);
       setFormData({ name: "", email: "", password: "" });
@@ -103,7 +103,7 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create teacher",
+        description: error.message || "Failed to add the Fellow",
         variant: "destructive",
       });
     },
@@ -156,23 +156,23 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Teachers</h1>
+              <h1 className="text-3xl font-bold">Fellows</h1>
               <p className="text-muted-foreground">
-                Active teachers are listed here. Inactive desks stay folded below.
+                Active Fellows are listed here. Inactive desks stay folded below.
               </p>
             </div>
           </div>
-          <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search teachers" />
+          <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search Fellows" />
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <Button type="button" data-testid="button-add-teacher" onClick={() => setIsDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Teacher
+                Add Fellow
             </Button>
             <DialogContent onCloseAutoFocus={(event) => event.preventDefault()}>
               <DialogHeader>
-                <DialogTitle>Add New Teacher</DialogTitle>
+                <DialogTitle>Add a Fellow</DialogTitle>
                 <DialogDescription>
-                  Create a new teacher account. The teacher will be automatically approved.
+                  Create a Fellow account. The Fellow is approved at once.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
@@ -228,7 +228,7 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
                         Creating...
                       </>
                     ) : (
-                      "Create Teacher"
+                      "Create Fellow"
                     )}
                   </Button>
                 </div>
@@ -245,7 +245,7 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
           </div>
         ) : isError ? (
           <Card className="p-8 text-center">
-            <p className="font-semibold">Could not load teachers</p>
+            <p className="font-semibold">Could not load Fellows</p>
             <p className="text-muted-foreground mt-1">Open Cohorts, or refresh this page.</p>
           </Card>
         ) : teachers && teachers.length > 0 ? (
@@ -361,13 +361,13 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
           </div>
         ) : (
           <Card className="p-8 text-center">
-            <p className="text-muted-foreground">No teachers found</p>
+            <p className="text-muted-foreground">No Fellows found</p>
           </Card>
         )}
         <Dialog open={Boolean(editTeacher)} onOpenChange={(open) => { if (!open) setEditTeacher(null); }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit teacher</DialogTitle>
+              <DialogTitle>Edit Fellow</DialogTitle>
               <DialogDescription>Update name and email. This is Moodle-style participant CRUD.</DialogDescription>
             </DialogHeader>
             {editTeacher && (
