@@ -45,7 +45,11 @@ function world(input: {
         cohortSteps: async () => [],
         cohortPlacements: async (cohortId) => input.placements[cohortId] ?? [],
     }
-    return quizGateReaders(completion, scope)
+    return quizGateReaders(completion, scope, {
+        coursesForCohort: async (cohortId) =>
+            (input.placements[cohortId] ?? []).map((entry) => ({ id: entry.courseId, name: entry.courseId, publishStatus: 'published' })),
+        checkedCourseIds: async () => [],
+    })
 }
 
 const order = { k1: [{ courseId: 'c1', assignedAt: '2026-01-01' }, { courseId: 'c2', assignedAt: '2026-02-01' }] }
@@ -112,6 +116,17 @@ test('a cohort with quizzes stopped does not open the course for the gate', asyn
         placements: { ...order, k2: [{ courseId: 'c2', assignedAt: '2026-01-01' }] },
     })
     assert.equal((await lessonQuizGate('t1', m1, readers))?.code, 'MODULE_LOCKED')
+})
+
+test('a course with no modules before it does not lock the quiz, as it does not lock the module (Track C path)', async () => {
+    // c0 has no modules. The Fellow's path skips it, so the module page shows m1 open; the quiz must agree.
+    const readers = world({
+        enrolled: [{ id: 'k1' }],
+        holding: { c2: ['k1'] },
+        placements: { k1: [{ courseId: 'c0', assignedAt: '2026-01-01' }, { courseId: 'c2', assignedAt: '2026-02-01' }] },
+    })
+    assert.equal(await lessonQuizGate('t1', m1, readers), null)
+    assert.equal((await lessonQuizGate('t1', m2, readers))?.code, 'MODULE_LOCKED')
 })
 
 test('teacherMayTakeQuiz([]) refuses', () => {

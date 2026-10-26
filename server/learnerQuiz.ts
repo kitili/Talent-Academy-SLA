@@ -6,6 +6,7 @@ import { scoreQuizSubmission } from "./progressLogic";
 import { quizStoppedReason, teacherMayTakeQuiz, type CohortGate } from "./cohortAccess";
 import { cohortCourseOrder, storageScopeReaders, teacherCohortsForCourse, type ScopeReaders } from "./scope";
 import { computeCourseCompletion, storageCompletionReaders, type CompletionModule, type CompletionReaders } from "./completion";
+import { cohortPath, storagePathReaders, type PathReaders } from "./learnerPath";
 
 type StoredQuestion = {
   id: string;
@@ -171,29 +172,23 @@ export type QuizGateModule = { id: string; courseId?: string | null };
 export type QuizGateReaders = {
   /** The teacher's open cohorts holding the course (C5 `teacherCohortsForCourse`). */
   cohortsForCourse(teacherId: string, courseId: string): Promise<Array<CohortGate & { id: string }>>;
-  /** The course order of a cohort (C5 `cohortCourseOrder`). */
-  courseOrder(cohortId: string): Promise<string[]>;
-  /** The modules of a course in order (`storage.getWeeksForCourse`). */
-  modulesForCourse(courseId: string): Promise<Array<CompletionModule & { weekNumber?: number | null }>>;
-  /** Whether the teacher has completed these modules of the course, or the whole course when none are given (C3). */
-  modulesDone(teacherId: string, courseId: string, modules?: CompletionModule[]): Promise<boolean>;
+  /** The readers of the Fellow's path through a cohort (Track C `cohortPath`), which decides locks. */
+  path: PathReaders;
 };
 
-/**
- * The gate's readers over C5 and C3. "These modules are done" is C3 run over just those modules, so a
- * module counts as done by exactly the rule that completes a course; nothing here re-states it.
- */
+/** The gate's readers over C5, and Track C's path readers over C3 and C5. */
 export function quizGateReaders(
   completion: CompletionReaders = storageCompletionReaders,
   scope: ScopeReaders = storageScopeReaders,
+  path: Partial<PathReaders> = {},
 ): QuizGateReaders {
   return {
     cohortsForCourse: (teacherId, courseId) => teacherCohortsForCourse(teacherId, courseId, scope),
-    courseOrder: (cohortId) => cohortCourseOrder(cohortId, scope),
-    modulesForCourse: (courseId) => completion.modulesForCourse(courseId),
-    async modulesDone(teacherId, courseId, modules) {
-      const readers = modules ? { ...completion, modulesForCourse: async () => modules } : completion;
-      return (await computeCourseCompletion(teacherId, courseId, readers)).complete;
+    path: {
+      ...storagePathReaders,
+      ...completion,
+      courseOrder: (cohortId) => cohortCourseOrder(cohortId, scope),
+      ...path,
     },
   };
 }
@@ -203,7 +198,9 @@ export const storageQuizGateReaders: QuizGateReaders = quizGateReaders();
 /**
  * Whether a teacher may submit this module's quiz. Refused with NOT_ENROLLED when no open cohort of
  * theirs holds the course (C5), when every such cohort has quizzes stopped, and with MODULE_LOCKED
- * when the module before it is not complete, or the course before it in cohort order is not (C3, D1).
+ * when the module is locked on the Fellow's path in every cohort where quizzes run. Locks come from
+ * Track C's `cohortPath`, the same path the desk and the module page use, so the quiz and the module
+ * never disagree (a course with no modules, for one, never blocks the next).
  * One cohort that lets them through is enough, as `teacherMayTakeQuiz` already says.
  */
 export async function lessonQuizGate(
@@ -217,18 +214,11 @@ export async function lessonQuizGate(
   const stopped = teacherMayTakeQuiz(cohorts);
   if (stopped) return { error: stopped };
 
-  const modules = await readers.modulesForCourse(courseId);
-  const ordered = [...modules].sort((a, b) => (a.weekNumber || 0) - (b.weekNumber || 0));
-  const at = ordered.findIndex((entry) => entry.id === module.id);
-  if (at > 0 && !await readers.modulesDone(teacherId, courseId, [ordered[at - 1]])) {
-    return refusal("MODULE_LOCKED");
-  }
-
   for (const cohort of cohorts) {
     if (quizStoppedReason(cohort) !== null) continue;
-    const order = await readers.courseOrder(cohort.id);
-    const place = order.indexOf(courseId);
-    if (place <= 0 || await readers.modulesDone(teacherId, order[place - 1])) return null;
+    const path = await cohortPath(teacherId, cohort, readers.path, courseId);
+    const mine = path.modules.find((entry) => entry.id === module.id);
+    if (mine && !mine.locked) return null;
   }
   return refusal("MODULE_LOCKED");
 }
