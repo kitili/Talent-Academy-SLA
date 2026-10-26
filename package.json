@@ -8,7 +8,7 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/vercel-handler.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/api.js --alias:@shared=./shared",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "test": "tsx --test tests/feedback-fixes.test.ts tests/fresh-start.test.ts tests/admin-desk.test.ts tests/admin-certificates.test.ts tests/access.test.ts tests/gap-closures.test.ts tests/week2-handover.test.ts tests/tanzania-path.test.ts tests/test-logins.test.ts tests/academy-path.test.ts tests/cohort-admin.test.ts tests/trainer-desk.test.ts tests/access-request.test.ts tests/cohort-medals.test.ts tests/teacher-desk-split.test.ts tests/attendance-board.test.ts tests/desk-name.test.ts tests/inactive-desks.test.ts tests/schema-guard.test.ts && node scripts/run-node-tests.mjs unit integration",
+    "test": "tsx --test tests/feedback-fixes.test.ts tests/fresh-start.test.ts tests/admin-desk.test.ts tests/admin-certificates.test.ts tests/access.test.ts tests/gap-closures.test.ts tests/week2-handover.test.ts tests/tanzania-path.test.ts tests/test-logins.test.ts tests/academy-path.test.ts tests/cohort-admin.test.ts tests/trainer-desk.test.ts tests/access-request.test.ts tests/cohort-medals.test.ts tests/teacher-desk-split.test.ts tests/attendance-board.test.ts tests/desk-name.test.ts tests/inactive-desks.test.ts tests/schema-guard.test.ts tests/learner-quiz.test.ts && node scripts/run-node-tests.mjs unit integration",
     "smoke": "tsx scripts/smoke-test.ts",
     "pdf:accept": "tsx scripts/pdf-acceptance.ts",
     "db:push": "drizzle-kit push",

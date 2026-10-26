@@ -47,7 +47,10 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
     totalQuestions: number;
     passed: boolean;
     percentage: number;
+    // Graded on the server; correct answers come back only after a pass.
+    review?: Array<{ id: string; correct: boolean | null; correctAnswer?: string }>;
   } | null>(null);
+  const reviewOf = (questionId: string) => results?.review?.find((item) => item.id === questionId);
   const [hasStartedGeneration, setHasStartedGeneration] = useState(false);
   // One-at-a-time runner state
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -152,7 +155,6 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
   const submitQuizMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', `/api/training-weeks/${weekId}/files/${fileId}/submit-quiz`, {
-        questions,
         answers,
       });
       return await response.json();
@@ -465,7 +467,8 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                   <h3 className="font-semibold text-lg">Review Answers</h3>
                   {questions.map((question, index) => {
                     const userAnswer = answers[question.id];
-                    const isCorrect = userAnswer === question.correctAnswer;
+                    const reviewed = reviewOf(question.id);
+                    const isCorrect = reviewed?.correct !== false;
                     return (
                       <div
                         key={question.id}
@@ -488,7 +491,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                             </p>
                             {!isCorrect && (
                               <p className="text-sm text-green-700 dark:text-green-400">
-                                <span className="font-medium">Correct answer:</span> {question.correctAnswer}
+                                <span className="font-medium">Correct answer:</span> {reviewed?.correctAnswer}
                               </p>
                             )}
                           </div>
@@ -681,7 +684,8 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                 <h3 className="font-semibold text-lg">Review Answers</h3>
                 {questions.map((question, index) => {
                   const userAnswer = answers[question.id];
-                  const isCorrect = userAnswer === question.correctAnswer;
+                  const reviewed = reviewOf(question.id);
+                  const isCorrect = reviewed?.correct !== false;
                   return (
                     <div
                       key={question.id}
@@ -704,7 +708,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                           </p>
                           {!isCorrect && (
                             <p className="text-sm text-green-700 dark:text-green-400">
-                              <span className="font-medium">Correct answer:</span> {question.correctAnswer}
+                              <span className="font-medium">Correct answer:</span> {reviewed?.correctAnswer}
                             </p>
                           )}
                         </div>
