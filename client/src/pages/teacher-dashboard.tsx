@@ -42,7 +42,7 @@ type TeacherTab = (typeof TEACHER_TABS)[number]["id"];
 
 function TeacherSideTabs({ tab, onTab }: { tab: TeacherTab; onTab: (next: TeacherTab) => void }) {
   return (
-    <nav aria-label="Teacher pages" data-testid="teacher-sidebar" className="lg:sticky lg:top-24 lg:w-48 shrink-0">
+    <nav aria-label="Fellow pages" data-testid="teacher-sidebar" className="lg:sticky lg:top-24 lg:w-48 shrink-0">
       <div className="flex gap-1 overflow-x-auto rounded-xl border border-[#102448]/10 bg-white p-2 dark:border-white/10 dark:bg-[#162033] lg:flex-col lg:overflow-visible">
         {TEACHER_TABS.map((item) => {
           const active = tab === item.id;
@@ -91,14 +91,14 @@ function TeacherPathCard() {
             <div className="flex items-center justify-between gap-2">
               <p className="font-medium">{cohort.name}</p>
               <Badge variant="outline">
-                {cohort.batches?.length || 0} {(cohort.batches?.length || 0) === 1 ? "batch" : "batches"}
+                {cohort.batches?.length || 0} {(cohort.batches?.length || 0) === 1 ? "step" : "steps"}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              This cohort has its own batches. Another cohort can have a different number.
+              This cohort has its own steps. Another cohort can have a different number.
             </p>
             {(cohort.batches || []).length === 0 ? (
-              <p className="text-sm text-muted-foreground mt-2">No batches in this cohort yet.</p>
+              <p className="text-sm text-muted-foreground mt-2">No steps in this cohort yet.</p>
             ) : (
               <ol className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
                 {cohort.batches.map((batch: any, index: number) => {
@@ -484,13 +484,13 @@ export default function TeacherDashboard() {
                 Silverleaf Academy
               </h1>
               <p className="text-xs sm:text-sm text-white/80 hidden sm:block">
-                Training Program Planner
+                Fellow desk
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
             <div className="text-xs sm:text-sm text-white/90 hidden md:block truncate max-w-[200px]" data-testid="text-user-info">
-              {teacher?.name} (Teacher ID: {teacher?.teacherId})
+              {teacher?.name} (Fellow ID: {teacher?.teacherId})
             </div>
             <Button
               variant="secondary"
@@ -543,7 +543,7 @@ export default function TeacherDashboard() {
         {tab === "home" && (
         <PlaceBanner
           place="garden"
-          title={`Welcome, ${teacher?.name || "teacher"}`}
+          title={`Welcome, ${teacher?.name || "Fellow"}`}
           subtitle="Goals you set on Reflect appear here. Lessons, assessments, and quizzes each have their own page."
           titleTestId="text-welcome"
         />
@@ -553,7 +553,7 @@ export default function TeacherDashboard() {
         {tab === "messages" && (
           <DeskMail
             peer={deskPeers[0] ? { id: deskPeers[0].id, name: deskPeers[0].name, role: deskPeers[0].role || "trainer" } : null}
-            selfLabel={teacher?.name || "Teacher"}
+            selfLabel={teacher?.name || "Fellow"}
           />
         )}
 
@@ -611,7 +611,6 @@ export default function TeacherDashboard() {
             <Card className="sl-rise border-primary/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">To do</CardTitle>
-                <CardDescription>Next actions, the way Canvas and Moodle keep the desk short.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {items.map((item) => (
@@ -987,7 +986,7 @@ export default function TeacherDashboard() {
               <div className="overflow-hidden rounded-xl border bg-white">
                 <PlaceCover place="classroom" className="h-40" />
                 <p className="text-muted-foreground text-center py-6 px-4">
-                  No training weeks assigned yet. Your trainer will place a course here.
+                  No courses yet. An admin places a course on your cohort, and it appears here.
                 </p>
               </div>
             ) : (
@@ -1208,7 +1207,7 @@ export default function TeacherDashboard() {
                 className="w-full"
                 onClick={() => {
                   if (!reflectionWeekId || !reflectionContent.trim()) {
-                    toast({ title: "Error", description: "Please select a week and write your reflection", variant: "destructive" });
+                    toast({ title: "Error", description: "Please select a module and write your reflection", variant: "destructive" });
                     return;
                   }
                   submitReflectionMutation.mutate({
@@ -1363,7 +1362,7 @@ export default function TeacherDashboard() {
         <Card className="border-[#1d4e89]/20 bg-[#f7f9fc] text-[#17233c]" data-testid="card-feedback">
           <CardHeader>
             <CardTitle>Feedback</CardTitle>
-            <CardDescription className="text-[#3a4a60]">Tell the academy how this week of learning felt. This is not a quiz and not an assignment.</CardDescription>
+            <CardDescription className="text-[#3a4a60]">Tell the academy how your learning is going. This is not a quiz and not an assignment.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2">
