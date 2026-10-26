@@ -16,6 +16,7 @@ no code moved, so the evidence below holds). Every track branches from `feat/imp
 - **Amendment 2, acceptance runs on a Neon branch first.** The full acceptance list runs against a Neon branch
   (a copy of production, `.env.design`) with the local app, before `feat/improvements` merges into `main`. Production
   gets only a short read-only smoke check after deploy (see *Acceptance Criteria*). Phase 0 also runs on that branch.
+- **Amendment 4, 2026-10-27: D6 now requires at least one lesson file before a course can be complete** (see D6).
 - **Amendment 3, a hotfix from `main` closes the two worst live gaps now** (Track H): answers sent to teachers with
   server trust in them, and the course skip at 0%. It ships to production ahead of the tracks, with the engineer's
   go-ahead, and merges into `feat/improvements` before Layer 2 starts.
@@ -293,6 +294,12 @@ graph, except where noted.
   course completion. The trainer desk lists lesson files with no approved quiz, so the trainer knows what to fix. A
   quiz approved after the teacher marked the file read does not undo their progress.
 - Alternative: block and alert. The quiz stays a hard gate, and the trainer desk lists blocked teachers. Teachers wait.
+- **Amended 2026-10-27 by the steering engineer: a course needs at least one lesson file to count as complete.**
+  Acceptance showed that under D6 as approved a course whose modules have no lesson file was complete at once, so
+  a Fellow could check it and be issued its certificate having done nothing. Now: a module with no lesson file still
+  counts as done and still never locks the next module or course, but C3 (`computeCourseCompletion`) is complete only
+  when the course has at least one lesson file. Such a course is never offered as the next to check
+  (`cohortPath`), and checking it is refused `COURSE_INCOMPLETE`. The D10 report SQL follows the same rule.
 
 **D7. Removing inactive accounts at server start.**
 - **Recommended: stop.** Remove `removeInactiveDesks()` from start-up. Inactive desks stay, folded on People, as the

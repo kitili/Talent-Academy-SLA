@@ -29,7 +29,7 @@ A module opens when you have finished the module before it.
 1. Read the objective. If the module has lesson files, open each one and read it.
 2. If a lesson file has an approved quiz, take it. You pass at 80%. Once you pass, the lesson file is done. After each try you see which of your answers were right; the correct answers appear only once you pass.
 3. If a lesson file has no approved quiz yet, mark it read. It is done once you do.
-4. A module with no lesson file counts as done without opening it.
+4. A module with no lesson file counts as done without opening it, so it never holds you up. A course with no lesson files at all cannot be marked complete yet; wait for your trainer to add them.
 5. When every lesson file in the module is done, the next module opens.
 
 Lesson quizzes can be retaken. An assigned quiz or exam from your trainer allows three attempts. If you miss it twice, a notice asks you to open the module again before the last attempt. Your trainer can reset your attempts.

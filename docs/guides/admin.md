@@ -64,7 +64,7 @@ You alone add cohorts, steps and courses.
 
 Every AI-drafted module quiz is saved as unapproved. A Fellow sees a quiz only after a person approves it. You approve any quiz: open Analytics, choose the cohort, and open its **Quizzes** tab. A trainer approves the quizzes of the courses on their own cohorts. The pass mark for a module quiz is 80%. A trainer exam can set its own pass mark, and it defaults to 80%.
 
-A lesson file with no approved quiz does not block a Fellow. It counts as done once the Fellow marks it read. A module with no lesson file counts as done without opening. The trainer desk does not yet list the lesson files that have no approved quiz (not shipped).
+A lesson file with no approved quiz does not block a Fellow. It counts as done once the Fellow marks it read. A module with no lesson file counts as done without opening, so it never holds a Fellow up. A course needs at least one lesson file before it can be complete, so a course with no lesson files cannot be marked complete or earn a certificate. The trainer desk does not yet list the lesson files that have no approved quiz (not shipped).
 
 ## F. Certificates
 

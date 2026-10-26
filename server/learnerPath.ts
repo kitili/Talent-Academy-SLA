@@ -266,7 +266,10 @@ export async function cohortPath(
   const open = cohortIsOpen(cohort);
   const locked = applyModuleLocks(modules, checked).map((mod) => ({ ...mod, locked: mod.locked || !open }));
   const courseIds = Array.from(new Set(locked.map((mod) => mod.courseId)));
-  return { modules: locked as PathModule[], courseIds, checked, nextToCheck: open ? nextCourseToCheck(courseIds, checked) : null };
+  // A course with no lesson file is never complete (D6, amended 2026-10-27), so it is never the next to
+  // check: offering it would hold every later course back from being checked.
+  const checkable = courseIds.filter((id) => locked.some((mod) => mod.courseId === id && (mod.deckFiles || []).length > 0));
+  return { modules: locked as PathModule[], courseIds, checked, nextToCheck: open ? nextCourseToCheck(checkable, checked) : null };
 }
 
 // ── Who may open, mark or discuss a module ─────────────────────────────────
@@ -331,6 +334,9 @@ export function courseCheckRefusal(input: {
   if (!input.placed) return { status: 404, body: { error: "That course is not in this cohort" } };
   // A draft course, or one with no modules, is not on the path: there is nothing to finish.
   if (!path.courseIds.includes(courseId)) return refuse(400, "COURSE_INCOMPLETE");
+  // An incomplete course is refused as incomplete whatever its turn, so a course with no lesson file
+  // (never complete, never next to check) is not told to wait for another course.
+  if (path.nextToCheck !== courseId && !completion.complete) return refuse(400, "COURSE_INCOMPLETE");
   if (path.nextToCheck !== courseId) {
     return { status: 400, body: { error: path.nextToCheck ? "Finish the course before this one first" : "Every course in this cohort is already complete" } };
   }

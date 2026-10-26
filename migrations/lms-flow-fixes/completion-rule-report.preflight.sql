@@ -9,6 +9,8 @@
 --   * A course is complete when it has at least one module and every module is complete (100%, D4).
 --     A course with no modules is never complete.
 --   * A module with no lesson file is complete (D6). Otherwise every lesson file must be done.
+--   * The course needs at least one lesson file in all (D6, amended 2026-10-27): a course made only of
+--     modules with no lesson file is never complete.
 --   * A lesson file is done when the Fellow's progress row is 'completed' or has completed_at set; or
 --     the Fellow has a passing attempt at its quiz (quiz_attempts or teacher_content_quiz_attempts);
 --     or the file has no approved quiz (quiz_cache.approved) and the Fellow marked it read
@@ -90,7 +92,8 @@ module_state AS (
     SELECT
         m.completion_id,
         m.week_id,
-        COALESCE(bool_and(fs.done), true) AS complete
+        COALESCE(bool_and(fs.done), true) AS complete,
+        pg_catalog.count(fs.file_id)::int AS lesson_files
     FROM modules AS m
     LEFT JOIN file_state AS fs ON fs.completion_id = m.completion_id AND fs.week_id = m.week_id
     GROUP BY m.completion_id, m.week_id
@@ -105,7 +108,8 @@ rule AS (
         cr.total_weeks,
         cr.completed_weeks,
         COALESCE(pg_catalog.count(ms.week_id), 0)::int AS total_modules,
-        COALESCE(pg_catalog.count(ms.week_id) FILTER (WHERE ms.complete), 0)::int AS done_modules
+        COALESCE(pg_catalog.count(ms.week_id) FILTER (WHERE ms.complete), 0)::int AS done_modules,
+        COALESCE(pg_catalog.sum(ms.lesson_files), 0)::int AS lesson_files
     FROM completed AS cr
     LEFT JOIN module_state AS ms ON ms.completion_id = cr.id
     GROUP BY cr.id, cr.teacher_id, cr.course_id, cr.batch_id, cr.completed_at, cr.total_weeks, cr.completed_weeks
@@ -113,7 +117,7 @@ rule AS (
 failing AS (
     SELECT r.*
     FROM rule AS r
-    WHERE NOT (r.total_modules > 0 AND r.done_modules = r.total_modules)
+    WHERE NOT (r.total_modules > 0 AND r.lesson_files > 0 AND r.done_modules = r.total_modules)
 ),
 checks AS (
     SELECT

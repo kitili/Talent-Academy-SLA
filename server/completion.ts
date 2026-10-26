@@ -44,12 +44,16 @@ export const storageCompletionReaders: CompletionReaders = {
   },
 };
 
-export type CourseCompletion = { totalModules: number; doneModules: number; complete: boolean };
+export type CourseCompletion = { totalModules: number; doneModules: number; lessonFiles: number; complete: boolean };
 
 /**
  * Every module counts, with or without lesson files (D4, D6). A lesson file is done by `fileIsDone`, or
  * when its progress row already records it completed: a quiz approved after the teacher finished the
  * file does not undo their progress (D6). `completedAt` survives a later `available` status write.
+ *
+ * A course needs at least one lesson file before it can be complete (D6, amended 2026-10-27): a module
+ * with no lesson file still counts as done, so it never holds the Fellow up, but a course made only of
+ * such modules has nothing to finish and is never complete, so it cannot be checked or earn a certificate.
  */
 export async function computeCourseCompletion(
   teacherId: string,
@@ -58,8 +62,10 @@ export async function computeCourseCompletion(
 ): Promise<CourseCompletion> {
   const modules = await readers.modulesForCourse(courseId);
   let doneModules = 0;
+  let lessonFiles = 0;
   for (const mod of modules) {
     const files = mod.deckFiles || [];
+    lessonFiles += files.length;
     if (files.length === 0) {
       doneModules++;
       continue;
@@ -82,5 +88,5 @@ export async function computeCourseCompletion(
     if (moduleIsComplete({ total: files.length, completed: doneFiles })) doneModules++;
   }
   const totalModules = modules.length;
-  return { totalModules, doneModules, complete: isCourseComplete(doneModules, totalModules) };
+  return { totalModules, doneModules, lessonFiles, complete: lessonFiles > 0 && isCourseComplete(doneModules, totalModules) };
 }

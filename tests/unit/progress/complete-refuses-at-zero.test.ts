@@ -34,7 +34,7 @@ async function check(passed: string[]) {
 
 test('complete refuses at 0 of 3 modules with COURSE_INCOMPLETE', async () => {
     const { completion, refused } = await check([])
-    assert.deepEqual(completion, { totalModules: 3, doneModules: 0, complete: false })
+    assert.deepEqual(completion, { totalModules: 3, doneModules: 0, lessonFiles: 3, complete: false })
     assert.equal(refused?.status, 400)
     assert.equal(refused?.body.code, 'COURSE_INCOMPLETE')
 })

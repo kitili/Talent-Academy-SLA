@@ -57,3 +57,28 @@ test('a draft course does not block the course after it', async () => {
     assert.deepEqual(path.courseIds, ['next'])
     assert.equal(path.modules.find((mod) => mod.courseId === 'next')?.locked, false)
 })
+
+// D6, amended 2026-10-27: a course needs at least one lesson file to be complete. A course whose modules
+// have no lesson file still opens the next course, and is skipped when choosing the next course to check.
+const noFiles = (): PathFacts => facts({
+    courses: [
+        { id: 'shell', name: 'Modules but no lesson files' },
+        { id: 'next', name: 'Next course' },
+    ],
+    placements: [
+        { courseId: 'shell', assignedAt: '2026-01-01T00:00:00Z' },
+        { courseId: 'next', assignedAt: '2026-02-01T00:00:00Z' },
+    ],
+    modules: { shell: [{ id: 's1', weekNumber: 1, deckFiles: [] }], next: [{ id: 'n1', weekNumber: 1, deckFiles: [{ id: 'f' }] }] },
+})
+
+test('a course with modules but no lesson file opens the next course, is never complete, and is not next to check', async () => {
+    const readers = readersFor(noFiles())
+    const path = await cohortPath('t1', cohort, readers)
+    assert.equal(path.modules.find((mod) => mod.id === 's1')?.locked, false)
+    assert.equal(path.modules.find((mod) => mod.id === 'n1')?.locked, false)
+    assert.equal(path.nextToCheck, 'next')
+    const completion = await computeCourseCompletion('t1', 'shell', readers)
+    assert.equal(completion.complete, false)
+    assert.equal(courseCheckRefusal({ courseId: 'shell', placed: true, path, completion })?.body.code, 'COURSE_INCOMPLETE')
+})

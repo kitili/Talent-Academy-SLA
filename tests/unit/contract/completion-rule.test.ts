@@ -55,13 +55,13 @@ test('computeCourseCompletion counts modules without files and refuses at N-1 of
         { id: 'm3', deckFiles: [{ id: 'f3' }] },
     ]
     const nothing = await computeCourseCompletion('t', 'c', readersFor({ modules, approved: ['m1/f1', 'm3/f3'] }))
-    assert.deepEqual(nothing, { totalModules: 3, doneModules: 1, complete: false })
+    assert.deepEqual(nothing, { totalModules: 3, doneModules: 1, lessonFiles: 2, complete: false })
 
     const almost = await computeCourseCompletion('t', 'c', readersFor({ modules, approved: ['m1/f1', 'm3/f3'], passed: ['m1/f1'] }))
-    assert.deepEqual(almost, { totalModules: 3, doneModules: 2, complete: false })
+    assert.deepEqual(almost, { totalModules: 3, doneModules: 2, lessonFiles: 2, complete: false })
 
     const all = await computeCourseCompletion('t', 'c', readersFor({ modules, approved: ['m1/f1', 'm3/f3'], passed: ['m1/f1', 'm3/f3'] }))
-    assert.deepEqual(all, { totalModules: 3, doneModules: 3, complete: true })
+    assert.deepEqual(all, { totalModules: 3, doneModules: 3, lessonFiles: 2, complete: true })
 })
 
 test('computeCourseCompletion: marking read completes a file only when it has no approved quiz', async () => {
@@ -84,13 +84,19 @@ test('computeCourseCompletion: a quiz approved after the file was completed does
         ],
     }
     const result = await computeCourseCompletion('t', 'c', readersFor({ modules, progress, approved: ['m1/f1', 'm1/f2'] }))
-    assert.deepEqual(result, { totalModules: 1, doneModules: 1, complete: true })
+    assert.deepEqual(result, { totalModules: 1, doneModules: 1, lessonFiles: 2, complete: true })
+})
+
+test('a course needs at least one lesson file to be complete, though its empty modules count as done (D6, amended 2026-10-27)', async () => {
+    const empty = await computeCourseCompletion('t', 'c', readersFor({ modules: [{ id: 'm1', deckFiles: [] }, { id: 'm2' }] }))
+    assert.deepEqual(empty, { totalModules: 2, doneModules: 2, lessonFiles: 0, complete: false })
 })
 
 test('computeCourseCompletion ignores the stored completion status: a course with no modules is not complete', async () => {
     assert.deepEqual(await computeCourseCompletion('t', 'c', readersFor({ modules: [] })), {
         totalModules: 0,
         doneModules: 0,
+        lessonFiles: 0,
         complete: false,
     })
 })
