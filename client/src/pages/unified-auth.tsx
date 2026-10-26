@@ -264,7 +264,7 @@ export default function UnifiedAuth() {
       }
       localStorage.setItem(DESK_REQUEST_KEY, JSON.stringify({ username: requestUsername.trim(), role }));
       setRequestSent(true);
-      toast({ title: "Request sent", description: "Refresh this page after an admin signs you in. Create your password will appear then." });
+      toast({ title: "Request sent", description: "Refresh this page after an admin approves you. Create your password will appear then." });
     } catch {
       toast({ variant: "destructive", title: "Request not saved", description: "Try again in a moment." });
     } finally {
@@ -318,7 +318,7 @@ export default function UnifiedAuth() {
     {
       value: "teacher",
       icon: GraduationCap,
-      title: "Teacher",
+      title: "Fellow",
       description: "Lessons",
     }
   ];
@@ -404,8 +404,8 @@ export default function UnifiedAuth() {
                 <CardTitle className="text-2xl font-bold">Come in</CardTitle>
                 <CardDescription>
                   {passwordReady
-                    ? "An admin signed you in. Create your password, then sign in."
-                    : "Sign in, or ask for a trainer or teacher desk."}
+                    ? "An admin approved you. Create your password, then sign in."
+                    : "Sign in, or ask for a trainer or Fellow desk."}
                 </CardDescription>
               </CardHeader>
               
@@ -452,7 +452,7 @@ export default function UnifiedAuth() {
 
                       <div className="space-y-2">
                         <Label htmlFor="login-email">
-                          {mode === "request" ? "Username" : loginRole === "teacher" ? "Username, teacher ID, or email" : "Username or email"}
+                          {mode === "request" ? "Username" : loginRole === "teacher" ? "Username, Fellow ID, or email" : "Username or email"}
                         </Label>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
@@ -515,15 +515,15 @@ export default function UnifiedAuth() {
                       </Button>
 
                       {mode === "request" && (
-                        <p className="text-left text-xs text-[#3a4a60]">Trainer and teacher desks. An admin signs you in from Approvals.</p>
+                        <p className="text-left text-xs text-[#3a4a60]">Trainer and Fellow desks. An admin approves you from Approvals.</p>
                       )}
                       {requestSent && mode === "request" && (
                         <p className="text-left text-sm text-[#17233c]" data-testid="text-request-sent">
-                          Request sent. Refresh this page after an admin signs you in. Create your password will appear then.
+                          Request sent. Refresh this page after an admin approves you. Create your password will appear then.
                         </p>
                       )}
                       {mode === "password" && (
-                        <p className="text-left text-xs text-[#3a4a60]">Use the username or email from your request. This stays closed until an admin signs you in.</p>
+                        <p className="text-left text-xs text-[#3a4a60]">Use the username or email from your request. This stays closed until an admin approves you.</p>
                       )}
                     </form>
               </CardContent>

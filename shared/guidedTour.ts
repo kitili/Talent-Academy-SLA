@@ -1,3 +1,5 @@
+import { MODULE_QUIZ_PASS_PERCENT } from "./constants";
+
 export type TourStep = {
   title: string;
   body: string;
@@ -53,37 +55,37 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Approvals",
-    body: "People who asked for a desk from the sign-in page. Sign a trainer or a teacher in, and they create their own password. If someone is waiting, Needs attention on this desk opens the same page.",
+    body: "People who asked for a desk from the sign-in page. Approve a trainer or a Fellow, and they create their own password. If someone is waiting, Needs attention on this desk opens the same page.",
     target: "admin-nav-approvals",
   },
   {
     title: "People",
-    body: "Trainers and teachers share this one tab. Switch between them at the top. Create a trainer or a teacher account, already approved, and open a name to see that account. A trainer cannot create another trainer.",
+    body: "Trainers and Fellows share this one tab. Switch between them at the top. Create a trainer or a Fellow account, already approved, and open a name to see that account. A trainer cannot create another trainer.",
     target: "admin-nav-people",
   },
   {
     title: "Attendance",
-    body: "The attendance list for teachers and for trainers. You can mark who was present, late, absent, or excused.",
+    body: "The attendance list for Fellows and for trainers. You can mark who was present, late, absent, or excused.",
     target: "admin-nav-attendance",
   },
   {
     title: "Cohorts",
-    body: "A cohort is the group of teachers. A batch is a step inside that cohort, and each cohort can have a different number. Courses are the lessons on a batch, placed here rather than on their own tab. A batch can hold more than one teacher, and a cohort can hold more than one trainer. You add the batches, place the courses, assign the trainers, and open or close the cohort and its quizzes.",
+    body: "A cohort is a group of Fellows. A step is one stage inside that cohort, and each cohort can have a different number. Courses are the lessons on a step, placed here rather than on their own tab. Steps set the order: a course opens when the course before it is complete. A cohort can hold more than one trainer. You add the steps, place the courses, assign the trainers, and open or close the cohort and its quizzes.",
     target: "admin-nav-cohorts",
   },
   {
     title: "Analytics",
-    body: "The gradebook for the whole academy: teachers, open cohorts, completion, attendance, quizzes, reflections, course ratings, and who is at risk.",
+    body: "The gradebook for the whole academy: Fellows, open cohorts, completion, attendance, quizzes, reflections, course ratings, and who is at risk.",
     target: "admin-nav-analytics",
   },
   {
     title: "Courses",
-    body: "Courses are the curriculum trainers teach. Open Cohorts, choose a batch, and place the course there. Keep a course on draft while you edit it, and publish it when teachers should see it.",
+    body: "Courses are the curriculum trainers teach, and only an admin adds, renames or deletes one. Open Cohorts, choose a step, and place the course there. Keep a course on draft while you edit it, and publish it when Fellows should see it.",
     target: "admin-nav-cohorts",
   },
   {
     title: "Counts",
-    body: "Trainers, teachers, and courses on the academy right now. Needs attention appears here when someone is waiting, and it opens Approvals.",
+    body: "Trainers, Fellows, and courses on the academy right now. Needs attention appears here when someone is waiting, and it opens Approvals.",
     target: "admin-stats",
   },
   {
@@ -93,7 +95,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Academy notice",
-    body: "Sends one note to every approved trainer and every approved teacher. It lands in their bell. They do not reply inside the note.",
+    body: "Sends one note to every approved trainer and every approved Fellow. It lands in their bell. They do not reply inside the note.",
     target: "admin-notice",
   },
   {
@@ -103,7 +105,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Start fresh",
-    body: "Clears only the areas you tick: cohorts, progress, quizzes, certificates, or notices. Pick the trainers or teachers it applies to. Courses and login accounts stay. Type CLEAR ACTIVITY only when you mean it.",
+    body: "Clears only the areas you tick: cohorts, progress, quizzes, certificates, or notices. Pick the trainers or Fellows it applies to. Courses and login accounts stay. Type CLEAR ACTIVITY only when you mean it.",
     target: "admin-fresh",
   },
 ];
@@ -120,23 +122,23 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "The side bar",
-    body: "Desk is the home, with the counts. Then Cohorts, Teachers, Assessments & quizzes, Progress, Attendance, Messages, and Schedule.",
+    body: "Desk is the home, with the counts. Then Cohorts, Assessments & quizzes, Progress, Attendance, Messages, and Schedule. Open a cohort to see its Fellows on Progress.",
     target: "trainer-tools",
   },
   {
     title: "What stays with admin",
-    body: "You can approve a new teacher and reset that teacher's password. You cannot add a course, add a cohort or a batch, create an admin, clear the academy, or open another trainer's cohort.",
+    body: "You can approve a new Fellow and reset that Fellow's password. You edit the modules, lesson files and quizzes of the courses on your cohorts. You cannot add or delete a course, add a cohort or a step, create an admin, clear the academy, or open another trainer's cohort.",
   },
 ];
 
 export const TEACHER_TOUR: TourStep[] = [
   {
-    title: "Teacher desk",
-    body: "This is your learning home. The tour walks the places you use after you sign in on the Teacher tab.",
+    title: "Fellow desk",
+    body: "This is your learning home. The tour walks the places you use after you sign in on the Fellow tab.",
   },
   {
     title: "Continue learning",
-    body: "Resume opens the next unlocked module. Read the lesson, mark it read, then take the quiz. The following module stays locked until this one is passed.",
+    body: `Resume opens the next unlocked module. Read the lesson, then take its quiz, which you pass at ${MODULE_QUIZ_PASS_PERCENT}%. A lesson with no approved quiz is done once you mark it read. The following module stays locked until this one is done.`,
     target: "teacher-continue",
   },
   {
@@ -151,7 +153,7 @@ export const TEACHER_TOUR: TourStep[] = [
   },
   {
     title: "Certificates",
-    body: "Open Certificates when a course is complete. Notices and desk mail, when your trainer writes, appear near the top of this page.",
+    body: "Open Certificates to see the certificates an admin has issued to you. An admin issues one after you finish every module of a course. Notices and desk mail, when your trainer writes, appear near the top of this page.",
     target: "teacher-certificates",
   },
 ];
