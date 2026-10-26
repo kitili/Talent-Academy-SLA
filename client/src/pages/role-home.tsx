@@ -1,27 +1,21 @@
 import { Redirect } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { readSessionUser } from "@/lib/sessionUser";
+import { OpeningClassroom } from "@/lib/protected-route";
+import { signInRedirect } from "@/lib/sessionUser";
 import UnifiedAuth from "@/pages/unified-auth";
 
 export default function RoleHome() {
-  const { user } = useAuth();
-  const sessionUser = user || readSessionUser();
+  const { user, isLoading } = useAuth();
+  const redirect = signInRedirect({ answered: !isLoading, user });
 
-  if (!sessionUser) {
-    return <UnifiedAuth />;
+  if (redirect) {
+    return <Redirect to={redirect} />;
   }
 
-  if (sessionUser.role === "admin") {
-    return <Redirect to="/admin" />;
+  // A stored user only means someone was signed in on this tab: wait for the server before drawing the sign-in form.
+  if (isLoading && user) {
+    return <OpeningClassroom />;
   }
 
-  if (sessionUser.role === "trainer") {
-    return <Redirect to="/trainer/batches" />;
-  }
-
-  if (sessionUser.role === "teacher") {
-    return <Redirect to="/teacher/dashboard" />;
-  }
-
-  return <Redirect to="/auth" />;
+  return <UnifiedAuth />;
 }

@@ -1,6 +1,15 @@
 import { useAuth } from "@/hooks/use-auth";
-import { readSessionUser } from "@/lib/sessionUser";
+import { protectedRedirect } from "@/lib/sessionUser";
 import { Redirect, Route } from "wouter";
+
+export function OpeningClassroom() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-primary text-white gap-3 px-6 text-center">
+      <p className="text-xl font-semibold">Silverleaf Academy</p>
+      <p className="text-white/90">Opening your classroom…</p>
+    </div>
+  );
+}
 
 export function ProtectedRoute({
   path,
@@ -14,26 +23,24 @@ export function ProtectedRoute({
   nest?: boolean;
 }) {
   const { user, isLoading } = useAuth();
-  const sessionUser = user || readSessionUser();
+  const redirect = protectedRedirect({ answered: !isLoading, user });
 
-  if (sessionUser) {
-    return <Route path={path} match={match} nest={nest} component={Component} />;
-  }
-
-  if (isLoading) {
+  if (redirect) {
     return (
       <Route path={path} match={match} nest={nest}>
-        <div className="flex min-h-screen flex-col items-center justify-center bg-primary text-white gap-3 px-6 text-center">
-          <p className="text-xl font-semibold">Silverleaf Academy</p>
-          <p className="text-white/90">Opening your classroom…</p>
-        </div>
+        <Redirect to={redirect} />
       </Route>
     );
   }
 
+  // `user` is the server's answer, or the stored placeholder while that answer is on its way.
+  if (user) {
+    return <Route path={path} match={match} nest={nest} component={Component} />;
+  }
+
   return (
     <Route path={path} match={match} nest={nest}>
-      <Redirect to="/auth" />
+      <OpeningClassroom />
     </Route>
   );
 }
