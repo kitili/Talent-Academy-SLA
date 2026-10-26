@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orchestration Skill"
+  short_description: "Plan, delegate to workers in worktrees, and integrate their results"
+  default_prompt: "Use $orchestration-skill to run this work as an orchestrator: fix shared contracts, brief workers from the template, review and merge their results, and log each one."

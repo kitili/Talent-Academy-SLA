@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handoff Skill"
+  short_description: "Hand an orchestrator's work to the next orchestrator"
+  default_prompt: "Use $handoff-skill to write a handoff in handoff/ that a new orchestrator can act on, or to take over from the latest one."
