@@ -324,3 +324,260 @@ graph, except where noted.
 - **Recommended: remove the shelf from the teacher Learning tab.** Delete `PracticeShelf.tsx` and
   `shared/practiceLessons.ts` if nothing else reads them. Today the shelf shows one early-years list to every track.
 - Alternative: keep it, labelled "Extra reading (not part of your course)", and show it only to the playgroup track.
+
+## Scope
+
+In scope: findings 1-25, the start-up deletion, and N1-N7, under the recommended decisions. Out of scope: design
+feedback (a separate track), table renames, new features beyond what a decision names, analytics screens other than
+the counts in finding 15, and the legacy staff-only week quiz (`routes.ts:1813, 1858`; QuizDialog on the staff course
+view, unreachable for teachers because `isAuthenticated` admits passport users only).
+
+## Shared Contracts (Track 0)
+
+Every contract two tracks share is fixed in committed files by **Track 0**, which merges into `feat/improvements`
+before Tracks B, C, D, E and G branch. Where a later track disagrees with this section, this section wins, and the
+track stops and reports.
+
+| # | Contract | Lives in | Read by |
+| --- | --- | --- | --- |
+| C1 | Pass marks: `MODULE_QUIZ_PASS_PERCENT` (D3), `ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT` (80), `QUIZ_ATTEMPTS` (3) | `shared/constants.ts` (new; the first constants module, as `.claude/CLAUDE.md` step 5 asks) | B (scoring, dialog text), C (progress), G (guides) |
+| C2 | Completion rule: `COURSE_COMPLETE_PERCENT` (D4) in constants; pure `fileIsDone({ hasApprovedQuiz, quizPassed, markedRead })`, `moduleIsComplete`, `isCourseComplete` (D4, D6) | `shared/constants.ts`, `server/progressLogic.ts` (existing home of these rules) | B, C, D, E (trainer desk average) |
+| C3 | `computeCourseCompletion(teacherId, courseId) → { totalModules, doneModules, complete }`, from progress rows, quiz-cache approval and quiz passes, using C2 | `server/completion.ts` (new) | C (the sync writer, `complete`, locks), D (certificate check), C's report SQL mirrors it |
+| C4 | Trainer scope (D8): pure `trainerOwnsBatch` and its SQL twin in `storage.getAllBatches` | `server/access.ts`, `server/storage.ts` method `getAllBatches` (Track 0 owns this one method) | B, C, D, E |
+| C5 | Resolvers: `trainerCohortIds(trainerId)`, `trainerMayEditCourse(user, courseId)` (D2: admin, or the course is placed on a cohort in scope), `teacherCohortsForCourse(teacherId, courseId)` (open cohorts only), `cohortCourseOrder(cohortId)` (D1: step `order_index`, then course `order_index` inside the step, then unplaced courses by `assigned_at`) | `server/scope.ts` (new) | B, C, D, E |
+| C6 | Naming (D1): `ACADEMY_TERMS` with `cohort`, `step`, `course`, `module`, `lessonFile` | `shared/academyPath.ts` (existing; updated, not copied) | C, E, G |
+| C7 | New refusals: `{ error, code }` with `code` one of `NOT_ENROLLED`, `MODULE_LOCKED`, `COURSE_INCOMPLETE`, `NOT_YOUR_COURSE`, `QUIZ_NOT_APPROVED`, `ADMIN_ONLY`, each with the sentence a user sees | `shared/constants.ts` (`REFUSALS`) | B, C, D, E, and the client pages that show them |
+| C8 | Cross-track call signatures that stay fixed: `storage.syncTeacherCourseCompletion(teacherId, courseId)` (B calls it; C owns its body); `storage.getCachedQuiz(weekId, fileId)` (C reads `approved`; B owns it) | unchanged files | B, C |
+
+Justification for the new files (one line each, per paradigm 1):
+- `shared/constants.ts`: the pass mark and completion percent are read on both sides and in docs; one reviewable place.
+- `server/completion.ts`: the completion rule has four copies today (findings 3, 10, N5); C and D both need it.
+- `server/scope.ts`: trainer and teacher scope have four copies today (finding 15); B, C, D and E all need them.
+
+Track 0 also moves the existing readers of the old rules in the same commit (checklist 5):
+`tests/feedback-fixes.test.ts` (70% cases, the module-unlock cases), `tests/access.test.ts` (trainer scope),
+`tests/academy-path.test.ts` if `ACADEMY_TERMS` text changes. The client and guide readers are named in B, E and G.
+
+## Task Boundaries
+
+### Ownership of the two large server files
+
+`server/routes.ts` and `server/storage.ts` cannot each have one owner without making B, C, D and E run one after
+another. This plan proposes **region ownership** of those two files, anchored by route path and method name (line
+numbers at `71c4782` are a guide only). A track edits only its own regions. If it needs a line elsewhere, it stops and
+reports. Disjoint regions merge without conflict, except two hot spots, which the orchestrator resolves at merge by
+keeping both sides: the import block at the top of `routes.ts`, and the `IStorage` interface at the top of
+`storage.ts`. If the orchestrator prefers the strict "one owner per file" rule, the fallback order is under
+*Dependency Graph*.
+
+`server/routes.ts` regions:
+
+| Region (first route → last route) | Lines at `71c4782` | Owner |
+| --- | --- | --- |
+| Top of file: imports, middlewares, `staffCanAccessBatch`, `teacherRecordAllowed` | 1-300 | Track 0 (others add imports only) |
+| `/api/health` → `/api/trainer/reset-teacher-password` (auth, profile, approvals) | 302-1106 | none |
+| `/api/training-weeks` → `/api/training-weeks/:weekId/files/:fileId/quiz-passed` (modules, lesson files, content items, module quizzes) | 1107-2298 | B |
+| `/api/batches` → `/api/quiz-attempts/:attemptId/review-open-ended` (cohorts, rosters, trainer exam management) | 2299-3047 | E |
+| `/api/teacher/quizzes` → `/api/teacher/quiz-attempts` (teacher assigned quizzes) | 3048-3340 | B |
+| `/api/batches/:batchId/progress` → `/api/teachers/weeks/:weekId/content/:deckFileId/viewed` (progress, gradebook, learner path, complete, medals, stars, content) | 3341-3920 | C |
+| `/api/teacher/week/:weekId/file-quizzes` → `.../regenerate-quiz` (teacher module-quiz routes) | 3921-4205 | B |
+| `/api/trainers/teachers/:teacherId/weeks/:weekId/content-history` | 4206-4245 | C |
+| `/api/admin/dashboard-stats` → `/api/courses/:courseId/weeks/reorder` → `/api/batches/:batchId/courses/:courseId` (admin people, courses, placements) | 4246-4761 | E |
+| `/api/teacher/:teacherId/courses` → `PATCH /api/certificates/:certId` (certificates) | 4762-4977 | D |
+| `/api/admin/analytics/*` → `/api/teacher/goals/:id` | 4978-6312 | none |
+| `/api/batches/:batchId/teachers/import-csv` → `/api/teacher/assignments/:assignmentId/submit` (CSV import, written work, discussions) | 6313-6576 | C, for `/api/weeks/:weekId/discussions` only (D11); the rest none |
+| `/api/batches/:batchId/events` → end | 6577-6826 | none |
+
+`server/storage.ts` methods:
+
+| Methods | Owner |
+| --- | --- |
+| `getAllBatches` | Track 0 (C4) |
+| Quiz cache and quiz attempt methods (`saveCachedQuiz`, `getCachedQuiz`, `approveCachedQuiz`, `updateCachedQuizQuestions`, `deleteCachedQuiz`, attempt savers and readers) | B |
+| `syncTeacherCourseCompletion`, `upsertTeacherCourseCompletion`, `calculateTeacherCourseCompletionPercentage`, `tryAutoGenerateCertificate`, teacher content progress methods | C |
+| `getCompletedTeachersForBatchCourse`, `issueAcademyCertificate`, `generateTeacherCertificate`, certificate readers and `updateTeacherCertificate` | D |
+| Batch, cohort, course and placement methods other than `getAllBatches`; `getTrainerAnalytics`, `getTrainerDesk` | E |
+| Everything else | none |
+
+### Tracks
+
+**Track 0 — Shared contract.** Model: **Opus** (a shared contract every other track builds on).
+- Fixes: nothing alone. It lands the decisions as code: C1 to C8.
+- Owns: `shared/constants.ts` (new), `server/progressLogic.ts`, `server/completion.ts` (new), `server/scope.ts` (new),
+  `server/access.ts`, `shared/academyPath.ts`, `storage.getAllBatches`, `routes.ts` lines 1-300,
+  `tests/feedback-fixes.test.ts`, `tests/access.test.ts`, `tests/academy-path.test.ts`, `tests/unit/contract/`.
+- Depends on: the decisions.
+- Tests: `tests/unit/contract/pass-mark.test.ts` (the scorer at the boundary: 79% fails, 80% passes under D3);
+  `tests/unit/contract/completion-rule.test.ts` (`fileIsDone` with and without an approved quiz; `isCourseComplete` at
+  N-1 of N modules is false under D4; modules without files count);
+  `tests/unit/contract/trainer-scope.test.ts` (`trainerOwnsBatch`: `cohort_trainers` yes, `trainer_id` yes,
+  `created_by` alone no under D8); `tests/unit/contract/course-order.test.ts` (the pure part of `cohortCourseOrder`:
+  step order, then course order, then unplaced by `assigned_at`). The db-backed resolvers in `server/scope.ts` and
+  `server/completion.ts` take their row readers as arguments, so the tests drive them with rows in memory.
+- Note: on its own, Track 0 changes what users get (the pass mark, the completion rule). It is merged into
+  `feat/improvements` only, and nothing deploys until every track is in (see *Rollout*).
+
+**Track A — Sign-in and session (N1, finding 17).** Model: **Opus** (sign-in and sessions).
+- Fixes: each sign-in (staff `/api/login` for staff or teacher accounts, `/api/teacher/login`) regenerates the session,
+  so it holds one identity. `/api/user` answers for that one identity. Logout makes one request that ends the whole
+  session, and the client waits for it before it reloads. The client asks the server who is signed in on every load:
+  `/api/user` is not `staleTime: Infinity`, and the stored user is a placeholder only. `unified-auth`, `role-home` and
+  `protected-route` redirect on the server's answer, not on `sessionStorage`.
+- Owns: `server/auth.ts`, `server/teacherAuth.ts`, `client/src/hooks/use-auth.tsx`, `client/src/lib/sessionUser.ts`,
+  `client/src/lib/protected-route.tsx`, `client/src/pages/unified-auth.tsx`, `client/src/pages/role-home.tsx`,
+  `tests/unit/auth/`.
+- Depends on: nothing. Layer 1.
+- Tests: `tests/unit/auth/one-identity-per-session.test.ts`. It drives the login handlers with a fake session object
+  and asserts that a teacher login after a staff login leaves no passport user, and the reverse. It must fail with
+  `regenerate` removed. Also run the text contracts that read `unified-auth.tsx` and `server/auth.ts`
+  (`tests/access-request.test.ts` and others that grep them) and keep them green with `\r?\n`.
+- Not covered by a test: the browser back-navigation case. Acceptance checks it by hand (*Acceptance Criteria*).
+
+**Track B — Quiz integrity (findings 2, 8, 11; N2, N3; part of 6).** Model: **Opus** (quiz scoring, role checks,
+model spend).
+- Fixes:
+  - Teachers receive questions without `correctAnswer` or explanation (module quiz `GET`, assigned quiz `GET`, and
+    attempt reads until the teacher has passed or used every attempt).
+  - Module-quiz submit takes `answers` only and scores against the approved cached quiz on the server, with C1. Body
+    `questions` are ignored. Old clients still work, because they served the same cached quiz.
+  - Submit refuses a teacher with no open cohort for the course (`NOT_ENROLLED`) and a module that is locked for them
+    (`MODULE_LOCKED`, via C3 and C5). `teacherMayTakeQuiz([])` refuses instead of allowing.
+  - Delete the three teacher routes nothing calls: content `generate-quiz`, `submit-quiz`, `regenerate-quiz`.
+  - Generate, regenerate and edit become staff-only and scoped by `trainerMayEditCourse`. Every AI draft is saved
+    unapproved (D5) at deck upload, generate, regenerate and the bulk admin job. A cache hit does not serve an
+    unapproved quiz to a learner.
+  - Approve is scoped the same way. `FileQuizEditDialog` is mounted on CourseWeeks for trainers (D5).
+  - The module, lesson-file and content-item routes in B's region check `trainerMayEditCourse` (D2, finding 6 for
+    modules).
+  - The hardcoded 80s at `routes.ts:3225, 3281` read the quiz's `passMark`. `FileQuizDialog` shows the pass mark from C1.
+  - `/api/teacher/week/:weekId/file-quizzes` reports `quizExists` only for approved quizzes. Track C's content view
+    needs this.
+- Owns: its `routes.ts` regions; its `storage.ts` methods; `server/quizDelivery.ts`, `server/cohortGate.ts`,
+  `server/cohortAccess.ts`, `server/quizService.ts`; `client/src/components/FileQuizDialog.tsx`,
+  `client/src/components/FileQuizEditDialog.tsx`, `client/src/pages/course-weeks.tsx`; `tests/unit/quiz/`.
+- Depends on: Track 0.
+- Tests: `tests/unit/quiz/learner-projection.test.ts` (no `correctAnswer` in any field of what a learner gets);
+  `tests/unit/quiz/server-scoring.test.ts` (a forged `questions` body with every answer "right" scores against the
+  cache and fails; it must fail with the cache lookup removed); `tests/unit/quiz/quiz-gate.test.ts`
+  (`teacherMayTakeQuiz([])` refuses). Route wiring that cannot be driven yet is guarded by text contracts in
+  `tests/unit/quiz/route-contracts.test.ts`: the submit handler does not read `req.body.questions`; no
+  `saveCachedQuiz({... approved: true })` remains; generate is not `isAuthenticatedAny`. Each is proven by removal.
+  Per `docs/_learnings/a-test-that-reads-source-as-text-cannot-guard-a-move.md`, they say so.
+
+**Track C — Learner path and completion (findings 1, 3, 9, 10, 22; N4, N5; D10 report; D11 scoping).** Model:
+**Opus** (completion and locks; quiet failures).
+- Fixes:
+  - `POST .../courses/:courseId/complete` refuses unless C3 says complete (`COURSE_INCOMPLETE`). `canCheckComplete`
+    uses the same rule.
+  - Course order and locks in `assigned-weeks`, `complete` and the content route come from `cohortCourseOrder` (D1).
+  - Module and file completion follow C2 (D6). Marking a file read completes it when it has no approved quiz, and
+    triggers the sync.
+  - `syncTeacherCourseCompletion` computes with C3, counts every module, completes at C1/C2's rule, and never writes
+    `in_progress` over `completed`. `tryAutoGenerateCertificate` is renamed for what it does (D4); both callers
+    (`routes.ts:2190` in B's region, `:4076` deleted by B) stay working through C8.
+  - The teacher content `GET` checks enrolment, draft status and the previous-course lock (N4).
+  - Medals use per-cohort quiz signals (finding 22). The trainer progress and gradebook figures read the same rule.
+  - Discussions are read and posted only by teachers enrolled in a cohort that holds the module's course, and staff in
+    scope (D11).
+  - The content-history route checks the trainer's scope.
+  - Teacher content view: lesson files without an approved quiz show "Mark read to continue".
+  - Write the D10 report SQL.
+- Owns: its `routes.ts` regions; its `storage.ts` methods; `client/src/pages/teacher-content-view.tsx`,
+  `client/src/components/DiscussionThread.tsx` (scope behaviour; G writes the copy line through C's brief, see G);
+  `migrations/lms-flow-fixes/`; `tests/unit/progress/`.
+- Depends on: Track 0. It does not depend on B: C reads quiz approval through C8.
+- Tests: `tests/unit/progress/complete-refuses-at-zero.test.ts` (the handler's rule function with in-memory rows:
+  0 of 3 modules refuses; 3 of 3 accepts; must fail with the check removed);
+  `tests/unit/progress/sync-never-downgrades.test.ts`; `tests/unit/progress/step-order-lock.test.ts`;
+  `tests/unit/progress/medals-per-cohort.test.ts` (a quiz passed in cohort X earns nothing in cohort Y). Update
+  `tests/cohort-medals.test.ts` if its signals change.
+
+**Track D — Certificates (findings 13, 14, 21 behaviour, 24's certificate pages; N6, N7).** Model: **Opus**
+(certificates).
+- Fixes: issue and bulk generate refuse a course certificate unless C3 says complete, and a Fellowship or Advanced
+  certificate unless the academy path is done (D4). Course wording names the course only (D4b). The admin
+  certificates page lists who is eligible, as the server computes it, and shows the refusal sentence. `GET
+  /api/batches/:batchId/certificates` checks cohort scope. Delete the unlinked approval and view pages and the bulk
+  route if the engineer agrees they are unused (N7 makes the approval page dead anyway); otherwise fix the route
+  pattern and link them from the admin certificates page.
+- Owns: its `routes.ts` region; its `storage.ts` methods; `shared/certificateDesigns.ts`,
+  `client/src/pages/admin-certificates.tsx`, `admin-certificate-approval.tsx`, `admin-certificate-view.tsx`,
+  `client/src/App.tsx` lines 56-57 only (G owns the rest of `App.tsx`; see the hot-spot rule), `tests/unit/certificates/`,
+  `tests/admin-certificates.test.ts`.
+- Depends on: Track 0 (C3, C5). It does not depend on C, because it recomputes rather than reading C's rows.
+- Tests: `tests/unit/certificates/issue-requires-completion.test.ts` (refusal proven by removal);
+  `tests/admin-certificates.test.ts` updated for the new wording.
+
+**Track E — Cohorts, steps, courses and trainer scope (findings 4, 5, 6, 7, 15, 16, 19; D1 admin side, D2, D8, D9).**
+Model: **Opus** (role checks).
+- Fixes:
+  - `PATCH`/`DELETE /api/courses/:id` become `isAdmin`; delete `POST /api/courses/:courseId/assign` (D2).
+  - `POST /api/courses/:courseId/weeks/reorder` checks `trainerMayEditCourse`.
+  - A step teacher save never removes cohort enrolment (D9).
+  - People, analytics and the course-batches filter count cohorts with C4. The People card labels the figure
+    "Cohorts", not "files completed", and drops the 0/100 bar.
+  - `admin-batches.tsx` labels steps with C6 ("Step n"). The trainer desk says "cohort" where it means a cohort.
+  - Remove the trainer's cohort Delete button (finding 19).
+  - Link the trainer content history from the Progress tab (finding 24).
+- Owns: its `routes.ts` regions; its `storage.ts` methods; `server/academyPathRoutes.ts`;
+  `client/src/pages/admin-batches.tsx`, `trainer-batches.tsx`, `admin-trainers.tsx`, `admin-teachers.tsx`,
+  `admin-people.tsx`; `tests/unit/cohorts/`, `tests/cohort-admin.test.ts`, `tests/trainer-desk.test.ts`.
+- Depends on: Track 0.
+- Tests: `tests/unit/cohorts/step-save-keeps-enrolment.test.ts` (the enrolment diff as a pure function: a
+  trainer-added teacher survives a step save; proven by removal); `tests/unit/cohorts/course-routes-admin-only.test.ts`
+  (text contract: no `isTrainer` on course PATCH or DELETE); `tests/unit/cohorts/trainer-counts-agree.test.ts` (People,
+  desk and guard counts come from one function for the same rows).
+
+**Track F — Start-up writes (D7, "Also found").** Model: **Opus** (start-up writes to production).
+- Fixes (under D7 recommended): `ensureAllTestLogins` no longer calls `removeInactiveDesks()`. The function stays,
+  unused, only if the engineer wants a later admin action; otherwise it is deleted with its test cases.
+  `tests/inactive-desks.test.ts` changes to pin "start-up does not delete" (a text contract over
+  `server/ensureTestLogins.ts`, proven by putting the call back). Every reader of the old rule changes in the same
+  commit: `skills/test-skill/references/this-repository.md`, `skills/migrations-skill/references/this-repository.md`,
+  `skills/plan-skill/references/this-repository.md` and `skills/orchestration-skill/references/this-repository.md` all
+  say start-up deletes inactive accounts. Under the alternative (keep), F only adds the trap to the docs, and E changes
+  the People copy.
+- Owns: `server/ensureTestLogins.ts`, `server/deskRoster.ts`, `tests/inactive-desks.test.ts`, the four skill
+  reference files named above. (Base those on `feat/improvements` at or after `991c551`, which edited two of them.)
+- Depends on: nothing. Layer 1.
+- Tests: as above, plus `npm run test:docs` for the skill text.
+
+**Track G — Copy, dead pages and docs (findings 12 copy, 18, 20, 21, 23, 24, 25; D11, D12; every guide).** Model:
+**Sonnet** (UI copy, text contracts, docs). A separate Sonnet verify pass follows before merge.
+- Fixes:
+  - Copy: `cohort-workspace.tsx:278`, `teacher-dashboard.tsx` (Canvas and Moodle line, "Training Program Planner"),
+    `approvals.tsx` ("Sign them in" → "Approve").
+  - D12: remove `PracticeShelf` from the teacher dashboard.
+  - Delete unrouted pages: `home.tsx`, `landing.tsx`, `auth-page.tsx`, `teacher-auth.tsx`, `admin-ops-catalog.tsx`,
+    `components/examples/Home.tsx`.
+  - Remove the `/emergency-reset` route and page, and `/admin/handover` (or link it from the admin desk if the
+    engineer wants to keep it).
+  - Docs: `docs/guides/*.md` for D1-D9 and D11; `docs/architecture/workflow.md`; `docs/ops/README.md`; `replit.md`
+    (replace with a pointer to `README.md`, or delete).
+  - The `DiscussionThread` copy line goes to Track C, the file's owner, as a fixed sentence from D11.
+- Owns: `client/src/pages/teacher-dashboard.tsx`, `approvals.tsx`, `cohort-workspace.tsx`, `admin-handover.tsx`,
+  `emergency-reset.tsx`, the deleted pages, `client/src/components/PracticeShelf.tsx`, `shared/practiceLessons.ts`,
+  `client/src/App.tsx` except lines 56-57, `docs/guides/`, `docs/architecture/workflow.md`, `docs/ops/README.md`,
+  `replit.md`, and the text-contract tests that read those pages (`tests/admin-desk.test.ts`,
+  `tests/teacher-desk-split.test.ts`, `tests/attendance-board.test.ts` where they read these files).
+- Depends on: Track 0 (C6 terms, C1 numbers). It merges **last**, after B to E, so the guides describe what merged.
+- Tests: the text contracts above stay green; `npm run test:docs`. Grep that no page still imports a deleted file.
+
+### Dependency Graph
+
+```
+Layer 1 (start together):   Track 0 ─────────┐      Track A        Track F
+                                              │
+Layer 2 (after 0 merges):   B    C    D    E    G (drafts in parallel)
+                             \    \    |    /    /
+Layer 3 (integration):        orchestrator merges B, C, D, E in any order,
+                              then G last; full suite, typecheck, build
+```
+
+- **First parallel layer: Track 0, Track A and Track F.** A and F share no file with 0 or with each other.
+- Layer 2 starts once Track 0 is merged into `feat/improvements`: B, C, D and E in parallel, under region ownership.
+  G starts drafting at the same time and merges last.
+- Strict fallback (one owner per file): 0 → B → C → E → D in sequence for `routes.ts` and `storage.ts`, with A, F and G
+  in parallel throughout. B goes first because it closes the largest live gap. C follows, then E, because C's lock
+  reads E-region data only through Track 0 resolvers. D goes last because it reads everyone's rules.
+- The only cross-track call that crosses regions is C8, and its signatures are frozen.
