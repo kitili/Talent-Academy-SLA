@@ -1839,9 +1839,9 @@ export default function AdminAnalytics() {
                           </div>
 
                           {/* Certificate Preview */}
-                          <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border">
+                          <div className="p-4 bg-sl-surface rounded-lg border">
                             <p className="text-sm font-medium mb-4 text-foreground">Certificate Preview</p>
-                            <div className="border-2 border-primary rounded-lg p-8 space-y-6 text-center bg-white dark:bg-slate-900">
+                            <div className="border-2 border-primary rounded-lg p-8 space-y-6 text-center bg-sl-surface">
                               <div className="space-y-2">
                                 <h1 className="text-3xl font-bold text-primary">Certificate of Completion</h1>
                                 <p className="text-sm text-muted-foreground">Silverleaf Academy</p>
