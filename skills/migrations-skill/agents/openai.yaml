@@ -1,0 +1,4 @@
+interface:
+  display_name: "Migrations Skill"
+  short_description: "Write safe migrations and operator SQL"
+  default_prompt: "Use $migrations-skill to write, review or hand off this database migration or data change."

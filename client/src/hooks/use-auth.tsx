@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
   user: SelectUser | null;
-  isLoading: boolean;
+  isLoading: boolean; // true until the server has answered /api/user
   error: Error | null;
   isAdmin: boolean;
   isTrainer: boolean;
@@ -28,20 +28,33 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const cachedUser = readSessionUser();
+  // The server decides who is signed in, on every load. The stored user is a placeholder while that request runs:
+  // it is never cached as the answer, so nothing redirects on it.
   const {
     data: user,
     error,
-    isLoading,
-  } = useQuery<SelectUser | undefined, Error>({
+    isSuccess,
+    isPlaceholderData,
+  } = useQuery<SelectUser | null, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    initialData: cachedUser,
+    placeholderData: () => readSessionUser(),
+    staleTime: 0,
   });
+  const answered = isSuccess && !isPlaceholderData;
 
   useEffect(() => {
-    if (user) persistSessionUser(user);
-  }, [user]);
+    if (answered) persistSessionUser(user);
+  }, [answered, user]);
+
+  // A page restored from the back-forward cache did not load again, so ask the server again.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   // Identify user in PostHog when user data is available
   useEffect(() => {
@@ -113,11 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const logoutMutation = useMutation({
+    // One request ends the whole session, whoever is in it; the reload below waits for it.
     mutationFn: async () => {
-      await Promise.allSettled([
-        fetch("/api/logout", { method: "POST", credentials: "include", signal: AbortSignal.timeout(4000) }),
-        fetch("/api/teacher/logout", { method: "POST", credentials: "include", signal: AbortSignal.timeout(4000) }),
-      ]);
+      await fetch("/api/logout", { method: "POST", credentials: "include", signal: AbortSignal.timeout(4000) });
     },
     onSettled: () => {
       queryClient.setQueryData(["/api/user"], null);
@@ -137,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user: user ?? null,
-        isLoading,
+        isLoading: !answered,
         error,
         isAdmin,
         isTrainer,

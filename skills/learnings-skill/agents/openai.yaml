@@ -1,0 +1,4 @@
+interface:
+  display_name: "Learnings Skill"
+  short_description: "Record and reuse traps found the hard way"
+  default_prompt: "Use $learnings-skill to record this trap in docs/_learnings, or check the index before starting."

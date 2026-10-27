@@ -123,6 +123,8 @@ import { eq, and, or, sql as sqlOp, desc, max, inArray } from "drizzle-orm";
 import { quizVisibleToTeacher, summarizeTrainerDesk, type TrainerCohortSummary } from "@shared/trainerDesk";
 import { courseHealth, quizStoppedReason } from "./cohortAccess";
 import { batchRiskStatus, moduleCoveragePercentage } from "./progressLogic";
+import { computeCourseCompletion } from "./completion";
+import { completionRowFor, mergeContentProgress, mergeCourseCompletion } from "./learnerPath";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -295,7 +297,6 @@ export interface IStorage {
   // Teacher course completion operations
   getTeacherCourseCompletion(teacherId: string, courseId: string, batchId: string): Promise<TeacherCourseCompletion | undefined>;
   upsertTeacherCourseCompletion(completion: Partial<InsertTeacherCourseCompletion> & { teacherId: string; courseId: string; batchId: string }): Promise<TeacherCourseCompletion>;
-  getCompletedTeachersForBatchCourse(batchId: string, courseId: string): Promise<Teacher[]>;
   syncTeacherCourseCompletion(teacherId: string, courseId: string): Promise<void>;
   refreshTeacherReportCard(teacherId: string): Promise<TeacherReportCard>;
   
@@ -321,8 +322,9 @@ export interface IStorage {
   }): Promise<TeacherCertificate>;
   updateTeacherCertificate(certificateId: string, updates: Partial<Pick<TeacherCertificate, 'teacherName' | 'courseName' | 'appreciationText' | 'adminName1' | 'adminName2'>>): Promise<TeacherCertificate | undefined>;
   
-  // Auto certificate generation
+  // Course completion share (C3: modules complete out of every module)
   calculateTeacherCourseCompletionPercentage(teacherId: string, courseId: string): Promise<number>;
+  /** @deprecated Issues no certificate: it is `syncTeacherCourseCompletion`. Kept until its last caller goes. */
   tryAutoGenerateCertificate(teacherId: string, courseId: string): Promise<TeacherCertificate | null>;
   
   // Analytics operations
@@ -1005,6 +1007,10 @@ export class DatabaseStorage implements IStorage {
     return cached;
   }
 
+  /**
+   * Saves a quiz draft for a lesson file, replacing any quiz it had. Every save is unapproved (D5):
+   * only `approveCachedQuiz`, called by a person, makes a quiz visible to teachers.
+   */
   async saveCachedQuiz(cache: InsertQuizCache): Promise<QuizCache> {
     // First, delete any existing quiz for this week/file combo to handle updates
     await db
@@ -1019,7 +1025,7 @@ export class DatabaseStorage implements IStorage {
     // Then insert the new one
     const [cached] = await db
       .insert(quizCache)
-      .values(cache as any)
+      .values({ ...cache, approved: false, approvedAt: null } as any)
       .returning();
     
     console.log(`[STORAGE] 💾 Cached quiz saved for weekId=${cache.weekId}, fileId=${cache.deckFileId}, questions=${cached.questions.length}`);
@@ -1233,11 +1239,12 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(batchTeachers, eq(batches.id, batchTeachers.batchId))
       .groupBy(batches.id);
     
+    // Trainer scope (D8), the SQL twin of trainerOwnsBatch in server/access.ts: trainer_id or a
+    // cohort_trainers row. created_by grants nothing.
     if (trainerId) {
       return await query.where(
         or(
           eq(batches.trainerId, trainerId),
-          eq(batches.createdBy, trainerId),
           sqlOp`exists (select 1 from cohort_trainers where cohort_id = ${batches.id} and trainer_id = ${trainerId})`,
         ),
       );
@@ -1582,24 +1589,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Teacher content progress operations (for content viewing with quiz gating)
+  // A write never moves a row back (completed or viewed to available) and keeps the first viewed and
+  // completed times, which C3 reads (`mergeContentProgress`).
   async upsertTeacherContentProgress(progress: Partial<InsertTeacherContentProgress> & { teacherId: string; weekId: string; deckFileId: string }): Promise<TeacherContentProgress> {
+    const existing = await this.getTeacherContentProgress(progress.teacherId, progress.weekId, progress.deckFileId);
+    const merged = mergeContentProgress(existing, progress);
+    const row = {
+      status: merged.status,
+      viewedAt: merged.viewedAt ? new Date(merged.viewedAt) : null,
+      completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
+    };
     const [result] = await db
       .insert(teacherContentProgress)
       .values({
         teacherId: progress.teacherId,
         weekId: progress.weekId,
         deckFileId: progress.deckFileId,
-        status: progress.status || "locked",
-        viewedAt: progress.viewedAt || null,
-        completedAt: progress.completedAt || null,
+        ...row,
       })
       .onConflictDoUpdate({
         target: [teacherContentProgress.teacherId, teacherContentProgress.weekId, teacherContentProgress.deckFileId],
-        set: {
-          status: progress.status !== undefined ? progress.status : sqlOp`${teacherContentProgress.status}`,
-          viewedAt: progress.viewedAt !== undefined ? progress.viewedAt : sqlOp`${teacherContentProgress.viewedAt}`,
-          completedAt: progress.completedAt !== undefined ? progress.completedAt : sqlOp`${teacherContentProgress.completedAt}`,
-        },
+        set: row,
       })
       .returning();
     return result;
@@ -1819,69 +1829,35 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  // A `completed` row stays completed with its first completion time (`mergeCourseCompletion`, N5).
   async upsertTeacherCourseCompletion(completion: Partial<InsertTeacherCourseCompletion> & { teacherId: string; courseId: string; batchId: string }): Promise<TeacherCourseCompletion> {
+    const existing = await this.getTeacherCourseCompletion(completion.teacherId, completion.courseId, completion.batchId);
+    const merged = mergeCourseCompletion(existing, completion);
+    const row = { ...merged, completedAt: merged.completedAt ? new Date(merged.completedAt) : null };
     const [result] = await db
       .insert(teacherCourseCompletion)
       .values({
         teacherId: completion.teacherId,
         courseId: completion.courseId,
         batchId: completion.batchId,
-        status: completion.status || "in_progress",
-        completedAt: completion.completedAt || null,
-        totalWeeks: completion.totalWeeks || 0,
-        completedWeeks: completion.completedWeeks || 0,
+        ...row,
       })
       .onConflictDoUpdate({
         target: [teacherCourseCompletion.teacherId, teacherCourseCompletion.courseId, teacherCourseCompletion.batchId],
-        set: {
-          status: completion.status !== undefined ? completion.status : sqlOp`${teacherCourseCompletion.status}`,
-          completedAt: completion.completedAt !== undefined ? completion.completedAt : sqlOp`${teacherCourseCompletion.completedAt}`,
-          totalWeeks: completion.totalWeeks !== undefined ? completion.totalWeeks : sqlOp`${teacherCourseCompletion.totalWeeks}`,
-          completedWeeks: completion.completedWeeks !== undefined ? completion.completedWeeks : sqlOp`${teacherCourseCompletion.completedWeeks}`,
-        },
+        set: row,
       })
       .returning();
     return result;
   }
 
+  // C3 decides: every module counts, the course completes at 100%, a course with no modules never does.
   async syncTeacherCourseCompletion(teacherId: string, courseId: string): Promise<void> {
-    const weeks = await this.getWeeksForCourse(courseId);
-    const modules = weeks.filter(w => (w.deckFiles?.length || 0) > 0);
-    let completedModules = 0;
-
-    for (const week of modules) {
-      const files = week.deckFiles || [];
-      const progressRecords = await this.getAllTeacherContentProgressForWeek(teacherId, week.id);
-      const allFilesComplete = files.length > 0 && files.every(f =>
-        progressRecords.some(p => p.deckFileId === f.id && p.status === "completed")
-      );
-      if (allFilesComplete) {
-        completedModules++;
-        continue;
-      }
-      const allQuizzesPassed = files.length > 0 && (await Promise.all(
-        files.map(f => this.hasPassedFileQuiz(week.id, f.id, teacherId))
-      )).every(Boolean);
-      if (allQuizzesPassed) completedModules++;
-    }
-
-    const total = modules.length;
-    const percentage = total > 0 ? Math.round((completedModules / total) * 100) : 0;
-    const isComplete = total > 0 && completedModules >= total;
-
+    const write = completionRowFor(await computeCourseCompletion(teacherId, courseId), new Date());
     const teacherBatches = await this.getBatchesForTeacher(teacherId);
     for (const batch of teacherBatches) {
       const coursesForBatch = await this.getCoursesForBatch(batch.id);
       if (!coursesForBatch.some(c => c.id === courseId)) continue;
-      await this.upsertTeacherCourseCompletion({
-        teacherId,
-        courseId,
-        batchId: batch.id,
-        status: isComplete || percentage >= 90 ? "completed" : "in_progress",
-        completedAt: isComplete || percentage >= 90 ? new Date() : null,
-        totalWeeks: total,
-        completedWeeks: completedModules,
-      });
+      await this.upsertTeacherCourseCompletion({ teacherId, courseId, batchId: batch.id, ...write });
     }
   }
 
@@ -1918,22 +1894,6 @@ export class DatabaseStorage implements IStorage {
       totalQuizzesPassed: totalPassed,
       averageScore,
     });
-  }
-
-  async getCompletedTeachersForBatchCourse(batchId: string, courseId: string): Promise<Teacher[]> {
-    const results = await db
-      .select({ teacher: teachers })
-      .from(teacherCourseCompletion)
-      .innerJoin(teachers, eq(teacherCourseCompletion.teacherId, teachers.id))
-      .where(
-        and(
-          eq(teacherCourseCompletion.batchId, batchId),
-          eq(teacherCourseCompletion.courseId, courseId),
-          eq(teacherCourseCompletion.status, "completed")
-        )
-      );
-    
-    return results.map(r => r.teacher);
   }
 
   // Certificate template operations
@@ -2102,24 +2062,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async calculateTeacherCourseCompletionPercentage(teacherId: string, courseId: string): Promise<number> {
-    const weeks = await this.getWeeksForCourse(courseId);
-    if (weeks.length === 0) return 0;
-    
-    let totalFiles = 0;
-    let completedFiles = 0;
-    
-    for (const week of weeks) {
-      const files = week.deckFiles || [];
-      totalFiles += files.length;
-      
-      const progressRecords = await this.getAllTeacherContentProgressForWeek(teacherId, week.id);
-      completedFiles += progressRecords.filter(p => p.status === "completed").length;
-    }
-    
-    if (totalFiles === 0) return 0;
-    return Math.round((completedFiles / totalFiles) * 100);
+    const { totalModules, doneModules } = await computeCourseCompletion(teacherId, courseId);
+    if (totalModules === 0) return 0;
+    return Math.round((doneModules / totalModules) * 100);
   }
 
+  /** @deprecated Issues no certificate (certificates stay manual, D4): it re-runs the completion sync. */
   async tryAutoGenerateCertificate(teacherId: string, courseId: string): Promise<TeacherCertificate | null> {
     await this.syncTeacherCourseCompletion(teacherId, courseId);
     return null;

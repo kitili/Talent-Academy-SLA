@@ -9,7 +9,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars } from "@shared/schema";
+import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars, contentItems } from "@shared/schema";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
@@ -27,21 +27,42 @@ import {
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
 import { parseDeadline } from "@shared/academyPath";
+import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, QUIZ_ATTEMPTS, refusal } from "@shared/constants";
+import { cohortIsOpen, trainerMayEditCourse } from "./scope";
+import { cohortsInScope, trainerCohortCounts } from "./cohortRoster";
 import { OPS_AREAS, OPS_DOCUMENTS, OPS_TABLES } from "@shared/opsCatalog";
 import { eq, and, or, sql, asc } from "drizzle-orm";
-import { applyModuleLocks, moduleIsComplete } from "./progressLogic";
-import { cohortMedals, nextCourseToCheck } from "@shared/cohortMedals";
+import { moduleIsComplete } from "./progressLogic";
+import { cohortMedals } from "@shared/cohortMedals";
 import { recordAudit } from "./audit";
 import { sanitizeLessonHtml } from "./htmlSanitize";
 import { signFileGrant, verifyFileGrant } from "./fileGrant";
 import { passMarkOf, shuffleQuestions } from "./quizDelivery";
 import { isWritingExam } from "@shared/trainerDesk";
-import { blockAssignedQuiz, blockTeacherWeekQuiz } from "./cohortGate";
+import { blockAssignedQuiz, blockCourseEdit, blockTeacherWeekQuiz, editableModule } from "./cohortGate";
 import { normalizeManualQuestions } from "./quizService";
+import { answerReview, assignedQuizStanding, attemptQuizView, gradeLessonQuiz, isLiveLessonQuiz, learnerQuiz, learnerQuestions, lessonQuizForViewer } from "./learnerQuiz";
+import { computeCourseCompletion } from "./completion";
+import {
+  cohortCourseFigures,
+  cohortPath,
+  cohortQuizSignalsFor,
+  courseCheckRefusal,
+  discussionAccess,
+  lessonFileStates,
+  markReadProgress,
+  memoizedPathReaders,
+  moduleProgress,
+  nextCourseCompletion,
+  teacherModuleAccess,
+  trainerMaySeeTeacherModule,
+  visibleDiscussionPosts,
+} from "./learnerPath";
 import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
+import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
 import multer from "multer";
@@ -87,7 +108,7 @@ function isStrictAdmin(req: Request, res: Response, next: NextFunction) {
 
 function staffCanAccessBatch(
   user?: Express.User,
-  batch?: { trainerId?: string | null; createdBy?: string | null } | null,
+  batch?: { trainerId?: string | null; trainerIds?: string[] | null } | null,
 ) {
   if (batch === undefined) return isAcademyStaff(user);
   return trainerOwnsBatch(user, batch);
@@ -184,7 +205,7 @@ async function saveWritingExam(
     paperUrl: body.paperUrl || null,
     paperName: body.paperName || null,
     numQuestions: 1,
-    passMark: 80,
+    passMark: ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT,
     questions: [{ id: randomUUID(), type: "open_ended", question: prompt }],
     assignedBy,
     dueDate: parseDeadline(body.dueDate),
@@ -1118,6 +1139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/training-weeks", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const validated = insertTrainingWeekSchema.parse(req.body);
+      if (await blockCourseEdit(res, req.user, validated.courseId)) return;
       const week = await storage.createTrainingWeek(validated);
       res.json(week);
     } catch (error) {
@@ -1129,10 +1151,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update a training week (admin only)
   app.patch("/api/training-weeks/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableModule(res, req.user, req.params.id)) return;
       const validated = updateTrainingWeekSchema.parse({
         ...req.body,
         id: req.params.id,
       });
+      // Moving a module to another course needs that course in scope too.
+      if (validated.courseId !== undefined && await blockCourseEdit(res, req.user, validated.courseId)) return;
       const week = await storage.updateTrainingWeek(validated);
       if (!week) {
         return res.status(404).json({ error: "Training week not found" });
@@ -1147,6 +1172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a training week (admin only)
   app.delete("/api/training-weeks/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableModule(res, req.user, req.params.id)) return;
       // 🗑️ CACHE INVALIDATION: Delete all cached quizzes for this week
       await storage.deleteCachedQuizzesForWeek(req.params.id);
       console.log(`[CACHE] Invalidated all quiz caches for week: ${req.params.id}`);
@@ -1191,7 +1217,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Insert at new position (newPosition - 1 for 0-based indexing)
       weeks.splice(newPosition - 1, 0, weekToMove);
 
-      // Renumber all weeks sequentially
+      // Renumber all weeks sequentially. Every module whose number changes must be on a course the caller may edit (D2).
+      const changed = weeks.filter((week, index) => week.weekNumber !== index + 1);
+      for (const courseId of Array.from(new Set(changed.map((week) => week.courseId)))) {
+        if (await blockCourseEdit(res, req.user, courseId)) return;
+      }
       const updatePromises = weeks.map((week, index) => 
         storage.updateTrainingWeek({
           id: week.id,
@@ -1246,8 +1276,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/training-weeks/:id/import-package", isAuthenticated, isTrainer, packageUpload.single("package"), async (req, res) => {
     try {
-      const week = await storage.getTrainingWeek(req.params.id);
-      if (!week) return res.status(404).json({ error: "Week not found" });
+      const week = await editableModule(res, req.user, req.params.id);
+      if (!week) return;
       const file = (req as any).file as { buffer?: Buffer; originalname?: string } | undefined;
       if (!file?.buffer) return res.status(400).json({ error: "Upload a .zip package" });
       const imported = lessonFromPackage(file.buffer, file.originalname || "package.zip");
@@ -1278,8 +1308,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!youtubeId) {
         return res.status(400).json({ error: "Paste a YouTube watch, share, or embed link." });
       }
-      const week = await storage.getTrainingWeek(req.params.id);
-      if (!week) return res.status(404).json({ error: "Training week not found" });
+      const week = await editableModule(res, req.user, req.params.id);
+      if (!week) return;
       const newFile = {
         id: randomUUID(),
         fileName: title,
@@ -1310,11 +1340,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[UPLOAD DEBUG] Processing ${files.length} files for week ${req.params.id}`);
 
-      const week = await storage.getTrainingWeek(req.params.id);
-      if (!week) {
-        console.log("[UPLOAD DEBUG] Week not found:", req.params.id);
-        return res.status(404).json({ error: "Training week not found" });
-      }
+      const week = await editableModule(res, req.user, req.params.id);
+      if (!week) return;
 
       // Process each file and add to the existing deck files
       const newDeckFiles = await Promise.all(files.map(async file => {
@@ -1355,8 +1382,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[UPLOAD DEBUG] Database updated successfully");
       
-      // 🚀 PRE-CACHE: Generate quiz questions in background (non-blocking)
-      // Admin gets instant response, students get instant quiz delivery later
+      // 🚀 PRE-CACHE: Generate quiz drafts in background (non-blocking)
+      // Each draft is saved unapproved; Fellows see it only after a trainer or admin approves it (D5)
       setImmediate(async () => {
         try {
           const { generateSingleFileQuiz } = await import('./quizService');
@@ -1379,7 +1406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 weekId: req.params.id,
                 deckFileId: file.id,
                 questions,
-                approved: true,
+                approved: false,
               });
 
               const cacheTime = Date.now() - cacheStartTime;
@@ -1405,10 +1432,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id, fileId } = req.params;
 
-      const week = await storage.getTrainingWeek(id);
-      if (!week) {
-        return res.status(404).json({ error: "Training week not found" });
-      }
+      const week = await editableModule(res, req.user, id);
+      if (!week) return;
 
       const currentDeckFiles = week.deckFiles || [];
       const updatedDeckFiles = currentDeckFiles.filter(file => file.id !== fileId);
@@ -1439,10 +1464,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid request: fileIds array required" });
       }
 
-      const week = await storage.getTrainingWeek(id);
-      if (!week) {
-        return res.status(404).json({ error: "Training week not found" });
-      }
+      const week = await editableModule(res, req.user, id);
+      if (!week) return;
 
       const currentDeckFiles = week.deckFiles || [];
       
@@ -1639,6 +1662,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Content Items API - for LMS-style course content
 
+  /** A content item's module, when the caller may edit it (D2). Otherwise answers 404 or 403 and returns null. */
+  async function editableContentItem(req: Request, res: Response) {
+    const [item] = await db.select({ weekId: contentItems.weekId }).from(contentItems).where(eq(contentItems.id, req.params.id));
+    if (!item) {
+      res.status(404).json({ error: "Content item not found" });
+      return null;
+    }
+    return editableModule(res, req.user, item.weekId);
+  }
+
   // Get all content items for a week with user progress (authenticated users)
   app.get("/api/training-weeks/:weekId/content", isAuthenticated, async (req, res) => {
     try {
@@ -1656,6 +1689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a content item (admin only)
   app.post("/api/training-weeks/:weekId/content", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableModule(res, req.user, req.params.weekId)) return;
       const item = await storage.createContentItem({ ...req.body, weekId: req.params.weekId });
       res.json(item);
     } catch (error) {
@@ -1667,6 +1701,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update a content item (admin only)
   app.patch("/api/content-items/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableContentItem(req, res)) return;
+      // Moving an item to another module needs that module in scope too.
+      if (req.body?.weekId && !await editableModule(res, req.user, String(req.body.weekId))) return;
       const item = await storage.updateContentItem(req.params.id, req.body);
       if (!item) {
         return res.status(404).json({ error: "Content item not found" });
@@ -1681,6 +1718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete a content item (admin only)
   app.delete("/api/content-items/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!await editableContentItem(req, res)) return;
       const success = await storage.deleteContentItem(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Content item not found" });
@@ -1930,17 +1968,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File-level quiz endpoints (modular approach)
 
   // Generate quiz for a specific file (with pre-caching for instant delivery)
-  app.post("/api/training-weeks/:weekId/files/:fileId/generate-quiz", isAuthenticatedAny, async (req, res) => {
+  app.post("/api/training-weeks/:weekId/files/:fileId/generate-quiz", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const startTime = Date.now();
       console.log("[FILE-QUIZ] Starting quiz generation for file:", req.params.fileId);
       const { weekId, fileId } = req.params;
       const { numQuestions = 5, force = false } = req.body;
-      
-      const week = await storage.getTrainingWeek(weekId);
-      if (!week) {
-        return res.status(404).json({ error: "Training week not found" });
-      }
+
+      const week = await editableModule(res, req.user, weekId);
+      if (!week) return;
 
       const file = week.deckFiles?.find(f => f.id === fileId);
       if (!file) {
@@ -1953,11 +1989,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cachedQuiz && cachedQuiz.questions.length >= numQuestions) {
           const cacheTime = Date.now() - startTime;
           console.log(`[FILE-QUIZ] 🎯 CACHE HIT! Instant retrieval in ${cacheTime}ms for ${file.fileName}`);
-          const slice = cachedQuiz.questions.slice(0, numQuestions);
-          const forLearner = !!(req.session as any)?.teacherId;
           return res.json({
-            questions: forLearner ? shuffleQuestions(slice) : slice,
+            questions: cachedQuiz.questions.slice(0, numQuestions),
             cached: true,
+            approved: cachedQuiz.approved,
           });
         }
       } else {
@@ -1979,17 +2014,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Save to cache for future instant retrieval
       console.log(`[FILE-QUIZ] 💾 About to save ${questions.length} questions to cache for weekId=${weekId}, fileId=${fileId}`);
+      // A draft: Fellows see it only after a trainer or admin approves it (D5).
       const savedQuiz = await storage.saveCachedQuiz({
         weekId,
         deckFileId: fileId,
         questions,
-        approved: true,
+        approved: false,
       });
       console.log(`[FILE-QUIZ] ✅ Successfully saved quiz, cached questions count:`, savedQuiz.questions.length);
 
       const totalTime = Date.now() - startTime;
       console.log(`[FILE-QUIZ] ✅ Generated and cached ${questions.length} questions in ${totalTime}ms`);
-      res.json({ questions, cached: false });
+      res.json({ questions, cached: false, approved: false });
     } catch (error) {
       console.error("[FILE-QUIZ] Error:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate quiz" });
@@ -2023,6 +2059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { weekId, fileId } = req.params;
       const { questions } = req.body;
       if (!Array.isArray(questions)) return res.status(400).json({ error: "questions must be an array" });
+      if (!await editableModule(res, req.user, weekId)) return;
       let updated = await storage.updateCachedQuizQuestions(weekId, fileId, questions);
       if (!updated) {
         updated = await storage.saveCachedQuiz({
@@ -2042,6 +2079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/training-weeks/:weekId/files/:fileId/quiz/approve", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { weekId, fileId } = req.params;
+      if (!await editableModule(res, req.user, weekId)) return;
       const updated = await storage.approveCachedQuiz(weekId, fileId);
       if (!updated) return res.status(404).json({ error: "No quiz found for this file" });
       res.json({ success: true, approved: true });
@@ -2083,7 +2121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               numQuestions: 10,
               openEndedCount: 2,
             });
-            await storage.saveCachedQuiz({ weekId: item.weekId, deckFileId: item.fileId, questions, approved: true });
+            await storage.saveCachedQuiz({ weekId: item.weekId, deckFileId: item.fileId, questions, approved: false });
             console.log(`[BULK-GEN] ✅ Generated quiz for ${item.fileName}`);
           } catch (err) {
             console.error(`[BULK-GEN] ❌ Failed for ${item.fileName}:`, err);
@@ -2098,11 +2136,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Force-regenerate quiz for a file (admin — bypasses cache)
-  app.post("/api/training-weeks/:weekId/files/:fileId/regenerate-quiz-admin", isAuthenticated, async (req, res) => {
+  app.post("/api/training-weeks/:weekId/files/:fileId/regenerate-quiz-admin", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { weekId, fileId } = req.params;
-      const week = await storage.getTrainingWeek(weekId);
-      if (!week) return res.status(404).json({ error: "Week not found" });
+      const week = await editableModule(res, req.user, weekId);
+      if (!week) return;
       const file = week.deckFiles?.find(f => f.id === fileId);
       if (!file) return res.status(404).json({ error: "File not found" });
 
@@ -2118,8 +2156,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         numQuestions: 10,
         openEndedCount: 2,
       });
-      await storage.saveCachedQuiz({ weekId, deckFileId: fileId, questions, approved: true });
-      res.json({ success: true, questionCount: questions.length });
+      await storage.saveCachedQuiz({ weekId, deckFileId: fileId, questions, approved: false });
+      res.json({ success: true, questionCount: questions.length, approved: false });
     } catch (error) {
       console.error("[ADMIN-REGEN] Error:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Failed to regenerate quiz" });
@@ -2132,25 +2170,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user?.id;
       const teacherId = req.teacherId;
       const { weekId, fileId } = req.params;
-      const { questions, answers } = req.body;
 
-      if (!questions || !Array.isArray(questions) || !answers || typeof answers !== 'object') {
+      if (!req.body?.answers || typeof req.body.answers !== 'object') {
         return res.status(400).json({ error: "Invalid quiz submission" });
       }
-      if (await blockTeacherWeekQuiz(res, teacherId, weekId)) return;
 
       // Defensive check: Verify the file belongs to this week
       const week = await storage.getTrainingWeek(weekId);
       if (!week) {
         return res.status(404).json({ error: "Training week not found" });
       }
+      // A teacher needs an open cohort for the course and an unlocked module (C3, C5).
+      if (await blockTeacherWeekQuiz(res, teacherId, week)) return;
       const fileExists = week.deckFiles?.some(f => f.id === fileId);
       if (!fileExists) {
         return res.status(400).json({ error: "File does not belong to this training week" });
       }
 
-      const { scoreQuizSubmission } = await import("./quizService");
-      const graded = scoreQuizSubmission(questions, answers);
+      // Grade against the stored quiz; any questions in the body are ignored.
+      const result = gradeLessonQuiz({
+        cached: await storage.getCachedQuiz(weekId, fileId),
+        answers: req.body.answers,
+        staff: !teacherId && isAcademyStaff(req.user),
+      });
+      if ("error" in result) return res.status(result.status).json({ error: result.error });
+      const { questions, answers, graded, review } = result;
       const passed = graded.passed ? "yes" : "no";
 
       const attempt = await storage.saveQuizAttempt({
@@ -2198,12 +2242,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.refreshTeacherReportCard(teacherId);
       }
 
-      res.json({ 
-        attempt,
+      res.json({
+        attempt: teacherId ? learnerQuiz(attempt) : attempt,
         score: graded.score,
         totalQuestions: graded.totalQuestions,
         passed: graded.passed,
         percentage: graded.percentage,
+        // The results screen reviews answers only after a pass.
+        review: graded.passed ? review : [],
       });
     } catch (error) {
       console.error("[FILE-QUIZ] Submission error:", error);
@@ -2232,21 +2278,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[FILE-QUIZ] 🔍 Fetching quiz for weekId=${weekId}, fileId=${fileId}`);
       
-      // First, check cache
-      const isAdminOrTrainer = !!(req.user && (req.user.role === 'admin' || req.user.role === 'trainer'));
+      // First, check cache. A teacher session is never staff, even if a staff login shares the session.
+      const isAdminOrTrainer = !req.teacherId && !!(req.user && (req.user.role === 'admin' || req.user.role === 'trainer'));
       const cachedQuiz = await storage.getCachedQuiz(weekId, fileId);
       if (cachedQuiz && cachedQuiz.questions.length > 0) {
-        // Teachers can only access approved quizzes; admins/trainers can always preview
-        if (!isAdminOrTrainer && !cachedQuiz.approved) {
+        // Teachers get an approved quiz without answers, or nothing; admins/trainers can always preview.
+        const view = lessonQuizForViewer(cachedQuiz, isAdminOrTrainer);
+        if (!view) {
           console.log(`[FILE-QUIZ] ⏳ Quiz not yet approved for teachers`);
           res.status(404).json({ error: "No quiz available for this file" });
           return;
         }
         console.log(`[FILE-QUIZ] ✅ Found cached quiz with ${cachedQuiz.questions.length} questions`);
-        res.json({ questions: cachedQuiz.questions, approved: cachedQuiz.approved });
+        res.json(view);
         return;
       }
-      
+
+      // Submit grades teachers only against an approved cached quiz, so the fallback below is staff-only.
+      if (!isAdminOrTrainer) {
+        res.status(404).json({ error: "No quiz available for this file" });
+        return;
+      }
+
       // Fallback: check assigned quizzes for this file/week
       console.log(`[FILE-QUIZ] 🔄 No cache found, checking assigned quizzes...`);
       const quizzes = await db
@@ -3049,7 +3102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const quizzes = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
       res.json(quizzes.map((quiz) => ({
-        ...quiz,
+        ...learnerQuiz(quiz),
         kind: quiz.paperUrl ? "paper" : isWritingExam(quiz) ? "written" : "quiz",
       })));
     } catch (error) {
@@ -3072,7 +3125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const writing = isWritingExam(quiz);
       const questions = writing || quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
-      res.json({ ...quiz, questions, passMark: passMarkOf(quiz.passMark) });
+      res.json({ ...quiz, questions: learnerQuestions(questions), passMark: passMarkOf(quiz.passMark) });
     } catch (error) {
       console.error("Error fetching quiz:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -3101,17 +3154,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       const passMark = passMarkOf((quiz as { passMark?: number }).passMark);
-      const hasPassedAttempt = existingAttempts.some(
-        (attempt) => (attempt.score / attempt.totalQuestions) * 100 >= passMark
-      );
+      const standing = assignedQuizStanding(existingAttempts, passMark);
 
-      if (hasPassedAttempt) {
+      if (standing.hasPassed) {
         return res.status(400).json({ error: "Quiz already passed. Retakes are not allowed after passing." });
       }
 
-      // Check if teacher has exhausted all 3 attempts
-      if (existingAttempts.length >= 3) {
-        return res.status(400).json({ error: "Maximum of 3 attempts reached for this quiz." });
+      // Check if teacher has exhausted every attempt
+      if (!standing.canRetake) {
+        return res.status(400).json({ error: `Maximum of ${QUIZ_ATTEMPTS} attempts reached for this quiz.` });
       }
 
       // Calculate score — only MCQ/true_false questions count for auto-scoring
@@ -3222,10 +3273,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalQuestions,
         mcqTotal,
         passed: passed === "yes",
-        openEndedPending: hasOpenEnded && percentage >= 80,
+        openEndedPending: hasOpenEnded && percentage >= passMark,
         percentage,
         attemptNumber,
-        remainingAttempts: 3 - attemptNumber,
+        remainingAttempts: Math.max(0, QUIZ_ATTEMPTS - attemptNumber),
+        review: answerReview(quiz.questions, answers, passed === "yes"),
       });
     } catch (error) {
       console.error("Error submitting quiz:", error);
@@ -3247,7 +3299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batchTeachersData.map(async (t: any) => {
           const attempts = await storage.getTeacherQuizAttemptsByQuiz(t.id, req.params.quizId);
           const passed = attempts.some((a: any) => a.passed === "yes");
-          const exhausted = attempts.length >= 3 && !passed;
+          const exhausted = attempts.length >= QUIZ_ATTEMPTS && !passed;
           return {
             teacherId: t.id,
             teacherName: t.name,
@@ -3277,20 +3329,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get quiz details for enrichment
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
       
-      // Calculate quiz status
-      const hasPassed = attempts.some(a => (a.score / a.totalQuestions) * 100 >= 80);
-      const attemptsUsed = attempts.length;
-      const canRetake = !hasPassed && attemptsUsed < 3;
-      const shouldShowAnswers = hasPassed || attemptsUsed >= 3;
-      
+      // Calculate quiz status at the quiz's own pass mark; answers show only once no retake is left.
+      const standing = assignedQuizStanding(attempts, passMarkOf(quiz?.passMark));
+
       res.json({
         attempts,
-        quiz,
-        hasPassed,
-        attemptsUsed,
-        remainingAttempts: Math.max(0, 3 - attemptsUsed),
-        canRetake,
-        shouldShowAnswers,
+        quiz: quiz ? attemptQuizView(quiz, standing) : quiz,
+        hasPassed: standing.hasPassed,
+        attemptsUsed: standing.attemptsUsed,
+        remainingAttempts: standing.remainingAttempts,
+        canRetake: standing.canRetake,
+        shouldShowAnswers: standing.showAnswers,
       });
     } catch (error) {
       console.error("Error fetching attempts:", error);
@@ -3318,14 +3367,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/quiz-attempts", isTeacherAuthenticated, async (req, res) => {
     try {
       const attempts = await storage.getAllTeacherQuizAttempts(req.teacherId!);
-      
-      // Enrich with quiz details
+
+      // Enrich with quiz details; answers show only once no retake is left on that quiz.
       const enrichedAttempts = await Promise.all(
         attempts.map(async (attempt) => {
           const quiz = await storage.getAssignedQuiz(attempt.assignedQuizId);
+          const standing = assignedQuizStanding(
+            attempts.filter((other) => other.assignedQuizId === attempt.assignedQuizId),
+            passMarkOf(quiz?.passMark),
+          );
           return {
             ...attempt,
-            quiz: quiz || null,
+            quiz: quiz ? attemptQuizView(quiz, standing) : null,
           };
         })
       );
@@ -3337,7 +3390,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get progress for all teachers in a batch (trainer view)
+  // Get progress for all teachers in a batch (trainer view). Course figures follow each Fellow's path in
+  // this cohort (`cohortPath`), the rule the locks use; quiz medals count this cohort's quizzes only.
   app.get("/api/batches/:batchId/progress", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
@@ -3349,43 +3403,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
-      const assignedCourses = await storage.getCoursesForBatch(req.params.batchId);
-      const courseNameById = Object.fromEntries(assignedCourses.map(c => [c.id, c.name]));
       const attendanceRows = await storage.getBatchAttendanceSummary(req.params.batchId);
       const attendanceByTeacher = Object.fromEntries(
         (attendanceRows || []).map((row: any) => [row.teacher_id || row.teacherId, row]),
       );
       const starRows = await db.select().from(trainerStars).where(eq(trainerStars.batchId, req.params.batchId));
       const starredTeacherIds = new Set(starRows.map((row) => row.teacherId));
+      const readers = memoizedPathReaders();
       const progress = await Promise.all(
         teachers.map(async (teacher) => {
           const reportCard = await storage.refreshTeacherReportCard(teacher.id);
-          const completions = await db
-            .select()
-            .from(teacherCourseCompletion)
-            .where(and(eq(teacherCourseCompletion.teacherId, teacher.id), eq(teacherCourseCompletion.batchId, req.params.batchId)));
-          const courseCompletions = completions.map(c => ({
-            courseId: c.courseId,
-            courseName: courseNameById[c.courseId] || "Course",
-            status: c.status,
-            completedModules: c.completedWeeks,
-            totalModules: c.totalWeeks,
-            percentage: c.totalWeeks > 0
-              ? Math.round((c.completedWeeks / c.totalWeeks) * 100)
-              : (c.status === "completed" ? 100 : 0),
-          }));
-          const completedCount = courseCompletions.filter(c => c.status === "completed").length;
-          const overallPercentage = assignedCourses.length > 0
-            ? Math.round((completedCount / assignedCourses.length) * 100)
-            : 0;
+          const path = await cohortPath(teacher.id, batch, readers);
+          const figures = cohortCourseFigures(path);
+          const signals = await cohortQuizSignalsFor(teacher.id, batch.id, path.modules);
           const attendanceRow = attendanceByTeacher[teacher.id];
           const medals = cohortMedals({
-            progressPercentage: overallPercentage,
-            coursesCompleted: completedCount,
+            progressPercentage: figures.overallPercentage,
+            coursesCompleted: figures.completedCount,
             attendanceRate: Number(attendanceRow?.attendance_rate || 0),
             attendanceDays: Number(attendanceRow?.total_days || 0),
-            questionsAnswered: reportCard?.totalQuizzesTaken || 0,
-            quizzesPassed: reportCard?.totalQuizzesPassed || 0,
+            questionsAnswered: signals.questionsAnswered,
+            quizzesPassed: signals.quizzesPassed,
             trainerStar: starredTeacherIds.has(teacher.id),
           });
           return {
@@ -3404,11 +3442,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               totalQuizzesPassed: 0,
               averageScore: 0,
             },
-            courseCompletions,
-            completedCount,
-            inProgressCount: courseCompletions.filter(c => c.status !== "completed").length,
-            notStartedCount: Math.max(0, assignedCourses.length - courseCompletions.length),
-            overallPercentage,
+            courseCompletions: figures.courses,
+            completedCount: figures.completedCount,
+            inProgressCount: figures.inProgressCount,
+            notStartedCount: figures.notStartedCount,
+            overallPercentage: figures.overallPercentage,
             trainerStar: starredTeacherIds.has(teacher.id),
             medals,
           };
@@ -3424,11 +3462,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/batches/:batchId/gradebook.csv", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
       if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
-      const assignedCourses = await storage.getCoursesForBatch(req.params.batchId);
       const attendance = await storage.getBatchAttendanceSummary(req.params.batchId);
       const attendanceById = Object.fromEntries(
         (attendance || []).map((row: any) => [row.teacher_id || row.teacherId, row.attendance_rate ?? row.attendanceRate ?? 0]),
@@ -3446,29 +3484,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "courses_assigned",
       ];
       const lines = [header.join(",")];
+      // The same course figures as the progress route above.
+      const readers = memoizedPathReaders();
       for (const teacher of teachers) {
         const reportCard = await storage.refreshTeacherReportCard(teacher.id);
-        const completions = await db
-          .select()
-          .from(teacherCourseCompletion)
-          .where(and(eq(teacherCourseCompletion.teacherId, teacher.id), eq(teacherCourseCompletion.batchId, req.params.batchId)));
-        const completedCount = completions.filter((c) => c.status === "completed").length;
-        const overall = assignedCourses.length > 0
-          ? Math.round((completedCount / assignedCourses.length) * 100)
-          : 0;
+        const figures = cohortCourseFigures(await cohortPath(teacher.id, batch, readers));
         const csvEscape = (value: string | number | null | undefined) =>
           `"${String(value ?? "").replace(/"/g, '""')}"`;
         lines.push([
           csvEscape(teacher.name),
           csvEscape(teacher.email),
           csvEscape(teacher.teacherId),
-          overall,
+          figures.overallPercentage,
           reportCard?.averageScore ?? 0,
           reportCard?.totalQuizzesTaken ?? 0,
           reportCard?.totalQuizzesPassed ?? 0,
           attendanceById[teacher.id] ?? 0,
-          completedCount,
-          assignedCourses.length,
+          figures.completedCount,
+          figures.courses.length,
         ].join(","));
       }
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -3524,21 +3557,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Teacher content viewing endpoints (with quiz gating)
   
-  // Get teacher's assigned weeks (from their batches and batch courses)
+  // The trainers of a Fellow's cohorts: `batches.trainer_id` and the `cohort_trainers` rows (C4, D8).
+  // `created_by` grants nothing.
   app.get("/api/teacher/desk-peers", isTeacherAuthenticated, async (req, res) => {
     try {
       const batchesForTeacher = await storage.getBatchesForTeacher(req.teacherId!);
       const peers: Array<{ id: string; name: string; role: string }> = [];
-      for (const batch of batchesForTeacher) {
-        const trainerId = batch.trainerId || batch.createdBy;
-        if (!trainerId || peers.some((peer) => peer.id === trainerId)) continue;
-        const trainer = await storage.getUser(trainerId);
-        if (trainer) {
-          peers.push({
-            id: trainer.id,
-            name: trainer.username,
-            role: trainer.role,
-          });
+      for (const enrolled of batchesForTeacher) {
+        const batch: { trainerId?: string | null; trainerIds?: string[] } | undefined = await storage.getBatch(enrolled.id);
+        for (const trainerId of [batch?.trainerId, ...(batch?.trainerIds || [])]) {
+          if (!trainerId || peers.some((peer) => peer.id === trainerId)) continue;
+          const trainer = await storage.getUser(trainerId);
+          if (trainer) {
+            peers.push({
+              id: trainer.id,
+              name: trainer.username,
+              role: trainer.role,
+            });
+          }
         }
       }
       res.json(peers);
@@ -3548,89 +3584,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // A Fellow's modules, cohort by cohort, in step order (D1), with the locks and figures of `cohortPath`.
   app.get("/api/teacher/assigned-weeks", isTeacherAuthenticated, async (req, res) => {
     try {
       const teacherId = req.teacherId!;
-      
-      // Get (course, batch) pairs so each week knows its batchId
-      const courseBatchPairs = await db
-        .select({ course: courses, batchId: batchTeachers.batchId })
-        .from(batchTeachers)
-        .innerJoin(batchCourses, eq(batchTeachers.batchId, batchCourses.batchId))
-        .innerJoin(courses, eq(batchCourses.courseId, courses.id))
-        .where(eq(batchTeachers.teacherId, teacherId))
-        .orderBy(asc(batchCourses.assignedAt));
-      
-      if (courseBatchPairs.length === 0) {
-        return res.json([]);
-      }
-      
-      // For each (course, batch) pair, get its weeks — track by weekId to avoid duplicates
-      const allWeeks: any[] = [];
+      // Open cohorts first, so a module in an open and a closed cohort shows under the open one.
+      const cohorts = [...await storage.getBatchesForTeacher(teacherId)]
+        .sort((a, b) => Number(!cohortIsOpen(a)) - Number(!cohortIsOpen(b)));
+      const readers = memoizedPathReaders();
       const seenWeekIds = new Set<string>();
-      
-      for (const { course, batchId } of courseBatchPairs) {
-        if (course.publishStatus === "draft") continue;
-        const courseWeeks = await storage.getWeeksForCourse(course.id);
-        
-        for (const week of courseWeeks) {
-          if (seenWeekIds.has(week.id)) {
-            continue;
-          }
+      const annotated: any[] = [];
+      for (const cohort of cohorts) {
+        const path = await cohortPath(teacherId, cohort, readers);
+        // The same rule as POST /api/teacher/courses/:courseId/complete: C3 on the next course to check.
+        const next = await nextCourseCompletion(teacherId, path.nextToCheck, readers);
+        for (const { files, ...week } of path.modules) {
+          if (seenWeekIds.has(week.id)) continue;
           seenWeekIds.add(week.id);
-          
-          const progressRecords = await storage.getAllTeacherContentProgressForWeek(teacherId, week.id);
-          const totalFiles = week.deckFiles?.length || 0;
-          let completedFiles = progressRecords.filter(p => p.status === "completed").length;
-          if (totalFiles > 0 && completedFiles < totalFiles) {
-            const passedFlags = await Promise.all(
-              (week.deckFiles || []).map(f => storage.hasPassedFileQuiz(week.id, f.id, teacherId))
-            );
-            completedFiles = Math.max(completedFiles, passedFlags.filter(Boolean).length);
-          }
-          const percentage = totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 100;
-          
-          allWeeks.push({
+          annotated.push({
             ...week,
-            batchId,
-            courseId: course.id,
-            courseName: course.name,
-            progress: {
-              total: totalFiles,
-              completed: completedFiles,
-              percentage,
-            },
+            canCheckComplete: week.courseId === path.nextToCheck && !week.locked && next?.complete === true,
           });
         }
       }
-      
-      const checkedRows = await db
-        .select({ courseId: teacherCourseCompletion.courseId, batchId: teacherCourseCompletion.batchId })
-        .from(teacherCourseCompletion)
-        .where(and(eq(teacherCourseCompletion.teacherId, teacherId), eq(teacherCourseCompletion.status, "completed")));
-      const byBatch = new Map<string, any[]>();
-      for (const week of allWeeks) {
-        const key = week.batchId || "none";
-        const list = byBatch.get(key) || [];
-        list.push(week);
-        byBatch.set(key, list);
-      }
-      const annotated = [...byBatch.entries()].flatMap(([batchId, list]) => {
-        const checkedHere = checkedRows.filter((row) => row.batchId === batchId).map((row) => row.courseId);
-        const locked = applyModuleLocks(list, checkedHere).map((week) => ({
-          ...week,
-          courseChecked: checkedHere.includes(week.courseId),
-        }));
-        const order: string[] = [];
-        for (const week of locked) {
-          if (week.courseId && !order.includes(week.courseId)) order.push(week.courseId);
-        }
-        const nextId = nextCourseToCheck(order, checkedHere);
-        return locked.map((week) => ({
-          ...week,
-          canCheckComplete: Boolean(nextId) && week.courseId === nextId && !week.locked,
-        }));
-      });
       res.json(annotated);
     } catch (error) {
       console.error("Error fetching assigned weeks:", error);
@@ -3645,34 +3621,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const courseId = req.params.courseId;
       if (!batchId) return res.status(400).json({ error: "Choose the cohort for this course" });
       const enrolled = await storage.getTeachersInBatch(batchId);
-      if (!enrolled.some((teacher) => teacher.id === teacherId)) {
-        return res.status(403).json({ error: "You are not in this cohort" });
+      const batch = await storage.getBatch(batchId);
+      if (!batch || !cohortIsOpen(batch) || !enrolled.some((teacher) => teacher.id === teacherId)) {
+        return res.status(403).json(refusal("NOT_ENROLLED"));
       }
-      const assigned = await storage.getCoursesForBatch(batchId);
-      const order = [...assigned]
-        .sort((a, b) => new Date(a.assignedAt || 0).getTime() - new Date(b.assignedAt || 0).getTime())
-        .map((course) => course.id);
-      if (!order.includes(courseId)) return res.status(404).json({ error: "That course is not in this cohort" });
-      const doneRows = await db
-        .select({ courseId: teacherCourseCompletion.courseId })
-        .from(teacherCourseCompletion)
-        .where(and(
-          eq(teacherCourseCompletion.teacherId, teacherId),
-          eq(teacherCourseCompletion.batchId, batchId),
-          eq(teacherCourseCompletion.status, "completed"),
-        ));
-      const nextId = nextCourseToCheck(order, doneRows.map((row) => row.courseId));
-      if (nextId !== courseId) {
-        return res.status(400).json({
-          error: nextId ? "Finish the course before this one first" : "Every course in this cohort is already complete",
-        });
-      }
+      const placed = (await storage.getCoursesForBatch(batchId)).some((course) => course.id === courseId);
+      // Order and locks from the cohort's steps (D1); completion from progress rows (C3), never a skip.
+      const path = await cohortPath(teacherId, batch);
+      const completion = await computeCourseCompletion(teacherId, courseId);
+      const refused = courseCheckRefusal({ courseId, placed, path, completion });
+      if (refused) return res.status(refused.status).json(refused.body);
       const saved = await storage.upsertTeacherCourseCompletion({
         teacherId,
         courseId,
         batchId,
         status: "completed",
         completedAt: new Date(),
+        totalWeeks: completion.totalModules,
+        completedWeeks: completion.doneModules,
       });
       res.json(saved);
     } catch (error) {
@@ -3681,19 +3647,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Medals per cohort: course figures from the path, quiz signals from this cohort's quizzes (finding 22).
   app.get("/api/teacher/medals", isTeacherAuthenticated, async (req, res) => {
     try {
       const teacherId = req.teacherId!;
       const enrolled = await storage.getBatchesForTeacher(teacherId);
-      const reportCard = await storage.getTeacherReportCard(teacherId);
+      const readers = memoizedPathReaders();
       const rows = [];
       for (const batch of enrolled) {
-        const courses = await storage.getCoursesForBatch(batch.id);
-        const completions = await db
-          .select()
-          .from(teacherCourseCompletion)
-          .where(and(eq(teacherCourseCompletion.teacherId, teacherId), eq(teacherCourseCompletion.batchId, batch.id)));
-        const completed = completions.filter((row) => row.status === "completed").length;
+        const path = await cohortPath(teacherId, batch, readers);
+        const figures = cohortCourseFigures(path);
+        const signals = await cohortQuizSignalsFor(teacherId, batch.id, path.modules);
         const attendance = await storage.getBatchAttendanceSummary(batch.id);
         const mine = (attendance || []).find((row: any) => (row.teacher_id || row.teacherId) === teacherId);
         const [star] = await db
@@ -3704,12 +3668,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           batchId: batch.id,
           batchName: batch.name,
           medals: cohortMedals({
-            progressPercentage: courses.length ? Math.round((completed / courses.length) * 100) : 0,
-            coursesCompleted: completed,
+            progressPercentage: figures.overallPercentage,
+            coursesCompleted: figures.completedCount,
             attendanceRate: Number(mine?.attendance_rate || 0),
             attendanceDays: Number(mine?.total_days || 0),
-            questionsAnswered: reportCard?.totalQuizzesTaken || 0,
-            quizzesPassed: reportCard?.totalQuizzesPassed || 0,
+            questionsAnswered: signals.questionsAnswered,
+            quizzesPassed: signals.quizzesPassed,
             trainerStar: Boolean(star),
           }),
         });
@@ -3728,7 +3692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const enrolled = await storage.getTeachersInBatch(batch.id);
       const teacher = enrolled.find((row) => row.id === req.params.teacherId);
-      if (!teacher) return res.status(404).json({ error: "That teacher is not in this cohort" });
+      if (!teacher) return res.status(404).json({ error: "That Fellow is not in this cohort" });
       const [existing] = await db
         .select()
         .from(trainerStars)
@@ -3782,22 +3746,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(batchCourses, eq(batchTeachers.batchId, batchCourses.batchId))
         .innerJoin(courses, eq(batchCourses.courseId, courses.id))
         .where(eq(batchTeachers.teacherId, req.teacherId!));
+      const readers = memoizedPathReaders();
       const skills = new Map<string, { competency: string; modules: number; completed: number }>();
+      const seenWeekIds = new Set<string>();
       for (const { course } of courseBatchPairs) {
         if (course.publishStatus === "draft") continue;
         const courseWeeks = await storage.getWeeksForCourse(course.id);
         for (const week of courseWeeks) {
+          if (seenWeekIds.has(week.id)) continue;
+          seenWeekIds.add(week.id);
           const key = (week.competencyFocus || "General practice").trim();
           const row = skills.get(key) || { competency: key, modules: 0, completed: 0 };
           row.modules += 1;
-          const progressRecords = await storage.getAllTeacherContentProgressForWeek(req.teacherId!, week.id);
-          const totalFiles = week.deckFiles?.length || 0;
-          const completedFiles = progressRecords.filter((p) => p.status === "completed").length;
-          if (totalFiles > 0 && completedFiles >= totalFiles) row.completed += 1;
+          // A module is complete when every lesson file is done (C2, D6); one with no file is complete.
+          if (moduleIsComplete(moduleProgress(await lessonFileStates(req.teacherId!, week, readers)))) row.completed += 1;
           skills.set(key, row);
         }
       }
-      res.json([...skills.values()].map((row) => ({
+      res.json(Array.from(skills.values()).map((row) => ({
         ...row,
         coverage: row.modules > 0 ? Math.round((row.completed / row.modules) * 100) : 0,
       })));
@@ -3806,86 +3772,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Internal server error" });
     }
   });
-  
-  // Get all content files for a week with progress and unlock status
+
+  // Get all content files for a week with progress and unlock status. N4: the Fellow is in an open cohort
+  // that holds the published course, and the module is unlocked there (`teacherModuleAccess`).
   app.get("/api/teachers/weeks/:weekId/content", isTeacherAuthenticated, async (req, res) => {
     try {
       const { weekId } = req.params;
       const teacherId = req.teacherId!;
-      
+
       const week = await storage.getTrainingWeek(weekId);
       if (!week || !week.deckFiles) {
         return res.status(404).json({ error: "Week not found" });
       }
+      const access = await teacherModuleAccess(teacherId, week);
+      if (!access.ok) return res.status(access.refusal.status).json(access.refusal.body);
 
-      if (week.courseId) {
-        const courseWeeks = await storage.getWeeksForCourse(week.courseId);
-        const ordered = [...courseWeeks].sort((a, b) => a.weekNumber - b.weekNumber);
-        const currentIndex = ordered.findIndex(w => w.id === weekId);
-        if (currentIndex > 0) {
-          const previous = ordered[currentIndex - 1];
-          const prevFiles = previous.deckFiles || [];
-          const prevProgress = await storage.getAllTeacherContentProgressForWeek(teacherId, previous.id);
-          const completedCount = prevFiles.filter(f =>
-            prevProgress.some(p => p.deckFileId === f.id && p.status === "completed")
-          ).length;
-          const passedCount = (await Promise.all(
-            prevFiles.map(f => storage.hasPassedFileQuiz(previous.id, f.id, teacherId))
-          )).filter(Boolean).length;
-          const previousComplete = moduleIsComplete({
-            total: prevFiles.length,
-            completed: Math.max(completedCount, passedCount),
-            percentage: prevFiles.length > 0
-              ? Math.round((Math.max(completedCount, passedCount) / prevFiles.length) * 100)
-              : 100,
-          });
-          if (!previousComplete) {
-            return res.status(403).json({
-              error: "Complete the previous module and its quiz before opening this one.",
-              locked: true,
-              previousWeekId: previous.id,
-              previousWeekNumber: previous.weekNumber,
-            });
-          }
-        }
-      }
-      
-      // Get all progress records for this teacher and week
-      const progressRecords = await storage.getAllTeacherContentProgressForWeek(teacherId, weekId);
-      const passedByFile = new Set<string>();
-      for (const file of week.deckFiles!) {
-        if (await storage.hasPassedFileQuiz(weekId, file.id, teacherId)) {
-          passedByFile.add(file.id);
-        }
-      }
-      
-      // Map deck files with their progress and unlock status
-      const contentWithProgress = week.deckFiles!.map((file, index) => {
-        const progress = progressRecords.find(p => p.deckFileId === file.id);
-        const quizPassed = passedByFile.has(file.id);
-        const isFirst = index === 0;
-        
-        let status: string;
-        if (quizPassed) {
-          status = "completed";
-        } else if (isFirst) {
-          status = progress?.status || "available";
-        } else {
-          const previousFile = week.deckFiles![index - 1];
-          const previousProgress = progressRecords.find(p => p.deckFileId === previousFile.id);
-          const isPreviousCompleted = previousProgress?.status === "completed" || passedByFile.has(previousFile.id);
-          status = isPreviousCompleted ? (progress?.status || "available") : "locked";
-        }
-        
+      // Each file with its progress, whether it has an approved quiz, and whether it is done (C2, D6).
+      const contentWithProgress = week.deckFiles.map((file) => {
+        const state = access.module.files.find((entry) => entry.fileId === file.id);
+        const progress = state?.row as any;
+        const done = Boolean(state?.done);
+        const status = state?.locked ? "locked" : done ? "completed" : (progress?.status || "available");
         return {
           ...file,
           status,
-          progress: quizPassed
+          quizApproved: Boolean(state?.hasApprovedQuiz),
+          quizPassed: Boolean(state?.quizPassed),
+          done,
+          progress: done
             ? { ...(progress || {}), status: "completed", completedAt: progress?.completedAt || new Date() }
             : progress,
         };
       });
-      
+
       res.json({
         week,
         content: contentWithProgress,
@@ -3895,28 +3814,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Internal server error" });
     }
   });
-  
-  // Mark content as viewed
+
+  // Mark content as read. With no approved quiz this completes the file (D6), then the course syncs.
   app.post("/api/teachers/weeks/:weekId/content/:deckFileId/viewed", isTeacherAuthenticated, async (req, res) => {
     try {
       const { weekId, deckFileId } = req.params;
       const teacherId = req.teacherId!;
-      
+      const week = await storage.getTrainingWeek(weekId);
+      if (!week || !week.deckFiles?.some((file) => file.id === deckFileId)) {
+        return res.status(404).json({ error: "Lesson file not found" });
+      }
+      // The content GET's gate: no marks in a module the Fellow cannot open, or on a locked file.
+      const access = await teacherModuleAccess(teacherId, week);
+      if (!access.ok) return res.status(access.refusal.status).json(access.refusal.body);
+      const file = access.module.files.find((entry) => entry.fileId === deckFileId);
+      if (!file || file.locked) {
+        return res.status(403).json({ error: "Finish the lesson file before this one first.", locked: true });
+      }
+
       const progress = await storage.upsertTeacherContentProgress({
         teacherId,
         weekId,
         deckFileId,
-        status: "viewed",
-        viewedAt: new Date(),
+        ...markReadProgress(file.hasApprovedQuiz, new Date()),
       });
-      
+      if (week.courseId) {
+        try {
+          await storage.syncTeacherCourseCompletion(teacherId, week.courseId);
+        } catch (syncError) {
+          console.error("Error syncing course completion after a read:", syncError);
+        }
+      }
+
       res.json(progress);
     } catch (error) {
       console.error("Error marking content as viewed:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
-  
+
   // Get quiz pass/fail status for all files in a week (used by content page to show quiz buttons)
   app.get("/api/teacher/week/:weekId/file-quizzes", isTeacherAuthenticated, async (req, res) => {
     try {
@@ -3929,9 +3865,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result: Record<string, { passed: boolean; hasPassed: boolean; attempts: number; quizExists: boolean }> = {};
 
       for (const file of week.deckFiles) {
-        // Check quiz_cache — does a quiz exist for this file?
+        // Check quiz_cache — does an approved quiz exist for this file? A draft does not count for a teacher.
         const cached = await storage.getCachedQuiz(weekId, file.id);
-        const quizExists = !!(cached && cached.questions.length > 0);
+        const quizExists = isLiveLessonQuiz(cached);
         const passed = await storage.hasPassedFileQuiz(weekId, file.id, teacherId);
         const contentAttempts = await storage.getAllTeacherContentQuizAttemptsForFile(teacherId, weekId, file.id);
         result[file.id] = { passed, hasPassed: passed, attempts: contentAttempts.length, quizExists };
@@ -3944,287 +3880,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate quiz for content file
-  app.post("/api/teachers/weeks/:weekId/content/:deckFileId/generate-quiz", isTeacherAuthenticated, async (req, res) => {
-    try {
-      const { weekId, deckFileId } = req.params;
-      const teacherId = req.teacherId!;
-      const { numQuestions = 5 } = req.body;
-      
-      const week = await storage.getTrainingWeek(weekId);
-      if (!week || !week.deckFiles) {
-        return res.status(404).json({ error: "Week not found" });
-      }
-      
-      const file = week.deckFiles.find(f => f.id === deckFileId);
-      if (!file) {
-        return res.status(404).json({ error: "File not found" });
-      }
-      
-      // Generate unique quiz generation ID
-      const quizGenerationId = `quiz-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Import quiz service
-      const { generateSingleFileQuiz } = await import('./quizService');
-      
-      const questions = await generateSingleFileQuiz({
-        fileUrl: file.fileUrl,
-        fileName: file.fileName,
-        competencyFocus: week.competencyFocus,
-        objective: week.objective,
-        numQuestions,
-      });
-      
-      // Update progress to quiz_required
-      await storage.upsertTeacherContentProgress({
-        teacherId,
-        weekId,
-        deckFileId,
-        status: "quiz_required",
-      });
-      
-      res.json({ 
-        questions,
-        quizGenerationId,
-      });
-    } catch (error) {
-      console.error("Error generating quiz:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate quiz" });
-    }
-  });
-  
-  // Submit quiz for content file
-  app.post("/api/teachers/weeks/:weekId/content/:deckFileId/submit-quiz", isTeacherAuthenticated, async (req, res) => {
-    try {
-      const { weekId, deckFileId } = req.params;
-      const teacherId = req.teacherId!;
-      const { questions, answers, quizGenerationId } = req.body;
-      
-      if (!questions || !Array.isArray(questions) || !answers || typeof answers !== 'object' || !quizGenerationId) {
-        return res.status(400).json({ error: "Invalid quiz submission" });
-      }
-      if (await blockTeacherWeekQuiz(res, teacherId, weekId)) return;
-      
-      const { scoreQuizSubmission } = await import("./quizService");
-      const graded = scoreQuizSubmission(questions, answers);
-
-      // Save attempt
-      const attempt = await storage.saveTeacherContentQuizAttempt({
-        teacherId,
-        weekId,
-        deckFileId,
-        quizGenerationId,
-        attemptNumber: 1, // Will be auto-calculated by storage method
-        questions,
-        answers,
-        score: graded.score,
-        totalQuestions: graded.totalQuestions,
-        passed: graded.passed ? "yes" : "no",
-      });
-      
-      // If passed, unlock next content and mark this as completed
-      let generatedCertificate = null;
-      const week = await storage.getTrainingWeek(weekId);
-      if (graded.passed) {
-        await storage.upsertTeacherContentProgress({
-          teacherId,
-          weekId,
-          deckFileId,
-          status: "completed",
-          completedAt: new Date(),
-        });
-
-        let unlockedLesson = "";
-        if (week && week.deckFiles) {
-          const currentIndex = week.deckFiles.findIndex(f => f.id === deckFileId);
-          if (currentIndex >= 0 && currentIndex < week.deckFiles.length - 1) {
-            const nextFile = week.deckFiles[currentIndex + 1];
-            await storage.upsertTeacherContentProgress({
-              teacherId,
-              weekId,
-              deckFileId: nextFile.id,
-              status: "available",
-            });
-            unlockedLesson = nextFile.fileName || "the next lesson";
-          }
-        }
-        if (unlockedLesson) {
-          notifyTeacher(
-            teacherId,
-            "Next lesson is open",
-            `You passed the quiz. ${unlockedLesson} is ready.`,
-            "general",
-            { weekId },
-          ).catch((error) => console.error("Unlock notice failed:", error));
-        } else if (week?.courseId) {
-          const siblings = await storage.getWeeksForCourse(week.courseId);
-          const nextWeek = siblings.find((item) => (item.weekNumber || 0) > (week.weekNumber || 0));
-          if (nextWeek) {
-            notifyTeacher(
-              teacherId,
-              "Next module is open",
-              `Module ${nextWeek.weekNumber}${nextWeek.competencyFocus ? `: ${nextWeek.competencyFocus}` : ""} is ready.`,
-              "general",
-              { weekId: nextWeek.id },
-            ).catch((error) => console.error("Unlock notice failed:", error));
-          }
-        }
-
-        // Try to auto-generate certificate if teacher has >= 90% course completion
-        if (week && week.courseId) {
-          try {
-            generatedCertificate = await storage.tryAutoGenerateCertificate(teacherId, week.courseId);
-            if (generatedCertificate) {
-              console.log(`Auto-generated certificate for teacher ${teacherId} in course ${week.courseId}`);
-            }
-          } catch (certError) {
-            console.error("Error auto-generating certificate:", certError);
-          }
-        }
-      }
-      
-      // Get current attempt count for this quiz generation
-      const attempts = await storage.getTeacherContentQuizAttempts(teacherId, weekId, deckFileId, quizGenerationId);
-      const canRegenerate = attempts.length >= 3 && !graded.passed;
-      if (!graded.passed) {
-        const failCount = attempts.filter((attempt) => attempt.passed === "no").length;
-        if (failCount >= 2) {
-          notifyTeacher(
-            teacherId,
-            "Quiz needs another try",
-            `You have missed this quiz ${failCount} times. Open the lesson again before the last attempt.`,
-            "general",
-            { weekId, deckFileId },
-          ).catch((error) => console.error("Fail-streak notice failed:", error));
-        }
-      }
-
-      if (teacherId) {
-        await storage.refreshTeacherReportCard(teacherId);
-      }
-      if (graded.passed) {
-        const completedWeek = await storage.getTrainingWeek(weekId);
-        if (completedWeek?.courseId) {
-          await storage.syncTeacherCourseCompletion(teacherId, completedWeek.courseId);
-        }
-      }
-      
-      res.json({
-        score: graded.score,
-        totalQuestions: graded.totalQuestions,
-        passed: graded.passed,
-        percentage: graded.percentage,
-        attemptNumber: attempt.attemptNumber,
-        attemptsUsed: attempts.length,
-        remainingAttempts: Math.max(0, 3 - attempts.length),
-        canRegenerate,
-        certificateGenerated: !!generatedCertificate,
-        certificate: generatedCertificate,
-      });
-    } catch (error) {
-      console.error("Error submitting quiz:", error);
-      if (error instanceof Error && error.message.includes('Maximum 3 attempts')) {
-        return res.status(400).json({ error: "Maximum 3 attempts per quiz exceeded. Please request a new quiz." });
-      }
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-  
-  // Regenerate quiz after 3 failed attempts
-  app.post("/api/teachers/weeks/:weekId/content/:deckFileId/regenerate-quiz", isTeacherAuthenticated, async (req, res) => {
-    try {
-      const { weekId, deckFileId } = req.params;
-      const teacherId = req.teacherId!;
-      const { previousQuizGenerationId, numQuestions = 5 } = req.body;
-      
-      if (!previousQuizGenerationId) {
-        return res.status(400).json({ error: "previousQuizGenerationId is required" });
-      }
-      
-      // Verify they've used all 3 attempts on the previous quiz
-      const previousAttempts = await storage.getTeacherContentQuizAttempts(teacherId, weekId, deckFileId, previousQuizGenerationId);
-      if (previousAttempts.length !== 3) {
-        return res.status(400).json({ error: "Must use exactly 3 attempts before requesting a new quiz" });
-      }
-      
-      // Check if any of the previous attempts passed
-      const hasPassed = previousAttempts.some(a => a.passed === "yes");
-      if (hasPassed) {
-        return res.status(400).json({ error: "You have already passed this quiz" });
-      }
-      
-      // Verify all 3 attempts failed (defensive check)
-      const failedAttempts = previousAttempts.filter(a => a.passed === "no");
-      if (failedAttempts.length !== 3) {
-        return res.status(400).json({ error: "Cannot regenerate quiz unless all 3 attempts have failed" });
-      }
-      
-      const week = await storage.getTrainingWeek(weekId);
-      if (!week || !week.deckFiles) {
-        return res.status(404).json({ error: "Week not found" });
-      }
-      
-      const file = week.deckFiles.find(f => f.id === deckFileId);
-      if (!file) {
-        return res.status(404).json({ error: "File not found" });
-      }
-      
-      // Generate new quiz generation ID
-      const newQuizGenerationId = `quiz-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Save regeneration record
-      await storage.saveTeacherQuizRegeneration({
-        teacherId,
-        weekId,
-        deckFileId,
-        previousQuizGenerationId,
-        newQuizGenerationId,
-      });
-      
-      // Generate new quiz
-      const { generateSingleFileQuiz } = await import('./quizService');
-      
-      const questions = await generateSingleFileQuiz({
-        fileUrl: file.fileUrl,
-        fileName: file.fileName,
-        competencyFocus: week.competencyFocus,
-        objective: week.objective,
-        numQuestions,
-      });
-      
-      res.json({ 
-        questions,
-        quizGenerationId: newQuizGenerationId,
-      });
-    } catch (error) {
-      console.error("Error regenerating quiz:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to regenerate quiz" });
-    }
-  });
-  
-  // Trainer endpoint: Get teacher's content viewing history for a week
+  // Trainer endpoint: Get teacher's content viewing history for a week. Admins, or a trainer running a
+  // cohort that enrolls the Fellow and holds the module's course.
   app.get("/api/trainers/teachers/:teacherId/weeks/:weekId/content-history", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { teacherId, weekId } = req.params;
-      
-      // Get all progress records
-      const progressRecords = await storage.getAllTeacherContentProgressForWeek(teacherId, weekId);
-      
-      // Get all quiz attempts
-      const allAttempts = await storage.getAllTeacherContentQuizAttemptsForFile(teacherId, weekId, ""); // Get all files
-      
-      // Get all regenerations
-      const regenerations = await storage.getAllTeacherQuizRegenerationsForWeek(teacherId, weekId);
-      
+
       // Get week details
       const week = await storage.getTrainingWeek(weekId);
-      
+      if (!week) return res.status(404).json({ error: "Module not found" });
+      if (!await trainerMaySeeTeacherModule(req.user, teacherId, week.courseId)) {
+        return res.status(403).json(refusal("NOT_YOUR_COURSE"));
+      }
+
+      // Get all progress records
+      const progressRecords = await storage.getAllTeacherContentProgressForWeek(teacherId, weekId);
+
+      // Get all quiz attempts
+      const allAttempts = await storage.getAllTeacherContentQuizAttemptsForFile(teacherId, weekId, ""); // Get all files
+
+      // Get all regenerations
+      const regenerations = await storage.getAllTeacherQuizRegenerationsForWeek(teacherId, weekId);
+
       // Organize data by deck file
       const history = progressRecords.map(progress => {
-        const file = week?.deckFiles?.find(f => f.id === progress.deckFileId);
+        const file = week.deckFiles?.find(f => f.id === progress.deckFileId);
         const fileAttempts = allAttempts.filter(a => a.deckFileId === progress.deckFileId);
         const fileRegenerations = regenerations.filter(r => r.deckFileId === progress.deckFileId);
-        
+
         return {
           file,
           progress,
@@ -4232,7 +3915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           regenerations: fileRegenerations,
         };
       });
-      
+
       res.json(history);
     } catch (error) {
       console.error("Error fetching content history:", error);
@@ -4408,21 +4091,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/trainers", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const allTrainers = await db.select().from(users).where(eq(users.role, "trainer")).orderBy(users.createdAt);
-      const allBatches = await storage.getAllBatches();
-      const trainersData = allTrainers.map((trainer: any) => {
-        const cohortCount = allBatches.filter((batch: any) => batch.createdBy === trainer.id || batch.trainerId === trainer.id).length;
-        return {
-          id: trainer.id,
-          username: trainer.username,
-          email: trainer.email,
-          role: trainer.role,
-          approvalStatus: trainer.approvalStatus,
-          createdAt: trainer.createdAt,
-          lastLogin: trainer.lastLogin,
-          progress: cohortCount > 0 ? 100 : 0,
-          filesCompleted: cohortCount,
-        };
-      });
+      // D8: the cohorts a trainer runs, by C4, the rule the desk and the route guard use.
+      const cohortCounts = await trainerCohortCounts(allTrainers.map((trainer) => trainer.id));
+      const trainersData = allTrainers.map((trainer: any) => ({
+        id: trainer.id,
+        username: trainer.username,
+        email: trainer.email,
+        role: trainer.role,
+        approvalStatus: trainer.approvalStatus,
+        createdAt: trainer.createdAt,
+        lastLogin: trainer.lastLogin,
+        cohortCount: cohortCounts[trainer.id] || 0,
+      }));
       
       res.json(trainersData);
     } catch (error) {
@@ -4442,11 +4122,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { password, ...sanitized } = trainer;
-      const trainerBatches = (await storage.getAllBatches()).filter(
-        (batch: any) => batch.createdBy === id || batch.trainerId === id,
-      );
+      const trainerBatches = await storage.getAllBatches(id);
       res.json({
         ...sanitized,
+        cohortCount: trainerBatches.length,
         progress: trainerBatches.length > 0 ? 100 : 0,
         filesCompleted: trainerBatches.length,
         completedLessons: trainerBatches.map((batch: any) => batch.name),
@@ -4562,13 +4241,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(batches, eq(batchCourses.batchId, batches.id))
         .where(eq(batchCourses.courseId, courseId));
       
-      // Filter by user permissions (admin sees all, trainer only sees their own)
-      let results = batchesWithCourse.map(r => r.batch);
-      if (req.user!.role !== "admin") {
-        results = results.filter(b => b.createdBy === req.user!.id);
-      }
-      
-      res.json(results);
+      // Admins see every cohort; a trainer sees the cohorts they run (C4).
+      res.json(await cohortsInScope(req.user, batchesWithCourse.map((row) => row.batch)));
     } catch (error) {
       console.error("Error getting batches for course:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -4596,7 +4270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update course (admin only)
-  app.patch("/api/courses/:id", isAuthenticated, isTrainer, async (req, res) => {
+  app.patch("/api/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const course = await storage.updateCourse(req.params.id, req.body);
       if (!course) return res.status(404).json({ error: "Course not found" });
@@ -4608,7 +4282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete course (admin only)
-  app.delete("/api/courses/:id", isAuthenticated, isTrainer, async (req, res) => {
+  app.delete("/api/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const success = await storage.deleteCourse(req.params.id);
       if (!success) return res.status(404).json({ error: "Course not found" });
@@ -4619,45 +4293,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign course to batch (trainer)
-  app.post("/api/courses/:courseId/assign", isAuthenticated, isTrainer, async (req, res) => {
-    try {
-      const { targetId, targetType } = req.body;
-      const { courseId } = req.params;
-
-      if (!targetId || targetType !== "batch") {
-        return res.status(400).json({ error: "Invalid request: targetId and targetType='batch' required" });
-      }
-
-      const batch = await storage.getBatch(targetId);
-      if (!batch) return res.status(404).json({ error: "Batch not found" });
-
-      const assignment = await storage.assignCourseToBatch({
-        batchId: targetId,
-        courseId,
-        assignedBy: req.user!.id,
-      });
-      await recordAudit({
-        actorId: req.user!.id,
-        actorRole: req.user!.role,
-        action: "course_assigned",
-        targetType: "batch",
-        targetId: targetId,
-        metadata: { courseId },
-      });
-      res.json(assignment);
-    } catch (error) {
-      console.error("Error assigning course:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  // Reorder weeks for a course (admin only)
+  // Reorder the modules of a course: an admin, or a trainer whose cohort holds the course (D2)
   app.post("/api/courses/:courseId/weeks/reorder", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { weekId, newPosition } = req.body;
       const { courseId } = req.params;
-      
+      if (!(await trainerMayEditCourse(req.user, courseId))) {
+        return res.status(403).json(refusal("NOT_YOUR_COURSE"));
+      }
+
       if (!weekId || typeof newPosition !== 'number') {
         return res.status(400).json({ error: "Invalid request: weekId and newPosition required" });
       }
@@ -4773,9 +4417,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== CERTIFICATE MANAGEMENT ====================
+  // A trainer reaches a cohort's certificate rows only when they run the cohort (C4, N6); an admin reaches every cohort.
+  // Sends the 404 or 403 itself and returns false when the caller may not.
+  async function certificateCohortAllowed(req: Request, res: Response, batchId: string) {
+    const access = await certificateCohortAccess(req.user, batchId);
+    if (access === "missing") res.status(404).json({ error: "Cohort not found" });
+    if (access === "denied") res.status(403).json({ error: "Access denied" });
+    return access === "allowed";
+  }
+
   // Get certificate template for batch
   app.get("/api/batches/:batchId/certificate-template", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const template = await storage.getBatchCertificateTemplate(req.params.batchId);
       res.json(template || null);
     } catch (error) {
@@ -4787,6 +4441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upsert certificate template (admin or trainer)
   app.post("/api/batches/:batchId/certificate-template", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const { courseId, appreciationText, adminName1, adminName2 } = req.body;
       const template = await storage.upsertBatchCertificateTemplate({
         batchId: req.params.batchId,
@@ -4806,6 +4461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Approve certificate template (admin only)
   app.post("/api/batches/:batchId/certificate-template/approve", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const template = await storage.approveBatchCertificateTemplate(req.params.batchId, req.user!.id);
       if (!template) return res.status(404).json({ error: "Template not found" });
       res.json(template);
@@ -4830,6 +4486,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Who may receive which certificate, by the rules the issue route applies (D4): the academy path for Fellowship and
+  // Advanced, every module of a course for a course certificate. Recomputed from progress, never from stored flags.
+  app.get("/api/admin/certificates/eligible", isAuthenticated, isStrictAdmin, async (_req, res) => {
+    try {
+      res.json(await listEligibleFellows(await loadEligibilityRows()));
+    } catch (error) {
+      console.error("Error listing certificate eligibility:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/admin/certificates/issue", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const { isCertificateDesignId } = await import("@shared/certificateDesigns");
@@ -4844,6 +4511,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (occasion === "course" && !courseId) {
         return res.status(400).json({ error: "courseId is required for course completion certificates" });
       }
+      if (!(await storage.getTeacher(teacherId))) return res.status(404).json({ error: "Teacher not found" });
+      if (occasion === "course" && !(await storage.getCourse(courseId!))) return res.status(404).json({ error: "Course not found" });
+      // D4: a course certificate needs every module of the course; Fellowship and Advanced need the academy path done.
+      const refused = await certificateRefusal({ teacherId, occasion, courseId });
+      if (refused) return res.status(400).json(refused);
       const cert = await storage.issueAcademyCertificate({
         teacherId,
         design,
@@ -4857,35 +4529,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const status = message === "Teacher not found" || message === "Course not found" ? 404 : 500;
       console.error("Error issuing academy certificate:", error);
       res.status(status).json({ error: message === "Teacher not found" || message === "Course not found" ? message : "Internal server error" });
-    }
-  });
-
-  // Generate certificates for completed teachers in batch-course (admin only)
-  app.post("/api/batches/:batchId/courses/:courseId/generate-certificates", isAuthenticated, isStrictAdmin, async (req, res) => {
-    try {
-      const completedTeachers = await storage.getCompletedTeachersForBatchCourse(req.params.batchId, req.params.courseId);
-      const course = await storage.getCourse(req.params.courseId);
-
-      if (!course) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-
-      const generatedCerts = await Promise.all(
-        completedTeachers.map((teacher) =>
-          storage.issueAcademyCertificate({
-            teacherId: teacher.id,
-            design: "fellowship",
-            occasion: "course",
-            courseId: req.params.courseId,
-            batchId: req.params.batchId,
-          })
-        )
-      );
-
-      res.json({ count: generatedCerts.length, certificates: generatedCerts });
-    } catch (error) {
-      console.error("Error generating certificates:", error);
-      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -4920,6 +4563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get certificates for batch (admin or trainer)
   app.get("/api/batches/:batchId/certificates", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      if (!(await certificateCohortAllowed(req, res, req.params.batchId))) return;
       const certs = await storage.getCertificatesForBatch(req.params.batchId);
       res.json(certs);
     } catch (error) {
@@ -4928,20 +4572,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get certificate by ID (admin/trainer can view any, teacher can view their own)
+  // Get certificate by ID: an admin sees any; a trainer sees it when the Fellow is in a cohort they run (C4)
   app.get("/api/certificates/:certId", isAuthenticated, async (req, res) => {
     try {
       const cert = await storage.getTeacherCertificateById(req.params.certId);
       if (!cert) {
         return res.status(404).json({ error: "Certificate not found" });
       }
-      
-      // Check access: admin/trainer can see any, teacher can only see their own
-      const user = req.user as Express.User;
-      if (user.role === "teacher" && cert.teacherId !== user.id) {
+      if (!(await teacherRecordAllowed(req, cert.teacherId))) {
         return res.status(403).json({ error: "Access denied" });
       }
-      
       res.json(cert);
     } catch (error) {
       console.error("Error getting certificate:", error);
@@ -6511,9 +6151,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Module discussion (D11): Fellows in an open cohort that holds the module's course, and staff in scope.
+  // A Fellow or trainer sees posts from Fellows in those cohorts only (`discussionAccess`).
   app.get("/api/weeks/:weekId/discussions", isAuthenticatedAny, async (req, res) => {
     try {
-      res.json(await storage.listDiscussionPosts(req.params.weekId));
+      const week = await storage.getTrainingWeek(req.params.weekId);
+      if (!week) return res.status(404).json({ error: "Module not found" });
+      const access = await discussionAccess({ teacherId: req.teacherId, user: req.user }, week.courseId);
+      if (!access.ok) return res.status(access.refusal.status).json(access.refusal.body);
+      res.json(visibleDiscussionPosts(await storage.listDiscussionPosts(req.params.weekId), access.authors));
     } catch (error) {
       console.error("Error listing discussion:", error);
       res.status(500).json({ error: "Failed to list discussion" });
@@ -6524,12 +6170,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const body = String(req.body?.body || "").trim();
       if (!body) return res.status(400).json({ error: "body is required" });
+      const week = await storage.getTrainingWeek(req.params.weekId);
+      if (!week) return res.status(404).json({ error: "Module not found" });
+      const access = await discussionAccess({ teacherId: req.teacherId, user: req.user }, week.courseId);
+      if (!access.ok) return res.status(access.refusal.status).json(access.refusal.body);
       let authorId = req.teacherId || req.user?.id || "";
       let authorRole = req.teacherId ? "teacher" : (req.user?.role || "trainer");
       let authorName = req.user?.username || "Staff";
       if (req.teacherId) {
         const teacher = await storage.getTeacher(req.teacherId);
-        authorName = teacher?.name || "Teacher";
+        authorName = teacher?.name || "Fellow";
       } else if (req.user) {
         authorName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.username || "Staff";
       }

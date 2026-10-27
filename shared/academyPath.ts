@@ -1,21 +1,34 @@
 /**
- * Cohort, batch, and course are three different things.
- * A cohort is the group. A batch is a step inside that group.
- * A course is the lessons on a batch.
+ * The words every screen and guide uses (D1, D13): Cohort, then Step, then Course, then Module, then
+ * Lesson file, and the learner is a Fellow. Tables, routes and code keep their old names:
+ * `batches` is a cohort, `cohort_batches` is a step, `training_weeks` is a module, `deckFiles` are
+ * lesson files, and `teachers` are Fellows.
  */
 
 export const ACADEMY_TERMS = {
   cohort: {
     title: "Cohort",
-    body: "A group of teachers. It can have more than one trainer. A teacher is done after the number of cohorts you set here. Cohorts do not have to look the same.",
+    body: "A group of Fellows. It can have more than one trainer. A Fellow is done after the number of cohorts you set here. Cohorts do not have to look the same.",
   },
-  batch: {
-    title: "Batch",
-    body: "One step inside a cohort. Each cohort has its own list, so one cohort can have two batches and another can have five. A batch can hold more than one teacher.",
+  step: {
+    title: "Step",
+    body: "One step inside a cohort. Each cohort has its own list, so one cohort can have two steps and another can have five. Steps set the order of the courses: a course opens when the course before it is complete.",
   },
   course: {
     title: "Course",
-    body: "The lessons taught in a batch. An admin adds a course on the Cohorts page, then places it on a batch. Only an admin adds cohorts and batches.",
+    body: "The lessons taught in a step. An admin adds a course on the Cohorts page, then places it on a step. Only an admin adds cohorts, steps and courses.",
+  },
+  module: {
+    title: "Module",
+    body: "One part of a course. Modules open in order: the next one opens when every lesson file in this one is done.",
+  },
+  lessonFile: {
+    title: "Lesson file",
+    body: "A file a Fellow reads inside a module. It is done when its approved quiz is passed, or, when it has no approved quiz, once the Fellow marks it read.",
+  },
+  learner: {
+    title: "Fellow",
+    body: "A learner in the academy. Fellows join cohorts, work through the courses in order and take the quizzes.",
   },
 } as const;
 
@@ -31,11 +44,14 @@ export function normalizeCohortsRequired(value: unknown, fallback = 1) {
 
 const BATCH_WORDS = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 
-/** The next step name, so a cohort reads Batch One, Batch Two, and onward. */
+/**
+ * The next step name, so a cohort reads Step One, Step Two, and onward (D1). Steps named before D1
+ * keep their stored "Batch" names until an admin renames them.
+ */
 export function nextBatchName(existingCount: number) {
   const number = Math.max(0, Math.floor(existingCount)) + 1;
   const word = BATCH_WORDS[number - 1] || String(number);
-  return `Batch ${word}`;
+  return `${ACADEMY_TERMS.step.title} ${word}`;
 }
 
 export function sortBatches<T extends { id: string; orderIndex: number }>(batches: T[]): T[] {

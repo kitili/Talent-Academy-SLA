@@ -3,6 +3,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import posthog from "posthog-js";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { QuizQuestion } from "@shared/schema";
+import { MODULE_QUIZ_PASS_PERCENT } from "@shared/constants";
+import { ACADEMY_TERMS } from "@shared/academyPath";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,19 @@ import {
 import { CheckCircle2, XCircle, Loader2, Clock, ChevronRight, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+/** The sentence the server sent with a refusal (`{ error }`), not the raw "403: {...}" of `apiRequest`. */
+export function serverSentence(error: Error | null | undefined, fallback: string) {
+  const text = error?.message || "";
+  const body = text.replace(/^\d{3}: /, "");
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.error === "string" && parsed.error) return parsed.error;
+  } catch {
+    // Not JSON: fall through to the plain text.
+  }
+  return body || fallback;
+}
+
 interface FileQuizDialogProps {
   weekId: string;
   fileId: string;
@@ -47,7 +62,10 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
     totalQuestions: number;
     passed: boolean;
     percentage: number;
+    // Graded on the server; correct answers come back only after a pass.
+    review?: Array<{ id: string; correct: boolean | null; correctAnswer?: string }>;
   } | null>(null);
+  const reviewOf = (questionId: string) => results?.review?.find((item) => item.id === questionId);
   const [hasStartedGeneration, setHasStartedGeneration] = useState(false);
   // One-at-a-time runner state
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -99,9 +117,10 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
       const data = await response.json();
       console.log('[FILE-QUIZ-DIALOG] 📦 Response data:', data);
       
-      return data.questions;
+      return data as { questions: QuizQuestion[]; approved?: boolean };
     },
-    onSuccess: (generatedQuestions: QuizQuestion[]) => {
+    onSuccess: (data: { questions: QuizQuestion[]; approved?: boolean }) => {
+      const generatedQuestions = data.questions || [];
       console.log('[FILE-QUIZ-DIALOG] Got', generatedQuestions.length, 'questions');
       
       // Invalidate the teacher's quiz query so they can fetch the newly generated quiz
@@ -129,6 +148,14 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
         });
       }
       
+      // A new AI draft is saved unapproved (D5): say so, so nobody thinks it is live.
+      if (data.approved === false) {
+        toast({
+          title: "This quiz is a draft",
+          description: `${ACADEMY_TERMS.learner.title}s cannot take this quiz until a trainer or admin approves it on the course page.`,
+        });
+      }
+
       setQuestions(generatedQuestions);
       setAnswers({});
       setQuizState('quiz');
@@ -152,7 +179,6 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
   const submitQuizMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', `/api/training-weeks/${weekId}/files/${fileId}/submit-quiz`, {
-        questions,
         answers,
       });
       return await response.json();
@@ -173,7 +199,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
     onError: (error: Error) => {
       toast({
         title: "Submission Failed",
-        description: error.message || "Failed to submit quiz. Please try again.",
+        description: serverSentence(error, "Failed to submit quiz. Please try again."),
         variant: "destructive",
       });
     },
@@ -315,7 +341,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
           {quizState === 'unavailable' && (
             <div className="py-6 text-center space-y-4">
               <p className="text-muted-foreground">
-                Your admin hasn't created a quiz for this file yet. Please check back later.
+                Your trainer has not approved a quiz for this file yet. Mark the file read to continue.
               </p>
               <Button onClick={() => onOpenChange(false)} data-testid="button-close-dialog">
                 Close
@@ -454,7 +480,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-destructive">
                     <XCircle className="h-6 w-6" />
-                    <span className="font-semibold">Not Passed (70% required)</span>
+                    <span className="font-semibold">Not Passed ({MODULE_QUIZ_PASS_PERCENT}% required)</span>
                   </div>
                 )}
               </div>
@@ -465,7 +491,8 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                   <h3 className="font-semibold text-lg">Review Answers</h3>
                   {questions.map((question, index) => {
                     const userAnswer = answers[question.id];
-                    const isCorrect = userAnswer === question.correctAnswer;
+                    const reviewed = reviewOf(question.id);
+                    const isCorrect = reviewed?.correct !== false;
                     return (
                       <div
                         key={question.id}
@@ -488,7 +515,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                             </p>
                             {!isCorrect && (
                               <p className="text-sm text-green-700 dark:text-green-400">
-                                <span className="font-medium">Correct answer:</span> {question.correctAnswer}
+                                <span className="font-medium">Correct answer:</span> {reviewed?.correctAnswer}
                               </p>
                             )}
                           </div>
@@ -670,7 +697,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
               ) : (
                 <div className="flex items-center justify-center gap-2 text-destructive">
                   <XCircle className="h-6 w-6" />
-                  <span className="font-semibold">Not Passed (70% required)</span>
+                  <span className="font-semibold">Not Passed ({MODULE_QUIZ_PASS_PERCENT}% required)</span>
                 </div>
               )}
             </div>
@@ -681,7 +708,8 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                 <h3 className="font-semibold text-lg">Review Answers</h3>
                 {questions.map((question, index) => {
                   const userAnswer = answers[question.id];
-                  const isCorrect = userAnswer === question.correctAnswer;
+                  const reviewed = reviewOf(question.id);
+                  const isCorrect = reviewed?.correct !== false;
                   return (
                     <div
                       key={question.id}
@@ -704,7 +732,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
                           </p>
                           {!isCorrect && (
                             <p className="text-sm text-green-700 dark:text-green-400">
-                              <span className="font-medium">Correct answer:</span> {question.correctAnswer}
+                              <span className="font-medium">Correct answer:</span> {reviewed?.correctAnswer}
                             </p>
                           )}
                         </div>

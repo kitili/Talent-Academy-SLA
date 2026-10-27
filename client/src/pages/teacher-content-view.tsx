@@ -102,6 +102,19 @@ function DocumentViewer({ url }: { url: string }) {
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
+/** For a lesson file with no approved quiz: reading it is what completes it (D6). */
+function MarkReadButton({ done, disabled, onClick }: { done: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <Button size="sm" variant={done ? "outline" : "secondary"} className="w-full" disabled={done || disabled} onClick={onClick}>
+      {done ? (
+        <><CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />Read</>
+      ) : (
+        <><CheckCircle2 className="mr-2 h-4 w-4" />Mark read to continue</>
+      )}
+    </Button>
+  );
+}
+
 function LessonPage({ title, html, onRead }: { title: string; html: string; onRead: () => void }) {
   return (
     <article className="sl-lesson mx-auto max-w-2xl p-6 sm:p-10">
@@ -124,8 +137,14 @@ interface DeckFile {
   fileSize: number;
   lessonHtml?: string;
   toc?: TocEntry[];
+  /** From the server: `locked`, `completed`, or the progress row's status (C2, D6). */
+  status?: string;
+  /** Whether the file has an approved quiz. With none, the Fellow marks it read to continue (D6). */
+  quizApproved?: boolean;
+  quizPassed?: boolean;
+  done?: boolean;
   progress?: {
-    status: 'pending' | 'completed';
+    status: string;
     completedAt: Date | null;
   };
 }
@@ -238,30 +257,31 @@ export default function TeacherContentView() {
     enabled: !!weekId,
   });
 
-  // Calculate week progress from deck files
+  // Calculate week progress from deck files; the server says which files are done.
   const weekProgress: WeekProgress = {
     total: deckFiles.length,
-    completed: deckFiles.filter((f: any) => f.progress?.status === 'completed').length,
-    percentage: deckFiles.length > 0 
-      ? Math.round((deckFiles.filter((f: any) => f.progress?.status === 'completed').length / deckFiles.length) * 100)
+    completed: deckFiles.filter((f) => f.done).length,
+    percentage: deckFiles.length > 0
+      ? Math.round((deckFiles.filter((f) => f.done).length / deckFiles.length) * 100)
       : 0,
   };
 
 
-  // Save progress mutation
+  // Mark a file read. The server decides what that means: with no approved quiz it completes the file.
   const saveProgressMutation = useMutation({
     mutationFn: async (data: {
       deckFileId: string;
       status: string;
       completedAt?: Date;
     }) => {
-      return apiRequest('POST', `/api/teachers/weeks/${weekId}/content/${selectedFile?.id}/viewed`, {
+      return apiRequest('POST', `/api/teachers/weeks/${weekId}/content/${data.deckFileId}/viewed`, {
         weekId,
         ...data
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/teachers/weeks', weekId, 'content'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/assigned-weeks"] });
     },
   });
 
@@ -283,7 +303,7 @@ export default function TeacherContentView() {
     if (deckFiles.length > 0 && !selectedFileId) {
       const firstFile = deckFiles[0];
       setSelectedFileId(firstFile.id);
-      setHasMarkedComplete(firstFile.progress?.status === 'completed');
+      setHasMarkedComplete(Boolean(firstFile.done));
       posthog.capture("file_opened", { weekId, fileId: firstFile.id, fileName: firstFile.fileName, source: "auto_select" });
     }
   }, [deckFiles, selectedFileId, weekId]);
@@ -358,7 +378,7 @@ export default function TeacherContentView() {
   // Handle file click
   const handleFileClick = (file: DeckFile) => {
     setSelectedFileId(file.id);
-    setHasMarkedComplete(file.progress?.status === 'completed');
+    setHasMarkedComplete(Boolean(file.done));
     setMobileSidebarOpen(false);
     // Auto-expand ToC for newly selected file if it has one
     if (file.toc && file.toc.length > 0) {
@@ -377,7 +397,7 @@ export default function TeacherContentView() {
 
   // Track completion when user reaches the last page
   useEffect(() => {
-    if (!selectedFile || hasMarkedComplete || selectedFile.progress?.status === 'completed') {
+    if (!selectedFile || hasMarkedComplete || selectedFile.done) {
       return;
     }
 
@@ -436,15 +456,22 @@ export default function TeacherContentView() {
   }
 
   if (contentError) {
-    const locked = contentError.message?.includes("previous module") || contentError.message?.includes("403");
+    // The server refuses with `{ error, code }`; show its sentence.
+    let refusal: { error?: string; code?: string; locked?: boolean } = {};
+    try {
+      refusal = JSON.parse(contentError.message.replace(/^\d+:\s*/, ""));
+    } catch {
+      refusal = {};
+    }
+    const locked = refusal.locked === true || refusal.code === "MODULE_LOCKED";
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center">
         <Lock className="h-10 w-10 text-muted-foreground" />
         <h2 className="text-xl font-semibold">{locked ? "Module locked" : "Unable to load this module"}</h2>
         <p className="text-muted-foreground max-w-md">
           {locked
-            ? "Finish the previous module and pass its quiz to unlock this one."
-            : contentError.message}
+            ? "Finish the module before this one, and the course before this course, to unlock it."
+            : refusal.error || contentError.message}
         </p>
         <Button onClick={() => navigate("/teacher/dashboard")}>Back to dashboard</Button>
       </div>
@@ -504,12 +531,11 @@ export default function TeacherContentView() {
             ) : (
               deckFiles.map((file, fileIndex) => {
                 const quizStatus = fileQuizData[file.id];
-                const hasPassedQuiz = quizStatus?.passed === true || quizStatus?.hasPassed === true;
+                const hasPassedQuiz = file.quizPassed === true || quizStatus?.passed === true || quizStatus?.hasPassed === true;
                 const hasToc = file.toc && file.toc.length > 0;
                 const isTocExpanded = expandedTocFileId === file.id;
-                const prevFileQuizStatus = fileIndex > 0 ? fileQuizData[deckFiles[fileIndex - 1]?.id] : null;
-                const prevFileQuizPassed = prevFileQuizStatus?.passed === true || prevFileQuizStatus?.hasPassed === true;
-                const isLocked = fileIndex > 0 && !prevFileQuizPassed;
+                // The server locks a file until the one before it is done (C2, D6).
+                const isLocked = file.status === "locked";
 
                 return (
                   <div key={file.id} className="space-y-2">
@@ -565,19 +591,27 @@ export default function TeacherContentView() {
                         </div>
                       </div>
                     )}
-                    <Button
-                      size="sm"
-                      variant={hasPassedQuiz ? "outline" : "secondary"}
-                      className="w-full"
-                      disabled={isLocked}
-                      onClick={() => { setSelectedQuizFileId(file.id); setFileQuizDialogOpen(true); }}
-                    >
-                      {hasPassedQuiz ? (
-                        <><CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />Quiz Passed</>
-                      ) : (
-                        <><Award className="mr-2 h-4 w-4" />Take Quiz</>
-                      )}
-                    </Button>
+                    {file.quizApproved ? (
+                      <Button
+                        size="sm"
+                        variant={hasPassedQuiz ? "outline" : "secondary"}
+                        className="w-full"
+                        disabled={isLocked}
+                        onClick={() => { setSelectedQuizFileId(file.id); setFileQuizDialogOpen(true); }}
+                      >
+                        {hasPassedQuiz ? (
+                          <><CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />Quiz Passed</>
+                        ) : (
+                          <><Award className="mr-2 h-4 w-4" />Take Quiz</>
+                        )}
+                      </Button>
+                    ) : (
+                      <MarkReadButton
+                        done={Boolean(file.done)}
+                        disabled={isLocked || saveProgressMutation.isPending}
+                        onClick={() => saveProgressMutation.mutate({ deckFileId: file.id, status: "completed" })}
+                      />
+                    )}
                   </div>
                 );
               })
@@ -948,15 +982,13 @@ export default function TeacherContentView() {
                     ) : (
                       deckFiles.map((file, fileIndex) => {
                         const quizStatus = fileQuizData[file.id];
-                        const hasPassedQuiz = quizStatus?.passed === true || quizStatus?.hasPassed === true;
+                        const hasPassedQuiz = file.quizPassed === true || quizStatus?.passed === true || quizStatus?.hasPassed === true;
                         const hasToc = file.toc && file.toc.length > 0;
                         const isTocExpanded = expandedTocFileId === file.id;
-                        
-                        // Lock file if it's not the first file AND the previous file's quiz hasn't been passed
-                        const prevFileQuizStatus = fileIndex > 0 ? fileQuizData[deckFiles[fileIndex - 1]?.id] : null;
-                        const prevFileQuizPassed = prevFileQuizStatus?.passed === true || prevFileQuizStatus?.hasPassed === true;
-                        const isLocked = fileIndex > 0 && !prevFileQuizPassed;
-                        
+
+                        // The server locks a file until the one before it is done (C2, D6).
+                        const isLocked = file.status === "locked";
+
                         return (
                           <div key={file.id} className="space-y-2">
                             <div className="relative">
@@ -1035,8 +1067,14 @@ export default function TeacherContentView() {
                               </div>
                             )}
                             
-                            {/* Only show quiz buttons to teachers */}
-                            {(
+                            {/* A file with an approved quiz is done when the quiz is passed; one without, when marked read (D6). */}
+                            {!file.quizApproved ? (
+                              <MarkReadButton
+                                done={Boolean(file.done)}
+                                disabled={isLocked || saveProgressMutation.isPending}
+                                onClick={() => saveProgressMutation.mutate({ deckFileId: file.id, status: "completed" })}
+                              />
+                            ) : (
                               <Button
                                 size="sm"
                                 variant={hasPassedQuiz ? "outline" : "secondary"}

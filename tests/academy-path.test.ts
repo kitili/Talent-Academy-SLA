@@ -14,11 +14,22 @@ import {
 } from "../shared/academyPath.ts";
 
 describe("academy path", () => {
-  it("names cohort, batch, and course as different things", () => {
-    assert.match(ACADEMY_TERMS.cohort.body, /group of teachers/i);
-    assert.match(ACADEMY_TERMS.batch.body, /step inside a cohort/i);
+  it("names cohort, step, course, module, lesson file and Fellow as different things", () => {
+    assert.deepEqual(
+      ["cohort", "step", "course", "module", "lessonFile", "learner"].map(
+        (key) => ACADEMY_TERMS[key as keyof typeof ACADEMY_TERMS].title,
+      ),
+      ["Cohort", "Step", "Course", "Module", "Lesson file", "Fellow"],
+    );
+    assert.match(ACADEMY_TERMS.cohort.body, /group of Fellows/);
+    assert.match(ACADEMY_TERMS.step.body, /step inside a cohort/i);
+    assert.match(ACADEMY_TERMS.step.body, /course opens when the course before it is complete/i);
     assert.match(ACADEMY_TERMS.course.body, /admin adds a course/i);
-    assert.match(ACADEMY_TERMS.course.body, /Only an admin adds cohorts and batches/i);
+    assert.match(ACADEMY_TERMS.course.body, /Only an admin adds cohorts, steps and courses/i);
+    for (const key of ["cohort", "step", "course", "module", "lessonFile", "learner"] as const) {
+      assert.doesNotMatch(ACADEMY_TERMS[key].body, /\bbatch(es)?\b/i, `${key} still says batch`);
+      assert.doesNotMatch(ACADEMY_TERMS[key].body, /\bteachers?\b/, `${key} calls a Fellow a teacher`);
+    }
   });
 
   it("lets each cohort keep its own number of batches", () => {
@@ -40,11 +51,13 @@ describe("academy path", () => {
     assert.equal(batchIsComplete({ id: "empty", courses: [] }), false);
   });
 
-  it("keeps batches in order from Batch One through Batch Five", () => {
+  it("keeps steps in order from Step One through Step Five", () => {
     assert.deepEqual(
       [0, 1, 2, 3, 4].map(nextBatchName),
-      ["Batch One", "Batch Two", "Batch Three", "Batch Four", "Batch Five"],
+      ["Step One", "Step Two", "Step Three", "Step Four", "Step Five"],
     );
+    assert.equal(nextBatchName(10), "Step 11");
+    assert.equal("batch" in ACADEMY_TERMS, false, "the deprecated batch term is gone");
     const ids = ["a", "b", "c", "d", "e"];
     assert.deepEqual(moveBatchOrder(ids, "c", "earlier"), ["a", "c", "b", "d", "e"]);
     assert.deepEqual(moveBatchOrder(ids, "a", "earlier"), ids);

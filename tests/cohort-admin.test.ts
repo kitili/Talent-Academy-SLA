@@ -13,7 +13,7 @@ describe("cohort access", () => {
   });
 
   it("lets a teacher through when one of their cohorts for the course is still open", () => {
-    assert.equal(teacherMayTakeQuiz([]), null);
+    assert.equal(teacherMayTakeQuiz([]), "You are not in a cohort for this course");
     assert.equal(teacherMayTakeQuiz([{ status: "closed", quizzesStatus: "open" }]), "This cohort is closed");
     assert.equal(
       teacherMayTakeQuiz([

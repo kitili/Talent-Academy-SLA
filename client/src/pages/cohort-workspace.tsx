@@ -128,7 +128,7 @@ export default function CohortWorkspace() {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: `Announcement sent to ${data.sent || 0} teachers` });
+      toast({ title: `Announcement sent to ${data.sent || 0} Fellows` });
       setAnnounceTitle("");
       setAnnounceMessage("");
       queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "announcements"] });
@@ -262,12 +262,12 @@ export default function CohortWorkspace() {
 
           <TabsContent value="people" className="space-y-3 mt-4">
             {teachers.length === 0 ? (
-              <Empty text="No teachers enrolled in this cohort yet." />
+              <Empty text="No Fellows enrolled in this cohort yet." />
             ) : teachers.map((teacher: any) => (
               <Card key={teacher.id} className="sl-rise border-l-4 border-l-primary">
                 <CardHeader className="py-4">
                   <CardTitle className="text-base">{teacher.name}</CardTitle>
-                  <CardDescription>{teacher.email} · Teacher ID {teacher.teacherId}</CardDescription>
+                  <CardDescription>{teacher.email} · Fellow ID {teacher.teacherId}</CardDescription>
                 </CardHeader>
               </Card>
             ))}
@@ -275,7 +275,7 @@ export default function CohortWorkspace() {
 
           <TabsContent value="quizzes" className="space-y-3 mt-4">
             {quizzes.length === 0 && fileQuizzes.length === 0 ? (
-              <Empty text="No quizzes in this cohort yet. Assign a module quiz from the trainer workspace." />
+              <Empty text="No quizzes in this cohort yet. A trainer assigns a module quiz on Assessments & quizzes (on the trainer desk), and an admin can on Analytics." />
             ) : (
               <>
                 {quizzes.map((quiz: any) => (
@@ -310,7 +310,7 @@ export default function CohortWorkspace() {
               </Button>
             </div>
             {progress.length === 0 ? (
-              <Empty text="The gradebook fills in as teachers finish modules and quizzes." />
+              <Empty text="The gradebook fills in as Fellows finish modules and quizzes." />
             ) : (
               <div className="overflow-x-auto rounded-xl border bg-white">
                 <table className="w-full text-sm">
@@ -349,7 +349,7 @@ export default function CohortWorkspace() {
                 <CardHeader>
                   <CardTitle>No graduates yet</CardTitle>
                   <CardDescription>
-                    Certificates appear after a teacher completes the assigned course. Nobody is missing from the system — this cohort simply has not certified anyone.
+                    Certificates appear after an admin issues one to a Fellow who has completed the course. Nobody is missing from the system — this cohort simply has not certified anyone.
                   </CardDescription>
                 </CardHeader>
                 {closeToGraduate.length > 0 && (
@@ -377,7 +377,7 @@ export default function CohortWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle>Schedule a session or deadline</CardTitle>
-                <CardDescription>Teachers see this on their dashboard calendar.</CardDescription>
+                <CardDescription>Fellows see this on their dashboard calendar.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input placeholder="Title" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} />
@@ -521,7 +521,7 @@ export default function CohortWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle>Import a class roster</CardTitle>
-                <CardDescription>CSV with name, email, and optional password. Existing emails are enrolled; new teachers get Teacher123! if password is blank.</CardDescription>
+                <CardDescription>CSV with name, email, and optional password. Existing emails are enrolled; new Fellows get Teacher123! if password is blank.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Textarea rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)} />
@@ -536,7 +536,7 @@ export default function CohortWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle>Pin a note to this cohort</CardTitle>
-                <CardDescription>Every enrolled teacher gets it in their bell. Email is sent when RESEND_API_KEY is configured.</CardDescription>
+                <CardDescription>Every enrolled Fellow gets it in their bell. Email is sent when RESEND_API_KEY is configured.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input placeholder="Title" value={announceTitle} onChange={(e) => setAnnounceTitle(e.target.value)} />
@@ -556,7 +556,7 @@ export default function CohortWorkspace() {
                 <CardHeader className="py-4">
                   <CardTitle className="text-base">{item.title}</CardTitle>
                   <CardDescription>
-                    {item.recipients || 0} teachers · {item.created_at ? new Date(item.created_at).toLocaleString() : ""}
+                    {item.recipients || 0} Fellows · {item.created_at ? new Date(item.created_at).toLocaleString() : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

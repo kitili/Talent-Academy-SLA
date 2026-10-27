@@ -1,12 +1,14 @@
 # Talent Academy ops catalog
 
-All LMS data lives in **one Supabase Postgres project**. App tables stay in `public` (Drizzle). Categories live in `ops` so you can find tables and documents in one place.
+> **Status.** The live database today is **Neon** (see `README.md` and `docs/architecture/STATUS.md`). The move to Supabase is planned and not done (`docs/architecture/supabase-workflow.md`). The `ops` schema below comes from `supabase/migrations/` and exists only where those scripts have been run; it was not checked against the live Neon database.
+
+The design: all LMS data lives in **one Postgres project**. App tables stay in `public` (Drizzle). Categories live in `ops` so you can find tables and documents in one place. In the table names below, `teachers` rows are Fellows.
 
 | Area | What it covers | Tables |
 |---|---|---|
 | identity | Trainers, admins, sessions, profiles, approval history | `sessions`, `users`, `user_profiles`, `approval_history` |
-| onboarding | Teacher accounts, cohorts, batches inside a cohort, enrollments | `teachers`, `teacher_profiles`, `batches`, `academy_settings`, `cohort_batches`, `batch_teachers`, `batch_courses` |
-| learning | Courses, weeks, materials, progress, quizzes | `courses`, `cohort_batch_courses`, `training_weeks`, `content_items`, `user_content_progress`, `deck_file_progress`, `quiz_attempts`, `quiz_cache`, `assigned_quizzes`, `teacher_quiz_attempts`, `teacher_content_progress`, `teacher_content_quiz_attempts`, `teacher_quiz_regenerations`, `open_ended_reviews`, `teacher_course_completion`, `course_repetitions` |
+| onboarding | Fellow accounts (`teachers`), cohorts (`batches`), steps inside a cohort (`cohort_batches`), enrollments | `teachers`, `teacher_profiles`, `batches`, `academy_settings`, `cohort_batches`, `batch_teachers`, `batch_courses` |
+| learning | Courses, modules (`training_weeks`), materials, progress, quizzes | `courses`, `cohort_batch_courses`, `training_weeks`, `content_items`, `user_content_progress`, `deck_file_progress`, `quiz_attempts`, `quiz_cache`, `assigned_quizzes`, `teacher_quiz_attempts`, `teacher_content_progress`, `teacher_content_quiz_attempts`, `teacher_quiz_regenerations`, `open_ended_reviews`, `teacher_course_completion`, `course_repetitions` |
 | classroom | Attendance, events, written work, certificates | `attendance_records`, `scheduled_events`, `written_assignments`, `assignment_submissions`, `batch_certificate_templates`, `teacher_certificates`, `teacher_report_cards` |
 | communications | In-app notices and alerts | `notifications`, `alert_rules` |
 | marketing | Satisfaction, comments, goals, reflections | `satisfaction_scores`, `trainer_comments`, `teacher_goals`, `fellow_reflections`, `fellow_disqualifications` |
@@ -36,7 +38,7 @@ Open SQL and run:
 SELECT area_id, table_name, document_path FROM ops.catalog ORDER BY area_id, table_name;
 ```
 
-In the app: Admin → **Data catalog** (`/admin/data-catalog`).
+There is no screen for the catalog. The same list is served to admins as JSON at `GET /api/admin/ops-catalog`.
 
 Then set **one** connection string:
 

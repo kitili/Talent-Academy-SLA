@@ -27,3 +27,17 @@ export function homeForRole(role?: string) {
   if (role === "admin") return "/admin";
   return "/trainer/batches";
 }
+
+// Who is signed in, as the gates see it. Until the server answers /api/user, `user` may be the stored user: a
+// placeholder that can draw a page but never moves anyone. Only the server's answer redirects.
+export type SignInView = { answered: boolean; user: { role?: string } | null | undefined };
+
+/** Where the sign-in page (and `/`) sends a visitor the server says is signed in; null to stay. */
+export function signInRedirect({ answered, user }: SignInView): string | null {
+  return answered && user?.role ? homeForRole(user.role) : null;
+}
+
+/** Where a protected page sends a visitor the server says is signed out; null to stay. */
+export function protectedRedirect({ answered, user }: SignInView): string | null {
+  return answered && !user ? "/auth" : null;
+}

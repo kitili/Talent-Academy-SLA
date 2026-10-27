@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ChevronRight, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -31,8 +30,8 @@ interface Trainer {
   approvalStatus: string;
   createdAt: string;
   lastLogin?: string;
-  progress?: number;
-  filesCompleted?: number;
+  /** Cohorts this trainer runs (D8): a cohort_trainers row or batches.trainer_id. */
+  cohortCount?: number;
 }
 
 export default function AdminTrainers({ embedded = false }: { embedded?: boolean }) {
@@ -249,21 +248,13 @@ export default function AdminTrainers({ embedded = false }: { embedded?: boolean
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Has a cohort
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {trainer.progress || 0}%
-                        </p>
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
                           Cohorts
                         </p>
-                        <p className="text-sm font-semibold">
-                          {trainer.filesCompleted || 0}
+                        <p className="text-sm font-semibold" data-testid={`text-trainer-cohorts-${trainer.id}`}>
+                          {trainer.cohortCount || 0}
                         </p>
                       </div>
                       <div>
@@ -277,8 +268,6 @@ export default function AdminTrainers({ embedded = false }: { embedded?: boolean
                         </p>
                       </div>
                     </div>
-
-                    <Progress value={trainer.progress || 0} className="h-2" />
                   </div>
 
                   <ChevronRight className="h-5 w-5 text-muted-foreground ml-4 flex-shrink-0 mt-1" />

@@ -11,13 +11,13 @@ describe("role boundaries", () => {
     assert.equal(isAcademyStaff(null), false);
   });
 
-  it("lets a trainer open only cohorts assigned to them", () => {
+  it("lets a trainer open only cohorts assigned to them, not cohorts they only created", () => {
     const trainer = { id: "t1", role: "trainer" };
     const own = { trainerId: "t1", createdBy: "admin" };
     const created = { trainerId: null, createdBy: "t1" };
     const other = { trainerId: "t2", createdBy: "admin" };
     assert.equal(trainerOwnsBatch(trainer, own), true);
-    assert.equal(trainerOwnsBatch(trainer, created), true);
+    assert.equal(trainerOwnsBatch(trainer, created), false);
     assert.equal(trainerOwnsBatch(trainer, other), false);
     assert.equal(trainerOwnsBatch(trainer, null), false);
     assert.equal(trainerOwnsBatch(trainer, { trainerId: "t2", createdBy: "admin", trainerIds: ["t1"] }), true);
@@ -31,11 +31,12 @@ describe("role boundaries", () => {
 });
 
 describe("trainer tour", () => {
-  it("shows cohorts, teachers, and what stays with admin", () => {
+  it("shows cohorts, Fellows, and what stays with admin", () => {
     const text = TRAINER_TOUR.map((step) => `${step.title} ${step.body}`).join(" ");
     assert.ok(text.includes("cohort"));
-    assert.ok(text.includes("Teachers"));
-    assert.ok(text.includes("You cannot add a course"));
+    assert.ok(text.includes("Fellow"));
+    assert.equal(/teacher/i.test(text), false);
+    assert.ok(text.includes("You cannot add or delete a course"));
     assert.equal(TRAINER_TOUR.some((step) => step.target === "trainer-batches"), true);
     assert.equal(text.toLowerCase().includes("trainer123"), false);
   });

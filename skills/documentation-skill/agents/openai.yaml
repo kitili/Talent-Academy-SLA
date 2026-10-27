@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation Skill"
+  short_description: "Design scalable docs folders"
+  default_prompt: "Use $documentation-skill to design a scalable docs folder architecture for this project."

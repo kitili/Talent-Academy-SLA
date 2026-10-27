@@ -4,13 +4,14 @@ import { AcademyShell } from "@/components/AcademyShell";
 import AdminTrainers from "@/pages/admin-trainers";
 import AdminTeachers from "@/pages/admin-teachers";
 import { deskName } from "@shared/deskName";
+import { ACADEMY_TERMS } from "@shared/academyPath";
 
 const TABS = [
   { id: "trainers", label: "Trainers", href: "/admin/trainers" },
-  { id: "teachers", label: "Teachers", href: "/admin/teachers" },
+  { id: "teachers", label: ACADEMY_TERMS.learner.title + "s", href: "/admin/teachers" },
 ] as const;
 
-/** Trainers and teachers share one tab. /admin/people opens on trainers. */
+/** Trainers and Fellows (stored as teachers) share one tab. /admin/people opens on trainers. */
 export default function AdminPeople() {
   const [location, navigate] = useLocation();
   const { user, logoutMutation } = useAuth();
@@ -19,7 +20,7 @@ export default function AdminPeople() {
     <AcademyShell
       scene="hall"
       title="People"
-      subtitle="Trainers and teachers"
+      subtitle="Trainers and Fellows"
       userLabel={user ? deskName(user) : undefined}
       onLogout={() => logoutMutation.mutate()}
       showAdminNav

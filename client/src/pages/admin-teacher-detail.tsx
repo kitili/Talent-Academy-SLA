@@ -120,7 +120,7 @@ export default function AdminTeacherDetail() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <Card className="p-8 text-center">
-            <p className="text-muted-foreground">Teacher not found</p>
+            <p className="text-muted-foreground">Fellow not found</p>
           </Card>
         </div>
       </div>
@@ -131,7 +131,7 @@ export default function AdminTeacherDetail() {
     <AcademyShell
       scene="board"
       title={teacher.name}
-      subtitle="Teacher"
+      subtitle="Fellow"
       userLabel={user ? deskName(user) : undefined}
       onLogout={() => logoutMutation.mutate()}
       showAdminNav

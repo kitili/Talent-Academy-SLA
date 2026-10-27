@@ -47,7 +47,7 @@ describe("admin attendance lists", () => {
     assert.match(read("client/src/pages/admin-attendance.tsx"), /AttendanceBoard/);
     assert.equal(read("client/src/pages/admin-home.tsx").includes("AttendanceBoard"), false);
     assert.match(read("client/src/pages/admin-analytics.tsx"), /AttendanceBoard/);
-    assert.match(list, /title="Teachers"/);
+    assert.match(list, /title="Fellows"/);
     assert.match(list, /title="Trainers"/);
   });
 });

@@ -10,3 +10,10 @@ vite.config.ts.*
 .vercel
 temp-add-users.sql
 .env*
+
+# Working folders (bootstrap kit)
+/references
+/tmp/
+/designs
+/.test-runs/
+**/.claude/worktrees/

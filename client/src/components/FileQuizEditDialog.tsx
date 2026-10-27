@@ -17,6 +17,8 @@ import {
 import { Trash2, Plus, CheckCircle, CheckCircle2, RefreshCw, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { QuizQuestion } from "@shared/schema";
+import { ACADEMY_TERMS } from "@shared/academyPath";
+import { serverSentence } from "@/components/FileQuizDialog";
 
 interface FileQuizEditDialogProps {
   open: boolean;
@@ -49,13 +51,16 @@ export function FileQuizEditDialog({
   const queryClient = useQueryClient();
   const [questions, setQuestions] = useState<QuizQuestion[]>(initialQuestions);
   const [regenCount, setRegenCount] = useState(initialQuestions.length || 10);
+  // Tracked here too, because a regenerated draft is saved unapproved before the parent refetches.
+  const [isApproved, setIsApproved] = useState(approved);
 
   useEffect(() => {
     if (open) {
       setQuestions(initialQuestions);
       setRegenCount(initialQuestions.length || 10);
+      setIsApproved(approved);
     }
-  }, [open, initialQuestions]);
+  }, [open, initialQuestions, approved]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [`/api/training-weeks/${weekId}/quiz-status`] });
@@ -71,7 +76,11 @@ export function FileQuizEditDialog({
       toast({ title: "Quiz saved" });
       invalidate();
     },
-    onError: () => toast({ title: "Failed to save quiz", variant: "destructive" }),
+    onError: (error: Error) => toast({
+      title: "Failed to save quiz",
+      description: serverSentence(error, "Please try again."),
+      variant: "destructive",
+    }),
   });
 
   const approveMutation = useMutation({
@@ -80,11 +89,16 @@ export function FileQuizEditDialog({
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Quiz approved — teachers can now take it" });
+      toast({ title: `Quiz approved — ${ACADEMY_TERMS.learner.title}s can now take it` });
+      setIsApproved(true);
       invalidate();
       onClose();
     },
-    onError: () => toast({ title: "Failed to approve quiz", variant: "destructive" }),
+    onError: (error: Error) => toast({
+      title: "Failed to approve quiz",
+      description: serverSentence(error, "Please try again."),
+      variant: "destructive",
+    }),
   });
 
   const regenMutation = useMutation({
@@ -97,12 +111,17 @@ export function FileQuizEditDialog({
     },
     onSuccess: (data) => {
       setQuestions(data.questions ?? []);
-      toast({ title: `Regenerated ${data.questions?.length ?? 0} questions` });
+      // A regenerated quiz is a new AI draft, saved unapproved (D5).
+      setIsApproved(false);
+      toast({
+        title: `Regenerated ${data.questions?.length ?? 0} questions`,
+        description: `Saved as a draft. Approve it before ${ACADEMY_TERMS.learner.title}s can take it.`,
+      });
       invalidate();
     },
     onError: (error: Error) => toast({
       title: "Regeneration failed",
-      description: error.message || "Create questions manually with Add Question instead.",
+      description: serverSentence(error, "Create questions manually with Add Question instead."),
       variant: "destructive",
     }),
   });
@@ -181,7 +200,7 @@ export function FileQuizEditDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {questions.length === 0 ? "Create Quiz" : "Edit Quiz"} — {fileName}
-            {approved
+            {isApproved
               ? <Badge className="bg-green-500 text-white text-xs">Approved</Badge>
               : <Badge variant="secondary" className="text-xs">Pending Approval</Badge>
             }
@@ -350,7 +369,7 @@ export function FileQuizEditDialog({
           >
             {saveMutation.isPending ? "Saving…" : "Save Changes"}
           </Button>
-          {!approved && (
+          {!isApproved && (
             <Button
               type="button"
               onClick={() => {
@@ -364,7 +383,7 @@ export function FileQuizEditDialog({
               {approveMutation.isPending ? "Approving…" : "Save & Approve"}
             </Button>
           )}
-          {approved && (
+          {isApproved && (
             <Button
               type="button"
               onClick={() => approveMutation.mutate()}
