@@ -6,9 +6,10 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        // design/DESIGN-BRIEF.md "Look": 8 for buttons and inputs (rounded-md), 12 for cards and dialogs.
+        lg: ".75rem", /* 12px */
+        md: ".5rem", /* 8px */
+        sm: ".25rem", /* 4px */
       },
       colors: {
         // Silverleaf redesign tokens (client/src/index.css --sl-*): bg-sl-ground, text-sl-muted, border-sl-line, ...
