@@ -1,12 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ChevronRight, Plus, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,12 +12,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
-import { AdminPage } from "@/components/AdminPage";
+import { filterByQuery, PageStrip, usePager } from "@/components/PageStrip";
+import {
+  AccessDenied,
+  PageHeader,
+  SkeletonRows,
+  StatusChip,
+  cardClass,
+  cohortFellows,
+  inputClass,
+  linkClass,
+  primaryButton,
+  type PathPayload,
+} from "@/components/AdminParts";
 
 interface Trainer {
   id: string;
@@ -34,7 +43,8 @@ interface Trainer {
   cohortCount?: number;
 }
 
-export default function AdminTrainers({ embedded = false }: { embedded?: boolean }) {
+/** The Trainers tab of People. The tab strip comes from AdminPeople so both tabs share one header row. */
+export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -48,6 +58,11 @@ export default function AdminTrainers({ embedded = false }: { embedded?: boolean
   const { data: trainers, isLoading } = useQuery<Trainer[]>({
     queryKey: ["/api/admin/trainers"],
   });
+  // Fellows per trainer come from the cohorts they run (the academy path read the Cohorts page makes).
+  const { data: path } = useQuery<PathPayload>({
+    queryKey: ["/api/admin/academy-path"],
+    enabled: user?.role === "admin",
+  });
   const [listQuery, setListQuery] = useState("");
   const filteredTrainers = filterByQuery(
     trainers ?? [],
@@ -57,6 +72,16 @@ export default function AdminTrainers({ embedded = false }: { embedded?: boolean
   const activeTrainers = filteredTrainers.filter((trainer) => trainer.approvalStatus !== "inactive");
   const inactiveTrainers = filteredTrainers.filter((trainer) => trainer.approvalStatus === "inactive");
   const trainerPager = usePager(activeTrainers);
+  const allActive = (trainers ?? []).filter((trainer) => trainer.approvalStatus !== "inactive");
+
+  const fellowsOf = (trainerId: string) => {
+    if (!path) return "…";
+    const seen = new Set<string>();
+    for (const cohort of path.cohorts) {
+      if ((cohort.trainerIds || []).includes(trainerId)) for (const fellow of cohortFellows(cohort)) seen.add(fellow.id);
+    }
+    return String(seen.size);
+  };
 
   const createTrainerMutation = useMutation({
     mutationFn: async (data: { name: string; email: string; password: string }) => {
@@ -103,48 +128,24 @@ export default function AdminTrainers({ embedded = false }: { embedded?: boolean
   };
 
   if (user?.role !== "admin") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="p-8 text-center max-w-md">
-          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-          <p className="text-muted-foreground">
-            Only administrators can access this page.
-          </p>
-        </Card>
-      </div>
-    );
+    return <AccessDenied />;
   }
 
   return (
-    <AdminPage embedded={embedded} scene="hall">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate("/admin")}
-              data-testid="button-back-dashboard"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Trainers</h1>
-              <p className="text-muted-foreground">
-                Active trainers are listed here. Inactive desks stay folded below.
-              </p>
-            </div>
-          </div>
-          <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search trainers" />
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="People"
+        tabs={tabs}
+        actions={
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-add-trainer">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Trainer
-              </Button>
+              <button type="button" className={primaryButton} data-testid="button-add-trainer">
+                Add a trainer
+              </button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add New Trainer</DialogTitle>
+                <DialogTitle>Add a trainer</DialogTitle>
                 <DialogDescription>
                   Create a new trainer account. The trainer will be automatically approved.
                 </DialogDescription>
@@ -209,88 +210,124 @@ export default function AdminTrainers({ embedded = false }: { embedded?: boolean
               </form>
             </DialogContent>
           </Dialog>
+        }
+      />
+
+      <section aria-labelledby="trainers-list" className={`${cardClass} overflow-hidden`}>
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-sl-line px-5 py-4">
+          <h2 id="trainers-list" className="text-lg font-semibold text-sl-ink">
+            Active trainers
+            {!isLoading && <span className="font-medium text-sl-muted"> · {allActive.length}</span>}
+          </h2>
+          <div className="flex min-w-[220px] flex-col gap-1.5 sm:w-80">
+            <label htmlFor="people-search" className="text-[13px] text-sl-muted">Find a trainer</label>
+            <input
+              id="people-search"
+              type="search"
+              className={inputClass}
+              placeholder="Name, username or email"
+              value={listQuery}
+              onChange={(e) => setListQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="p-6 animate-pulse bg-muted h-24" />
-            ))}
-          </div>
-        ) : trainers && trainers.length > 0 ? (
-          <div className="space-y-4">
-            {trainerPager.slice.map((trainer) => (
-              <Card
-                key={trainer.id}
-                className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => navigate(`/admin/trainers/${trainer.id}`)}
-                data-testid={`card-trainer-${trainer.id}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold">{trainer.username}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {trainer.email || "No email"}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={
-                          trainer.approvalStatus === "approved"
-                            ? "default"
-                            : trainer.approvalStatus === "pending"
-                            ? "secondary"
-                            : "destructive"
-                        }
-                      >
-                        {trainer.approvalStatus}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Cohorts
-                        </p>
-                        <p className="text-sm font-semibold" data-testid={`text-trainer-cohorts-${trainer.id}`}>
-                          {trainer.cohortCount || 0}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Last Active
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {trainer.lastLogin
-                            ? format(new Date(trainer.lastLogin), "MMM d")
-                            : "Never"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <ChevronRight className="h-5 w-5 text-muted-foreground ml-4 flex-shrink-0 mt-1" />
-                </div>
-              </Card>
-            ))}
-            <PageStrip page={trainerPager.page} pages={trainerPager.pages} setPage={trainerPager.setPage} />
-            {inactiveTrainers.length > 0 && (
-              <details className="rounded-xl border p-4" data-testid="inactive-trainers">
-                <summary className="cursor-pointer font-medium">Inactive ({inactiveTrainers.length})</summary>
-                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                  {inactiveTrainers.map((trainer) => (
-                    <li key={trainer.id}>{trainer.username}{trainer.email ? ` · ${trainer.email}` : ""}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </div>
+          <SkeletonRows />
+        ) : (trainers ?? []).length === 0 ? (
+          <p className="px-5 py-6 text-[15px] text-sl-muted">No trainers yet. Add one, or approve a request from the sign-in page.</p>
         ) : (
-          <Card className="p-8 text-center">
-            <p className="text-muted-foreground">No trainers found</p>
-          </Card>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse text-sm">
+                <thead>
+                  <tr className="text-left text-sl-muted">
+                    <th scope="col" className="px-5 py-2.5 font-medium">Trainer</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Email</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Cohorts</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Fellows</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Last active</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Status</th>
+                    <th scope="col" className="px-5 py-2.5"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trainerPager.slice.map((trainer) => (
+                    <tr key={trainer.id} className="border-t border-sl-line" data-testid={`card-trainer-${trainer.id}`}>
+                      <th scope="row" className="px-5 py-3.5 text-left font-semibold text-sl-ink">{trainer.username}</th>
+                      <td className="px-3 py-3.5 text-sl-ink">{trainer.email || "No email"}</td>
+                      <td className="px-3 py-3.5 text-sl-ink" data-testid={`text-trainer-cohorts-${trainer.id}`}>
+                        {trainer.cohortCount || 0}
+                      </td>
+                      <td className="px-3 py-3.5 text-sl-ink">{fellowsOf(trainer.id)}</td>
+                      <td className="px-3 py-3.5 text-sl-muted">
+                        {trainer.lastLogin ? format(new Date(trainer.lastLogin), "d MMM") : "Not recorded"}
+                      </td>
+                      <td className="px-3 py-3.5"><StatusChip status={trainer.approvalStatus} /></td>
+                      <td className="px-5 py-1.5 text-right">
+                        <a
+                          href={`/admin/trainers/${trainer.id}`}
+                          aria-label={`Open ${trainer.username}`}
+                          className={`${linkClass} inline-flex min-h-[44px] items-center font-semibold no-underline hover:underline`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            navigate(`/admin/trainers/${trainer.id}`);
+                          }}
+                        >
+                          Open
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                  {activeTrainers.length === 0 && (
+                    <tr className="border-t border-sl-line">
+                      <td colSpan={7} className="px-5 py-5 text-sl-muted">No trainer matches “{listQuery.trim()}”.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-5">
+              <PageStrip page={trainerPager.page} pages={trainerPager.pages} setPage={trainerPager.setPage} />
+            </div>
+          </>
         )}
-    </AdminPage>
+
+        <details className="border-t border-sl-line" data-testid="inactive-trainers">
+          <summary className="min-h-[44px] cursor-pointer px-5 py-3 text-[15px] font-semibold text-sl-neutral">
+            Inactive desks · {inactiveTrainers.length}
+          </summary>
+          {inactiveTrainers.length === 0 ? (
+            <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
+              No inactive trainer desks. A deactivated desk folds in here; it is not deleted.
+            </p>
+          ) : (
+            <ul className="space-y-2 px-5 pb-4 text-sm text-sl-muted">
+              {inactiveTrainers.map((trainer) => (
+                <li key={trainer.id}>{trainer.username}{trainer.email ? ` · ${trainer.email}` : ""}</li>
+              ))}
+            </ul>
+          )}
+        </details>
+      </section>
+
+      {!isLoading && (trainers ?? []).length > 0 && (
+        <p className="text-sm text-sl-muted">
+          {(trainers ?? []).some((trainer) => trainer.lastLogin) ? "" : "Last active is not recorded yet for any trainer. "}
+          Fellows are on the{" "}
+          <a
+            href="/admin/teachers"
+            className={linkClass}
+            onClick={(event) => {
+              event.preventDefault();
+              navigate("/admin/teachers");
+            }}
+          >
+            Fellows
+          </a>{" "}
+          tab.
+        </p>
+      )}
+    </div>
   );
 }

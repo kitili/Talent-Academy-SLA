@@ -33,8 +33,11 @@ describe("admin desk", () => {
     assert.equal(nav.includes("rounded-full"), false);
     assert.equal(home.includes("/admin/handover"), false);
     assert.equal(home.includes("showAdminNav"), true);
-    assert.match(home, /PlaceCover/);
-    assert.match(home, /place: "certificate"/);
+    // The redesigned Home (design/board/AdminHome.dc.html) has no picture tiles: the menu opens each part.
+    assert.equal(home.includes("PlaceArt"), false);
+    assert.match(home, /Needs attention/);
+    assert.match(home, /The academy at a glance/);
+    assert.match(home, /Clear previous activity…/);
     const auth = read("client/src/pages/unified-auth.tsx");
     assert.equal(auth.includes("bg-library.jpg"), false);
     assert.equal(auth.includes("PlaceArt"), false);

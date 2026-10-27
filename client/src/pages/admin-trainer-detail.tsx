@@ -1,15 +1,27 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { AcademyShell } from "@/components/AcademyShell";
 import { deskName } from "@shared/deskName";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
-import { useRoute } from "wouter";
+import {
+  AccessDenied,
+  Breadcrumb,
+  Chip,
+  ResetPasswordDialog,
+  SkeletonRows,
+  StatusChip,
+  cardClass,
+  cohortFellows,
+  emptyStepNumbers,
+  linkClass,
+  orderedSteps,
+  plural,
+  secondaryButton,
+  stepWords,
+  type PathPayload,
+} from "@/components/AdminParts";
 
 interface TrainerDetail {
   id: string;
@@ -19,8 +31,7 @@ interface TrainerDetail {
   approvalStatus: string;
   createdAt: string;
   lastLogin?: string;
-  progress?: number;
-  filesCompleted?: number;
+  cohortCount?: number;
   completedLessons?: string[];
   activityTimeline?: Array<{
     action: string;
@@ -37,9 +48,21 @@ interface TrainerDetail {
 export default function AdminTrainerDetail() {
   const { user, logoutMutation } = useAuth();
   const [, navigate] = useLocation();
-  const [match, params] = useRoute("/admin/trainers/:id");
+  const [, params] = useRoute("/admin/trainers/:id");
+  const [resetOpen, setResetOpen] = useState(false);
 
   const trainerId = params?.id;
+
+  // Fetch trainer details
+  const { data: trainer, isLoading } = useQuery<TrainerDetail>({
+    queryKey: ["/api/admin/trainers", trainerId],
+    enabled: !!trainerId,
+  });
+  // Cohorts, steps and Fellows (the read the Cohorts page makes).
+  const { data: path } = useQuery<PathPayload>({
+    queryKey: ["/api/admin/academy-path"],
+    enabled: user?.role === "admin",
+  });
 
   // Guard: only admins can access this page
   if (user && user.role !== "admin") {
@@ -47,182 +70,162 @@ export default function AdminTrainerDetail() {
     return null;
   }
 
-  // Fetch trainer details
-  const { data: trainer, isLoading } = useQuery<TrainerDetail>({
-    queryKey: ["/api/admin/trainers", trainerId],
-    enabled: !!trainerId,
-  });
-
   if (user?.role !== "admin") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="p-8 text-center max-w-md">
-          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-          <p className="text-muted-foreground">
-            Only administrators can access this page.
-          </p>
-        </Card>
-      </div>
-    );
+    return <AccessDenied />;
   }
 
+  const shell = (children: React.ReactNode) => (
+    <AcademyShell
+      title="Silverleaf Academy"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      showAdminNav
+      desk="admin"
+      current="people"
+    >
+      <div className="flex flex-col gap-5">{children}</div>
+    </AcademyShell>
+  );
+
+  const trail = [
+    { label: "People", href: "/admin/people" },
+    { label: "Trainers", href: "/admin/trainers", testId: "button-back-trainers" },
+  ];
+
   if (isLoading) {
-    return (
-      <div className="sl-page sl-bg-garden min-h-screen p-4 sm:p-6 md:p-8">
-        <div className="max-w-4xl mx-auto">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate("/admin/trainers")}
-            className="mb-8"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="space-y-6">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="p-6 animate-pulse bg-muted h-32" />
-            ))}
-          </div>
-        </div>
-      </div>
+    return shell(
+      <>
+        <Breadcrumb trail={trail} current="Trainer" />
+        <div className={cardClass}><SkeletonRows rows={4} /></div>
+      </>,
     );
   }
 
   if (!trainer) {
-    return (
-      <div className="sl-page sl-bg-garden min-h-screen p-4 sm:p-6 md:p-8">
-        <div className="max-w-4xl mx-auto">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate("/admin/trainers")}
-            className="mb-8"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <Card className="p-8 text-center">
-            <p className="text-muted-foreground">Trainer not found</p>
-          </Card>
-        </div>
-      </div>
+    return shell(
+      <>
+        <Breadcrumb trail={trail} current="Trainer" />
+        <div className={`${cardClass} p-8 text-center text-sl-muted`}>Trainer not found</div>
+      </>,
     );
   }
 
-  return (
-    <AcademyShell
-      scene="garden"
-      title={trainer.username}
-      subtitle="Trainer"
-      userLabel={user ? deskName(user) : undefined}
-      onLogout={() => logoutMutation.mutate()}
-      showAdminNav
-    >
-      <div className="space-y-6">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => navigate("/admin/trainers")}
-          className="mb-8"
-          data-testid="button-back-trainers"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+  const running = (path?.cohorts ?? []).filter((cohort) => (cohort.trainerIds || []).includes(trainer.id));
 
-        {/* Header */}
-        <Card className="p-8 mb-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">{trainer.username}</h1>
-              <p className="text-muted-foreground">{trainer.email || "No email"}</p>
-            </div>
-            <Badge
-              variant={
-                trainer.approvalStatus === "approved"
-                  ? "default"
-                  : trainer.approvalStatus === "pending"
-                  ? "secondary"
-                  : "destructive"
-              }
-              className="text-sm"
-            >
-              {trainer.approvalStatus}
-            </Badge>
+  return shell(
+    <>
+      <Breadcrumb trail={trail} current={trainer.username} />
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{trainer.username}</h1>
+            <StatusChip status={trainer.approvalStatus} />
           </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Overall Progress</p>
-              <p className="text-2xl font-bold mb-2">{trainer.progress || 0}%</p>
-              <Progress value={trainer.progress || 0} />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Files Completed</p>
-              <p className="text-2xl font-bold">{trainer.filesCompleted || 0}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Joined</p>
-              <p className="text-2xl font-bold">
-                {format(new Date(trainer.createdAt), "MMM d, yyyy")}
-              </p>
-            </div>
-          </div>
-
-          {/* Last Login */}
-          {trainer.lastLogin && (
-            <p className="text-sm text-muted-foreground">
-              Last active: {format(new Date(trainer.lastLogin), "PPP p")}
-            </p>
-          )}
-        </Card>
-
-        {/* Completed Lessons */}
-        {trainer.completedLessons && trainer.completedLessons.length > 0 && (
-          <Card className="p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4">Completed Lessons</h2>
-            <div className="space-y-2">
-              {trainer.completedLessons.map((lesson, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                  data-testid={`completed-lesson-${idx}`}
-                >
-                  <span className="font-medium">{lesson}</span>
-                  <Badge variant="outline">Completed</Badge>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {/* Activity Timeline */}
-        {trainer.activityTimeline && trainer.activityTimeline.length > 0 && (
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4">Activity Timeline</h2>
-            <div className="space-y-4">
-              {trainer.activityTimeline.map((activity, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-4 p-4 bg-muted rounded-lg"
-                  data-testid={`activity-${idx}`}
-                >
-                  <div className="flex-1">
-                    <p className="font-medium capitalize">{activity.action}</p>
-                    {activity.details && (
-                      <p className="text-sm text-muted-foreground">
-                        {activity.details}
-                      </p>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground whitespace-nowrap">
-                    {format(new Date(activity.timestamp), "MMM d, HH:mm")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+          <p className="text-sm text-sl-muted">
+            Trainer · {trainer.email || "No email"} · Joined {format(new Date(trainer.createdAt), "d MMM yyyy")} ·{" "}
+            {trainer.lastLogin ? `Last active ${format(new Date(trainer.lastLogin), "PPP p")}` : "Last active not recorded"}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className={secondaryButton} onClick={() => setResetOpen(true)} data-testid="button-reset-person-password">
+            Reset password…
+          </button>
+        </div>
       </div>
-    </AcademyShell>
+
+      <section aria-labelledby="cohorts-and-steps" className={`${cardClass} overflow-hidden`}>
+        <h2 id="cohorts-and-steps" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">
+          Cohorts and steps
+          {path && <span className="font-medium text-sl-muted"> · {running.length}</span>}
+        </h2>
+        {!path ? (
+          <SkeletonRows rows={2} />
+        ) : running.length === 0 ? (
+          <p className="px-5 py-4 text-[15px] text-sl-muted">
+            This trainer runs no cohort yet. Assign them under{" "}
+            <a href="/admin/batches" className={linkClass} onClick={(event) => { event.preventDefault(); navigate("/admin/batches"); }}>Cohorts</a>.
+          </p>
+        ) : (
+          <ul>
+            {running.map((cohort) => {
+              const steps = orderedSteps(cohort);
+              const empty = emptyStepNumbers(cohort);
+              return (
+                <li key={cohort.id} className="flex flex-col gap-2.5 border-b border-sl-line px-5 py-4 last:border-b-0">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <a
+                      href={`/admin/batches?cohort=${cohort.id}`}
+                      className={`${linkClass} font-semibold no-underline hover:underline`}
+                      onClick={(event) => { event.preventDefault(); navigate(`/admin/batches?cohort=${cohort.id}`); }}
+                    >
+                      {cohort.name}
+                    </a>
+                    <span className="text-[13px] text-sl-muted">{plural(cohortFellows(cohort).length, "Fellow")}</span>
+                  </div>
+                  {steps.length === 0 ? (
+                    <span className="self-start"><Chip>No steps yet</Chip></span>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {steps.map((step, index) => (
+                        <span key={step.id} className="rounded-lg border border-sl-line bg-sl-ground px-2.5 py-1 text-[13px] text-sl-ink">
+                          Step {index + 1} · {step.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {empty.length > 0 && <span className="self-start"><Chip tone="attention">{stepWords(empty)} {empty.length === 1 ? "has" : "have"} no course</Chip></span>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Completed Lessons */}
+      {trainer.completedLessons && trainer.completedLessons.length > 0 && (
+        <section className={`${cardClass} p-5`}>
+          <h2 className="mb-3 text-lg font-semibold text-sl-ink">Completed Lessons</h2>
+          <div className="space-y-2">
+            {trainer.completedLessons.map((lesson, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between rounded-lg bg-sl-ground p-3"
+                data-testid={`completed-lesson-${idx}`}
+              >
+                <span className="font-medium text-sl-ink">{lesson}</span>
+                <Chip tone="done">Completed</Chip>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Activity Timeline */}
+      {trainer.activityTimeline && trainer.activityTimeline.length > 0 && (
+        <section className={`${cardClass} p-5`}>
+          <h2 className="mb-3 text-lg font-semibold text-sl-ink">Activity Timeline</h2>
+          <div className="space-y-3">
+            {trainer.activityTimeline.map((activity, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-4 rounded-lg bg-sl-ground p-4"
+                data-testid={`activity-${idx}`}
+              >
+                <div className="flex-1">
+                  <p className="font-medium capitalize text-sl-ink">{activity.action}</p>
+                  {activity.details && <p className="text-sm text-sl-muted">{activity.details}</p>}
+                </div>
+                <p className="whitespace-nowrap text-sm text-sl-muted">
+                  {format(new Date(activity.timestamp), "MMM d, HH:mm")}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <ResetPasswordDialog open={resetOpen} onOpenChange={setResetOpen} personName={trainer.username} identifier={trainer.username} />
+    </>,
   );
 }
