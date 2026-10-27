@@ -105,9 +105,7 @@ export default function TeacherExam() {
               <PaperPane name={quiz.paperName} url={paperObjectUrl} />
             ) : (
               <article className="flex-1 whitespace-pre-wrap font-serif text-base leading-7" data-testid="exam-prompt">
-                {(quiz.questions || []).map((question: { id: string; question: string }) => question.question).join("
-
-")}
+                {(quiz.questions || []).map((question: { id: string; question: string }) => question.question).join("\n\n")}
               </article>
             )}
           </section>
