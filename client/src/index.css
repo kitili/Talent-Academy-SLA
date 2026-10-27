@@ -54,7 +54,7 @@ a, button, [role="button"] {
   --elevate-2: rgba(0,0,0, .08);
 
   /* shadcn colours, mapped to the sl palette above so untouched buttons, inputs, dialogs and tabs match the boards. */
-  --background: 220 20% 97%;          /* ground #F6F7F9 */
+  --background: 0 0% 100%;            /* surface: inputs, dialogs and sheets sit on it; the page ground is body and the shell */
   --foreground: 221 39% 11%;          /* ink #111827 */
   --border: 218 17% 91%;              /* line #E3E6EB */
   --card: 0 0% 100%;
@@ -184,7 +184,7 @@ a, button, [role="button"] {
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 217 41% 10%;          /* ground */
+  --background: 219 40% 14%;          /* surface */
   --foreground: 220 14% 96%;          /* ink */
   --border: 217 26% 22%;              /* line */
   --card: 219 40% 14%;                /* surface */
@@ -266,7 +266,7 @@ a, button, [role="button"] {
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased bg-sl-ground text-foreground;
     /* Body 15/400 at every width (design/DESIGN-BRIEF.md "Look"). */
     font-size: 15px;
     line-height: 1.6;
