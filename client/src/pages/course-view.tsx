@@ -60,11 +60,11 @@ function DocumentViewer({ url }: { url: string }) {
   }, [url]);
 
   if (loading) {
-    return <div className="flex items-center justify-center w-full p-12"><p className="text-muted-foreground">Loading document...</p></div>;
+    return <div className="flex items-center justify-center w-full p-12"><p className="text-sl-muted">Loading document...</p></div>;
   }
 
   if (error) {
-    return <div className="flex items-center justify-center w-full p-12"><p className="text-destructive">{error}</p></div>;
+    return <div className="flex items-center justify-center w-full p-12"><p className="text-sl-risk">{error}</p></div>;
   }
 
   return (
@@ -354,9 +354,9 @@ export default function CourseView() {
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-primary" />;
+        return <CheckCircle2 className="h-5 w-5 text-sl-accent" />;
       default:
-        return <Circle className="h-5 w-5 text-muted-foreground/40" />;
+        return <Circle className="h-5 w-5 text-sl-muted/40" />;
     }
   };
 
@@ -396,7 +396,7 @@ export default function CourseView() {
   // Sidebar content - reused in both mobile Sheet and desktop ResizablePanel
   const sidebarInner = (
     <>
-      <div className="p-4 sm:p-6 border-b flex-shrink-0">
+      <div className="p-4 sm:p-6 border-b border-sl-line flex-shrink-0">
         <Button variant="ghost" size="sm" onClick={() => courseId ? navigate(`/courses/${courseId}`) : navigate('/')} className="mb-4 -ml-2" data-testid="button-back-to-weeks">
           <ChevronLeft className="h-4 w-4 mr-1" />
           Back to {courseId ? "modules" : "courses"}
@@ -406,13 +406,13 @@ export default function CourseView() {
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 sm:p-6 pb-32 space-y-6">
           <div>
-            <h3 className="text-base font-semibold uppercase tracking-wider text-[#666] mb-3">Competency Focus</h3>
-            <p className="text-sm text-foreground leading-relaxed font-normal">{currentWeek?.competencyFocus || "This module"}</p>
+            <h3 className="text-base font-semibold uppercase tracking-wider text-sl-muted mb-3">Module name</h3>
+            <p className="text-sm text-sl-ink leading-relaxed font-normal">{currentWeek?.competencyFocus || "This module"}</p>
           </div>
           {currentWeek?.objective && (
             <div>
-              <h3 className="text-base font-semibold uppercase tracking-wider text-[#666] mb-3">Learning Objectives</h3>
-              <div className="text-sm text-foreground leading-loose space-y-2">
+              <h3 className="text-base font-semibold uppercase tracking-wider text-sl-muted mb-3">Objective</h3>
+              <div className="text-sm text-sl-ink leading-loose space-y-2">
                 {currentWeek.objective.split(/(?=\d+\.)/).map((line: string, idx: number) => {
                   const trimmed = line.trim();
                   if (!trimmed) return null;
@@ -424,24 +424,24 @@ export default function CourseView() {
           {weekProgress && weekProgress.total > 0 && (
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-muted-foreground">Course Progress</span>
-                <span className="text-sm font-bold text-primary">{weekProgress.percentage}%</span>
+                <span className="text-sm font-semibold text-sl-muted">Module progress</span>
+                <span className="text-sm font-bold text-sl-accent">{weekProgress.percentage}%</span>
               </div>
               <Progress value={weekProgress.percentage} className="h-2" />
-              <p className="text-sm text-muted-foreground mt-1">{weekProgress.completed} of {weekProgress.total} completed</p>
-              <p className="text-xs text-muted-foreground/70 mt-2 italic">Tip: Navigate to the last page of each file to mark it as complete</p>
+              <p className="text-sm text-sl-muted mt-1">{weekProgress.completed} of {weekProgress.total} completed</p>
+              <p className="text-xs text-sl-muted mt-2 italic">Tip: Navigate to the last page of each file to mark it as complete</p>
             </div>
           )}
           <div>
-            <h3 className="text-base font-semibold text-foreground mb-3">Lesson Files</h3>
+            <h3 className="text-base font-semibold text-sl-ink mb-3">Lesson files</h3>
             <div className="space-y-2">
               {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">Loading content...</div>
+                <div className="text-center py-8 text-sl-muted text-sm">Loading content...</div>
               ) : deckFiles.length === 0 ? (
                 <div className="text-center py-8">
-                  <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                  <p className="text-sm font-medium text-muted-foreground mb-1">No content available yet</p>
-                  <p className="text-xs text-muted-foreground/70">An administrator needs to add files to this module.</p>
+                  <FileText className="h-12 w-12 mx-auto mb-3 text-sl-muted/40" />
+                  <p className="text-sm font-medium text-sl-muted mb-1">No content available yet</p>
+                  <p className="text-xs text-sl-muted">An Admin or Trainer needs to add files to this module.</p>
                 </div>
               ) : (
                 deckFiles.map((file) => {
@@ -453,28 +453,28 @@ export default function CourseView() {
                       <div className="relative">
                         <button
                           onClick={() => { handleFileClick(file); if (isMobile) setMobileSidebarOpen(false); }}
-                          className={`w-full text-left p-3 rounded-lg transition-colors ${selectedFileId === file.id ? 'bg-primary/10 border-2 border-primary' : 'hover:bg-muted/50 border-2 border-transparent'} ${hasToc ? 'pr-12' : ''}`}
+                          className={`w-full text-left p-3 rounded-lg transition-colors ${selectedFileId === file.id ? 'bg-sl-accent-soft border-2 border-sl-accent' : 'hover:bg-sl-neutral-soft border-2 border-transparent'} ${hasToc ? 'pr-12' : ''}`}
                           data-testid={`button-file-${file.id}`}
                         >
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 mt-0.5">{getStatusIcon(file.progress?.status)}</div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                                <FileText className="h-5 w-5 text-sl-accent flex-shrink-0" />
                                 <span className="font-semibold text-base truncate">{file.fileName}</span>
                               </div>
-                              <div className="text-sm text-muted-foreground">{(file.fileSize / 1024 / 1024).toFixed(2)} MB</div>
+                              <div className="text-sm text-sl-muted">{(file.fileSize / 1024 / 1024).toFixed(2)} MB</div>
                             </div>
                           </div>
                         </button>
                         {hasToc && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setExpandedTocFileId(isTocExpanded ? null : file.id); }}
-                            className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-muted/80 transition-colors"
+                            className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-sl-neutral-soft transition-colors"
                             data-testid={`button-toggle-toc-${file.id}`}
                             aria-label={isTocExpanded ? "Hide contents" : "View contents"}
                           >
-                            <span className="flex items-center gap-1 text-xs text-primary font-medium">
+                            <span className="flex items-center gap-1 text-xs text-sl-accent font-medium">
                               <List className="h-3.5 w-3.5" />
                               Contents
                               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isTocExpanded ? 'rotate-180' : ''}`} />
@@ -483,8 +483,8 @@ export default function CourseView() {
                         )}
                       </div>
                       {hasToc && isTocExpanded && (
-                        <div className="ml-3 pl-3 border-l-2 border-primary/20">
-                          <div className="bg-muted/30 rounded-lg overflow-hidden">
+                        <div className="ml-3 pl-3 border-l-2 border-sl-accent/20">
+                          <div className="bg-sl-neutral-soft rounded-lg overflow-hidden">
                             <TableOfContents
                               toc={file.toc || []}
                               currentPage={selectedFileId === file.id ? pageNumber : 1}
@@ -501,7 +501,7 @@ export default function CourseView() {
                           onClick={() => { setSelectedQuizFileId(file.id); setFileQuizDialogOpen(true); }}
                           data-testid={`button-file-quiz-${file.id}`}
                         >
-                          {hasPassedQuiz ? (<><CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />Quiz Passed</>) : (<><Award className="mr-2 h-4 w-4" />Take Quiz</>)}
+                          {hasPassedQuiz ? (<><CheckCircle2 className="mr-2 h-4 w-4 text-sl-done" />Quiz Passed</>) : (<><Award className="mr-2 h-4 w-4" />Take Quiz</>)}
                         </Button>
                       )}
                     </div>
@@ -513,11 +513,11 @@ export default function CourseView() {
           {!isLoading && deckFiles.length > 0 && !isTrainer && (
             <div className="pt-4">
               <Button onClick={() => setQuizDialogOpen(true)} className="w-full" variant={quizStatus?.passed ? "outline" : "default"} data-testid="button-take-quiz">
-                {quizStatus?.passed ? <CheckCircle2 className="mr-2 h-5 w-5 text-green-600" /> : <Award className="mr-2 h-5 w-5" />}
+                {quizStatus?.passed ? <CheckCircle2 className="mr-2 h-5 w-5 text-sl-done" /> : <Award className="mr-2 h-5 w-5" />}
                 {quizStatus?.passed ? "Quiz Passed" : "Take module quiz"}
               </Button>
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                {quizStatus?.passed ? "You've completed this module quiz" : "Test your knowledge on this week's content"}
+              <p className="text-xs text-sl-muted mt-2 text-center">
+                {quizStatus?.passed ? "You've completed this module quiz" : "Test your knowledge on this module's content"}
               </p>
             </div>
           )}
@@ -531,14 +531,14 @@ export default function CourseView() {
     <>
       {selectedFile ? (
         <div className="flex-1 flex flex-col h-full">
-          <div className="p-3 sm:p-6 border-b bg-card flex-shrink-0">
+          <div className="p-3 sm:p-6 border-b bg-sl-surface flex-shrink-0">
             <h1 className="text-base sm:text-2xl font-bold mb-1 truncate">{selectedFile.fileName}</h1>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Presentation File</span>
+            <div className="flex items-center gap-2 text-sm text-sl-muted">
+              <span>Lesson file</span>
               {selectedFile.progress?.status && (<><span>•</span><span className="capitalize">{selectedFile.progress.status}</span></>)}
             </div>
           </div>
-          <div className={`flex-1 ${(isMobile || isTablet) ? 'overflow-hidden' : 'overflow-y-auto'} bg-muted/20 flex flex-col min-h-0`}>
+          <div className={`flex-1 ${(isMobile || isTablet) ? 'overflow-hidden' : 'overflow-y-auto'} bg-sl-ground flex flex-col min-h-0`}>
             {(selectedFile.fileName.toLowerCase().endsWith('.pdf') || selectedFile.fileName.toLowerCase().endsWith('.pptx') || selectedFile.fileName.toLowerCase().endsWith('.ppt')) ? (
               (isMobile || isTablet) ? (
                 // Mobile: fit-to-screen with pinch-to-zoom
@@ -549,13 +549,13 @@ export default function CourseView() {
                   style={{ touchAction: zoomScale > 1 ? 'none' : 'pan-y' }}
                 >
                   {viewUrl ? (
-                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-muted-foreground text-sm">Preview not available</div>} loading={<div className="p-8 text-muted-foreground text-sm">Loading document...</div>} className="shadow-lg flex-shrink-0">
+                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-sl-muted text-sm">Preview not available</div>} loading={<div className="p-8 text-sl-muted text-sm">Loading document...</div>} className="shadow-lg flex-shrink-0">
                       <Page pageNumber={pageNumber} width={mobilePdfWidth} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={false} renderAnnotationLayer={false} />
                     </Document>
                   ) : documentLoadError ? (
-                    <div className="p-8 text-muted-foreground text-sm">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</div>
+                    <div className="p-8 text-sl-muted text-sm">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</div>
                   ) : (
-                    <div className="p-8 text-muted-foreground text-sm">Loading document...</div>
+                    <div className="p-8 text-sl-muted text-sm">Loading document...</div>
                   )}
                   {zoomScale > 1.05 && (
                     <button onClick={() => setZoomScale(1.0)} className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full z-10">Reset zoom</button>
@@ -565,15 +565,15 @@ export default function CourseView() {
               <div className="flex flex-col items-center p-2 sm:p-8 pb-24 overflow-x-auto">
                 <div className="w-full max-w-5xl flex flex-col items-center gap-6">
                   {viewUrl ? (
-                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="h-96 bg-muted rounded-xl flex items-center justify-center"><p className="text-sm text-muted-foreground">Preview not available</p></div>} loading={<div className="p-8 text-center text-muted-foreground">Loading document...</div>} className="shadow-2xl rounded-xl overflow-hidden">
+                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="h-96 bg-sl-neutral-soft rounded-xl flex items-center justify-center"><p className="text-sm text-sl-muted">Preview not available</p></div>} loading={<div className="p-8 text-center text-sl-muted">Loading document...</div>} className="shadow-2xl rounded-xl overflow-hidden">
                       <Page pageNumber={pageNumber} scale={scale} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={true} renderAnnotationLayer={true} />
                     </Document>
                   ) : documentLoadError ? (
-                    <div className="h-96 bg-muted rounded-xl flex items-center justify-center p-8 text-center">
-                      <p className="text-sm text-muted-foreground">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</p>
+                    <div className="h-96 bg-sl-neutral-soft rounded-xl flex items-center justify-center p-8 text-center">
+                      <p className="text-sm text-sl-muted">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</p>
                     </div>
                   ) : (
-                    <div className="p-8 text-center text-muted-foreground">Loading document...</div>
+                    <div className="p-8 text-center text-sl-muted">Loading document...</div>
                   )}
                 </div>
               </div>
@@ -583,7 +583,7 @@ export default function CourseView() {
                 {viewUrl && (<div className="w-full max-w-5xl"><video src={viewUrl} controls controlsList="nodownload" className="w-full h-auto rounded-xl shadow-2xl bg-black" data-testid="video-viewer">Your browser does not support the video tag.</video></div>)}
               </div>
             ) : (
-              <div className="flex flex-col bg-muted/20">
+              <div className="flex flex-col bg-sl-ground">
                 <div className="flex items-start justify-center py-4 sm:py-8 px-3 sm:px-6">
                   {viewUrl ? (
                     <div className="w-full max-w-4xl flex flex-col gap-6">
@@ -598,24 +598,24 @@ export default function CourseView() {
                         <Button onClick={() => setIsFullscreen(true)} variant="default" size="lg" data-testid="button-fullscreen"><Maximize2 className="h-5 w-5 mr-2" />Fullscreen View</Button>
                       </div>
                     </div>
-                  ) : (<div className="flex items-center justify-center"><p className="text-muted-foreground">Loading file...</p></div>)}
+                  ) : (<div className="flex items-center justify-center"><p className="text-sl-muted">Loading file...</p></div>)}
                 </div>
               </div>
             )}
           </div>
           {/* Control Bar */}
           {(selectedFile.fileName.toLowerCase().endsWith('.pdf') || selectedFile.fileName.toLowerCase().endsWith('.pptx') || selectedFile.fileName.toLowerCase().endsWith('.ppt')) && viewUrl && (
-            <div className="flex-shrink-0 bg-card/95 backdrop-blur-sm border-t shadow-2xl">
+            <div className="flex-shrink-0 bg-sl-surface/95 backdrop-blur-sm border-t shadow-2xl">
               <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
                 <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-center">
-                  <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-sl-neutral-soft rounded-lg">
                     <Button onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1} variant="outline" size="sm">
                       <ChevronLeft className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Previous</span>
                     </Button>
                     <div className="flex items-center gap-1 sm:gap-2">
-                      <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap hidden sm:inline">Page</span>
+                      <span className="text-xs sm:text-sm text-sl-muted whitespace-nowrap hidden sm:inline">Page</span>
                       <Input type="text" inputMode="numeric" value={pageInputValue} onChange={handlePageInputChange} onKeyDown={handlePageInputKeyDown} onBlur={handlePageInputSubmit} placeholder={pageNumber.toString()} className="w-12 sm:w-16 h-8 text-center text-sm" data-testid="input-page-number" />
-                      <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">/ {numPages}</span>
+                      <span className="text-xs sm:text-sm text-sl-muted whitespace-nowrap">/ {numPages}</span>
                     </div>
                     <Button onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages} variant="outline" size="sm">
                       <span className="hidden sm:inline">Next</span><ChevronRight className="h-4 w-4 sm:ml-1" />
@@ -625,9 +625,9 @@ export default function CourseView() {
                     <Maximize2 className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Fullscreen</span>
                   </Button>
                   {pageNumber === numPages && numPages > 0 && (
-                    <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 bg-primary/10 rounded-lg">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      <span className="text-xs sm:text-sm font-semibold text-primary">Last page!</span>
+                    <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 bg-sl-accent-soft rounded-lg">
+                      <CheckCircle2 className="h-4 w-4 text-sl-accent" />
+                      <span className="text-xs sm:text-sm font-semibold text-sl-accent">Last page!</span>
                     </div>
                   )}
                 </div>
@@ -638,9 +638,9 @@ export default function CourseView() {
       ) : deckFiles.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center max-w-md">
-            <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground/40" />
+            <FileText className="h-16 w-16 mx-auto mb-4 text-sl-muted/40" />
             <h3 className="text-xl font-semibold mb-2">No Content Available</h3>
-            <p className="text-muted-foreground">This training week doesn't have any files yet. Please check back later or contact an administrator.</p>
+            <p className="text-sl-muted">This module doesn't have any files yet. Please check back later or contact an Admin.</p>
           </div>
         </div>
       ) : (
@@ -652,7 +652,7 @@ export default function CourseView() {
                 View Lesson Files
               </Button>
             )}
-            <p className="text-muted-foreground">{isMobile ? 'Tap above to select a file' : 'Select a file from the sidebar to begin'}</p>
+            <p className="text-sl-muted">{isMobile ? 'Tap above to select a file' : 'Select a file from the sidebar to begin'}</p>
           </div>
         </div>
       )}
@@ -667,16 +667,16 @@ export default function CourseView() {
   );
 
   return (
-    <div className="sl-page sl-bg-garden h-[100dvh] flex flex-col">
+    <div className="bg-sl-ground text-sl-ink h-[100dvh] flex flex-col">
       {(isMobile || isTablet) ? (
         <>
           {/* Mobile: top bar */}
-          <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-card border-b shadow-sm z-10">
+          <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-sl-surface border-b shadow-sm z-10">
             <Button variant="ghost" size="sm" onClick={() => courseId ? navigate(`/courses/${courseId}`) : navigate('/')} className="-ml-2">
               <ChevronLeft className="h-5 w-5" />
               <span className="text-sm font-medium">Back</span>
             </Button>
-            <span className="text-base font-semibold truncate max-w-[140px]">{selectedFile?.fileName || `Week ${currentWeek?.weekNumber}`}</span>
+            <span className="text-base font-semibold truncate max-w-[140px]">{selectedFile?.fileName || `Module ${currentWeek?.weekNumber}`}</span>
             <Button variant="ghost" size="sm" onClick={handleSidebarOpen} className="-mr-2">
               <Menu className="h-5 w-5" />
             </Button>
@@ -692,14 +692,14 @@ export default function CourseView() {
           <div className="flex-1 flex flex-col overflow-hidden">{mainContentInner}</div>
           {/* Fixed bottom nav for PDF on mobile */}
           {isMobilePdfFile && viewUrl && (
-            <div className="flex-shrink-0 bg-card/95 backdrop-blur-sm border-t shadow-lg">
+            <div className="flex-shrink-0 bg-sl-surface/95 backdrop-blur-sm border-t shadow-lg">
               <div className="flex items-center justify-between px-3 py-2 gap-2">
                 <Button onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1} variant="outline" size="sm" className="h-10 px-3">
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
                 <div className="flex items-center gap-1.5 flex-1 justify-center">
                   <Input type="text" inputMode="numeric" value={pageInputValue} onChange={handlePageInputChange} onKeyDown={handlePageInputKeyDown} onBlur={handlePageInputSubmit} placeholder={pageNumber.toString()} className="w-12 h-10 text-center text-sm" />
-                  <span className="text-sm text-muted-foreground">/ {numPages}</span>
+                  <span className="text-sm text-sl-muted">/ {numPages}</span>
                 </div>
                 <Button onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages} variant="outline" size="sm" className="h-10 px-3">
                   <ChevronRight className="h-5 w-5" />
@@ -710,8 +710,8 @@ export default function CourseView() {
               </div>
               {pageNumber === numPages && numPages > 0 && (
                 <div className="flex items-center justify-center gap-1.5 pb-2">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-semibold text-primary">Last page reached!</span>
+                  <CheckCircle2 className="h-4 w-4 text-sl-accent" />
+                  <span className="text-xs font-semibold text-sl-accent">Last page reached!</span>
                 </div>
               )}
             </div>
@@ -720,7 +720,7 @@ export default function CourseView() {
       ) : (
         <ResizablePanelGroup direction="horizontal" className="flex-1">
           <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-            <div className="h-full border-r bg-card flex flex-col shadow-lg">{sidebarInner}</div>
+            <div className="h-full border-r bg-sl-surface flex flex-col shadow-lg">{sidebarInner}</div>
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={75} minSize={60}>
@@ -733,10 +733,10 @@ export default function CourseView() {
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
         <DialogContent className="max-w-[100vw] w-full h-[100dvh] p-0 gap-0">
           <div className="flex flex-col h-full bg-background">
-            <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-card flex-shrink-0">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-sl-surface flex-shrink-0">
               <h2 className="text-base sm:text-lg font-semibold truncate">{selectedFile?.fileName}</h2>
             </div>
-            <div className="flex-1 overflow-hidden bg-muted/20 relative">
+            <div className="flex-1 overflow-hidden bg-sl-ground relative">
               {selectedFile && (
                 (selectedFile.fileName.toLowerCase().endsWith('.pdf') || selectedFile.fileName.toLowerCase().endsWith('.pptx') || selectedFile.fileName.toLowerCase().endsWith('.ppt')) ? (
                   <div
@@ -748,13 +748,13 @@ export default function CourseView() {
                     {viewUrl ? (
                       <>
                         <div className="select-none flex-shrink-0" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
-                          <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-sm text-muted-foreground">Preview not available</div>} className="shadow-2xl">
+                          <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-sm text-sl-muted">Preview not available</div>} className="shadow-2xl">
                             <Page pageNumber={pageNumber} width={(isMobile || isTablet) ? mobilePdfWidth : undefined} scale={(isMobile || isTablet) ? undefined : scale} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={!(isMobile || isTablet)} renderAnnotationLayer={!(isMobile || isTablet)} />
                           </Document>
                         </div>
-                        {documentLoadError && (<div className="h-96 bg-muted rounded-xl flex items-center justify-center mt-4"><p className="text-xs text-muted-foreground">Preview not available</p></div>)}
+                        {documentLoadError && (<div className="h-96 bg-sl-neutral-soft rounded-xl flex items-center justify-center mt-4"><p className="text-xs text-sl-muted">Preview not available</p></div>)}
                       </>
-                    ) : (<div className="p-8 text-center text-muted-foreground">Loading document...</div>)}
+                    ) : (<div className="p-8 text-center text-sl-muted">Loading document...</div>)}
                   </div>
                 ) : (selectedFile?.fileName.toLowerCase().endsWith('.docx') || selectedFile?.fileName.toLowerCase().endsWith('.doc')) ? (
                   <div className="h-full flex items-start justify-center p-4 sm:p-6 overflow-auto">
@@ -768,33 +768,33 @@ export default function CourseView() {
               )}
             </div>
             {(selectedFile?.fileName.toLowerCase().endsWith('.pdf') || selectedFile?.fileName.toLowerCase().endsWith('.pptx') || selectedFile?.fileName.toLowerCase().endsWith('.ppt')) && (
-              <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t shadow-2xl z-50">
+              <div className="fixed bottom-0 left-0 right-0 bg-sl-surface/95 backdrop-blur-sm border-t shadow-2xl z-50">
                 <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
                   <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-center">
-                    <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-sl-neutral-soft rounded-lg">
                       <Button onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1} variant="outline" size="sm">
                         <ChevronLeft className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Previous</span>
                       </Button>
                       <div className="flex items-center gap-1 sm:gap-2">
                         <Input type="text" inputMode="numeric" value={pageInputValue} onChange={handlePageInputChange} onKeyDown={handlePageInputKeyDown} onBlur={handlePageInputSubmit} placeholder={pageNumber.toString()} className="w-12 sm:w-16 h-8 text-center text-sm" data-testid="input-page-number-fullscreen" />
-                        <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">/ {numPages}</span>
+                        <span className="text-xs sm:text-sm text-sl-muted whitespace-nowrap">/ {numPages}</span>
                       </div>
                       <Button onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages} variant="outline" size="sm">
                         <span className="hidden sm:inline">Next</span><ChevronRight className="h-4 w-4 sm:ml-1" />
                       </Button>
                     </div>
-                    <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+                    <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-sl-neutral-soft rounded-lg">
                       <Button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} variant="outline" size="sm" data-testid="button-zoom-out-fullscreen"><ZoomOut className="h-4 w-4" /></Button>
-                      <span className="text-sm text-muted-foreground min-w-16 text-center font-medium">{Math.round(scale * 100)}%</span>
+                      <span className="text-sm text-sl-muted min-w-16 text-center font-medium">{Math.round(scale * 100)}%</span>
                       <Button onClick={() => setScale(s => Math.min(2.5, s + 0.2))} variant="outline" size="sm" data-testid="button-zoom-in-fullscreen"><ZoomIn className="h-4 w-4" /></Button>
                     </div>
                     <Button onClick={() => setIsFullscreen(false)} variant="outline" size="sm" data-testid="button-exit-fullscreen-control">
                       <Minimize2 className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Exit Fullscreen</span>
                     </Button>
                     {pageNumber === numPages && numPages > 0 && (
-                      <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 bg-primary/10 rounded-lg">
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
-                        <span className="text-xs sm:text-sm font-semibold text-primary">Last page!</span>
+                      <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 bg-sl-accent-soft rounded-lg">
+                        <CheckCircle2 className="h-4 w-4 text-sl-accent" />
+                        <span className="text-xs sm:text-sm font-semibold text-sl-accent">Last page!</span>
                       </div>
                     )}
                   </div>
