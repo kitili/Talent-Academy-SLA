@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { Loading, SkeletonBar } from '@/components/Skeletons';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -14,6 +15,33 @@ interface PresentationViewerProps {
   onClose: () => void;
   fileUrl: string;
   fileName: string;
+}
+
+/** A slide that has not arrived: one grey page, in the shape the page will take. */
+function SlideSkeleton({ label = 'Loading the presentation' }: { label?: string }) {
+  return (
+    <Loading label={label} className="w-full space-y-3 p-4">
+      <SkeletonBar className="aspect-video w-full" />
+      <SkeletonBar className="h-4 w-1/2" />
+    </Loading>
+  );
+}
+
+/** The Office Online frame, with grey bars behind it until it has loaded. */
+function ViewerFrame({ src, title }: { src: string; title: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className="relative h-full w-full">
+      {!loaded && <div className="absolute inset-0 flex items-start justify-center"><div className="w-full max-w-3xl"><SlideSkeleton /></div></div>}
+      <iframe
+        src={src}
+        className={`relative h-full w-full border-0 ${loaded ? '' : 'opacity-0'}`}
+        title={title}
+        allow="fullscreen"
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
+  );
 }
 
 // ============= PPT/PPTX VIEWER (using Office Online) =============
@@ -33,12 +61,7 @@ function PPTXViewer({ isOpen, onClose, fileUrl, fileName }: PresentationViewerPr
       <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden">
         {/* Iframe Content */}
         <div className="flex-1 overflow-auto">
-          <iframe
-            src={viewerUrl}
-            className="w-full h-full border-0"
-            title={fileName}
-            allow="fullscreen"
-          />
+          <ViewerFrame src={viewerUrl} title={fileName} />
         </div>
 
         {/* Pinned Controls at Bottom */}
@@ -79,12 +102,7 @@ function PPTXViewer({ isOpen, onClose, fileUrl, fileName }: PresentationViewerPr
 
         {/* Iframe Content */}
         <div className="flex-1 overflow-auto bg-muted/50">
-          <iframe
-            src={viewerUrl}
-            className="w-full h-full border-0"
-            title={fileName}
-            allow="fullscreen"
-          />
+          <ViewerFrame src={viewerUrl} title={fileName} />
         </div>
 
         {/* Pinned Controls at Bottom */}
@@ -147,10 +165,12 @@ function PDFViewer({ isOpen, onClose, fileUrl, fileName }: PresentationViewerPro
               <Document
                 file={fileUrl}
                 onLoadSuccess={handleDocumentLoadSuccess}
+                loading={<SlideSkeleton label="Loading the document" />}
                 error={<div className="p-8 text-center text-red-500">Failed to load PDF</div>}
               >
                 <Page
                   pageNumber={currentPage}
+                  loading={<SlideSkeleton label="Loading the page" />}
                   width={containerWidth}
                   renderTextLayer={true}
                   renderAnnotationLayer={true}
@@ -228,10 +248,12 @@ function PDFViewer({ isOpen, onClose, fileUrl, fileName }: PresentationViewerPro
               <Document
                 file={fileUrl}
                 onLoadSuccess={handleDocumentLoadSuccess}
+                loading={<SlideSkeleton label="Loading the document" />}
                 error={<div className="p-8 text-center text-red-500">Failed to load PDF</div>}
               >
                 <Page
                   pageNumber={currentPage}
+                  loading={<SlideSkeleton label="Loading the page" />}
                   width={containerWidth}
                   renderTextLayer={true}
                   renderAnnotationLayer={true}
