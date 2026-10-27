@@ -35,6 +35,10 @@ The shell's top bar and side menu stay in view on every page while the page scro
   - The menu strip sticks under the header between 640px and 1023px. The side menu sticks under it from 1024px up,
     and scrolls on its own when it is taller than the window.
   - The phone bar stays fixed at the bottom.
+  - **Amended the same day, at the steering engineer's request:** only the main content area scrolls. The shell is a
+    fixed frame the height of the window. The header, the side menu (or the strip above the page) and the phone bar
+    sit outside `<main>`, which is the only scroll container. The side menu scrolls on its own only when it is taller
+    than the window. When printing, the frame is hidden and the page flows on paper.
 
 ## Rules for every track
 
@@ -53,8 +57,9 @@ The shell's top bar and side menu stay in view on every page while the page scro
 4. **Actions in progress keep their button state.** A button whose mutation is running keeps its label ("Sending…",
    "Saving…") and is disabled. A small spinner icon inside a button may stay.
 5. **Errors stay errors.** Keep every error message and retry.
-6. **Every page sits in the shell** (`AcademyShell` with its desk), so the top bar and menu stay in view. A page's own
-   sticky bar sticks below the header: `top-14 sm:top-[68px]`, not `top-0`.
+6. **Every page sits in the shell** (`AcademyShell` with its desk), so the top bar and menu stay in view. Only the
+   shell's `<main>` scrolls, so a page's own sticky bar sticks at `top-0` of it. Never call `window.scrollTo`: the shell
+   resets the main area's scroll when the page or section changes.
 7. Keep every `data-testid` and `data-tour`. Never start the server, and never load `.env` (the live database).
 
 ## Tracks
