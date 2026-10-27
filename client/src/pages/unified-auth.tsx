@@ -27,7 +27,7 @@ const fieldClass =
 const labelClass = "text-sm font-semibold text-sl-ink";
 const hintClass = "text-[13px] text-sl-muted";
 const primaryClass =
-  "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-sl-accent-strong px-4 py-3 text-[15px] font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent focus-visible:ring-offset-2 focus-visible:ring-offset-sl-surface disabled:opacity-60";
+  "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-sl-accent-strong px-4 py-2.5 text-[15px] font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent focus-visible:ring-offset-2 focus-visible:ring-offset-sl-surface disabled:opacity-60";
 const secondaryClass =
   "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-4 py-2.5 text-[15px] font-semibold text-sl-ink hover:bg-sl-neutral-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent";
 const linkClass =
