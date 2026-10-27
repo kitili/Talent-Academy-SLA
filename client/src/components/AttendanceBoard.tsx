@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type TeacherRow = {
   id: string;
@@ -26,11 +25,12 @@ type TrainerRow = {
   cohorts: Array<{ id: string; name: string; teachers: number; marked: number; rate: number | null }>;
 };
 
+/** Status colours by meaning: present is done, late needs attention, absent is a risk, excused is out of the viewer's hands. */
 const STATUSES = [
-  { key: "present", label: "Present", color: "#0ca30c" },
-  { key: "late", label: "Late", color: "#fab219" },
-  { key: "absent", label: "Absent", color: "#d03b3b" },
-  { key: "excused", label: "Excused", color: "#9aa3ad" },
+  { key: "present", label: "Present", bar: "bg-sl-done" },
+  { key: "late", label: "Late", bar: "bg-sl-attention" },
+  { key: "absent", label: "Absent", bar: "bg-sl-risk" },
+  { key: "excused", label: "Excused", bar: "bg-sl-neutral" },
 ] as const;
 
 type StatusKey = (typeof STATUSES)[number]["key"];
@@ -50,113 +50,99 @@ function totalsFor(teachers: TeacherRow[]) {
   return { totals, marked, rate };
 }
 
-function Figure({ label, value, note, swatch }: { label: string; value: string | number; note?: string; swatch?: string }) {
+/** One white line of figures: the rate, then each status. */
+function SummaryLine({ totals, marked, rate }: { totals: Record<StatusKey, number>; marked: number; rate: number | null }) {
+  const figures: Array<[string, string | number]> = [
+    ["Attendance rate", rateLabel(rate, marked)],
+    ...STATUSES.map((status): [string, number] => [status.label, totals[status.key]]),
+  ];
   return (
-    <div className="rounded-2xl border border-[#102448]/10 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#162033]">
-      <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {swatch && <span className="h-2.5 w-2.5 rounded-full" style={{ background: swatch }} aria-hidden />}
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold text-[#17233c] dark:text-[#f6f1e8]">{value}</p>
-      {note && <p className="text-xs text-muted-foreground">{note}</p>}
-    </div>
-  );
-}
-
-function StatusSplit({ totals, marked }: { totals: Record<StatusKey, number>; marked: number }) {
-  if (!marked) {
-    return <p className="text-sm text-muted-foreground">No attendance marked yet. The split appears after the first marks.</p>;
-  }
-  return (
-    <div className="space-y-2" data-testid="attendance-split">
-      <div className="flex h-3 gap-[2px] overflow-hidden rounded-full" role="img" aria-label="Attendance split by status">
-        {STATUSES.filter((status) => totals[status.key] > 0).map((status) => (
-          <span
-            key={status.key}
-            title={`${status.label}: ${totals[status.key]}`}
-            style={{ width: `${(totals[status.key] / marked) * 100}%`, background: status.color }}
-          />
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {STATUSES.map((status) => (
-          <span key={status.key} className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: status.color }} aria-hidden />
-            {status.label} {totals[status.key]} ({Math.round((totals[status.key] / marked) * 100)}%)
+    <div className="space-y-3 rounded-xl border border-sl-line bg-sl-surface px-5 py-3.5" data-testid="attendance-split">
+      <p className="flex flex-wrap gap-x-7 gap-y-2 text-[15px] text-sl-ink">
+        {figures.map(([label, value]) => (
+          <span key={label}>
+            <span className="text-sl-muted">{label}</span> <span className="font-semibold">{value}</span>
           </span>
         ))}
-      </div>
+      </p>
+      {marked > 0 && (
+        <div className="flex h-2 gap-[2px] overflow-hidden rounded-full bg-sl-neutral-soft" role="img" aria-label="Attendance split by status">
+          {STATUSES.filter((status) => totals[status.key] > 0).map((status) => (
+            <span
+              key={status.key}
+              title={`${status.label}: ${totals[status.key]}`}
+              className={status.bar}
+              style={{ width: `${(totals[status.key] / marked) * 100}%` }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function CohortRates({ trainers }: { trainers: TrainerRow[] }) {
-  const seen = new Map<string, { name: string; rate: number; marked: number; teachers: number }>();
-  let unmarked = 0;
+/** Cohorts with marks, each with its rate; the cohorts with none are named together on the last line. */
+function CohortRates({ trainers, allCohorts }: { trainers: TrainerRow[]; allCohorts: Array<{ id: string; name: string }> }) {
+  const seen = new Map<string, { id: string; name: string; rate: number; marked: number }>();
   for (const trainer of trainers) {
     for (const cohort of trainer.cohorts) {
-      if (seen.has(cohort.id)) continue;
-      if (!cohort.marked || cohort.rate == null) {
-        unmarked += 1;
-        continue;
-      }
-      seen.set(cohort.id, { name: cohort.name, rate: cohort.rate, marked: cohort.marked, teachers: cohort.teachers });
+      if (seen.has(cohort.id) || !cohort.marked || cohort.rate == null) continue;
+      seen.set(cohort.id, { id: cohort.id, name: cohort.name, rate: cohort.rate, marked: cohort.marked });
     }
   }
-  const data = Array.from(seen.values()).sort((a, b) => b.rate - a.rate);
+  const marked = Array.from(seen.values()).sort((a, b) => b.rate - a.rate);
+  // A cohort the attendance lists know of but no trainer's rollup has marks for.
+  const unmarked = allCohorts.filter((cohort) => !seen.has(cohort.id));
   return (
-    <section className="rounded-2xl border border-[#102448]/10 bg-white p-4 dark:border-white/10 dark:bg-[#162033]" data-testid="attendance-cohort-chart">
-      <h3 className="font-semibold text-[#17233c] dark:text-[#f6f1e8]">Attendance rate by cohort</h3>
-      <p className="text-xs text-muted-foreground">
-        Present and late out of all marks.{unmarked > 0 ? ` ${unmarked} cohort${unmarked === 1 ? " has" : "s have"} no marks yet.` : ""}
-      </p>
-      {data.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">No cohort has attendance marks yet.</p>
-      ) : (
-        <div style={{ height: Math.max(140, data.length * 40 + 40) }} className="mt-3">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-              <CartesianGrid horizontal={false} stroke="#102448" strokeOpacity={0.08} />
-              <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 12 }} stroke="#8a94a6" />
-              <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} stroke="#8a94a6" />
-              <Tooltip
-                cursor={{ fill: "#102448", fillOpacity: 0.05 }}
-                formatter={(value: number) => [`${value}%`, "Attendance"]}
-                labelFormatter={(label, payload) => {
-                  const row = payload?.[0]?.payload;
-                  return row ? `${label} · ${row.marked} marks · ${row.teachers} Fellows` : label;
-                }}
-              />
-              <Bar dataKey="rate" fill="#1d4e89" radius={[0, 4, 4, 0]} barSize={18} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+    <section className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" aria-labelledby="attendance-by-cohort" data-testid="attendance-cohort-chart">
+      <h2 id="attendance-by-cohort" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">By cohort</h2>
+      <ul>
+        {marked.map((cohort) => (
+          <li key={cohort.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-sl-neutral-soft px-5 py-3.5">
+            <Link href={`/cohorts/${cohort.id}`} className="text-[15px] font-semibold text-sl-accent hover:underline">{cohort.name}</Link>
+            <span className="text-sm text-sl-ink">
+              <strong className="font-semibold">{cohort.rate}%</strong>{" "}
+              <span className="text-sl-muted">· {cohort.marked} mark{cohort.marked === 1 ? "" : "s"}</span>
+            </span>
+          </li>
+        ))}
+        {unmarked.length > 0 && (
+          <li className="flex flex-col gap-1.5 px-5 py-3.5">
+            <span className="text-[15px] font-semibold text-sl-ink">
+              {unmarked.length} cohort{unmarked.length === 1 ? "" : "s"} · no marks yet
+            </span>
+            <span className="text-sm leading-relaxed text-sl-muted">{unmarked.map((cohort) => cohort.name).join(" · ")}</span>
+          </li>
+        )}
+        {marked.length === 0 && unmarked.length === 0 && (
+          <li className="px-5 py-4 text-sm text-sl-muted">No cohort has attendance marks yet.</li>
+        )}
+      </ul>
     </section>
   );
 }
 
-function PeopleTable({ title, head, rows, empty }: { title: string; head: string[]; rows: Array<{ id: string; cells: (string | number)[] }>; empty: string }) {
+function PeopleTable({ title, head, rows, empty, testId }: { title: string; head: string[]; rows: Array<{ id: string; cells: (string | number)[] }>; empty: string; testId: string }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#102448]/10 bg-white dark:border-white/10 dark:bg-[#162033]">
-      <h3 className="border-b border-[#102448]/10 px-4 py-3 font-semibold text-[#17233c] dark:border-white/10 dark:text-[#f6f1e8]">{title}</h3>
+    <section className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" data-testid={testId}>
+      <h3 className="border-b border-sl-line px-5 py-3.5 text-base font-semibold text-sl-ink">{title}</h3>
       {rows.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-muted-foreground">{empty}</p>
+        <p className="px-5 py-5 text-sm text-sl-muted">{empty}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr className="text-left text-sl-muted">
                 {head.map((cell, index) => (
-                  <th key={cell} className={`px-4 py-2 font-medium ${index > 0 ? "text-right" : ""}`}>{cell}</th>
+                  <th key={cell} scope="col" className={`py-2.5 font-medium ${index === 0 ? "px-5" : "px-3 text-right"}`}>{cell}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-t border-[#102448]/5 dark:border-white/5" data-testid={`attendance-row-${row.id}`}>
+                <tr key={row.id} className="border-t border-sl-neutral-soft" data-testid={`attendance-row-${row.id}`}>
                   {row.cells.map((cell, index) => (
-                    <td key={index} className={`px-4 py-2 ${index > 0 ? "text-right tabular-nums" : "font-medium text-[#17233c] dark:text-[#f6f1e8]"}`}>{cell}</td>
+                    <td key={index} className={`py-3 ${index === 0 ? "px-5 font-medium text-sl-ink" : "px-3 text-right tabular-nums text-sl-ink"}`}>{cell}</td>
                   ))}
                 </tr>
               ))}
@@ -168,13 +154,18 @@ function PeopleTable({ title, head, rows, empty }: { title: string; head: string
   );
 }
 
-export function AttendanceBoard({ variant = "full" }: { variant?: "compact" | "full" }) {
+export function AttendanceBoard({ variant = "full", heading = "All marks so far" }: { variant?: "compact" | "full"; heading?: string }) {
   const { data, isLoading, isError } = useQuery<{ teachers: TeacherRow[]; trainers: TrainerRow[] }>({
     queryKey: ["/api/admin/attendance-summary"],
   });
+  // Every cohort by name, so the ones with no marks can be listed. The attendance page loads the same list.
+  const { data: lists } = useQuery<{ cohorts: Array<{ id: string; name: string }> }>({
+    queryKey: ["/api/admin/attendance"],
+    enabled: variant === "full",
+  });
 
   if (isLoading) {
-    return <div className="h-32 animate-pulse rounded-2xl bg-[#102448]/10" data-testid="admin-attendance" />;
+    return <div className="h-32 animate-pulse rounded-xl bg-sl-neutral-soft" data-testid="admin-attendance" />;
   }
 
   const teachers = data?.teachers || [];
@@ -182,36 +173,31 @@ export function AttendanceBoard({ variant = "full" }: { variant?: "compact" | "f
   const { totals, marked, rate } = totalsFor(teachers);
 
   return (
-    <div className="space-y-3" data-testid="admin-attendance">
+    <div className="space-y-4" data-testid="admin-attendance">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-[#17233c] dark:text-[#f6f1e8]">Attendance</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-lg font-semibold text-sl-ink">{heading}</h2>
+          <p className="text-sm text-sl-muted">
             {marked ? `${marked} marks across ${teachers.length} approved Fellows.` : "No attendance marked yet."}
           </p>
         </div>
         {variant === "compact" && (
-          <Link href="/admin/attendance" className="text-sm font-medium text-[#1d4e89] hover:underline" data-testid="link-open-attendance">
+          <Link href="/admin/attendance" className="inline-flex min-h-11 items-center text-sm font-semibold text-sl-accent hover:underline" data-testid="link-open-attendance">
             Open attendance
           </Link>
         )}
       </div>
-      {isError && <p className="text-sm text-[#9b3d55]">Attendance could not be loaded.</p>}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Figure label="Attendance rate" value={rateLabel(rate, marked)} note="Present + late" />
-        {STATUSES.map((status) => (
-          <Figure key={status.key} label={status.label} value={totals[status.key]} swatch={status.color} />
-        ))}
-      </div>
-      <StatusSplit totals={totals} marked={marked} />
+      {isError && <p className="text-sm text-sl-risk" role="alert">Attendance could not be loaded.</p>}
+      <SummaryLine totals={totals} marked={marked} rate={rate} />
       {variant === "full" && (
         <>
-          <CohortRates trainers={trainers} />
+          <CohortRates trainers={trainers} allCohorts={lists?.cohorts ?? []} />
           <div className="grid gap-4 lg:grid-cols-2">
             <PeopleTable
               title="Fellows"
               head={["Fellow", "Present", "Late", "Absent", "Excused", "Rate"]}
               empty="No approved Fellows yet."
+              testId="attendance-teachers"
               rows={teachers.map((teacher) => ({
                 id: teacher.id,
                 cells: [teacher.name, teacher.present, teacher.late, teacher.absent, teacher.excused, rateLabel(teacher.rate, teacher.marked)],
@@ -220,7 +206,8 @@ export function AttendanceBoard({ variant = "full" }: { variant?: "compact" | "f
             <PeopleTable
               title="Trainers"
               head={["Trainer", "Cohorts", "Marks", "Rate"]}
-              empty="No approved trainers yet."
+              empty="No approved Trainers yet."
+              testId="attendance-trainers"
               rows={trainers.map((trainer) => ({
                 id: trainer.id,
                 cells: [trainer.name, trainer.cohorts.length, trainer.marked, rateLabel(trainer.rate, trainer.marked)],
