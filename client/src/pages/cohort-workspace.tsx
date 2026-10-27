@@ -1,24 +1,58 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Users, ClipboardCheck, BarChart3, GraduationCap, Megaphone, Calendar, FileText, Upload } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { learningStatus, staffWatchLabel } from "@shared/learningStatus";
 import { deadlineLocalValue, parseDeadline } from "@shared/academyPath";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import { deskName } from "@shared/deskName";
+import { AcademyShell } from "@/components/AcademyShell";
+
+// Buttons, fields and chips follow design/board/CohortRoom.dc.html with the sl-* tokens.
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sl-accent";
+const BTN_PRIMARY = `inline-flex items-center justify-center rounded-lg bg-sl-accent-strong px-4 py-2.5 min-h-[44px] text-[15px] font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const BTN_SECONDARY = `inline-flex items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-3.5 py-2.5 min-h-[44px] text-sm text-sl-ink hover:bg-sl-neutral-soft disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const FIELD = `w-full rounded-lg border border-sl-control bg-sl-surface px-3 py-2.5 text-[15px] text-sl-ink placeholder:text-sl-muted ${FOCUS}`;
+const LABEL = "text-sm font-medium text-sl-ink";
+const PANEL = "rounded-xl border border-sl-line bg-sl-surface";
+
+type Tone = "risk" | "attention" | "done" | "neutral";
+const CHIP: Record<Tone, string> = {
+  risk: "bg-sl-risk-soft text-sl-risk",
+  attention: "bg-sl-attention-soft text-sl-attention",
+  done: "bg-sl-done-soft text-sl-done",
+  neutral: "bg-sl-neutral-soft text-sl-neutral",
+};
+
+function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
+  return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${CHIP[tone]}`}>{children}</span>;
+}
+
+/** The roster's Status column: done for finished, attention when the Trainer can help, neutral otherwise. */
+function fellowStatus(percentage: number): { label: string; tone: Tone } {
+  const status = learningStatus({ percentage });
+  if (status === "Completed" || status === "Passed") return { label: "Completed", tone: "done" };
+  if (staffWatchLabel(percentage, status) === "Needs support") return { label: "Needs support", tone: "attention" };
+  if (status === "In Progress") return { label: "In progress", tone: "neutral" };
+  return { label: "Not started", tone: "neutral" };
+}
+
+const TAB_TRIGGER = `h-auto min-h-[44px] rounded-none border-b-2 border-transparent bg-transparent px-3.5 py-3 text-[15px] font-normal text-sl-neutral shadow-none -mb-px data-[state=active]:border-sl-accent data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-sl-accent data-[state=active]:shadow-none ${FOCUS}`;
 
 export default function CohortWorkspace() {
   const params = useParams<{ batchId: string }>();
   const batchId = params.batchId;
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user, isAdmin, logoutMutation } = useAuth();
+  const [tab, setTab] = useState("people");
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addEmail, setAddEmail] = useState("");
   const [announceTitle, setAnnounceTitle] = useState("");
   const [announceMessage, setAnnounceMessage] = useState("");
   const [csvText, setCsvText] = useState("name,email,password\n");
@@ -37,12 +71,12 @@ export default function CohortWorkspace() {
     enabled: Boolean(batchId),
   });
 
-  const { data: quizzes = [] } = useQuery<any[]>({
+  const { data: quizzes = [], isLoading: quizzesLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "quizzes"],
     enabled: Boolean(batchId),
   });
 
-  const { data: fileQuizzes = [] } = useQuery<any[]>({
+  const { data: fileQuizzes = [], isLoading: fileQuizzesLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "file-quizzes"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${batchId}/file-quizzes`);
@@ -52,9 +86,15 @@ export default function CohortWorkspace() {
     enabled: Boolean(batchId),
   });
 
-  const { data: progress = [] } = useQuery<any[]>({
+  const { data: progress = [], isLoading: progressLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "progress"],
     enabled: Boolean(batchId),
+  });
+
+  // Only an Admin can read the academy path, so only an Admin sees each Fellow's Step on the roster.
+  const { data: academyPath } = useQuery<any>({
+    queryKey: ["/api/admin/academy-path"],
+    enabled: Boolean(batchId) && isAdmin,
   });
 
   const { data: certificates = [] } = useQuery<any[]>({
@@ -107,6 +147,16 @@ export default function CohortWorkspace() {
     () => progress.filter((row) => (row.overallPercentage || 0) >= 80 && (row.overallPercentage || 0) < 100),
     [progress],
   );
+  const stepByFellow = useMemo(() => {
+    const steps: any[] = academyPath?.cohorts?.find((cohort: any) => cohort.id === batchId)?.batches ?? [];
+    const byFellow = new Map<string, string>();
+    steps.forEach((step: any, index: number) => {
+      (step.teachers ?? []).forEach((fellow: any) => {
+        if (!byFellow.has(fellow.id)) byFellow.set(fellow.id, `Step ${index + 1} · ${step.name}`);
+      });
+    });
+    return byFellow;
+  }, [academyPath, batchId]);
   const overview = useMemo(() => {
     const rows = Array.isArray(progress) ? progress : [];
     const statuses = rows.map((row) => learningStatus({ percentage: row.overallPercentage || 0 }));
@@ -137,8 +187,8 @@ export default function CohortWorkspace() {
   });
 
   const importCsv = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/batches/${batchId}/teachers/import-csv`, { csv: csvText });
+    mutationFn: async (csv: string) => {
+      const res = await apiRequest("POST", `/api/batches/${batchId}/teachers/import-csv`, { csv });
       return res.json();
     },
     onSuccess: (data) => {
@@ -217,123 +267,140 @@ export default function CohortWorkspace() {
     onError: () => toast({ title: "Could not save feedback", variant: "destructive" }),
   });
 
+  const backHref = isAdmin ? "/admin/batches" : "/trainer/batches?tab=cohorts";
+  const fellowCount = teachers.length;
+  const figures: { label: string; value: number | string }[] = [
+    { label: "Fellows", value: isLoading ? "—" : fellowCount },
+    { label: "Quizzes", value: quizzesLoading || fileQuizzesLoading ? "—" : quizzes.length + fileQuizzes.length },
+    { label: "In progress", value: progressLoading ? "—" : overview.inProgress },
+    { label: "Completed", value: progressLoading ? "—" : overview.completed },
+    { label: "Needs support", value: progressLoading ? "—" : overview.needsSupport },
+  ];
+  const progressByFellow = new Map<string, any>(progress.map((row: any) => [row.teacherId, row]));
+  const assessments = assignments.filter((item: any) => item.kind === "assessment");
+  const addFellow = () => {
+    const name = addName.replace(/["\r\n,]+/g, " ").trim();
+    const email = addEmail.replace(/["\r\n,\s]+/g, "").toLowerCase();
+    importCsv.mutate(`name,email\n"${name}","${email}"`, {
+      onSuccess: () => {
+        setAddOpen(false);
+        setAddName("");
+        setAddEmail("");
+      },
+    });
+  };
+
   return (
-    <div className="sl-page sl-bg-lamp min-h-screen">
-      <header className="sticky top-0 z-50 bg-primary shadow-md">
-        <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" className="text-white hover:bg-white/10" onClick={() => navigate("/")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Home
-            </Button>
-            <img src={logoImage} alt="Silverleaf Academy" className="h-10 w-10 object-contain" />
-            <div className="min-w-0">
-              <p className="text-white font-semibold truncate">{isLoading ? "Cohort" : batch?.name || "Cohort"}</p>
-              <p className="text-white/80 text-xs hidden sm:block">Silverleaf Academy</p>
-            </div>
-          </div>
+    <AcademyShell
+      title="Silverleaf Academy"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      desk={isAdmin ? "admin" : "trainer"}
+      current="cohorts"
+    >
+      <a
+        href={backHref}
+        onClick={(event) => {
+          event.preventDefault();
+          navigate(backHref);
+        }}
+        className={`inline-flex min-h-[44px] items-center gap-1 self-start text-sm text-sl-accent no-underline hover:underline ${FOCUS}`}
+        data-testid="link-back-to-cohorts"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        Back to cohorts
+      </a>
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{isLoading ? "Cohort" : batch?.name || "Cohort"}</h1>
+          {batch && (
+            <>
+              <Chip tone={batch.status === "closed" ? "neutral" : "done"}>{batch.status === "closed" ? "Closed" : "Open"}</Chip>
+              <Chip tone={batch.quizzesStatus === "stopped" ? "neutral" : "done"}>{batch.quizzesStatus === "stopped" ? "Quizzes stopped" : "Quizzes on"}</Chip>
+            </>
+          )}
         </div>
-      </header>
+        {batch?.description && <p className="text-sm leading-relaxed text-sl-muted">{batch.description}</p>}
+      </div>
 
-      <div className="sl-sheet sl-frame my-4 sm:my-6 p-4 sm:p-8 space-y-6">
-        <p className="text-muted-foreground sl-rise">
-          {batch?.description || "People, quizzes, performance, and graduates — in one classroom."}
-        </p>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList aria-label="Cohort room" className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-sl-line bg-transparent p-0 text-sl-neutral">
+          <TabsTrigger value="people" className={TAB_TRIGGER}>People</TabsTrigger>
+          <TabsTrigger value="quizzes" className={TAB_TRIGGER}>Quizzes</TabsTrigger>
+          <TabsTrigger value="performance" className={TAB_TRIGGER}>Gradebook</TabsTrigger>
+          <TabsTrigger value="graduates" className={TAB_TRIGGER}>Graduates</TabsTrigger>
+          <TabsTrigger value="announce" className={TAB_TRIGGER}>Announce</TabsTrigger>
+          <TabsTrigger value="calendar" className={TAB_TRIGGER}>Calendar</TabsTrigger>
+          <TabsTrigger value="work" className={TAB_TRIGGER}>Assessments</TabsTrigger>
+          <TabsTrigger value="import" className={TAB_TRIGGER}>Import</TabsTrigger>
+        </TabsList>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Stat label="People" value={overview.total} delay="sl-rise-delay-1" />
-          <Stat label="Quizzes" value={quizzes.length + fileQuizzes.length} delay="sl-rise-delay-2" />
-          <Stat label="In progress" value={overview.inProgress} />
-          <Stat label="Completed" value={overview.completed} />
-          <Stat label="Needs support" value={overview.needsSupport} />
-        </div>
-
-        <Tabs defaultValue="people">
-          <TabsList className="flex flex-wrap h-auto">
-            <TabsTrigger value="people"><Users className="h-4 w-4 mr-2" />People</TabsTrigger>
-            <TabsTrigger value="quizzes"><ClipboardCheck className="h-4 w-4 mr-2" />Quizzes</TabsTrigger>
-            <TabsTrigger value="performance"><BarChart3 className="h-4 w-4 mr-2" />Gradebook</TabsTrigger>
-            <TabsTrigger value="graduates"><GraduationCap className="h-4 w-4 mr-2" />Graduates</TabsTrigger>
-            <TabsTrigger value="announce"><Megaphone className="h-4 w-4 mr-2" />Announce</TabsTrigger>
-            <TabsTrigger value="calendar"><Calendar className="h-4 w-4 mr-2" />Calendar</TabsTrigger>
-            <TabsTrigger value="work"><FileText className="h-4 w-4 mr-2" />Assessments</TabsTrigger>
-            <TabsTrigger value="import"><Upload className="h-4 w-4 mr-2" />Import</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="people" className="space-y-3 mt-4">
-            {teachers.length === 0 ? (
-              <Empty text="No Fellows enrolled in this cohort yet." />
-            ) : teachers.map((teacher: any) => (
-              <Card key={teacher.id} className="sl-rise border-l-4 border-l-primary">
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">{teacher.name}</CardTitle>
-                  <CardDescription>{teacher.email} · Fellow ID {teacher.teacherId}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </TabsContent>
-
-          <TabsContent value="quizzes" className="space-y-3 mt-4">
-            {quizzes.length === 0 && fileQuizzes.length === 0 ? (
-              <Empty text="No quizzes in this cohort yet. A trainer assigns a module quiz on Assessments & quizzes (on the trainer desk), and an admin can on Analytics." />
-            ) : (
-              <>
-                {quizzes.map((quiz: any) => (
-                  <Card key={quiz.id} className="sl-rise">
-                    <CardHeader className="py-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="text-base">{quiz.title || "Module quiz"}</CardTitle>
-                        <Badge>{quiz.status || "ready"}</Badge>
-                      </div>
-                      <CardDescription>{quiz.description || "Module quiz for this cohort"}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                ))}
-                {fileQuizzes.map((quiz: any) => (
-                  <Card key={quiz.id || quiz.file_id || quiz.deckFileId} className="sl-rise">
-                    <CardHeader className="py-4">
-                      <CardTitle className="text-base">{quiz.file_name || quiz.fileName || "Slide quiz"}</CardTitle>
-                      <CardDescription>Questions from the lesson slides</CardDescription>
-                    </CardHeader>
-                  </Card>
-                ))}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="performance" className="space-y-3 mt-4">
-            <div className="flex justify-end">
-              <Button asChild variant="outline" size="sm">
-                <a href={`/api/batches/${batchId}/gradebook.csv`} download>
-                  Download gradebook CSV
-                </a>
-              </Button>
+        <TabsContent value="people" className="mt-5 space-y-6">
+          <section className={`${PANEL} overflow-hidden`} aria-labelledby="roster-heading">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sl-line px-5 py-3.5">
+              <h2 id="roster-heading" className="text-lg font-semibold text-sl-ink">
+                Roster{" "}
+                <span className="font-medium text-sl-muted">
+                  · {isLoading ? "…" : `${fellowCount} ${fellowCount === 1 ? "Fellow" : "Fellows"}`}
+                </span>
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={BTN_SECONDARY} onClick={() => setTab("import")} data-testid="button-import-roster">
+                  Import a roster (CSV)
+                </button>
+                <button type="button" className={BTN_PRIMARY} onClick={() => setAddOpen(true)} data-testid="button-add-fellow">
+                  Add a Fellow
+                </button>
+              </div>
             </div>
-            {progress.length === 0 ? (
-              <Empty text="The gradebook fills in as Fellows finish modules and quizzes." />
+            {isLoading ? (
+              <div className="space-y-3 px-5 py-4" aria-busy="true">
+                <div className="h-4 w-1/3 rounded bg-sl-neutral-soft" />
+                <div className="h-4 w-1/2 rounded bg-sl-neutral-soft" />
+              </div>
+            ) : teachers.length === 0 ? (
+              <p className="px-5 py-8 text-sm text-sl-muted">
+                No Fellows in this cohort yet. Add a Fellow, or import a roster (CSV), and they will appear here.
+              </p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border bg-white">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="text-left text-muted-foreground border-b">
-                      <th className="p-3 font-medium">Participant</th>
-                      <th className="p-3 font-medium">Course %</th>
-                      <th className="p-3 font-medium">Quiz avg</th>
-                      <th className="p-3 font-medium">Quizzes</th>
-                      <th className="p-3 font-medium">Status</th>
+                    <tr className="text-left text-sl-muted">
+                      <th scope="col" className="px-5 py-2.5 font-medium">Fellow</th>
+                      <th scope="col" className="px-3 py-2.5 font-medium">Email</th>
+                      <th scope="col" className="px-3 py-2.5 font-medium">Fellow ID</th>
+                      {isAdmin && <th scope="col" className="px-3 py-2.5 font-medium">Step</th>}
+                      <th scope="col" className="px-5 py-2.5 font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {progress.map((row: any) => {
-                      const pct = row.overallPercentage || 0;
-                      const status = learningStatus({ percentage: pct });
+                    {teachers.map((teacher: any) => {
+                      const row = progressByFellow.get(teacher.id);
+                      const status = row ? fellowStatus(row.overallPercentage || 0) : null;
                       return (
-                        <tr key={row.teacherId || row.id} className="border-b last:border-0">
-                          <td className="p-3 font-medium">{row.name || row.teacherName}</td>
-                          <td className="p-3">{pct}%</td>
-                          <td className="p-3">{row.reportCard?.averageScore ?? 0}%</td>
-                          <td className="p-3">{row.reportCard?.totalQuizzesTaken ?? 0}</td>
-                          <td className="p-3">{status}</td>
+                        <tr key={teacher.id} className="border-t border-sl-line text-sl-ink">
+                          <th scope="row" className="px-5 py-3.5 text-left font-semibold">
+                            {isAdmin ? (
+                              <a
+                                href={`/admin/teachers/${teacher.id}`}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  navigate(`/admin/teachers/${teacher.id}`);
+                                }}
+                                className="text-sl-accent no-underline hover:underline"
+                              >
+                                {teacher.name}
+                              </a>
+                            ) : (
+                              teacher.name
+                            )}
+                          </th>
+                          <td className="px-3 py-3.5">{teacher.email}</td>
+                          <td className="px-3 py-3.5">{teacher.teacherId}</td>
+                          {isAdmin && <td className="px-3 py-3.5">{stepByFellow.get(teacher.id) ?? "—"}</td>}
+                          <td className="px-5 py-3.5">{status ? <Chip tone={status.tone}>{status.label}</Chip> : <span className="text-sl-muted">—</span>}</td>
                         </tr>
                       );
                     })}
@@ -341,245 +408,354 @@ export default function CohortWorkspace() {
                 </table>
               </div>
             )}
-          </TabsContent>
+          </section>
 
-          <TabsContent value="graduates" className="space-y-3 mt-4">
-            {certificates.length === 0 ? (
-              <Card className="sl-rise">
-                <CardHeader>
-                  <CardTitle>No graduates yet</CardTitle>
-                  <CardDescription>
-                    Certificates appear after an admin issues one to a Fellow who has completed the course. Nobody is missing from the system — this cohort simply has not certified anyone.
-                  </CardDescription>
-                </CardHeader>
-                {closeToGraduate.length > 0 && (
-                  <CardContent>
-                    <p className="text-sm font-medium mb-2">Closest to graduating</p>
-                    {closeToGraduate.map((row: any) => (
-                      <p key={row.teacherId} className="text-sm text-muted-foreground">
-                        {row.name} · {row.overallPercentage}%
-                      </p>
-                    ))}
-                  </CardContent>
-                )}
-              </Card>
-            ) : certificates.map((cert: any) => (
-              <Card key={cert.id}>
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">{cert.teacherName || cert.name || "Graduate"}</CardTitle>
-                  <CardDescription>{cert.status || "issued"}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </TabsContent>
+          <section className="space-y-3" aria-labelledby="figures-heading">
+            <h2 id="figures-heading" className="text-lg font-semibold text-sl-ink">This cohort in figures</h2>
+            <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-2 px-5 py-3.5 text-[15px]`}>
+              {figures.map((figure) => (
+                <span key={figure.label}>
+                  <span className="text-sl-muted">{figure.label}</span> <span className="font-semibold text-sl-ink">{figure.value}</span>
+                </span>
+              ))}
+            </p>
+          </section>
+        </TabsContent>
 
-          <TabsContent value="calendar" className="space-y-3 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Schedule a session or deadline</CardTitle>
-                <CardDescription>Fellows see this on their dashboard calendar.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input placeholder="Title" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} />
-                <select className="border rounded-md h-10 px-3 bg-background" value={eventType} onChange={(e) => setEventType(e.target.value)}>
-                  <option value="session">Session</option>
-                  <option value="deadline">Deadline</option>
-                  <option value="assessment">Assessment</option>
-                  <option value="general">General</option>
-                </select>
-                <Input type="datetime-local" value={eventStart} onChange={(e) => setEventStart(e.target.value)} />
-                <Button disabled={!eventTitle.trim() || !eventStart || createEvent.isPending} onClick={() => createEvent.mutate()}>
-                  Add to calendar
-                </Button>
-              </CardContent>
-            </Card>
-            {events.length === 0 ? (
-              <Empty text="Nothing on the calendar yet." />
-            ) : events.map((event: any) => (
-              <Card key={event.id} className="sl-rise">
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">{event.title}</CardTitle>
-                  <CardDescription>
-                    {event.eventType} · {event.startDate ? new Date(event.startDate).toLocaleString() : ""}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </TabsContent>
-
-          <TabsContent value="work" className="space-y-3 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Assign an assessment</CardTitle>
-                <CardDescription>Besides quizzes — written assessments with a due date.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input placeholder="Title" value={workTitle} onChange={(e) => setWorkTitle(e.target.value)} />
-                <Textarea placeholder="Instructions" value={workInstructions} onChange={(e) => setWorkInstructions(e.target.value)} />
-                <Input type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} />
-                <Button disabled={!workTitle.trim() || !workInstructions.trim() || createWork.isPending} onClick={() => createWork.mutate()}>
-                  Assign assessment
-                </Button>
-              </CardContent>
-            </Card>
-            {assignments.filter((item: any) => item.kind === "assessment").length === 0 ? (
-              <Empty text="No assessments in this cohort yet." />
-            ) : assignments.filter((item: any) => item.kind === "assessment").map((item: any) => (
-              <Card key={item.id} className="sl-rise">
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">{item.title}</CardTitle>
-                  <CardDescription>
-                    {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}
-                  </CardDescription>
-                  <div className="flex flex-wrap items-end gap-2 pt-2">
-                    <Input
-                      type="datetime-local"
-                      value={dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate)}
-                      onChange={(event) => setDueDrafts((drafts) => ({ ...drafts, [item.id]: event.target.value }))}
-                      data-testid={`input-work-deadline-${item.id}`}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={saveWorkDue.isPending}
-                      onClick={() => {
-                        const draft = dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate);
-                        const due = parseDeadline(draft);
-                        saveWorkDue.mutate({ id: item.id, dueDate: due ? due.toISOString() : null });
-                      }}
-                      data-testid={`button-save-work-deadline-${item.id}`}
-                    >
-                      Save deadline
-                    </Button>
+        <TabsContent value="quizzes" className="mt-5 space-y-3">
+          {quizzes.length === 0 && fileQuizzes.length === 0 ? (
+            <Empty text="No quizzes in this cohort yet. A Trainer assigns a module quiz on Assessments (on the Trainer desk), and an Admin can on Analytics." />
+          ) : (
+            <>
+              {quizzes.map((quiz: any) => (
+                <div key={quiz.id} className={`${PANEL} px-5 py-4`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold text-sl-ink">{quiz.title || "Module quiz"}</h3>
+                    <Chip tone="neutral">{quiz.status || "ready"}</Chip>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={openWorkId === item.id ? "default" : "outline"}
-                    onClick={() => setOpenWorkId(openWorkId === item.id ? null : item.id)}
-                  >
-                    {openWorkId === item.id ? "Hide submissions" : "Mark submissions"}
-                  </Button>
-                </CardHeader>
-                {openWorkId === item.id && (
-                  <CardContent className="space-y-4">
-                    {submissions.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No submissions yet.</p>
-                    ) : submissions.map((row: any) => {
-                      const teacherId = row.teacher_id || row.teacherId;
-                      const draft = markDrafts[teacherId] || {
-                        score: row.trainer_score ?? row.trainerScore ?? "",
-                        comment: row.trainer_comment || row.trainerComment || "",
-                      };
-                      return (
-                        <div key={row.id} className="space-y-2 border-t pt-3">
-                          <p className="font-medium">{row.teacher_name || row.teacherName}</p>
-                          <p className="text-sm text-muted-foreground">{row.response}</p>
-                          <div className="flex flex-wrap gap-2">
-                            <Input
-                              className="w-24"
-                              type="number"
-                              min={0}
-                              max={100}
-                              placeholder="Score"
-                              value={draft.score}
-                              onChange={(e) => setMarkDrafts((current) => ({
-                                ...current,
-                                [teacherId]: { ...draft, score: e.target.value },
-                              }))}
-                            />
-                            <Input
-                              className="flex-1 min-w-[180px]"
-                              placeholder="Comment / rubric note"
-                              value={draft.comment}
-                              onChange={(e) => setMarkDrafts((current) => ({
-                                ...current,
-                                [teacherId]: { ...draft, comment: e.target.value },
-                              }))}
-                            />
-                            <Button
-                              size="sm"
-                              disabled={markWork.isPending}
-                              onClick={() => markWork.mutate({
-                                teacherId,
-                                trainerScore: String(draft.score),
-                                trainerComment: draft.comment,
-                              })}
-                            >
-                              Save mark
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                )}
-              </Card>
-            ))}
-          </TabsContent>
+                  <p className="mt-1 text-sm text-sl-muted">{quiz.description || "Module quiz for this cohort"}</p>
+                </div>
+              ))}
+              {fileQuizzes.map((quiz: any) => (
+                <div key={quiz.id || quiz.file_id || quiz.deckFileId} className={`${PANEL} px-5 py-4`}>
+                  <h3 className="text-base font-semibold text-sl-ink">{quiz.file_name || quiz.fileName || "Slide quiz"}</h3>
+                  <p className="mt-1 text-sm text-sl-muted">Questions from the lesson slides</p>
+                </div>
+              ))}
+            </>
+          )}
+        </TabsContent>
 
-          <TabsContent value="import" className="space-y-3 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Import a class roster</CardTitle>
-                <CardDescription>CSV with name, email, and optional password. Existing emails are enrolled; new Fellows get Teacher123! if password is blank.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)} />
-                <Button disabled={importCsv.isPending} onClick={() => importCsv.mutate()}>
-                  Import roster
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+        <TabsContent value="performance" className="mt-5 space-y-3">
+          <div className="flex justify-end">
+            <a className={`${BTN_SECONDARY} no-underline`} href={`/api/batches/${batchId}/gradebook.csv`} download>
+              Download gradebook CSV
+            </a>
+          </div>
+          {progress.length === 0 ? (
+            <Empty text="The gradebook fills in as Fellows finish modules and quizzes." />
+          ) : (
+            <div className={`${PANEL} overflow-x-auto`}>
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="text-left text-sl-muted">
+                    <th scope="col" className="px-5 py-2.5 font-medium">Fellow</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Course %</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Quiz avg</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Quizzes</th>
+                    <th scope="col" className="px-5 py-2.5 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {progress.map((row: any) => {
+                    const pct = row.overallPercentage || 0;
+                    const status = fellowStatus(pct);
+                    return (
+                      <tr key={row.teacherId || row.id} className="border-t border-sl-line text-sl-ink">
+                        <th scope="row" className="px-5 py-3.5 text-left font-semibold">{row.name || row.teacherName}</th>
+                        <td className="px-3 py-3.5">{pct}%</td>
+                        <td className="px-3 py-3.5">{row.reportCard?.averageScore ?? 0}%</td>
+                        <td className="px-3 py-3.5">{row.reportCard?.totalQuizzesTaken ?? 0}</td>
+                        <td className="px-5 py-3.5"><Chip tone={status.tone}>{status.label}</Chip></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
 
-          <TabsContent value="announce" className="space-y-3 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pin a note to this cohort</CardTitle>
-                <CardDescription>Every enrolled Fellow gets it in their bell. Email is sent when RESEND_API_KEY is configured.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input placeholder="Title" value={announceTitle} onChange={(e) => setAnnounceTitle(e.target.value)} />
-                <Textarea placeholder="What should they know?" value={announceMessage} onChange={(e) => setAnnounceMessage(e.target.value)} />
-                <Button
-                  disabled={!announceTitle.trim() || !announceMessage.trim() || announce.isPending}
-                  onClick={() => announce.mutate()}
+        <TabsContent value="graduates" className="mt-5 space-y-3">
+          {certificates.length === 0 ? (
+            <div className={`${PANEL} space-y-3 px-5 py-4`}>
+              <h3 className="text-base font-semibold text-sl-ink">No graduates yet</h3>
+              <p className="text-sm text-sl-muted">
+                Certificates appear after an Admin issues one to a Fellow who has completed the course. Nobody is missing from the system — this cohort simply has not certified anyone.
+              </p>
+              {closeToGraduate.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-sl-ink">Closest to graduating</p>
+                  {closeToGraduate.map((row: any) => (
+                    <p key={row.teacherId} className="text-sm text-sl-muted">
+                      {row.name || row.teacherName} · {row.overallPercentage}%
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : certificates.map((cert: any) => (
+            <div key={cert.id} className={`${PANEL} flex items-center justify-between gap-2 px-5 py-4`}>
+              <h3 className="text-base font-semibold text-sl-ink">{cert.teacherName || cert.name || "Graduate"}</h3>
+              <Chip tone="done">{cert.status || "issued"}</Chip>
+            </div>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-5 space-y-4">
+          <div className={`${PANEL} space-y-3 px-5 py-4`}>
+            <div>
+              <h3 className="text-base font-semibold text-sl-ink">Schedule a session or deadline</h3>
+              <p className="text-sm text-sl-muted">Fellows see this on their dashboard calendar.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="event-title" className={LABEL}>Title</label>
+              <input id="event-title" className={FIELD} value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="event-type" className={LABEL}>Type</label>
+              <select id="event-type" className={FIELD} value={eventType} onChange={(e) => setEventType(e.target.value)}>
+                <option value="session">Session</option>
+                <option value="deadline">Deadline</option>
+                <option value="assessment">Assessment</option>
+                <option value="general">General</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="event-start" className={LABEL}>Starts</label>
+              <input id="event-start" className={FIELD} type="datetime-local" value={eventStart} onChange={(e) => setEventStart(e.target.value)} />
+            </div>
+            <button type="button" className={BTN_PRIMARY} disabled={!eventTitle.trim() || !eventStart || createEvent.isPending} onClick={() => createEvent.mutate()}>
+              Add to calendar
+            </button>
+          </div>
+          {events.length === 0 ? (
+            <Empty text="Nothing on the calendar yet." />
+          ) : events.map((event: any) => (
+            <div key={event.id} className={`${PANEL} px-5 py-4`}>
+              <h3 className="text-base font-semibold text-sl-ink">{event.title}</h3>
+              <p className="mt-1 text-sm text-sl-muted">
+                <span className="capitalize">{event.eventType}</span> · {event.startDate ? new Date(event.startDate).toLocaleString() : ""}
+              </p>
+            </div>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="work" className="mt-5 space-y-4">
+          <div className={`${PANEL} space-y-3 px-5 py-4`}>
+            <div>
+              <h3 className="text-base font-semibold text-sl-ink">Assign an assessment</h3>
+              <p className="text-sm text-sl-muted">Besides quizzes — written assessments with a due date.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="work-title" className={LABEL}>Title</label>
+              <input id="work-title" className={FIELD} value={workTitle} onChange={(e) => setWorkTitle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="work-instructions" className={LABEL}>Instructions</label>
+              <textarea id="work-instructions" rows={3} className={`${FIELD} resize-y`} value={workInstructions} onChange={(e) => setWorkInstructions(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="work-due" className={LABEL}>Due</label>
+              <input id="work-due" className={FIELD} type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} />
+            </div>
+            <button type="button" className={BTN_PRIMARY} disabled={!workTitle.trim() || !workInstructions.trim() || createWork.isPending} onClick={() => createWork.mutate()}>
+              Assign assessment
+            </button>
+          </div>
+          {assessments.length === 0 ? (
+            <Empty text="No assessments in this cohort yet." />
+          ) : assessments.map((item: any) => (
+            <div key={item.id} className={`${PANEL} space-y-3 px-5 py-4`}>
+              <div>
+                <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
+                <p className="mt-1 text-sm text-sl-muted">{item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1.5">
+                  <label htmlFor={`work-deadline-${item.id}`} className={LABEL}>Deadline</label>
+                  <input
+                    id={`work-deadline-${item.id}`}
+                    className={FIELD}
+                    type="datetime-local"
+                    value={dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate)}
+                    onChange={(event) => setDueDrafts((drafts) => ({ ...drafts, [item.id]: event.target.value }))}
+                    data-testid={`input-work-deadline-${item.id}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={BTN_SECONDARY}
+                  disabled={saveWorkDue.isPending}
+                  onClick={() => {
+                    const draft = dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate);
+                    const due = parseDeadline(draft);
+                    saveWorkDue.mutate({ id: item.id, dueDate: due ? due.toISOString() : null });
+                  }}
+                  data-testid={`button-save-work-deadline-${item.id}`}
                 >
-                  Send to class
-                </Button>
-              </CardContent>
-            </Card>
-            {announcements.length === 0 ? (
-              <Empty text="No announcements sent yet." />
-            ) : announcements.map((item: any, index: number) => (
-              <Card key={`${item.title}-${index}`} className="sl-rise">
-                <CardHeader className="py-4">
-                  <CardTitle className="text-base">{item.title}</CardTitle>
-                  <CardDescription>
-                    {item.recipients || 0} Fellows · {item.created_at ? new Date(item.created_at).toLocaleString() : ""}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">{item.message}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-}
+                  Save deadline
+                </button>
+              </div>
+              <button
+                type="button"
+                className={openWorkId === item.id ? BTN_PRIMARY : BTN_SECONDARY}
+                aria-expanded={openWorkId === item.id}
+                onClick={() => setOpenWorkId(openWorkId === item.id ? null : item.id)}
+              >
+                {openWorkId === item.id ? "Hide submissions" : "Mark submissions"}
+              </button>
+              {openWorkId === item.id && (
+                <div className="space-y-4">
+                  {submissions.length === 0 ? (
+                    <p className="text-sm text-sl-muted">No submissions yet.</p>
+                  ) : submissions.map((row: any) => {
+                    const teacherId = row.teacher_id || row.teacherId;
+                    const draft = markDrafts[teacherId] || {
+                      score: row.trainer_score ?? row.trainerScore ?? "",
+                      comment: row.trainer_comment || row.trainerComment || "",
+                    };
+                    return (
+                      <div key={row.id} className="space-y-2 border-t border-sl-line pt-3">
+                        <p className="font-medium text-sl-ink">{row.teacher_name || row.teacherName}</p>
+                        <p className="text-sm text-sl-muted">{row.response}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            className={`${FIELD} w-24`}
+                            type="number"
+                            min={0}
+                            max={100}
+                            aria-label={`Score for ${row.teacher_name || row.teacherName}`}
+                            placeholder="Score"
+                            value={draft.score}
+                            onChange={(e) => setMarkDrafts((current) => ({
+                              ...current,
+                              [teacherId]: { ...draft, score: e.target.value },
+                            }))}
+                          />
+                          <input
+                            className={`${FIELD} min-w-[180px] flex-1`}
+                            aria-label={`Comment for ${row.teacher_name || row.teacherName}`}
+                            placeholder="Comment / rubric note"
+                            value={draft.comment}
+                            onChange={(e) => setMarkDrafts((current) => ({
+                              ...current,
+                              [teacherId]: { ...draft, comment: e.target.value },
+                            }))}
+                          />
+                          <button
+                            type="button"
+                            className={BTN_PRIMARY}
+                            disabled={markWork.isPending}
+                            onClick={() => markWork.mutate({
+                              teacherId,
+                              trainerScore: String(draft.score),
+                              trainerComment: draft.comment,
+                            })}
+                          >
+                            Save mark
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </TabsContent>
 
-function Stat({ label, value, delay = "" }: { label: string; value: number; delay?: string }) {
-  return (
-    <Card className={`p-4 sl-rise ${delay}`}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold mt-1">{value}</p>
-    </Card>
+        <TabsContent value="import" className="mt-5 space-y-3">
+          <div className={`${PANEL} space-y-3 px-5 py-4`}>
+            <div>
+              <h3 className="text-base font-semibold text-sl-ink">Import a roster (CSV)</h3>
+              <p className="text-sm text-sl-muted">CSV with name, email, and optional password. Existing emails are enrolled; new Fellows get Teacher123! if password is blank.</p>
+            </div>
+            <label htmlFor="roster-csv" className="sr-only">Roster CSV</label>
+            <textarea id="roster-csv" rows={8} className={`${FIELD} resize-y font-mono text-sm`} value={csvText} onChange={(e) => setCsvText(e.target.value)} />
+            <button type="button" className={BTN_PRIMARY} disabled={importCsv.isPending} onClick={() => importCsv.mutate(csvText)}>
+              Import roster
+            </button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="announce" className="mt-5 space-y-4">
+          <div className={`${PANEL} space-y-3 px-5 py-4`}>
+            <div>
+              <h3 className="text-base font-semibold text-sl-ink">Pin a note to this cohort</h3>
+              <p className="text-sm text-sl-muted">Every enrolled Fellow gets it in their bell. Email is sent when RESEND_API_KEY is configured.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="announce-title" className={LABEL}>Title</label>
+              <input id="announce-title" className={FIELD} value={announceTitle} onChange={(e) => setAnnounceTitle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="announce-message" className={LABEL}>What should they know?</label>
+              <textarea id="announce-message" rows={3} className={`${FIELD} resize-y`} value={announceMessage} onChange={(e) => setAnnounceMessage(e.target.value)} />
+            </div>
+            <button
+              type="button"
+              className={BTN_PRIMARY}
+              disabled={!announceTitle.trim() || !announceMessage.trim() || announce.isPending}
+              onClick={() => announce.mutate()}
+            >
+              Send to cohort
+            </button>
+          </div>
+          {announcements.length === 0 ? (
+            <Empty text="No announcements sent yet." />
+          ) : announcements.map((item: any, index: number) => (
+            <div key={`${item.title}-${index}`} className={`${PANEL} space-y-2 px-5 py-4`}>
+              <div>
+                <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
+                <p className="mt-1 text-sm text-sl-muted">
+                  {item.recipients || 0} Fellows · {item.created_at ? new Date(item.created_at).toLocaleString() : ""}
+                </p>
+              </div>
+              <p className="text-sm text-sl-ink">{item.message}</p>
+            </div>
+          ))}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="border-sl-line bg-sl-surface text-sl-ink">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-sl-ink">Add a Fellow</DialogTitle>
+            <DialogDescription className="text-sm text-sl-muted">
+              An existing email is enrolled in this cohort. A new email creates the Fellow, with the default password Teacher123!.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <label htmlFor="add-fellow-name" className={LABEL}>Name</label>
+            <input id="add-fellow-name" className={FIELD} value={addName} onChange={(e) => setAddName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="add-fellow-email" className={LABEL}>Email</label>
+            <input id="add-fellow-email" className={FIELD} type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className={BTN_SECONDARY} onClick={() => setAddOpen(false)}>Cancel</button>
+            <button type="button" className={BTN_PRIMARY} disabled={!addName.trim() || !addEmail.includes("@") || importCsv.isPending} onClick={addFellow}>
+              Add a Fellow
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </AcademyShell>
   );
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="text-sm text-muted-foreground py-8">{text}</p>;
+  return <p className="py-8 text-sm text-sl-muted">{text}</p>;
 }
