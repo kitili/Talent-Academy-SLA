@@ -289,7 +289,8 @@ export default function AdminTeacherDetail() {
             {mine.map(({ cohort, onSteps }) => {
               const trainerNames = (cohort.trainerIds || []).map((id) => path.trainers.find((trainer) => trainer.id === id)?.username).filter(Boolean);
               const noTrainer = trainerNames.length === 0;
-              const emptyOnes = onSteps.filter(({ step }) => step.courses.length === 0).map(({ step }) => `${step.name} has no course`);
+              const emptyNames = onSteps.filter(({ step }) => step.courses.length === 0).map(({ step }) => step.name);
+              const emptyOnes = emptyNames.length ? [`${emptyNames.join(" and ")} ${emptyNames.length === 1 ? "has" : "have"} no course`] : [];
               const flag = [noTrainer ? "No trainer" : "", ...emptyOnes].filter(Boolean).join(" · ");
               return (
                 <li key={cohort.id} className="flex flex-col gap-2.5 border-b border-sl-line px-5 py-4 last:border-b-0">

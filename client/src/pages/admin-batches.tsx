@@ -570,7 +570,7 @@ export default function AdminBatches() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      batch.courses.length === 0 && <span className="text-sm text-sl-muted">Every course is already placed on a step. Add a course on the Courses tab.</span>
+                      batch.courses.length === 0 && <span className="text-sm text-sl-muted">Every course is already on a step in this cohort. Add a course on the Courses tab.</span>
                     )}
                   </div>
                   <p className="text-xs text-sl-muted">These courses sit in step {index + 1}, and in no other step.</p>

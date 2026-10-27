@@ -233,6 +233,9 @@ export default function AdminHome() {
     }
   }
 
+  // Red before amber: what hides a cohort from its trainers comes first.
+  attention.sort((a, b) => Number(b.tone === "risk") - Number(a.tone === "risk"));
+
   const openCohorts = cohorts.filter((cohort) => (cohort.status || "open") !== "closed").length;
   const placedCourses = new Set(cohorts.flatMap((cohort) => cohort.batches.flatMap((step) => step.courses.map((course) => course.id)))).size;
   const marks = (attendance?.teachers || []).reduce((sum, row) => sum + row.marked, 0);
