@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { SkeletonRows } from "@/components/Skeletons";
 import {
   CERTIFICATE_DESIGNS,
   CERTIFICATE_SIGNERS,
@@ -83,7 +84,7 @@ export default function AdminCertificates() {
 
   const { data: teachers = [] } = useQuery<Teacher[]>({ queryKey: ["/api/admin/teachers"] });
   const { data: courses = [] } = useQuery<Course[]>({ queryKey: ["/api/courses"] });
-  const { data: issued = [] } = useQuery<Issued[]>({ queryKey: ["/api/admin/certificates"] });
+  const { data: issued = [], isLoading: issuedLoading } = useQuery<Issued[]>({ queryKey: ["/api/admin/certificates"] });
   const { data: eligible, isError: eligibilityFailed } = useQuery<EligibleFellow[]>({ queryKey: ["/api/admin/certificates/eligible"] });
 
   const activeTeachers = teachers.filter((teacher) => teacher.approvalStatus !== "inactive");
@@ -208,7 +209,7 @@ export default function AdminCertificates() {
           {eligibilityFailed ? (
             <p className="px-5 py-4 text-sm text-sl-muted">Could not load who is ready. You can still issue; the server checks each certificate.</p>
           ) : !eligible ? (
-            <p className="px-5 py-4 text-sm text-sl-muted">Working out who is ready...</p>
+            <SkeletonRows label="Working out who is ready" rows={3} />
           ) : (
             <>
               {eligible.length === 0 ? (
@@ -379,9 +380,12 @@ export default function AdminCertificates() {
 
         <section aria-labelledby="issued" className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface">
           <h2 id="issued" className="px-5 py-4 text-lg font-semibold text-sl-ink">
-            Issued <span className="font-medium text-sl-muted">· {issued.length === 0 ? "none yet" : issued.length}</span>
+            Issued
+            {!issuedLoading && <span className="font-medium text-sl-muted"> · {issued.length === 0 ? "none yet" : issued.length}</span>}
           </h2>
-          {issued.length === 0 ? (
+          {issuedLoading ? (
+            <SkeletonRows label="Loading issued certificates" rows={3} className="border-t border-sl-line" />
+          ) : issued.length === 0 ? (
             <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
               No certificate has been issued. Each one you issue is listed here, and the Fellow sees it on their Certificates page.
             </p>
