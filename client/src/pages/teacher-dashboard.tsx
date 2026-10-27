@@ -280,7 +280,7 @@ export default function TeacherDashboard() {
     queryKey: ["/api/teacher/report-card"],
   });
 
-  const { data: assignedWeeks = [] } = useQuery<any[]>({
+  const { data: assignedWeeks = [], isLoading: weeksLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/assigned-weeks"],
   });
   const { data: medalRows = [] } = useQuery<Array<{ batchId: string; batchName: string; medals: Medal[] }>>({
@@ -289,9 +289,11 @@ export default function TeacherDashboard() {
   const { data: deskPeers = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher/desk-peers"],
   });
-  const { data: path } = useQuery<any>({
+  const { data: path, isLoading: pathLoading } = useQuery<any>({
     queryKey: ["/api/teacher/academy-path"],
   });
+  // Until the cohorts and modules arrive, the desk shows grey bars, never "not in a cohort" or "no modules" (D-brief: no false empty state).
+  const deskLoading = pathLoading || weeksLoading;
   const { data: certificates = [] } = useQuery<any[]>({
     queryKey: ["/api/teacher", teacher?.id, "certificates"],
     enabled: Boolean(teacher?.id),
@@ -664,7 +666,9 @@ export default function TeacherDashboard() {
     cohorts.find((cohort) => cohort.id === resumeWeek?.batchId) || cohorts.find((cohort) => (cohort.batches || []).length > 0) || cohorts[0];
   const focus = stepsWithState(focusCohort);
   const homeStep = focus.steps[focus.current];
-  const headerLine = focusCohort
+  const headerLine = deskLoading
+    ? ""
+    : focusCohort
     ? focus.steps.length > 0
       ? `${focusCohort.name} · Step ${focus.current + 1} of ${focus.steps.length}`
       : `${focusCohort.name} · no steps yet`
@@ -697,7 +701,14 @@ export default function TeacherDashboard() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-6">
           <section className="rounded-xl border border-sl-line bg-sl-surface px-5 py-5" data-tour="teacher-continue" aria-labelledby="continue-heading">
-            {resumeWeek && !shelfIsEmpty ? (
+            {deskLoading ? (
+              <div className="space-y-3" aria-busy="true" aria-label="Loading your courses">
+                <h2 id="continue-heading" className="sr-only">Loading your courses</h2>
+                <div className="h-3 w-24 rounded bg-sl-neutral-soft" />
+                <div className="h-5 w-2/3 rounded bg-sl-neutral-soft" />
+                <div className="h-3 w-5/6 rounded bg-sl-neutral-soft" />
+              </div>
+            ) : resumeWeek && !shelfIsEmpty ? (
               <>
                 <p className="text-xs font-semibold uppercase tracking-wide text-sl-accent">Continue</p>
                 <h2 id="continue-heading" className="mt-1 text-[22px] font-semibold text-sl-ink">{resumeWeek.competencyFocus || `Module ${resumeWeek.weekNumber}`}</h2>
@@ -1213,7 +1224,7 @@ export default function TeacherDashboard() {
         sub={`Your courses, attendance and medals in each cohort${path ? ` · academy path ${path.cohortsCompleted} of ${path.cohortsRequired} cohorts finished` : ""}`}
       />
       <div className="space-y-6" data-tour="teacher-progress">
-        {cohorts.length === 0 && (
+        {!pathLoading && cohorts.length === 0 && (
           <Panel title="Cohorts" id="progress-none">
             <Empty title="You are not in a cohort yet." body="An Admin places you in one. Your courses, attendance and medals appear here." />
           </Panel>
