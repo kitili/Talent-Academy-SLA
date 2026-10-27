@@ -21,8 +21,9 @@ describe("admin academy certificates", () => {
     assert.match(page, /button-template-\$\{id\}/);
     assert.match(page, /CERTIFICATE_DESIGNS/);
     assert.match(page, /select-certificate-occasion/);
-    assert.match(page, /Graduation/);
-    assert.match(page, /Course completion/);
+    // The board names the kinds Course certificate, Fellowship and Advanced Level (it used to say Graduation and Course completion).
+    assert.match(page, /Course certificate/);
+    assert.match(page, /Advanced Level/);
     assert.match(copy, /Aloyce Shirima/);
     assert.match(copy, /Nelly Zablon/);
     assert.match(overlay, /text-certificate-name/);
