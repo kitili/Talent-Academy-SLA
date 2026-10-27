@@ -12,6 +12,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SilverleafCertificate } from "@/components/SilverleafCertificate";
 import { AcademyShell } from "@/components/AcademyShell";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 /** Print only the certificate, whatever the page around it is (the shell's header and menu stay out of the PDF). */
@@ -107,10 +108,25 @@ export default function TeacherCertificateView() {
   }
 
   if (isLoading) {
+    const loadingFellow = user.role === "teacher";
     return (
-      <div className="min-h-screen bg-sl-ground flex items-center justify-center">
-        <p className="text-sl-muted">Loading certificate...</p>
-      </div>
+      <AcademyShell
+        title="Certificate"
+        userLabel={user.username}
+        onLogout={() => logoutMutation.mutate()}
+        desk={loadingFellow ? "fellow" : user.role === "trainer" ? "trainer" : undefined}
+        current={loadingFellow ? "certificates" : undefined}
+      >
+        <div className="flex flex-col gap-1">
+          <SkeletonBar className="h-4 w-36" />
+          <h1 className="m-0 text-[28px] font-semibold text-sl-ink">Certificate</h1>
+        </div>
+        <div className="flex justify-center">
+          <Loading label="Loading your certificate" className="w-full max-w-5xl">
+            <SkeletonBar className="aspect-[1024/723] w-full" />
+          </Loading>
+        </div>
+      </AcademyShell>
     );
   }
 
