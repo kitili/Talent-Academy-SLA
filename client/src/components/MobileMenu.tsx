@@ -29,15 +29,15 @@ export function MobileMenu({ items, userInfo, children }: MobileMenuProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden h-9 w-9 text-white hover:bg-white/20">
-          <Menu className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="md:hidden h-11 w-11 text-inherit" aria-label="Menu">
+          <Menu className="h-5 w-5" aria-hidden="true" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-72 p-0">
+      <SheetContent side="right" className="w-72 border-sl-line bg-sl-surface p-0 text-sl-ink">
         <SheetHeader className="p-4 pb-2">
           <SheetTitle>Menu</SheetTitle>
           {userInfo && (
-            <p className="text-sm text-muted-foreground truncate">{userInfo}</p>
+            <p className="text-sm text-sl-muted truncate">{userInfo}</p>
           )}
         </SheetHeader>
         <Separator />
@@ -52,13 +52,13 @@ export function MobileMenu({ items, userInfo, children }: MobileMenuProps) {
             <Button
               key={i}
               variant={item.variant === "destructive" ? "destructive" : "ghost"}
-              className="justify-start h-10"
+              className="justify-start min-h-11"
               onClick={() => {
                 item.onClick();
                 setOpen(false);
               }}
             >
-              <item.icon className="mr-3 h-4 w-4" />
+              <item.icon className="mr-3 h-4 w-4" aria-hidden="true" />
               {item.label}
             </Button>
           ))}

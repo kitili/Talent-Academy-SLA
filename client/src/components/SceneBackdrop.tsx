@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+/** The photos the desks used to sit on. Nothing draws them now; the names stay so callers still compile. */
 export const SCENE_PHOTOS = {
   room: "/silverleaf-room.jpg",
   library: "/bg-library.jpg",
@@ -12,19 +13,7 @@ export const SCENE_PHOTOS = {
 
 export type SceneName = keyof typeof SCENE_PHOTOS;
 
-export function SceneBackdrop({ scene, veil = "photo", children }: { scene: SceneName; veil?: "photo" | "light"; children: ReactNode }) {
-  return (
-    <div className={`relative min-h-screen ${veil === "light" ? "bg-[#f4efe6] dark:bg-[#10182a]" : "bg-[#102448]"}`}>
-      <img
-        src={SCENE_PHOTOS[scene]}
-        alt=""
-        className={`pointer-events-none fixed inset-0 z-0 h-full w-full object-cover object-center ${veil === "light" ? "opacity-25" : ""}`}
-        decoding="async"
-      />
-      {veil === "light" && (
-        <div className="pointer-events-none fixed inset-0 z-0 bg-[#f7f3ea]/80 dark:bg-[#10182a]/90" />
-      )}
-      <div className="relative z-10">{children}</div>
-    </div>
-  );
+/** The page ground. No photo, veil or cream: photos never sit behind text (design/board/Shell.dc.html). */
+export function SceneBackdrop({ children }: { scene?: SceneName; veil?: "photo" | "light"; children: ReactNode }) {
+  return <div className="min-h-screen bg-sl-ground text-sl-ink">{children}</div>;
 }
