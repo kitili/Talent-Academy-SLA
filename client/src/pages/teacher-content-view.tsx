@@ -18,7 +18,7 @@ import { ScreenshotWarning } from "@/components/ScreenshotWarning";
 import { TableOfContents } from "@/components/TableOfContents";
 import { AcademyShell } from "@/components/AcademyShell";
 import { sanitizeLessonHtml } from "@shared/htmlSanitize";
-import { MODULE_QUIZ_PASS_PERCENT } from "@shared/constants";
+import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import { DiscussionThread } from "@/components/DiscussionThread";
 import { saveLastLesson } from "@/lib/lastLessonCache";
 import type { TocEntry } from "@shared/schema";
@@ -530,7 +530,7 @@ export default function TeacherContentView() {
             Module {currentWeek?.weekNumber}{currentWeek?.competencyFocus ? ` · ${currentWeek.competencyFocus}` : ""}
           </h1>
           <span className="text-sm text-sl-muted">
-            {[courseName, pathCohort?.name, `pass mark ${MODULE_QUIZ_PASS_PERCENT}%`].filter(Boolean).join(" · ")}
+            {[courseName, pathCohort?.name, `pass mark ${MODULE_QUIZ_PASS_PERCENT}%`, `${QUIZ_ATTEMPTS} tries per quiz`].filter(Boolean).join(" · ")}
           </span>
         </div>
         {(previousModule || nextModule) && (

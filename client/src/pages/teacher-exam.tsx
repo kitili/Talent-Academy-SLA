@@ -7,7 +7,7 @@ import { AcademyShell } from "@/components/AcademyShell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { QuizRunner } from "@/components/QuizRunner";
-import { QUIZ_ATTEMPTS } from "@shared/constants";
+import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import { isWritingExam, mimeFromPaperName, paperPreviewKind } from "@shared/trainerDesk";
 import { ChevronLeft } from "lucide-react";
 
@@ -31,6 +31,13 @@ export default function TeacherExam() {
 
   const mine = attempts.filter((attempt) => attempt.assignedQuizId === quizId);
   const latest = mine[0];
+  // The server's standing rule (assignedQuizStanding): passed at the pass mark, or no try left, means the exam is over.
+  const passMark = quiz?.passMark || MODULE_QUIZ_PASS_PERCENT;
+  const percentOf = (attempt: any) => (attempt.totalQuestions > 0 ? Math.round((attempt.score / attempt.totalQuestions) * 100) : 0);
+  const passed = mine.some((attempt) => attempt.totalQuestions > 0 && (attempt.score / attempt.totalQuestions) * 100 >= passMark);
+  const finished = passed || mine.length >= QUIZ_ATTEMPTS;
+  // A try finished on this visit keeps the runner on screen, so its right / wrong review stays visible.
+  const [triedHere, setTriedHere] = useState(false);
   const writing = quiz ? isWritingExam(quiz) : false;
   const questionId = quiz?.questions?.[0]?.id;
   const savedAnswer = latest?.answers?.[questionId] || "";
@@ -136,13 +143,33 @@ export default function TeacherExam() {
           </section>
         </div>
       )}
-      {quiz && !writing && (
+      {quiz && !writing && finished && !triedHere && (
+        <section className="flex flex-col gap-3 rounded-xl border border-sl-line bg-sl-surface p-5" data-testid="exam-finished">
+          <span className={`self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${passed ? "bg-sl-done-soft text-sl-done" : "bg-sl-neutral-soft text-sl-neutral"}`}>
+            {passed ? `Passed · best ${Math.max(...mine.map(percentOf))}%` : `All ${QUIZ_ATTEMPTS} tries used · best ${Math.max(0, ...mine.map(percentOf))}%`}
+          </span>
+          <h2 className="m-0 text-lg font-semibold text-sl-ink">Your tries</h2>
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {mine.map((attempt, index) => (
+              <li key={attempt.id ?? index} className="flex justify-between gap-3 rounded-lg border border-sl-line px-4 py-2.5 text-[15px] text-sl-ink">
+                <span>Try {mine.length - index}</span>
+                <span className="text-sl-muted">{attempt.score} of {attempt.totalQuestions} · {percentOf(attempt)}%</span>
+              </li>
+            ))}
+          </ul>
+          <p className="m-0 text-sm text-sl-muted">This exam is finished; there is no try left to take.</p>
+        </section>
+      )}
+      {quiz && !writing && (!finished || triedHere) && (
         <section className="rounded-xl border border-sl-line bg-sl-surface p-5">
           <QuizRunner
             questions={quiz.questions || []}
             quizId={quiz.id}
             attemptNumber={mine.length + 1}
-            onComplete={() => queryClient.invalidateQueries({ queryKey: ["/api/teacher/quiz-attempts"] })}
+            onComplete={() => {
+              setTriedHere(true);
+              queryClient.invalidateQueries({ queryKey: ["/api/teacher/quiz-attempts"] });
+            }}
             onClose={() => undefined}
           />
         </section>

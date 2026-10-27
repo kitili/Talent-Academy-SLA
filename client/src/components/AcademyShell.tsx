@@ -103,6 +103,9 @@ function DeskLink({
   children: ReactNode;
 }) {
   const hook = deskItemHook(desk, item);
+  const [path] = useLocation();
+  // A page switches only its own sections in place; an item on another page (Fellow Certificates) follows its href.
+  const inPlace = Boolean(onNavigate) && item.href.split("?")[0] === path;
   return (
     <Link
       href={item.href}
@@ -110,7 +113,7 @@ function DeskLink({
       data-testid={hooks ? hook : undefined}
       data-tour={hooks ? item.tour ?? hook : undefined}
       onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-        if (onNavigate) {
+        if (inPlace && onNavigate) {
           event.preventDefault();
           onNavigate(item.key);
         }

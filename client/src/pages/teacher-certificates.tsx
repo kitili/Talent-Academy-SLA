@@ -151,7 +151,7 @@ export default function TeacherCertificates() {
             ))}
           </div>
           <span className="text-sm text-sl-muted">
-            {cohortNames.length > 0 ? `In ${listNames(cohortNames)}. ` : "You are not in a cohort yet. An admin places you in one. "}
+            {cohortNames.length > 0 ? `In ${listNames(cohortNames)}. ` : "You are not in a cohort yet. An Admin places you in one. "}
             Your course progress is on{" "}
             <Link href="/teacher/dashboard?tab=progress" className="text-sl-accent underline">Progress</Link>.
           </span>

@@ -814,7 +814,7 @@ export default function TeacherDashboard() {
           </SideCard>
           <SideCard title="From your trainer">
             {trainerComments.length === 0 ? (
-              <p>No feedback yet. Desk mail with your trainer is under Messages.</p>
+              <p>No new messages or feedback.</p>
             ) : (
               <p>
                 <span className="font-medium text-sl-ink">Latest feedback: </span>
@@ -1163,7 +1163,7 @@ export default function TeacherDashboard() {
                           ) : standing.tries === 0 ? (
                             <Chip>Not started · pass at {standing.passMark}% · {QUIZ_ATTEMPTS} tries</Chip>
                           ) : (
-                            <Chip tone="attention">
+                            <Chip tone={standing.left === 0 ? "neutral" : "attention"}>
                               Not passed · {standing.best}% · {standing.left === 0 ? "no tries left" : `${standing.left} ${standing.left === 1 ? "try" : "tries"} left`}
                             </Chip>
                           )}
