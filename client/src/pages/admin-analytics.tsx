@@ -1036,7 +1036,7 @@ export default function AdminAnalytics() {
                     subtitle="Completed all courses"
                   />
                   <KPICard
-                    label="At Risk"
+                    label="At risk"
                     value={pipelineData?.atRiskCount ?? 0}
                     icon={AlertCircle}
                     color="red"

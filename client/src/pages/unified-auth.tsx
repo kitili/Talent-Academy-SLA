@@ -33,6 +33,9 @@ const secondaryClass =
 const linkClass =
   "inline-flex min-h-11 items-center font-semibold text-sl-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent rounded";
 
+/** The desk name a role is shown as on screen: a stored "teacher" is a Fellow. */
+const roleName = (role: string) => (role === "teacher" ? "Fellow" : role === "trainer" ? "Trainer" : role === "admin" ? "Admin" : role);
+
 export default function UnifiedAuth() {
   const { toast } = useToast();
   const { user, isLoading } = useAuth();
@@ -127,7 +130,7 @@ export default function UnifiedAuth() {
 
         toast({
           title: "Welcome!",
-          description: `Successfully logged in as ${selectedRole.role}`,
+          description: `Signed in as ${roleName(selectedRole.role)}`,
         });
         setLocation(homeForRole(user.role || selectedRole.role));
       } else {
@@ -204,7 +207,7 @@ export default function UnifiedAuth() {
 
         toast({
           title: "Welcome!",
-          description: `Successfully logged in as ${signedInRole}`,
+          description: `Signed in as ${roleName(signedInRole)}`,
         });
         setLoginLoading(false);
         setLocation(homeForRole(signedInRole));
@@ -443,7 +446,7 @@ export default function UnifiedAuth() {
                     <Icon className="h-6 w-6" />
                   </div>
                   <div className="flex-1">
-                    <div className="font-semibold capitalize text-sl-ink">{roleOption.role}</div>
+                    <div className="font-semibold text-sl-ink">{roleName(roleOption.role)}</div>
                     <div className="text-sm text-sl-muted">{roleOption.name}</div>
                     <div className="mt-1 text-xs text-sl-muted">
                       {getRoleDescription(roleOption.role)}
