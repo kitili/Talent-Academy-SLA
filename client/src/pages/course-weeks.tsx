@@ -812,8 +812,8 @@ export default function CourseWeeks() {
       title="Silverleaf Academy"
       userLabel={user ? deskName(user) : undefined}
       onLogout={() => logoutMutation.mutate()}
-      desk={isAdmin ? "admin" : "trainer"}
-      current="cohorts"
+      desk={isAdmin ? "admin" : user?.role === "teacher" ? "fellow" : "trainer"}
+      current={user?.role === "teacher" ? "learning" : "cohorts"}
       actions={
         <ProfileSettingsDialog
           userType="admin"

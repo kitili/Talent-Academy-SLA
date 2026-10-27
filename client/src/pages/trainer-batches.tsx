@@ -500,7 +500,7 @@ export default function TrainerBatches() {
     if (weekQueries[index]?.data) modulesByCourse[courseId] = weekQueries[index].data as any[];
   });
   // The quiz being reviewed, with the questions the editor opens on
-  const { data: reviewQuizStatus } = useQuery<Record<string, any>>({
+  const { data: reviewQuizStatus, isLoading: isLoadingReviewQuiz } = useQuery<Record<string, any>>({
     queryKey: ["/api/training-weeks", reviewQuiz?.week_id, "quiz-status"],
     enabled: !!reviewQuiz,
     queryFn: async () => {
@@ -2774,7 +2774,7 @@ export default function TrainerBatches() {
       </Dialog>
 
       {/* Review and approve a lesson file's quiz */}
-      {reviewQuiz && (
+      {reviewQuiz && !isLoadingReviewQuiz && (
         <FileQuizEditDialog
           open
           onClose={() => setReviewQuiz(null)}
