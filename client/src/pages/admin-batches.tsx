@@ -670,7 +670,7 @@ export default function AdminBatches() {
                 <SkeletonRows label="Loading cohorts" rows={5} />
               </section>
               <div className="min-w-0 flex-[2_1_520px]">
-                <SkeletonCard label="Loading the cohort" lines={6} className="p-6" />
+                <SkeletonCard label="Loading the cohort" lines={6} />
               </div>
             </div>
           ) : (
