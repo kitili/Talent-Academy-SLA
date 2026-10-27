@@ -13,25 +13,20 @@ import {
   RotateCcw,
   AlertCircle
 } from "lucide-react";
+import { AcademyShell } from "@/components/AcademyShell";
+import { SkeletonBar, SkeletonCard, SkeletonRows } from "@/components/Skeletons";
+import { useAuth } from "@/hooks/use-auth";
+import { deskName } from "@shared/deskName";
 
 export default function TrainerTeacherContentHistory() {
   const { teacherId, weekId } = useParams();
   const [, setLocation] = useLocation();
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const { user, logoutMutation } = useAuth();
 
   const { data: historyData = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/trainers/teachers", teacherId, "weeks", weekId, "content-history"],
   });
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-lg font-medium">Loading history...</div>
-        </div>
-      </div>
-    );
-  }
 
   // Set first item as selected by default
   const firstItem = historyData.length > 0 ? historyData[0] : null;
@@ -43,8 +38,14 @@ export default function TrainerTeacherContentHistory() {
   const isCompleted = status === "completed";
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
+    <AcademyShell
+      title="Silverleaf Academy"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      desk="trainer"
+      current="cohorts"
+    >
+      <div>
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Button
@@ -56,27 +57,29 @@ export default function TrainerTeacherContentHistory() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">
+            <h1 className="text-[28px] font-semibold leading-tight text-sl-ink" data-testid="text-page-title">
               Fellow Content History
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sl-muted">
               View all attempts, regenerations, and progress
             </p>
           </div>
         </div>
 
         {/* Two-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-250px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-17rem)] min-h-[26rem]">
           {/* Left Sidebar - History List */}
-          <div className="lg:col-span-1 border rounded-lg bg-card overflow-hidden flex flex-col">
-            <div className="p-4 border-b">
+          <div className="lg:col-span-1 border border-sl-line rounded-lg bg-sl-surface overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-sl-line">
               <h3 className="font-semibold">Content Items</h3>
-              <p className="text-xs text-muted-foreground mt-1">{historyData.length} total</p>
+              {isLoading ? <SkeletonBar className="mt-1 h-3 w-16" /> : <p className="text-xs text-sl-muted mt-1">{historyData.length} total</p>}
             </div>
             <ScrollArea className="flex-1">
               <div className="p-2 space-y-2">
-                {historyData.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
+                {isLoading ? (
+                  <SkeletonRows label="Loading content items" rows={4} />
+                ) : historyData.length === 0 ? (
+                  <div className="text-center py-8 text-sl-muted text-sm">
                     <AlertCircle className="mx-auto h-8 w-8 mb-2 opacity-50" />
                     No content found
                   </div>
@@ -90,8 +93,8 @@ export default function TrainerTeacherContentHistory() {
                         onClick={() => setSelectedItem(item)}
                         className={`w-full text-left p-3 rounded-lg transition-colors border text-sm ${
                           isSelected
-                            ? "bg-primary/10 border-primary"
-                            : "bg-muted/30 border-transparent hover:bg-muted/50"
+                            ? "bg-sl-accent-soft border-sl-accent"
+                            : "bg-sl-neutral-soft border-transparent hover:bg-sl-line"
                         }`}
                         data-testid={`button-history-item-${index}`}
                       >
@@ -99,12 +102,12 @@ export default function TrainerTeacherContentHistory() {
                           <FileText className="h-4 w-4 flex-shrink-0 mt-0.5" />
                           <div className="min-w-0 flex-1">
                             <p className="font-semibold truncate text-xs">{item.file?.title || "Unknown"}</p>
-                            <p className="text-xs text-muted-foreground capitalize mt-1">
+                            <p className="text-xs text-sl-muted capitalize mt-1">
                               {itemStatus}
                             </p>
                           </div>
                           {itemStatus === "completed" && (
-                            <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                            <CheckCircle className="h-3 w-3 text-sl-done flex-shrink-0" />
                           )}
                         </div>
                       </button>
@@ -116,17 +119,22 @@ export default function TrainerTeacherContentHistory() {
           </div>
 
           {/* Right Panel - Details */}
-          {displayItem ? (
-            <div className="lg:col-span-3 border rounded-lg bg-card overflow-hidden flex flex-col">
+          {isLoading ? (
+            <div className="lg:col-span-3 space-y-4">
+              <SkeletonCard label="Loading the history" lines={2} />
+              <SkeletonCard label="Loading the attempts" lines={3} />
+            </div>
+          ) : displayItem ? (
+            <div className="lg:col-span-3 border border-sl-line rounded-lg bg-sl-surface overflow-hidden flex flex-col">
               {/* Header */}
-              <div className="p-4 border-b sticky top-0 z-10 bg-card">
+              <div className="p-4 border-b border-sl-line sticky top-14 sm:top-[68px] z-10 bg-sl-surface">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
                       <FileText className="h-5 w-5" />
                       {displayItem.file?.title || "Unknown Content"}
                     </h2>
-                    <p className="text-sm text-muted-foreground mt-1 capitalize">
+                    <p className="text-sm text-sl-muted mt-1 capitalize">
                       {displayItem.file?.type || "file"} - Status: {status}
                     </p>
                   </div>
@@ -144,7 +152,7 @@ export default function TrainerTeacherContentHistory() {
                 <div className="p-4 space-y-6">
                   {/* Progress Information */}
                   {displayItem.progress && (
-                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <div className="bg-sl-neutral-soft p-4 rounded-lg space-y-2">
                       <h3 className="font-semibold text-sm">Progress Details</h3>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Status:</span>
@@ -180,10 +188,7 @@ export default function TrainerTeacherContentHistory() {
                           return (
                             <Card 
                               key={attempt.id}
-                              className="border-l-4"
-                              style={{
-                                borderLeftColor: passed ? '#22c55e' : '#ef4444'
-                              }}
+                              className={`border-l-4 ${passed ? "border-l-sl-done" : "border-l-sl-risk"}`}
                               data-testid={`card-attempt-${attempt.id}`}
                             >
                               <CardHeader>
@@ -205,11 +210,11 @@ export default function TrainerTeacherContentHistory() {
                               <CardContent>
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                   <div>
-                                    <span className="text-muted-foreground">Score:</span>
+                                    <span className="text-sl-muted">Score:</span>
                                     <span className="ml-2 font-semibold">{attempt.score}/{attempt.totalQuestions}</span>
                                   </div>
                                   <div>
-                                    <span className="text-muted-foreground">Result:</span>
+                                    <span className="text-sl-muted">Result:</span>
                                     <span className="ml-2 font-semibold">{passed ? "Passed" : "Failed"}</span>
                                   </div>
                                 </div>
@@ -232,8 +237,7 @@ export default function TrainerTeacherContentHistory() {
                         {displayItem.regenerations.map((regen: any) => (
                           <Card 
                             key={regen.id} 
-                            className="border-l-4"
-                            style={{ borderLeftColor: '#f97316' }}
+                            className="border-l-4 border-l-sl-attention"
                             data-testid={`card-regen-${regen.id}`}
                           >
                             <CardHeader>
@@ -255,11 +259,11 @@ export default function TrainerTeacherContentHistory() {
                             <CardContent>
                               <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                  <span className="text-muted-foreground">Previous Quiz:</span>
+                                  <span className="text-sl-muted">Previous Quiz:</span>
                                   <span className="ml-2 font-mono text-xs">{regen.previousQuizGenerationId?.slice(0, 8)}...</span>
                                 </div>
                                 <div>
-                                  <span className="text-muted-foreground">New Quiz:</span>
+                                  <span className="text-sl-muted">New Quiz:</span>
                                   <span className="ml-2 font-mono text-xs">{regen.newQuizGenerationId?.slice(0, 8)}...</span>
                                 </div>
                               </div>
@@ -271,9 +275,9 @@ export default function TrainerTeacherContentHistory() {
                   )}
 
                   {!hasAttempts && !hasRegenerations && (
-                    <div className="bg-muted/30 p-6 rounded-lg text-center">
-                      <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-muted-foreground">
+                    <div className="bg-sl-neutral-soft p-6 rounded-lg text-center">
+                      <AlertCircle className="h-8 w-8 text-sl-muted mx-auto mb-2" />
+                      <p className="text-sl-muted">
                         No quiz attempts or regenerations yet
                       </p>
                     </div>
@@ -282,15 +286,15 @@ export default function TrainerTeacherContentHistory() {
               </ScrollArea>
             </div>
           ) : (
-            <div className="lg:col-span-3 border rounded-lg bg-card flex items-center justify-center">
+            <div className="lg:col-span-3 border border-sl-line rounded-lg bg-sl-surface flex items-center justify-center">
               <div className="text-center">
-                <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">No content data available</p>
+                <AlertCircle className="mx-auto h-12 w-12 text-sl-muted mb-3" />
+                <p className="text-sl-muted">No content data available</p>
               </div>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </AcademyShell>
   );
 }
