@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loading, SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -81,7 +81,7 @@ function PageHead({ title, sub, action }: { title: string; sub?: ReactNode; acti
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{title}</h1>
-        {sub && <p className="mt-1 text-sm text-sl-muted">{sub}</p>}
+        {sub && <div className="mt-1 text-sm text-sl-muted">{sub}</div>}
       </div>
       {action}
     </div>
@@ -113,11 +113,12 @@ function Panel({ title, sub, action, children, testId, titleSuffix }: {
   );
 }
 
-function Bars({ rows = 2 }: { rows?: number }) {
+/** Grey bars for a few lines of text that have not arrived. */
+function Bars({ rows = 2, label = "Loading" }: { rows?: number; label?: string }) {
   return (
-    <div className="space-y-3" aria-busy="true" aria-label="Loading">
-      {Array.from({ length: rows }).map((_, index) => <Skeleton key={index} className="h-4 w-full max-w-lg bg-sl-neutral-soft" />)}
-    </div>
+    <Loading label={label} className="space-y-3">
+      {Array.from({ length: rows }).map((_, index) => <SkeletonBar key={index} className="h-4 w-full max-w-lg" />)}
+    </Loading>
   );
 }
 
@@ -186,19 +187,23 @@ function TeacherAudience({
   onChange,
   deadline,
   onDeadline,
+  loading = false,
 }: {
   teachers: Array<{ id: string; name?: string; email?: string }>;
   selected: string[];
   onChange: (ids: string[]) => void;
   deadline?: string;
   onDeadline?: (value: string) => void;
+  loading?: boolean;
 }) {
   return (
     <>
     <div className="space-y-2" data-testid="quiz-audience">
       <Label>Who sits this</Label>
       <p className="text-xs text-sl-muted">Tick Fellows to assign it only to them. Leave every box empty to give it to the whole cohort.</p>
-      {teachers.length === 0 ? (
+      {loading ? (
+        <Bars rows={2} label="Loading Fellows" />
+      ) : teachers.length === 0 ? (
         <p className="text-xs text-sl-muted">No Fellows in this cohort yet.</p>
       ) : (
         <div className="max-h-36 space-y-2 overflow-y-auto">
@@ -330,10 +335,10 @@ export default function TrainerBatches() {
   const [taskNote, setTaskNote] = useState("");
   const [taskFile, setTaskFile] = useState<File | null>(null);
 
-  const { data: batches = [] } = useQuery<any[]>({
+  const { data: batches = [], isLoading: batchesLoading } = useQuery<any[]>({
     queryKey: ["/api/batches"],
   });
-  const { data: desk, isError: deskError } = useQuery<any>({
+  const { data: desk, isError: deskError, isLoading: deskLoading } = useQuery<any>({
     queryKey: ["/api/trainer/desk"],
   });
   const filteredBatches = filterByQuery(batches, listQuery, (batch) => `${batch.name || ""}`);
@@ -356,11 +361,11 @@ export default function TrainerBatches() {
   });
 
   // Fetch batch details including teachers
-  const { data: batchDetails } = useQuery<any>({
+  const { data: batchDetails, isLoading: detailsLoading } = useQuery<any>({
     queryKey: ["/api/batches", selectedBatch?.id],
     enabled: !!selectedBatch?.id,
   });
-  const { data: selectedBatchCourses = [] } = useQuery<any[]>({
+  const { data: selectedBatchCourses = [], isLoading: coursesLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", selectedBatch?.id, "courses"],
     enabled: !!selectedBatch?.id,
   });
@@ -387,19 +392,19 @@ export default function TrainerBatches() {
   });
 
   // Fetch pending open-ended reviews
-  const { data: pendingReviews = [] } = useQuery<any[]>({
+  const { data: pendingReviews = [], isLoading: reviewsLoading } = useQuery<any[]>({
     queryKey: ["/api/trainer/pending-reviews"],
     enabled: !!selectedBatch,
   });
 
   // Fetch teacher quiz attempts
-  const { data: teacherAttempts = [] } = useQuery<any[]>({
+  const { data: teacherAttempts = [], isLoading: teacherAttemptsLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", selectedBatch?.id, "teachers", selectedTeacher?.id, "quiz-attempts"],
     enabled: !!selectedBatch?.id && !!selectedTeacher?.id && viewTeacherAttemptsOpen,
   });
 
   // Fetch all teacher attempts for a specific quiz (to show who needs reset)
-  const { data: quizTeacherAttempts = [], refetch: refetchQuizAttempts } = useQuery<any[]>({
+  const { data: quizTeacherAttempts = [], refetch: refetchQuizAttempts, isLoading: quizAttemptsLoading } = useQuery<any[]>({
     queryKey: ["/api/assigned-quizzes", selectedQuizForAttempts?.id, "all-attempts"],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/assigned-quizzes/${selectedQuizForAttempts?.id}/all-teacher-attempts`);
@@ -409,7 +414,7 @@ export default function TrainerBatches() {
   });
 
   // Fetch batch attendance summary (per teacher)
-  const { data: batchAttendanceSummary = [], refetch: refetchAttendance } = useQuery<any[]>({
+  const { data: batchAttendanceSummary = [], refetch: refetchAttendance, isLoading: summaryLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", selectedBatch?.id, "attendance", "summary"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${selectedBatch?.id}/attendance/summary`);
@@ -420,7 +425,7 @@ export default function TrainerBatches() {
   });
 
   // Fetch batch attendance by date
-  const { data: dailyAttendance = [] } = useQuery<any[]>({
+  const { data: dailyAttendance = [], isLoading: dailyLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", selectedBatch?.id, "attendance", attendanceDate],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${selectedBatch?.id}/attendance?date=${attendanceDate}`);
@@ -431,7 +436,7 @@ export default function TrainerBatches() {
   });
 
   // Every mark of the cohort, newest first on the Attendance page
-  const { data: recentMarks = [] } = useQuery<any[]>({
+  const { data: recentMarks = [], isLoading: marksLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", selectedBatch?.id, "attendance", "recent"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${selectedBatch?.id}/attendance`);
@@ -472,6 +477,13 @@ export default function TrainerBatches() {
       enabled: onHome || section === "assessments",
     })),
   });
+  // The work given to each cohort on the Fellow Work page; AssessmentDesk reads the same answers, this one says when they are in.
+  const assignmentQueries = useQueries({
+    queries: cohortIds.map((id) => ({
+      queryKey: ["/api/batches", id, "assignments"],
+      enabled: section === "assessments",
+    })),
+  });
   const courseQueries = useQueries({
     queries: cohortIds.map((id) => ({
       queryKey: ["/api/batches", id, "courses"],
@@ -484,7 +496,7 @@ export default function TrainerBatches() {
       enabled: onHome && Number(batch.teacherCount || 0) > 0,
     })),
   });
-  const { data: pendingFellows = [] } = useQuery<any[]>({
+  const { data: pendingFellows = [], isLoading: pendingFellowsLoading } = useQuery<any[]>({
     queryKey: ["/api/trainer/pending-teachers"],
     enabled: onHome,
   });
@@ -511,7 +523,7 @@ export default function TrainerBatches() {
   });
 
   // Search approved teachers for bulk enrollment
-  const { data: searchedTeachers = [] } = useQuery<any[]>({
+  const { data: searchedTeachers = [], isLoading: searchLoading } = useQuery<any[]>({
     queryKey: ["/api/teachers/search", teacherSearch],
     queryFn: async () => {
       const url = teacherSearch.trim()
@@ -985,6 +997,10 @@ export default function TrainerBatches() {
 
 
   // ---------- what every section reads ----------
+  // The cohort the section works on is picked once the list has answered, so its own queries start a render later.
+  const cohortPending = batchesLoading || (batches.length > 0 && !selectedBatch);
+  const teachersLoading = cohortPending || detailsLoading;
+  const progressLoading = cohortPending || isLoadingProgress;
   const teachers: any[] = batchDetails?.teachers || [];
   const today = new Date();
   const todayKey = dayKey(today);
@@ -1019,7 +1035,7 @@ export default function TrainerBatches() {
   const fileQuizzes = Array.from(fileQuizById.values());
   const draftQuizzes = fileQuizzes.filter((quiz) => !quiz.approved);
   const approvedFileQuizzes = fileQuizzes.filter((quiz) => quiz.approved);
-  const fileQuizzesLoading = fileQuizQueries.some((query) => query.isLoading);
+  const fileQuizzesLoading = batchesLoading || fileQuizQueries.some((query) => query.isLoading);
 
   const draftRow = (quiz: any) => (
     <li key={quiz.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-sl-control p-4" data-testid={`draft-quiz-${quiz.id}`}>
@@ -1035,7 +1051,7 @@ export default function TrainerBatches() {
     </li>
   );
 
-  const cohortSelect = (id: string, withCount = false) => (
+  const cohortSelect = (id: string, withCount = false) => batchesLoading ? <SkeletonBar className="h-11 w-full rounded-lg" /> : (
     <select
       id={id}
       className={FIELD}
@@ -1111,7 +1127,8 @@ export default function TrainerBatches() {
       });
     });
   });
-  const homeLoading = courseQueries.some((query) => query.isLoading) || weekQueries.some((query) => query.isLoading) || progressQueries.some((query) => query.isLoading);
+  const homeLoading = batchesLoading || pendingFellowsLoading || courseQueries.some((query) => query.isLoading) || weekQueries.some((query) => query.isLoading) || progressQueries.some((query) => query.isLoading);
+  const eventsLoading = batchesLoading || eventQueries.some((query) => query.isLoading);
   const shownNeeds = showAllNeeds ? needs : needs.slice(0, 6);
   const sessionsToday = events.filter((event) => event.eventType === "session" && dayKey(new Date(event.startDate)) === todayKey);
 
@@ -1119,9 +1136,12 @@ export default function TrainerBatches() {
     <div className="space-y-6">
       <PageHead
         title="Home"
-        sub={`${today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · ${plural(batches.length, "cohort")} · ${plural(fellowTotal, "Fellow")}`}
+        sub={batchesLoading
+          ? <SkeletonBar className="h-4 w-72 max-w-full" />
+          : `${today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · ${plural(batches.length, "cohort")} · ${plural(fellowTotal, "Fellow")}`}
         action={<Button className={PRIMARY_BUTTON} onClick={openAddEvent} data-testid="button-add-session">Add a session</Button>}
       />
+      {deskLoading && <SkeletonBar className="h-4 w-80 max-w-full" />}
       {(desk?.encouragement || deskError) && (
         <p className="text-sm text-sl-muted" data-testid="trainer-encouragement">
           {desk?.encouragement || "You make it safe for a Fellow to try again."}
@@ -1133,7 +1153,7 @@ export default function TrainerBatches() {
           Needs you today{!homeLoading && <span className="font-normal text-sl-muted"> · {needs.length}</span>}
         </h2>
         {homeLoading ? (
-          <div className="p-5"><Bars rows={3} /></div>
+          <SkeletonRows label="Loading what needs you" rows={3} />
         ) : needs.length === 0 ? (
           <p className="px-5 pb-4 pt-2 text-sm text-sl-muted">Nothing needs you today. Missing lesson files, Fellows who have not started and approvals appear here.</p>
         ) : (
@@ -1157,20 +1177,24 @@ export default function TrainerBatches() {
             </button>
           </div>
         )}
-        <p className="border-t border-sl-line px-5 py-3 text-sm text-sl-muted" data-testid="trainer-today-line">
-          Open answers to mark: {pendingReviews.length === 0 ? "none" : pendingReviews.length}
-          <span className="ml-5">Sessions today: {sessionsToday.length === 0 ? "none scheduled" : sessionsToday.length}</span>
-          <span className="ml-5">
-            <Link href="/approvals" className="text-sl-accent underline" data-testid="link-trainer-approvals">
-              Approvals: {pendingFellows.length === 0 ? "none waiting" : `${pendingFellows.length} waiting`}
-            </Link>
-          </span>
-        </p>
+        {homeLoading || eventsLoading || cohortPending || reviewsLoading ? (
+          <div className="border-t border-sl-line px-5 py-3.5"><SkeletonBar className="h-4 w-2/3" /></div>
+        ) : (
+          <p className="border-t border-sl-line px-5 py-3 text-sm text-sl-muted" data-testid="trainer-today-line">
+            Open answers to mark: {pendingReviews.length === 0 ? "none" : pendingReviews.length}
+            <span className="ml-5">Sessions today: {sessionsToday.length === 0 ? "none scheduled" : sessionsToday.length}</span>
+            <span className="ml-5">
+              <Link href="/approvals" className="text-sl-accent underline" data-testid="link-trainer-approvals">
+                Approvals: {pendingFellows.length === 0 ? "none waiting" : `${pendingFellows.length} waiting`}
+              </Link>
+            </span>
+          </p>
+        )}
       </section>
 
       <Panel title="Quizzes waiting for your approval" testId="trainer-drafts">
         {fileQuizzesLoading ? (
-          <Bars rows={1} />
+          <SkeletonRows label="Loading quizzes" rows={2} className="-mx-5" />
         ) : draftQuizzes.length === 0 ? (
           <p className="text-sm text-sl-muted">None yet. When you upload a lesson file, its AI-drafted quiz waits here; Fellows see it only after you approve it.</p>
         ) : (
@@ -1186,8 +1210,10 @@ export default function TrainerBatches() {
       </Panel>
 
       <section className={`${PANEL} overflow-hidden`} aria-label="Your cohorts">
-        <h2 className="px-5 pt-5 text-lg font-semibold text-sl-ink">Your cohorts <span className="font-normal text-sl-muted">· {batches.length}</span></h2>
-        {batches.length === 0 ? (
+        <h2 className="px-5 pt-5 text-lg font-semibold text-sl-ink">Your cohorts{!batchesLoading && <span className="font-normal text-sl-muted"> · {batches.length}</span>}</h2>
+        {batchesLoading ? (
+          <SkeletonRows label="Loading cohorts" rows={3} className="mt-3 border-t border-sl-line" />
+        ) : batches.length === 0 ? (
           <p className="px-5 pb-5 pt-2 text-sm text-sl-muted">No cohorts on this desk yet. Your Admin adds them.</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
@@ -1216,7 +1242,7 @@ export default function TrainerBatches() {
                         </button>
                       </td>
                       <td className="px-3 py-3 text-sl-ink">{batch.teacherCount || 0}</td>
-                      <td className="px-3 py-3 text-sl-ink">{steps.length === 0 ? "No steps yet" : plural(steps.length, "step")}</td>
+                      <td className="px-3 py-3 text-sl-ink">{deskLoading ? <SkeletonBar className="h-4 w-16" /> : steps.length === 0 ? "No steps yet" : plural(steps.length, "step")}</td>
                       <td className="px-5 py-3 text-sl-ink">
                         {batch.status === "closed" ? "Closed" : batch.quizzesStatus === "stopped" ? "Open · quizzes stopped" : "Open · quizzes on"}
                       </td>
@@ -1228,19 +1254,23 @@ export default function TrainerBatches() {
           </div>
         )}
         <p className="border-t border-sl-line px-5 py-3 text-sm text-sl-muted">
-          Showing {Math.min(4, batches.length)} of {batches.length}.{" "}
+          {!batchesLoading && <>Showing {Math.min(4, batches.length)} of {batches.length}.{" "}</>}
           <button type="button" className="font-semibold text-sl-accent underline" onClick={() => goTo("cohorts")}>See all cohorts</button>
         </p>
       </section>
 
       <section aria-label="This term" data-testid="trainer-kpis">
         <h2 className="mb-3 text-lg font-semibold text-sl-ink">This term</h2>
-        <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-1 px-5 py-4 text-sl-muted`}>
-          <span>Fellows <b className="text-sl-ink">{desk?.teacherCount ?? "—"}</b></span>
-          <span>Quizzes open <b className="text-sl-ink">{desk?.openQuizzes ?? "—"}</b></span>
-          <span>Assessments <b className="text-sl-ink">{desk?.paperExams ?? "—"}</b></span>
-          <span>Attendance <b className="text-sl-ink">{desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`}</b></span>
-        </p>
+        {deskLoading ? (
+          <SkeletonFigures label="Loading this term's figures" line />
+        ) : (
+          <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-1 px-5 py-4 text-sl-muted`}>
+            <span>Fellows <b className="text-sl-ink">{desk?.teacherCount ?? "—"}</b></span>
+            <span>Quizzes open <b className="text-sl-ink">{desk?.openQuizzes ?? "—"}</b></span>
+            <span>Assessments <b className="text-sl-ink">{desk?.paperExams ?? "—"}</b></span>
+            <span>Attendance <b className="text-sl-ink">{desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`}</b></span>
+          </p>
+        )}
       </section>
     </div>
   );
@@ -1320,8 +1350,21 @@ export default function TrainerBatches() {
     const steps = selectedBatch ? stepsOf(selectedBatch.id) : [];
     return (
       <div className="space-y-6" data-tour="trainer-batches">
-        <PageHead title="Cohorts" sub={`The ${plural(batches.length, "cohort")} you run. Admins create, close and delete cohorts and place courses on them.`} />
-        {batches.length === 0 ? (
+        <PageHead
+          title="Cohorts"
+          sub={batchesLoading
+            ? <SkeletonBar className="h-4 w-96 max-w-full" />
+            : `The ${plural(batches.length, "cohort")} you run. Admins create, close and delete cohorts and place courses on them.`}
+        />
+        {batchesLoading ? (
+          <div className="grid gap-5 lg:grid-cols-[minmax(15rem,21rem)_minmax(0,1fr)] lg:items-start">
+            <div className={`${PANEL} overflow-hidden`}>
+              <div className="p-4"><SkeletonBar className="h-11 w-full" /></div>
+              <SkeletonRows label="Loading cohorts" rows={4} className="border-t border-sl-line" />
+            </div>
+            <SkeletonCard label="Loading the cohort" lines={6} className="p-6" />
+          </div>
+        ) : batches.length === 0 ? (
           <Panel title="No cohorts on this desk yet">
             <p className="text-sm text-sl-muted">Your Admin adds a cohort and places you on it. It then appears here.</p>
           </Panel>
@@ -1358,7 +1401,7 @@ export default function TrainerBatches() {
                           {batch.status === "closed" && <Chip>Closed</Chip>}
                         </span>
                         <span className="text-sm text-sl-muted">
-                          {plural(Number(batch.teacherCount || 0), "Fellow")} · {count === 0 ? "no steps yet" : plural(count, "step")}
+                          {plural(Number(batch.teacherCount || 0), "Fellow")}{!deskLoading && ` · ${count === 0 ? "no steps yet" : plural(count, "step")}`}
                         </span>
                       </button>
                     </li>
@@ -1367,6 +1410,7 @@ export default function TrainerBatches() {
               </ul>
             </div>
 
+            {!selectedBatch && <SkeletonCard label="Loading the cohort" lines={6} className="p-6" />}
             {selectedBatch && (
               <section className={`${PANEL} space-y-6 p-6`} aria-label={selectedBatch.name} data-testid="trainer-cohort-detail">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1392,19 +1436,23 @@ export default function TrainerBatches() {
 
                 <div className="space-y-3">
                   <h3 className="text-lg font-semibold text-sl-ink">Steps <span className="font-normal text-sl-muted">· run in order</span></h3>
-                  {steps.length === 0 ? (
+                  {deskLoading ? (
+                    <SkeletonRows label="Loading steps" rows={2} className="rounded-lg border border-sl-line" />
+                  ) : steps.length === 0 ? (
                     <p className="text-sm text-sl-muted">No steps yet. Your Admin adds the steps of a cohort.</p>
                   ) : steps.map((step, index) => (
                     <div key={step.id} className="rounded-lg border border-sl-line p-4" data-testid={`step-${step.id}`}>
                       <p className="font-semibold text-sl-ink">Step {index + 1} · {step.name}</p>
-                      {selectedBatchCourses.length === 0 && (
+                      {coursesLoading ? (
+                        <SkeletonBar className="mt-2 h-6 w-40 rounded-full" />
+                      ) : selectedBatchCourses.length === 0 && (
                         <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-sl-muted">
                           <Chip>No course yet</Chip> Ask your Admin to place one.
                         </p>
                       )}
                     </div>
                   ))}
-                  {selectedBatchCourses.length > 0 && (
+                  {!coursesLoading && selectedBatchCourses.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm text-sl-muted">Courses on this cohort, placed on its steps by your Admin:</p>
                       <div className="flex flex-wrap gap-2">
@@ -1425,12 +1473,14 @@ export default function TrainerBatches() {
 
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-lg font-semibold text-sl-ink">Fellows <span className="font-normal text-sl-muted">· {teachers.length}</span></h3>
+                    <h3 className="text-lg font-semibold text-sl-ink">Fellows{!teachersLoading && <span className="font-normal text-sl-muted"> · {teachers.length}</span>}</h3>
                     <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => setAddTeacherOpen(true)} data-testid="button-add-teacher">
                       Add a Fellow
                     </Button>
                   </div>
-                  {teachers.length === 0 ? (
+                  {teachersLoading ? (
+                    <SkeletonRows label="Loading Fellows" rows={3} className="rounded-lg border border-sl-line" />
+                  ) : teachers.length === 0 ? (
                     <p className="text-sm text-sl-muted">No Fellows in this cohort yet. Add one by Fellow ID, name or email.</p>
                   ) : (
                     <ul className="space-y-3">{teachers.map(fellowRow)}</ul>
@@ -1450,14 +1500,17 @@ export default function TrainerBatches() {
     ((query.data as any[]) || []).map((quiz: any) => ({ ...quiz, cohortName: batches[index]?.name || "Cohort" })));
   const examList = cohortQuizzes.filter((quiz) => isWritingExam(quiz));
   const lessonQuizList = cohortQuizzes.filter((quiz) => !isWritingExam(quiz));
-  const quizzesLoading = quizQueries.some((query) => query.isLoading);
+  const quizzesLoading = batchesLoading || quizQueries.some((query) => query.isLoading);
+  const examsLoading = quizzesLoading || assignmentQueries.some((query) => query.isLoading);
   const givenTo = (quiz: any) => (quiz.teacherIds?.length ? plural(quiz.teacherIds.length, "Fellow") : "Whole cohort");
 
   const renderAssessments = () => (
     <div className="space-y-6">
       <PageHead
         title="Assessments"
-        sub={`Quizzes to approve, exams you set, and lesson quizzes on your ${plural(batches.length, "cohort")} · pass mark 80% · 3 tries`}
+        sub={batchesLoading
+          ? <SkeletonBar className="h-4 w-96 max-w-full" />
+          : `Quizzes to approve, exams you set, and lesson quizzes on your ${plural(batches.length, "cohort")} · pass mark 80% · 3 tries`}
       />
 
       <Panel
@@ -1467,7 +1520,7 @@ export default function TrainerBatches() {
           ? "None waiting. When a lesson file is uploaded to a course on your cohorts, AI drafts its quiz and the draft waits here. Fellows see it only after you approve it."
           : undefined}
       >
-        {fileQuizzesLoading ? <Bars rows={1} /> : draftQuizzes.length > 0 && <ul className="space-y-3">{draftQuizzes.map(draftRow)}</ul>}
+        {fileQuizzesLoading ? <SkeletonRows label="Loading quizzes" rows={2} className="-mx-5" /> : draftQuizzes.length > 0 && <ul className="space-y-3">{draftQuizzes.map(draftRow)}</ul>}
       </Panel>
 
       <div data-testid="trainer-assessments">
@@ -1490,7 +1543,7 @@ export default function TrainerBatches() {
         }
       >
         <div className="space-y-3">
-          {quizzesLoading ? <Bars rows={2} /> : examList.length === 0 && (
+          {examsLoading ? <SkeletonRows label="Loading exams" rows={2} className="-mx-5" /> : examList.length === 0 && (
             <p className="text-sm text-sl-muted">No exams yet.</p>
           )}
           {examList.map((quiz: any) => (
@@ -1545,6 +1598,7 @@ export default function TrainerBatches() {
         }
       >
         <div className="space-y-3">
+          {(quizzesLoading || fileQuizzesLoading) && <SkeletonRows label="Loading lesson quizzes" rows={2} className="-mx-5" />}
           {approvedFileQuizzes.map((quiz: any) => (
             <div key={quiz.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-sl-line p-4" data-testid={`file-quiz-${quiz.id}`}>
               <div className="min-w-0 flex-1">
@@ -1660,7 +1714,7 @@ export default function TrainerBatches() {
   // ---------- Progress ----------
   const progressCourseCell = (row: any, course: any) => {
     const mods = modulesByCourse[course.id];
-    if (!mods) return <Skeleton className="h-6 w-24 bg-sl-neutral-soft" />;
+    if (!mods) return <SkeletonBar className="h-6 w-24 rounded-full" />;
     if (mods.length === 0) return <Chip>No modules yet</Chip>;
     if (!mods.some((mod: any) => mod.deckFiles?.length)) return <Chip tone="attention">No lesson files yet</Chip>;
     const done = (row.courseCompletions || []).find((item: any) => item.courseId === course.id);
@@ -1692,7 +1746,16 @@ export default function TrainerBatches() {
           </a>
         )}
       />
-      {batches.length === 0 ? (
+      {batchesLoading ? (
+        <>
+          <div className="max-w-md space-y-1">
+            <Label htmlFor="progress-cohort">Cohort</Label>
+            <SkeletonBar className="h-11 w-full rounded-lg" />
+          </div>
+          <SkeletonCard label="Loading progress" lines={5} />
+          <SkeletonFigures label="Loading the cohort in figures" line />
+        </>
+      ) : batches.length === 0 ? (
         <Panel title="No cohorts on this desk yet" />
       ) : (
         <>
@@ -1701,14 +1764,19 @@ export default function TrainerBatches() {
             {cohortSelect("progress-cohort")}
           </div>
           <Panel
-            title={selectedBatchCourses.length === 0 ? "Courses" : `Courses on ${selectedBatch?.name}`}
+            title={cohortPending || coursesLoading || selectedBatchCourses.length === 0 ? "Courses" : `Courses on ${selectedBatch?.name}`}
             testId="trainer-progress-matrix"
-            sub={selectedBatchCourses.length === 0
+            sub={cohortPending || coursesLoading
+              ? undefined
+              : selectedBatchCourses.length === 0
               ? "No course has been placed on this cohort yet, so there are no columns. Your Admin places courses on a step."
               : "Your Admin places courses on a step. A step with no course has no columns."}
           >
-            {isLoadingProgress ? (
-              <Bars rows={3} />
+            {progressLoading ? (
+              <div>
+                <p className="border-b border-sl-line py-3 text-sm text-sl-muted">Fellow</p>
+                <SkeletonRows label="Loading progress" rows={3} className="-mx-5" />
+              </div>
             ) : batchProgress.length === 0 ? (
               <p className="text-sm text-sl-muted">No Fellows in this cohort yet. Add one on Cohorts and their progress fills in here.</p>
             ) : (
@@ -1758,18 +1826,22 @@ export default function TrainerBatches() {
                 </table>
               </div>
             )}
-            {selectedBatchCourses.length > 0 && batchProgress.length > 0 && (
+            {!progressLoading && !coursesLoading && selectedBatchCourses.length > 0 && batchProgress.length > 0 && (
               <p className="mt-3 text-sm text-sl-muted">A course with no modules does not hold a Fellow up. A course needs at least one lesson file before it can be complete.</p>
             )}
           </Panel>
           <section aria-label="Cohort in figures" data-testid="trainer-progress-figures">
-            <h2 className="mb-3 text-lg font-semibold text-sl-ink">{selectedBatch?.name} in figures</h2>
-            <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-1 px-5 py-4 text-sl-muted`}>
-              <span>Fellows <b className="text-sl-ink">{batchProgress.length}</b></span>
-              <span>Average completion <b className="text-sl-ink">{progressAverage}%</b></span>
-              <span>Quizzes passed <b className="text-sl-ink">{quizzesPassed}</b></span>
-              <span>Needs support <b className="text-sl-ink">{needSupport}</b></span>
-            </p>
+            <h2 className="mb-3 text-lg font-semibold text-sl-ink">{selectedBatch?.name ?? "Cohort"} in figures</h2>
+            {progressLoading ? (
+              <SkeletonFigures label="Loading the cohort in figures" line />
+            ) : (
+              <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-1 px-5 py-4 text-sl-muted`}>
+                <span>Fellows <b className="text-sl-ink">{batchProgress.length}</b></span>
+                <span>Average completion <b className="text-sl-ink">{progressAverage}%</b></span>
+                <span>Quizzes passed <b className="text-sl-ink">{quizzesPassed}</b></span>
+                <span>Needs support <b className="text-sl-ink">{needSupport}</b></span>
+              </p>
+            )}
           </section>
         </>
       )}
@@ -1795,7 +1867,13 @@ export default function TrainerBatches() {
   const renderAttendance = () => (
     <div className="space-y-6">
       <PageHead title="Attendance" sub="Mark who came, one cohort and one day at a time" />
-      {batches.length === 0 ? (
+      {batchesLoading ? (
+        <>
+          <SkeletonCard label="Loading attendance" lines={5} />
+          <SkeletonCard label="Loading recent marks" lines={3} />
+          <SkeletonFigures label="Loading attendance in figures" count={3} />
+        </>
+      ) : batches.length === 0 ? (
         <Panel title="No cohorts on this desk yet" />
       ) : (
         <>
@@ -1820,12 +1898,18 @@ export default function TrainerBatches() {
             </div>
             <div className="mt-5 space-y-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="font-semibold text-sl-ink">Fellows in {selectedBatch?.name} <span className="font-normal text-sl-muted">· {teachers.length}</span></h3>
-                <p className="text-sm text-sl-muted" data-testid="text-attendance-status">
-                  {dailyAttendance.length === 0 ? "Nobody is marked for this date yet" : `${dailyAttendance.length} of ${teachers.length} marked for this date`}
-                </p>
+                <h3 className="font-semibold text-sl-ink">Fellows in {selectedBatch?.name ?? "the cohort"}{!teachersLoading && <span className="font-normal text-sl-muted"> · {teachers.length}</span>}</h3>
+                {teachersLoading || dailyLoading ? (
+                  <SkeletonBar className="h-4 w-52" />
+                ) : (
+                  <p className="text-sm text-sl-muted" data-testid="text-attendance-status">
+                    {dailyAttendance.length === 0 ? "Nobody is marked for this date yet" : `${dailyAttendance.length} of ${teachers.length} marked for this date`}
+                  </p>
+                )}
               </div>
-              {teachers.length === 0 ? (
+              {teachersLoading ? (
+                <SkeletonRows label="Loading Fellows" rows={3} />
+              ) : teachers.length === 0 ? (
                 <p className="text-sm text-sl-muted">No Fellows enrolled in this cohort.</p>
               ) : (
                 <>
@@ -1891,9 +1975,13 @@ export default function TrainerBatches() {
           <section className={`${PANEL} overflow-hidden`} aria-label="Recent marks" data-testid="trainer-recent-marks">
             <div className="p-5 pb-3">
               <h2 className="text-lg font-semibold text-sl-ink">Recent marks</h2>
-              <p className="text-sm text-sl-muted">{selectedBatch?.name} · {plural(recentMarks.length, "mark")}</p>
+              {cohortPending || marksLoading
+                ? <SkeletonBar className="mt-1 h-4 w-40" />
+                : <p className="text-sm text-sl-muted">{selectedBatch?.name} · {plural(recentMarks.length, "mark")}</p>}
             </div>
-            {recentMarks.length === 0 ? (
+            {cohortPending || marksLoading ? (
+              <SkeletonRows label="Loading recent marks" rows={3} className="border-t border-sl-line" />
+            ) : recentMarks.length === 0 ? (
               <p className="border-t border-sl-line px-5 py-4 text-sm text-sl-muted">No marks yet. Marks you save above appear here, newest first.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -1921,6 +2009,9 @@ export default function TrainerBatches() {
 
           <section aria-label="Attendance in figures" data-testid="trainer-attendance-figures">
             <h2 className="mb-3 text-lg font-semibold text-sl-ink">Attendance in figures</h2>
+            {cohortPending || summaryLoading ? (
+              <SkeletonFigures label="Loading attendance in figures" count={3} />
+            ) : (
             <div className="grid gap-3 sm:grid-cols-3">
               <div className={`${PANEL} p-4`}>
                 <p className="text-sm text-sl-muted">Attendance rate</p>
@@ -1938,6 +2029,7 @@ export default function TrainerBatches() {
                 <p className="text-sm text-sl-muted">of {teachers.length}</p>
               </div>
             </div>
+            )}
             <p className="mt-3 text-sm text-sl-muted">Only Fellows are marked; trainers are not.</p>
           </section>
         </>
@@ -1955,6 +2047,7 @@ export default function TrainerBatches() {
           selectedBatchId={selectedBatch?.id || ""}
           onSelectBatch={chooseBatch}
           teachers={teachers}
+          loading={teachersLoading}
           expandedId={expandedTeacherId}
           onPick={setExpandedTeacherId}
           selfLabel={user ? deskName(user) : "Trainer"}
@@ -1976,7 +2069,7 @@ export default function TrainerBatches() {
     <div className="space-y-6">
       <PageHead
         title="Schedule"
-        sub={`Sessions and deadlines on your ${plural(batches.length, "cohort")}`}
+        sub={batchesLoading ? <SkeletonBar className="h-4 w-72 max-w-full" /> : `Sessions and deadlines on your ${plural(batches.length, "cohort")}`}
         action={<Button className={PRIMARY_BUTTON} onClick={openAddEvent} data-testid="button-add-session">Add a session</Button>}
       />
       <section className={`${PANEL} overflow-hidden`} aria-label="This week" data-testid="trainer-week">
@@ -1992,8 +2085,8 @@ export default function TrainerBatches() {
             </Button>
           </div>
         </div>
-        {eventQueries.some((query) => query.isLoading) ? (
-          <div className="border-t border-sl-line p-5"><Bars rows={3} /></div>
+        {eventsLoading ? (
+          <SkeletonRows label="Loading the week" rows={5} className="border-t border-sl-line" />
         ) : (
           <ol className="border-t border-sl-line">
             {weekDays.map((day) => {
@@ -2107,7 +2200,7 @@ export default function TrainerBatches() {
                             <Label htmlFor="open-exam-prompt">Exam paper</Label>
                             <Textarea id="open-exam-prompt" value={examPrompt} onChange={(e) => setExamPrompt(e.target.value)} placeholder="Write the questions they will see." data-testid="input-open-exam-prompt" />
                           </div>
-                          <TeacherAudience teachers={batchDetails?.teachers || []} selected={quizTeacherIds} onChange={setQuizTeacherIds} deadline={deadline} onDeadline={setDeadline} />
+                          <TeacherAudience teachers={batchDetails?.teachers || []} loading={teachersLoading} selected={quizTeacherIds} onChange={setQuizTeacherIds} deadline={deadline} onDeadline={setDeadline} />
                           <Button
                             onClick={() => writeExamMutation.mutate()}
                             disabled={!quizTitle.trim() || !examPrompt.trim() || writeExamMutation.isPending}
@@ -2144,7 +2237,7 @@ export default function TrainerBatches() {
                             <Label htmlFor="paper-exam-prompt">Note on the paper (optional)</Label>
                             <Textarea id="paper-exam-prompt" value={examPrompt} onChange={(e) => setExamPrompt(e.target.value)} placeholder="Leave blank to ask them to answer the uploaded paper." />
                           </div>
-                          <TeacherAudience teachers={batchDetails?.teachers || []} selected={quizTeacherIds} onChange={setQuizTeacherIds} deadline={deadline} onDeadline={setDeadline} />
+                          <TeacherAudience teachers={batchDetails?.teachers || []} loading={teachersLoading} selected={quizTeacherIds} onChange={setQuizTeacherIds} deadline={deadline} onDeadline={setDeadline} />
                           <Button
                             onClick={() => uploadExamMutation.mutate()}
                             disabled={!quizTitle.trim() || !paperFile || uploadExamMutation.isPending}
@@ -2234,6 +2327,7 @@ export default function TrainerBatches() {
                             </div>
                             <TeacherAudience
                               teachers={batchDetails?.teachers || []}
+                              loading={teachersLoading}
                               selected={quizTeacherIds}
                               onChange={setQuizTeacherIds}
                               deadline={deadline}
@@ -2321,6 +2415,7 @@ export default function TrainerBatches() {
                             </div>
                             <TeacherAudience
                               teachers={batchDetails?.teachers || []}
+                              loading={teachersLoading}
                               selected={quizTeacherIds}
                               onChange={setQuizTeacherIds}
                               deadline={deadline}
@@ -2386,7 +2481,9 @@ export default function TrainerBatches() {
                             </div>
                             <ScrollArea className="h-48 border rounded-md">
                               <div className="p-2 space-y-1">
-                                {searchedTeachers.length === 0 ? (
+                                {searchLoading ? (
+                                  <SkeletonRows label="Searching Fellows" rows={3} />
+                                ) : searchedTeachers.length === 0 ? (
                                   <p className="text-sm text-sl-muted text-center py-4">No Fellows found</p>
                                 ) : (
                                   searchedTeachers.map((t: any) => {
@@ -2439,7 +2536,9 @@ export default function TrainerBatches() {
               Reset a Fellow's attempts to let them retake the quiz.
             </DialogDescription>
           </DialogHeader>
-          {quizTeacherAttempts.length === 0 ? (
+          {quizAttemptsLoading ? (
+            <SkeletonRows label="Loading attempts" rows={3} />
+          ) : quizTeacherAttempts.length === 0 ? (
             <p className="text-center py-6 text-sl-muted text-sm">No Fellows have attempted this quiz yet.</p>
           ) : (
             <div className="space-y-2">
@@ -2495,12 +2594,13 @@ export default function TrainerBatches() {
           <DialogHeader>
             <DialogTitle>{quizDetails?.title || "Quiz Details"}</DialogTitle>
             <DialogDescription>
-              {quizDetails?.description || ""} • {quizDetails?.questions?.length || 0} questions
+              {quizDetails ? `${quizDetails.description || ""} • ${quizDetails.questions?.length || 0} questions` : ""}
             </DialogDescription>
           </DialogHeader>
           {!quizDetails ? (
-            <div className="text-center py-8 text-sl-muted">
-              Loading quiz details...
+            <div className="space-y-4">
+              <SkeletonCard label="Loading quiz details" lines={4} />
+              <SkeletonCard label="Loading quiz details" lines={4} />
             </div>
           ) : (
             <div className="space-y-4">
@@ -2565,7 +2665,12 @@ export default function TrainerBatches() {
             <DialogDescription>{selectedTeacher?.teacherEmail}</DialogDescription>
           </DialogHeader>
           {(selectedTeacher?.medals || []).length > 0 && <CohortMedals medals={selectedTeacher.medals} />}
-          {teacherAttempts.length === 0 ? (
+          {teacherAttemptsLoading ? (
+            <div className="space-y-4">
+              <SkeletonCard label="Loading quiz attempts" lines={2} />
+              <SkeletonCard label="Loading quiz attempts" lines={2} />
+            </div>
+          ) : teacherAttempts.length === 0 ? (
             <div className="text-center py-8 text-sl-muted">
               No quiz attempts yet
             </div>
@@ -2774,6 +2879,20 @@ export default function TrainerBatches() {
       </Dialog>
 
       {/* Review and approve a lesson file's quiz */}
+      {reviewQuiz && isLoadingReviewQuiz && (
+        <Dialog open onOpenChange={(open) => { if (!open) setReviewQuiz(null); }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{reviewQuiz.file_name || "Lesson file"}</DialogTitle>
+              <DialogDescription>Review the questions, then approve the quiz.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <SkeletonCard label="Loading the quiz" lines={3} />
+              <SkeletonCard label="Loading the quiz" lines={3} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       {reviewQuiz && !isLoadingReviewQuiz && (
         <FileQuizEditDialog
           open
