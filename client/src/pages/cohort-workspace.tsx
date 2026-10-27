@@ -11,6 +11,7 @@ import { learningStatus, staffWatchLabel } from "@shared/learningStatus";
 import { deadlineLocalValue, parseDeadline } from "@shared/academyPath";
 import { deskName } from "@shared/deskName";
 import { AcademyShell } from "@/components/AcademyShell";
+import { SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 
 // Buttons, fields and chips follow design/board/CohortRoom.dc.html with the sl-* tokens.
 const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sl-accent";
@@ -92,17 +93,17 @@ export default function CohortWorkspace() {
   });
 
   // Only an Admin can read the academy path, so only an Admin sees each Fellow's Step on the roster.
-  const { data: academyPath } = useQuery<any>({
+  const { data: academyPath, isLoading: academyPathLoading } = useQuery<any>({
     queryKey: ["/api/admin/academy-path"],
     enabled: Boolean(batchId) && isAdmin,
   });
 
-  const { data: certificates = [] } = useQuery<any[]>({
+  const { data: certificates = [], isLoading: certificatesLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "certificates"],
     enabled: Boolean(batchId),
   });
 
-  const { data: events = [] } = useQuery<any[]>({
+  const { data: events = [], isLoading: eventsLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "events"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${batchId}/events`);
@@ -112,7 +113,7 @@ export default function CohortWorkspace() {
     enabled: Boolean(batchId),
   });
 
-  const { data: assignments = [] } = useQuery<any[]>({
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "assignments"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${batchId}/assignments`);
@@ -122,7 +123,7 @@ export default function CohortWorkspace() {
     enabled: Boolean(batchId),
   });
 
-  const { data: announcements = [] } = useQuery<any[]>({
+  const { data: announcements = [], isLoading: announcementsLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "announcements"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${batchId}/announcements`);
@@ -132,7 +133,7 @@ export default function CohortWorkspace() {
     enabled: Boolean(batchId),
   });
 
-  const { data: submissions = [] } = useQuery<any[]>({
+  const { data: submissions = [], isLoading: submissionsLoading } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "assignments", openWorkId, "submissions"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${batchId}/assignments/${openWorkId}/submissions`);
@@ -269,12 +270,13 @@ export default function CohortWorkspace() {
 
   const backHref = isAdmin ? "/admin/batches" : "/trainer/batches?tab=cohorts";
   const fellowCount = teachers.length;
+  const figuresLoading = isLoading || quizzesLoading || fileQuizzesLoading || progressLoading;
   const figures: { label: string; value: number | string }[] = [
-    { label: "Fellows", value: isLoading ? "—" : fellowCount },
-    { label: "Quizzes", value: quizzesLoading || fileQuizzesLoading ? "—" : quizzes.length + fileQuizzes.length },
-    { label: "In progress", value: progressLoading ? "—" : overview.inProgress },
-    { label: "Completed", value: progressLoading ? "—" : overview.completed },
-    { label: "Needs support", value: progressLoading ? "—" : overview.needsSupport },
+    { label: "Fellows", value: fellowCount },
+    { label: "Quizzes", value: quizzes.length + fileQuizzes.length },
+    { label: "In progress", value: overview.inProgress },
+    { label: "Completed", value: overview.completed },
+    { label: "Needs support", value: overview.needsSupport },
   ];
   const progressByFellow = new Map<string, any>(progress.map((row: any) => [row.teacherId, row]));
   const assessments = assignments.filter((item: any) => item.kind === "assessment");
@@ -313,7 +315,14 @@ export default function CohortWorkspace() {
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{isLoading ? "Cohort" : batch?.name || "Cohort"}</h1>
+          {isLoading ? (
+            <>
+              <h1 className="sr-only">Cohort</h1>
+              <SkeletonBar className="h-8 w-56" />
+            </>
+          ) : (
+            <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{batch?.name || "Cohort"}</h1>
+          )}
           {batch && (
             <>
               <Chip tone={batch.status === "closed" ? "neutral" : "done"}>{batch.status === "closed" ? "Closed" : "Open"}</Chip>
@@ -341,9 +350,11 @@ export default function CohortWorkspace() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sl-line px-5 py-3.5">
               <h2 id="roster-heading" className="text-lg font-semibold text-sl-ink">
                 Roster{" "}
-                <span className="font-medium text-sl-muted">
-                  · {isLoading ? "…" : `${fellowCount} ${fellowCount === 1 ? "Fellow" : "Fellows"}`}
-                </span>
+                {!isLoading && (
+                  <span className="font-medium text-sl-muted">
+                    · {`${fellowCount} ${fellowCount === 1 ? "Fellow" : "Fellows"}`}
+                  </span>
+                )}
               </h2>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={BTN_SECONDARY} onClick={() => setTab("import")} data-testid="button-import-roster">
@@ -355,10 +366,7 @@ export default function CohortWorkspace() {
               </div>
             </div>
             {isLoading ? (
-              <div className="space-y-3 px-5 py-4" aria-busy="true">
-                <div className="h-4 w-1/3 rounded bg-sl-neutral-soft" />
-                <div className="h-4 w-1/2 rounded bg-sl-neutral-soft" />
-              </div>
+              <SkeletonRows label="Loading the roster" rows={4} />
             ) : teachers.length === 0 ? (
               <p className="px-5 py-8 text-sm text-sl-muted">
                 No Fellows in this cohort yet. Add a Fellow, or import a roster (CSV), and they will appear here.
@@ -399,8 +407,8 @@ export default function CohortWorkspace() {
                           </th>
                           <td className="px-3 py-3.5">{teacher.email}</td>
                           <td className="px-3 py-3.5">{teacher.teacherId}</td>
-                          {isAdmin && <td className="px-3 py-3.5">{stepByFellow.get(teacher.id) ?? "—"}</td>}
-                          <td className="px-5 py-3.5">{status ? <Chip tone={status.tone}>{status.label}</Chip> : <span className="text-sl-muted">—</span>}</td>
+                          {isAdmin && <td className="px-3 py-3.5">{academyPathLoading ? <SkeletonBar className="h-4 w-28" /> : stepByFellow.get(teacher.id) ?? "—"}</td>}
+                          <td className="px-5 py-3.5">{progressLoading ? <SkeletonBar className="h-6 w-20 rounded-full" /> : status ? <Chip tone={status.tone}>{status.label}</Chip> : <span className="text-sl-muted">—</span>}</td>
                         </tr>
                       );
                     })}
@@ -412,18 +420,27 @@ export default function CohortWorkspace() {
 
           <section className="space-y-3" aria-labelledby="figures-heading">
             <h2 id="figures-heading" className="text-lg font-semibold text-sl-ink">This cohort in figures</h2>
-            <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-2 px-5 py-3.5 text-[15px]`}>
-              {figures.map((figure) => (
-                <span key={figure.label}>
-                  <span className="text-sl-muted">{figure.label}</span> <span className="font-semibold text-sl-ink">{figure.value}</span>
-                </span>
-              ))}
-            </p>
+            {figuresLoading ? (
+              <SkeletonFigures label="Loading this cohort in figures" count={5} line />
+            ) : (
+              <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-2 px-5 py-3.5 text-[15px]`}>
+                {figures.map((figure) => (
+                  <span key={figure.label}>
+                    <span className="text-sl-muted">{figure.label}</span> <span className="font-semibold text-sl-ink">{figure.value}</span>
+                  </span>
+                ))}
+              </p>
+            )}
           </section>
         </TabsContent>
 
         <TabsContent value="quizzes" className="mt-5 space-y-3">
-          {quizzes.length === 0 && fileQuizzes.length === 0 ? (
+          {quizzesLoading || fileQuizzesLoading ? (
+            <>
+              <SkeletonCard label="Loading quizzes" lines={1} />
+              <SkeletonCard label="Loading quizzes" lines={1} />
+            </>
+          ) : quizzes.length === 0 && fileQuizzes.length === 0 ? (
             <Empty text="No quizzes in this cohort yet. A Trainer assigns a module quiz on Assessments (on the Trainer desk), and an Admin can on Analytics." />
           ) : (
             <>
@@ -452,7 +469,12 @@ export default function CohortWorkspace() {
               Download gradebook CSV
             </a>
           </div>
-          {progress.length === 0 ? (
+          {progressLoading ? (
+            <div className={PANEL}>
+              <p className="border-b border-sl-line px-5 py-2.5 text-sm font-medium text-sl-muted">Fellow</p>
+              <SkeletonRows label="Loading the gradebook" rows={4} />
+            </div>
+          ) : progress.length === 0 ? (
             <Empty text="The gradebook fills in as Fellows finish modules and quizzes." />
           ) : (
             <div className={`${PANEL} overflow-x-auto`}>
@@ -487,12 +509,15 @@ export default function CohortWorkspace() {
         </TabsContent>
 
         <TabsContent value="graduates" className="mt-5 space-y-3">
-          {certificates.length === 0 ? (
+          {certificatesLoading ? (
+            <SkeletonCard label="Loading graduates" lines={2} />
+          ) : certificates.length === 0 ? (
             <div className={`${PANEL} space-y-3 px-5 py-4`}>
               <h3 className="text-base font-semibold text-sl-ink">No graduates yet</h3>
               <p className="text-sm text-sl-muted">
                 Certificates appear after an Admin issues one to a Fellow who has completed the course. Nobody is missing from the system — this cohort simply has not certified anyone.
               </p>
+              {progressLoading && <SkeletonBar className="h-4 w-48" />}
               {closeToGraduate.length > 0 && (
                 <div>
                   <p className="mb-2 text-sm font-medium text-sl-ink">Closest to graduating</p>
@@ -539,7 +564,12 @@ export default function CohortWorkspace() {
               Add to calendar
             </button>
           </div>
-          {events.length === 0 ? (
+          {eventsLoading ? (
+            <>
+              <SkeletonCard label="Loading the calendar" lines={1} />
+              <SkeletonCard label="Loading the calendar" lines={1} />
+            </>
+          ) : events.length === 0 ? (
             <Empty text="Nothing on the calendar yet." />
           ) : events.map((event: any) => (
             <div key={event.id} className={`${PANEL} px-5 py-4`}>
@@ -573,7 +603,12 @@ export default function CohortWorkspace() {
               Assign assessment
             </button>
           </div>
-          {assessments.length === 0 ? (
+          {assignmentsLoading ? (
+            <>
+              <SkeletonCard label="Loading assessments" lines={2} />
+              <SkeletonCard label="Loading assessments" lines={2} />
+            </>
+          ) : assessments.length === 0 ? (
             <Empty text="No assessments in this cohort yet." />
           ) : assessments.map((item: any) => (
             <div key={item.id} className={`${PANEL} space-y-3 px-5 py-4`}>
@@ -617,7 +652,9 @@ export default function CohortWorkspace() {
               </button>
               {openWorkId === item.id && (
                 <div className="space-y-4">
-                  {submissions.length === 0 ? (
+                  {submissionsLoading ? (
+                    <SkeletonRows label="Loading submissions" rows={2} className="-mx-5" />
+                  ) : submissions.length === 0 ? (
                     <p className="text-sm text-sl-muted">No submissions yet.</p>
                   ) : submissions.map((row: any) => {
                     const teacherId = row.teacher_id || row.teacherId;
@@ -712,7 +749,12 @@ export default function CohortWorkspace() {
               Send to cohort
             </button>
           </div>
-          {announcements.length === 0 ? (
+          {announcementsLoading ? (
+            <>
+              <SkeletonCard label="Loading announcements" lines={2} />
+              <SkeletonCard label="Loading announcements" lines={2} />
+            </>
+          ) : announcements.length === 0 ? (
             <Empty text="No announcements sent yet." />
           ) : announcements.map((item: any, index: number) => (
             <div key={`${item.title}-${index}`} className={`${PANEL} space-y-2 px-5 py-4`}>
