@@ -11,7 +11,7 @@ const read = (path: string) => readFileSync(join(root, path), "utf8");
 describe("teacher desk split", () => {
   it("keeps assignments and quizzes on different pages, with no practice shelf", () => {
     const page = read("client/src/pages/teacher-dashboard.tsx");
-    assert.match(page, /tab === "quiz"/);
+    assert.match(page, /tab === "quizzes"/);
     assert.equal(page.includes("PracticeShelf"), false);
     assert.match(page, /card-home-goals/);
     assert.match(page, /card-reflect-goals/);
@@ -37,7 +37,7 @@ describe("admin attendance list", () => {
     const route = read("server/routes.ts");
     assert.match(route, /\/api\/admin\/attendance/);
     assert.match(route, /trainer_attendance/);
-    const nav = read("client/src/components/AdminNav.tsx");
+    const nav = read("client/src/components/deskMenu.ts");
     assert.match(nav, /Attendance/);
   });
 });

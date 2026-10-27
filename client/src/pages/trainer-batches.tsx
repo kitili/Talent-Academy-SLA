@@ -1,39 +1,129 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation, Link } from "wouter";
+import { useState, useEffect, type ReactNode } from "react";
+import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
+import { useLocation, useSearch, Link } from "wouter";
 import posthog from "posthog-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { NotificationBell } from "@/components/NotificationBell";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
-import { ArrowLeft, Users, Plus, Trash2, LogOut, Award, CheckCircle, TrendingUp, ChevronDown, ChevronRight, AlertCircle, FileText, X, MessageSquare, Ban, Search, ClipboardCheck, Calendar, Upload, Star, Sparkles, Layers, PenLine, Mail } from "lucide-react";
+import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
+import { AcademyShell } from "@/components/AcademyShell";
+import { DESK_MENUS } from "@/components/deskMenu";
+import { Users, Plus, Trash2, FileText, X, CheckCircle, Upload, ChevronLeft, ChevronRight, MoreHorizontal, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CohortMedals } from "@/components/CohortMedals";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
 import { TRAINER_TOUR } from "@shared/guidedTour";
-import { learningStatus, learningStatusBadgeVariant } from "@shared/learningStatus";
+import { learningStatus } from "@shared/learningStatus";
 import { isWritingExam } from "@shared/trainerDesk";
 import { deadlineLocalValue } from "@shared/academyPath";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
-import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
+import { filterByQuery } from "@/components/PageStrip";
 import { TrainerMessages } from "@/components/TrainerMessages";
-import { SceneBackdrop } from "@/components/SceneBackdrop";
-import { PlaceBanner, PlaceCover } from "@/components/PlaceArt";
 import { deskName } from "@shared/deskName";
+
+/** The desk's sections, in the order of its side menu (components/deskMenu.ts). `?tab=` names one of them. */
+type SectionKey = "home" | "cohorts" | "assessments" | "progress" | "attendance" | "messages" | "schedule";
+const SECTION_KEYS = DESK_MENUS.trainer.map((item) => item.key) as SectionKey[];
+
+/** The section a `?tab=` names. The old name for Home was "desk"; links that still carry it land on Home. */
+function sectionFromSearch(search: string): SectionKey {
+  const tab = new URLSearchParams(search).get("tab");
+  if (tab === "desk") return "home";
+  return SECTION_KEYS.find((key) => key === tab) ?? "home";
+}
+
+const PRIMARY_BUTTON = "min-h-11 bg-sl-accent-strong text-white hover:bg-sl-accent-strong/90";
+const SECONDARY_BUTTON = "min-h-11 border-sl-control bg-sl-surface text-sl-ink hover:bg-sl-neutral-soft";
+const FIELD = "min-h-11 w-full rounded-lg border border-sl-control bg-sl-surface px-3 text-sm text-sl-ink";
+/** One empty list for an editor that has not loaded yet, so its reset effect does not run on every render. */
+const NO_QUESTIONS: any[] = [];
+const PANEL = "rounded-xl border border-sl-line bg-sl-surface";
+
+type Tone = "risk" | "attention" | "done" | "neutral" | "accent";
+const CHIP_TONE: Record<Tone, string> = {
+  risk: "bg-sl-risk-soft text-sl-risk",
+  attention: "bg-sl-attention-soft text-sl-attention",
+  done: "bg-sl-done-soft text-sl-done",
+  neutral: "bg-sl-neutral-soft text-sl-neutral",
+  accent: "bg-sl-accent-soft text-sl-accent",
+};
+
+function Chip({ tone = "neutral", children, testId }: { tone?: Tone; children: ReactNode; testId?: string }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${CHIP_TONE[tone]}`} data-testid={testId}>
+      {children}
+    </span>
+  );
+}
+
+/** A course status as a chip, by what it means: done, started, failed or not yet. */
+function statusTone(status: string): Tone {
+  if (status === "Completed" || status === "Passed") return "done";
+  if (status === "In Progress") return "accent";
+  if (status === "Failed") return "risk";
+  return "neutral";
+}
+
+function PageHead({ title, sub, action }: { title: string; sub?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{title}</h1>
+        {sub && <p className="mt-1 text-sm text-sl-muted">{sub}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function Panel({ title, sub, action, children, testId, titleSuffix }: {
+  title: string;
+  sub?: ReactNode;
+  action?: ReactNode;
+  children?: ReactNode;
+  testId?: string;
+  titleSuffix?: ReactNode;
+}) {
+  return (
+    <section className={`${PANEL} p-5`} data-testid={testId} aria-label={title}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold text-sl-ink">
+            {title}
+            {titleSuffix !== undefined && <span className="font-normal text-sl-muted"> · {titleSuffix}</span>}
+          </h2>
+          {sub && <div className="mt-1 text-sm text-sl-muted">{sub}</div>}
+        </div>
+        {action && <div className="flex flex-wrap gap-2">{action}</div>}
+      </div>
+      {children && <div className="mt-4">{children}</div>}
+    </section>
+  );
+}
+
+function Bars({ rows = 2 }: { rows?: number }) {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }).map((_, index) => <Skeleton key={index} className="h-4 w-full max-w-lg bg-sl-neutral-soft" />)}
+    </div>
+  );
+}
+
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
+const dayKey = (value: Date) => `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`;
 
 /** A local date and time from a form field, as the time the server stores. */
 function deadlineIso(value: string) {
@@ -47,7 +137,7 @@ function DeadlineField({ id, value, onChange }: { id: string; value: string; onC
     <div className="space-y-2">
       <Label htmlFor={id}>Deadline</Label>
       <Input id={id} type="datetime-local" value={value} onChange={(event) => onChange(event.target.value)} data-testid={`input-${id}`} />
-      <p className="text-xs text-muted-foreground">Optional. Fellows see this date beside the work.</p>
+      <p className="text-xs text-sl-muted">Optional. Fellows see this date beside the work.</p>
     </div>
   );
 }
@@ -107,9 +197,9 @@ function TeacherAudience({
     <>
     <div className="space-y-2" data-testid="quiz-audience">
       <Label>Who sits this</Label>
-      <p className="text-xs text-muted-foreground">Tick Fellows to assign it only to them. Leave every box empty to give it to the whole cohort.</p>
+      <p className="text-xs text-sl-muted">Tick Fellows to assign it only to them. Leave every box empty to give it to the whole cohort.</p>
       {teachers.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No Fellows in this cohort yet.</p>
+        <p className="text-xs text-sl-muted">No Fellows in this cohort yet.</p>
       ) : (
         <div className="max-h-36 space-y-2 overflow-y-auto">
           {teachers.map((teacher) => (
@@ -132,107 +222,8 @@ function TeacherAudience({
   );
 }
 
-const TRAINER_NAV = [
-  { id: "desk", label: "Desk", icon: Sparkles, wash: "#fff4df", ink: "#8a5a12", live: "#c4842a" },
-  { id: "cohorts", label: "Cohorts", icon: Layers, wash: "#e8eef8", ink: "#1d3f73", live: "#1d4e89" },
-  { id: "assessments", label: "Assessments & quizzes", icon: PenLine, wash: "#fde8ef", ink: "#9b3d55", live: "#c45b78" },
-  { id: "progress", label: "Progress", icon: TrendingUp, wash: "#e7f7e4", ink: "#2f6b32", live: "#3d8b45" },
-  { id: "attendance", label: "Attendance", icon: ClipboardCheck, wash: "#e6f3fb", ink: "#1d5f86", live: "#2f7eae" },
-  { id: "messages", label: "Messages", icon: Mail, wash: "#e7f6f2", ink: "#0d6b5c", live: "#0f7a6c" },
-  { id: "schedule", label: "Schedule", icon: Calendar, wash: "#f8eee6", ink: "#8a4b2f", live: "#c47b2b" },
-] as const;
-
-function TrainerSideNav({
-  tab,
-  onTab,
-}: {
-  tab: string;
-  onTab: (tab: string) => void;
-}) {
-  return (
-    <nav
-      aria-label="Trainer pages"
-      data-testid="trainer-sidebar"
-      data-tour="trainer-tools"
-      className="lg:sticky lg:top-24 lg:w-56 shrink-0"
-    >
-      <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
-        {TRAINER_NAV.map((item) => {
-          const active = tab === item.id;
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              aria-current={active ? "page" : undefined}
-              data-testid={`trainer-nav-${item.id}`}
-              onClick={() => onTab(item.id)}
-              className="flex min-w-[9.5rem] items-center gap-2 rounded-2xl px-2.5 py-2 text-left text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 lg:min-w-0"
-              style={active
-                ? { background: item.live, color: "#fffaf4" }
-                : { background: item.wash, color: item.ink }}
-            >
-              <span
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl"
-                style={{ background: active ? "rgba(255,255,255,0.28)" : "#fff" }}
-              >
-                <Icon className="h-4 w-4" />
-              </span>
-              {item.label}
-            </button>
-          );
-        })}
-        <Link
-          href="/approvals"
-          data-testid="button-trainer-approvals"
-          className="flex min-w-[9.5rem] items-center gap-2 rounded-2xl bg-[#e8f6ea] px-2.5 py-2 text-sm font-semibold text-[#24633a] shadow-sm lg:min-w-0"
-        >
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-white"><CheckCircle className="h-4 w-4" /></span>
-          Approvals
-        </Link>
-      </div>
-    </nav>
-  );
-}
-
-function TrainerKpis({
-  desk,
-  onOpen,
-}: {
-  desk: any;
-  onOpen: (tab: string) => void;
-}) {
-  const stats = [
-    { id: "cohorts", label: "Cohorts", value: desk?.cohortCount ?? 0, tab: "cohorts", wash: "#e8eef8", ink: "#1d4e89" },
-    { id: "teachers", label: "Fellows", value: desk?.teacherCount ?? 0, tab: "progress", wash: "#e7f6f2", ink: "#0f7a6c" },
-    { id: "progress", label: "Progress", value: desk?.progressPercent == null ? "—" : `${desk.progressPercent}%`, tab: "progress", wash: "#e7f7e4", ink: "#2f6b32" },
-    { id: "quizzes", label: "Quizzes", value: desk?.openQuizzes ?? 0, tab: "assessments", wash: "#efe8fb", ink: "#5b3d8a" },
-    { id: "papers", label: "Assessments", value: desk?.paperExams ?? 0, tab: "assessments", wash: "#fff1e0", ink: "#9a5b16" },
-    { id: "attendance", label: "Attendance", value: desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`, tab: "attendance", wash: "#e6f3fb", ink: "#1d5f86" },
-    { id: "schedule", label: "Upcoming", value: desk?.upcomingEvents ?? 0, tab: "schedule", wash: "#f8eee6", ink: "#8a4b2f" },
-  ];
-  return (
-    <div data-testid="trainer-kpis">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {stats.map((stat) => (
-          <button
-            key={stat.id}
-            type="button"
-            onClick={() => onOpen(stat.tab)}
-            className="rounded-2xl px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5"
-            style={{ background: stat.wash, color: stat.ink }}
-            data-testid={`trainer-kpi-${stat.id}`}
-          >
-            <span className="block text-xs font-semibold uppercase tracking-wide opacity-80">{stat.label}</span>
-            <span className="mt-1 block text-2xl font-semibold">{stat.value}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AssessmentDesk({ batchId }: { batchId: string }) {
+/** The work a Trainer gave one cohort on the Fellow Work page, with its deadline. Nothing shows when there is none. */
+function AssessmentDesk({ batchId, cohortName }: { batchId: string; cohortName: string }) {
   const { toast } = useToast();
   const { data: assignments = [] } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "assignments"],
@@ -251,27 +242,21 @@ function AssessmentDesk({ batchId }: { batchId: string }) {
   });
   if (assessments.length === 0) return null;
   return (
-    <div className="space-y-3">
+    <>
       {assessments.map((item: any) => (
-        <Card key={item.id} className="border-[#fff1e0]">
-          <CardHeader className="py-4">
-            <CardTitle className="text-base">{item.title}</CardTitle>
-            <CardDescription>
-              {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {item.instructions && <p className="text-sm text-muted-foreground">{item.instructions}</p>}
-            <WorkDeadlineEditor
-              current={item.dueDate}
-              pending={saveDue.isPending}
-              testId={`assignment-deadline-${item.id}`}
-              onSave={(dueDate) => saveDue.mutate({ id: item.id, dueDate })}
-            />
-          </CardContent>
-        </Card>
+        <div key={item.id} className="rounded-lg border border-sl-line p-4">
+          <p className="font-semibold text-sl-ink">{item.title}</p>
+          <p className="text-sm text-sl-muted">{cohortName} · Fellows open it on Work · {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
+          {item.instructions && <p className="mt-1 text-sm text-sl-muted">{item.instructions}</p>}
+          <WorkDeadlineEditor
+            current={item.dueDate}
+            pending={saveDue.isPending}
+            testId={`assignment-deadline-${item.id}`}
+            onSave={(dueDate) => saveDue.mutate({ id: item.id, dueDate })}
+          />
+        </div>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -294,7 +279,14 @@ export default function TrainerBatches() {
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("desk");
+  // The section is the URL's `?tab=`: a menu click, a link from another page and a reload all land on the same place.
+  const section = sectionFromSearch(useSearch());
+  const goTo = (key: SectionKey) => setLocation(`/trainer/batches?tab=${key}`);
+  const [reviewQuiz, setReviewQuiz] = useState<any>(null);
+  const [showAllNeeds, setShowAllNeeds] = useState(false);
+  const [addEventOpen, setAddEventOpen] = useState(false);
+  const [eventBatchId, setEventBatchId] = useState("");
+  const [weekOffset, setWeekOffset] = useState(0);
   const [deadline, setDeadline] = useState("");
 
   const [teacherId, setTeacherId] = useState("");
@@ -345,7 +337,19 @@ export default function TrainerBatches() {
     queryKey: ["/api/trainer/desk"],
   });
   const filteredBatches = filterByQuery(batches, listQuery, (batch) => `${batch.name || ""}`);
-  const batchPager = usePager(filteredBatches, 8);
+
+  // Every section works on one cohort at a time; the first is open until the Trainer picks another.
+  useEffect(() => {
+    if (!selectedBatch && batches[0]) setSelectedBatch(batches[0]);
+  }, [batches, selectedBatch]);
+  const chooseBatch = (id: string) => {
+    const next = batches.find((batch: any) => batch.id === id);
+    if (!next || next.id === selectedBatch?.id) return;
+    setSelectedBatch(next);
+    setExpandedTeacherId(null);
+    // Marks pick the Fellows of one cohort; they must not travel to another.
+    setAttendanceRecordsState({});
+  };
 
   const { data: weeks = [] } = useQuery<any[]>({
     queryKey: ["/api/training-weeks"],
@@ -361,11 +365,6 @@ export default function TrainerBatches() {
     enabled: !!selectedBatch?.id,
   });
 
-  // Fetch assigned quizzes for selected batch
-  const { data: assignedQuizzes = [] } = useQuery<any[]>({
-    queryKey: ["/api/batches", selectedBatch?.id, "quizzes"],
-    enabled: !!selectedBatch?.id,
-  });
 
   // Fetch progress for selected batch - auto-loads and refreshes every 30 seconds
   const { data: batchProgress = [], isLoading: isLoadingProgress } = useQuery<any[]>({
@@ -417,7 +416,7 @@ export default function TrainerBatches() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!selectedBatch?.id && activeTab === "attendance",
+    enabled: !!selectedBatch?.id && section === "attendance",
   });
 
   // Fetch batch attendance by date
@@ -428,18 +427,87 @@ export default function TrainerBatches() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!selectedBatch?.id && activeTab === "attendance",
+    enabled: !!selectedBatch?.id && section === "attendance",
   });
 
-  // Fetch scheduled events for batch
-  const { data: batchEvents = [], refetch: refetchEvents } = useQuery<any[]>({
-    queryKey: ["/api/batches", selectedBatch?.id, "events"],
+  // Every mark of the cohort, newest first on the Attendance page
+  const { data: recentMarks = [] } = useQuery<any[]>({
+    queryKey: ["/api/batches", selectedBatch?.id, "attendance", "recent"],
     queryFn: async () => {
-      const res = await fetch(`/api/batches/${selectedBatch?.id}/events`);
+      const res = await fetch(`/api/batches/${selectedBatch?.id}/attendance`);
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!selectedBatch?.id && activeTab === "schedule",
+    enabled: !!selectedBatch?.id && section === "attendance",
+  });
+
+  // What the Home, Assessments and Schedule pages read across every cohort on the desk
+  const cohortIds: string[] = batches.map((batch: any) => batch.id);
+  const onHome = section === "home";
+  const eventQueries = useQueries({
+    queries: cohortIds.map((id) => ({
+      queryKey: ["/api/batches", id, "events"],
+      queryFn: async () => {
+        const res = await fetch(`/api/batches/${id}/events`);
+        if (!res.ok) return [];
+        return res.json();
+      },
+      enabled: onHome || section === "schedule",
+    })),
+  });
+  const quizQueries = useQueries({
+    queries: cohortIds.map((id) => ({
+      queryKey: ["/api/batches", id, "quizzes"],
+      enabled: section === "assessments",
+    })),
+  });
+  const fileQuizQueries = useQueries({
+    queries: cohortIds.map((id) => ({
+      queryKey: ["/api/batches", id, "file-quizzes"],
+      queryFn: async () => {
+        const res = await fetch(`/api/batches/${id}/file-quizzes`);
+        if (!res.ok) return [];
+        return res.json();
+      },
+      enabled: onHome || section === "assessments",
+    })),
+  });
+  const courseQueries = useQueries({
+    queries: cohortIds.map((id) => ({
+      queryKey: ["/api/batches", id, "courses"],
+      enabled: onHome,
+    })),
+  });
+  const progressQueries = useQueries({
+    queries: batches.map((batch: any) => ({
+      queryKey: ["/api/batches", batch.id, "progress"],
+      enabled: onHome && Number(batch.teacherCount || 0) > 0,
+    })),
+  });
+  const { data: pendingFellows = [] } = useQuery<any[]>({
+    queryKey: ["/api/trainer/pending-teachers"],
+    enabled: onHome,
+  });
+  const homeCourseIds: string[] = Array.from(new Set(courseQueries.flatMap((query) => ((query.data as any[]) || []).map((course: any) => course.id))));
+  const weekCourseIds: string[] = onHome ? homeCourseIds : section === "progress" ? selectedBatchCourses.map((course: any) => course.id) : [];
+  const weekQueries = useQueries({
+    queries: weekCourseIds.map((courseId) => ({
+      queryKey: ["/api/courses", courseId, "weeks"],
+    })),
+  });
+  const modulesByCourse: Record<string, any[]> = {};
+  weekCourseIds.forEach((courseId, index) => {
+    if (weekQueries[index]?.data) modulesByCourse[courseId] = weekQueries[index].data as any[];
+  });
+  // The quiz being reviewed, with the questions the editor opens on
+  const { data: reviewQuizStatus, isLoading: isLoadingReviewQuiz } = useQuery<Record<string, any>>({
+    queryKey: ["/api/training-weeks", reviewQuiz?.week_id, "quiz-status"],
+    enabled: !!reviewQuiz,
+    queryFn: async () => {
+      const res = await fetch(`/api/training-weeks/${reviewQuiz.week_id}/quiz-status`);
+      if (!res.ok) return {};
+      return res.json();
+    },
   });
 
   // Search approved teachers for bulk enrollment
@@ -590,12 +658,14 @@ export default function TrainerBatches() {
   // Create scheduled event
   const createEventMutation = useMutation({
     mutationFn: async (data: { title: string; eventType: string; startDate: string; endDate?: string; description?: string }) => {
-      const res = await apiRequest("POST", `/api/batches/${selectedBatch?.id}/events`, data);
+      const res = await apiRequest("POST", `/api/batches/${eventBatchId}/events`, data);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Event scheduled" });
-      refetchEvents();
+      toast({ title: "Added to the schedule" });
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", eventBatchId, "events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
+      setAddEventOpen(false);
       setNewEventTitle(""); setNewEventType("session"); setNewEventStart(""); setNewEventEnd(""); setNewEventDesc("");
     },
     onError: (error: Error) => {
@@ -609,7 +679,8 @@ export default function TrainerBatches() {
       await apiRequest("DELETE", `/api/events/${id}`);
     },
     onSuccess: () => {
-      refetchEvents();
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "/api/batches" && query.queryKey[2] === "events" });
+      queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
       toast({ title: "Deleted", description: "Event removed" });
     },
   });
@@ -912,199 +983,1083 @@ export default function TrainerBatches() {
     return "outline";
   };
 
-  return (
-    <SceneBackdrop scene="hall">
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#102448] via-[#1d4e89] to-[#0f7a6c] shadow-md">
-        <div className="sl-frame py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white p-1 shadow-md ring-2 ring-[#f0c14a] sm:h-14 sm:w-14">
-              <img src={logoImage} alt="Silverleaf Academy Logo" className="w-full h-full object-contain" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-white truncate" data-testid="text-app-title">
-                Silverleaf Academy
-              </h1>
-              <p className="hidden text-xs text-[#f0c14a] sm:block sm:text-sm">
-                Trainer hall
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
-            <div className="text-xs sm:text-sm italic text-white/90 hidden md:block truncate max-w-[200px]" data-testid="text-user-info">
-              {user ? deskName(user) : ""}
-            </div>
-            <TourButton onClick={tour.replay} testId="button-trainer-tour" />
-            <NotificationBell />
-            <div className="text-white">
-              <ThemeToggle />
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              data-testid="button-logout"
-              className="hidden sm:flex bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => logoutMutation.mutate()}
-              data-testid="button-logout-mobile"
-              className="sm:hidden h-8 w-8 bg-white/10 hover:bg-white/20 text-white border-white/20"
-              aria-label="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
 
-      <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 py-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <TrainerSideNav
-            tab={activeTab}
-            onTab={(tab) => {
-              setActiveTab(tab);
-              if (tab !== "desk" && !selectedBatch && batches[0]) setSelectedBatch(batches[0]);
-            }}
-          />
-          <div className="min-w-0 flex-1 space-y-4">
-            {activeTab !== "desk" && (
-              <Button variant="ghost" size="sm" className="-ml-2" onClick={() => setActiveTab("desk")} data-testid="button-back-to-desk">
-                <ArrowLeft className="mr-1 h-4 w-4" />
-                Back to desk
-              </Button>
-            )}
-            {activeTab === "desk" && (
-              <>
-                <PlaceBanner place="hall" title="Your desk" />
-                <section className="overflow-hidden rounded-2xl shadow-md" data-testid="trainer-welcome">
-                  <div className="bg-gradient-to-r from-[#9b3d55] via-[#c47b2b] to-[#0f7a6c] px-4 py-4 text-white">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">For you today</p>
-                    <p className="text-xl font-semibold">Hello{user ? `, ${deskName(user)}` : ""}</p>
-                    {(desk?.encouragement || deskError) && (
-                      <p className="mt-1 max-w-2xl text-sm text-white/95" data-testid="trainer-encouragement">
-                        {desk?.encouragement || "You make it safe for a Fellow to try again."}
-                      </p>
-                    )}
-                  </div>
-                </section>
-                <TrainerKpis
-                  desk={desk}
-                  onOpen={(tab) => {
-                    if (!selectedBatch && batches[0]) setSelectedBatch(batches[0]);
-                    setActiveTab(tab);
-                  }}
-                />
-              </>
-            )}
-            {activeTab === "cohorts" && (
-              <div className="space-y-3" data-tour="trainer-batches">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h2 className="text-2xl font-semibold text-[#1d4e89]">Cohorts</h2>
-                    <p className="text-sm text-muted-foreground">{filteredBatches.length} on this desk</p>
-                  </div>
-                  <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search cohorts" />
+  // ---------- what every section reads ----------
+  const teachers: any[] = batchDetails?.teachers || [];
+  const today = new Date();
+  const todayKey = dayKey(today);
+  const stepsOf = (cohortId: string): Array<{ id: string; name: string }> =>
+    desk?.cohorts?.find((cohort: any) => cohort.id === cohortId)?.batches || [];
+  const progressFor = (teacherId: string) =>
+    batchProgress.find((row: any) => (row.teacher?.id ?? row.teacherId) === teacherId);
+  const fellowTotal = desk?.teacherCount ?? batches.reduce((sum: number, batch: any) => sum + Number(batch.teacherCount || 0), 0);
+  const openMail = (cohort: any, fellowId: string) => {
+    setSelectedBatch(cohort);
+    setAttendanceRecordsState({});
+    setExpandedTeacherId(fellowId);
+    goTo("messages");
+  };
+  const openAddEvent = () => {
+    setEventBatchId(selectedBatch?.id || batches[0]?.id || "");
+    setAddEventOpen(true);
+  };
+
+  const events: any[] = eventQueries.flatMap((query, index) =>
+    ((query.data as any[]) || []).map((event: any) => ({ ...event, cohortId: cohortIds[index], cohortName: batches[index]?.name || "Cohort" })));
+
+  // A lesson quiz is one row per lesson file, even when the course sits on several cohorts.
+  const fileQuizById = new Map<string, any>();
+  fileQuizQueries.forEach((query, index) => {
+    ((query.data as any[]) || []).forEach((row: any) => {
+      const seen = fileQuizById.get(row.id);
+      if (seen) seen.cohorts.push(batches[index]?.name);
+      else fileQuizById.set(row.id, { ...row, cohorts: [batches[index]?.name] });
+    });
+  });
+  const fileQuizzes = Array.from(fileQuizById.values());
+  const draftQuizzes = fileQuizzes.filter((quiz) => !quiz.approved);
+  const approvedFileQuizzes = fileQuizzes.filter((quiz) => quiz.approved);
+  const fileQuizzesLoading = fileQuizQueries.some((query) => query.isLoading);
+
+  const draftRow = (quiz: any) => (
+    <li key={quiz.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-sl-control p-4" data-testid={`draft-quiz-${quiz.id}`}>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-sl-ink">Quiz for {quiz.file_name || "a lesson file"}</p>
+        <p className="text-sm text-sl-muted">
+          {quiz.course_name} · Module {quiz.week_number} · {plural(Number(quiz.question_count || 0), "question")} · drafted by AI {quiz.created_at ? new Date(quiz.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}
+        </p>
+        <div className="mt-1"><Chip tone="attention">Draft · Fellows cannot see it</Chip></div>
+      </div>
+      <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => setReviewQuiz(quiz)} data-testid={`button-edit-draft-${quiz.id}`}>Edit</Button>
+      <Button className={PRIMARY_BUTTON} onClick={() => setReviewQuiz(quiz)} data-testid={`button-approve-draft-${quiz.id}`}>Review and approve</Button>
+    </li>
+  );
+
+  const cohortSelect = (id: string, withCount = false) => (
+    <select
+      id={id}
+      className={FIELD}
+      value={selectedBatch?.id || ""}
+      onChange={(event) => chooseBatch(event.target.value)}
+      data-testid={`select-${id}`}
+    >
+      {batches.map((batch: any) => (
+        <option key={batch.id} value={batch.id}>
+          {batch.name}{withCount ? ` · ${plural(Number(batch.teacherCount || 0), "Fellow")}` : ""}
+        </option>
+      ))}
+    </select>
+  );
+  // A dialog that acts on a cohort says which one, and lets the Trainer change it.
+  const cohortField = (id: string) => (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Cohort</Label>
+      {cohortSelect(id)}
+    </div>
+  );
+
+  // ---------- Home ----------
+  type Need = { key: string; chip: string; tone: Tone; title: string; detail: string; action: ReactNode };
+  const needs: Need[] = [];
+  if (pendingFellows.length > 0) {
+    needs.push({
+      key: "approvals",
+      chip: "Waiting",
+      tone: "attention",
+      title: `${plural(pendingFellows.length, "Fellow")} waiting for approval`,
+      detail: "Approve or decline them. After approval, each Fellow sets their own password.",
+      action: (
+        <Button asChild variant="outline" className={SECONDARY_BUTTON}>
+          <Link href="/approvals" data-testid="button-trainer-approvals">Review approvals</Link>
+        </Button>
+      ),
+    });
+  }
+  courseQueries.forEach((query, index) => {
+    ((query.data as any[]) || []).forEach((course: any) => {
+      (modulesByCourse[course.id] || []).filter((mod: any) => !(mod.deckFiles?.length)).forEach((mod: any) => {
+        needs.push({
+          key: `file-${cohortIds[index]}-${mod.id}`,
+          chip: "No lesson file",
+          tone: "attention",
+          title: `${course.name}: Module ${mod.weekNumber} has no lesson file`,
+          detail: `Add a lesson file, then approve its quiz. Fellows in ${batches[index]?.name} are not held up meanwhile.`,
+          action: (
+            <Button asChild variant="outline" className={SECONDARY_BUTTON}>
+              <Link href={`/courses/${course.id}`} data-testid={`link-add-lesson-file-${mod.id}`}>Add a lesson file</Link>
+            </Button>
+          ),
+        });
+      });
+    });
+  });
+  progressQueries.forEach((query, index) => {
+    ((query.data as any[]) || []).forEach((row: any) => {
+      if ((row.overallPercentage || 0) > 0 || row.inProgressCount || row.completedCount) return;
+      const fellowId = row.teacher?.id ?? row.teacherId;
+      needs.push({
+        key: `quiet-${cohortIds[index]}-${fellowId}`,
+        chip: "Not started",
+        tone: "neutral",
+        title: `${row.teacher?.name ?? row.teacherName} has not started ${batches[index]?.name}`,
+        detail: "No module opened yet.",
+        action: (
+          <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => openMail(batches[index], fellowId)} data-testid={`button-note-${fellowId}`}>
+            Send a note
+          </Button>
+        ),
+      });
+    });
+  });
+  const homeLoading = courseQueries.some((query) => query.isLoading) || weekQueries.some((query) => query.isLoading) || progressQueries.some((query) => query.isLoading);
+  const shownNeeds = showAllNeeds ? needs : needs.slice(0, 6);
+  const sessionsToday = events.filter((event) => event.eventType === "session" && dayKey(new Date(event.startDate)) === todayKey);
+
+  const renderHome = () => (
+    <div className="space-y-6">
+      <PageHead
+        title="Home"
+        sub={`${today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · ${plural(batches.length, "cohort")} · ${plural(fellowTotal, "Fellow")}`}
+        action={<Button className={PRIMARY_BUTTON} onClick={openAddEvent} data-testid="button-add-session">Add a session</Button>}
+      />
+      {(desk?.encouragement || deskError) && (
+        <p className="text-sm text-sl-muted" data-testid="trainer-encouragement">
+          {desk?.encouragement || "You make it safe for a Fellow to try again."}
+        </p>
+      )}
+
+      <section className={PANEL} aria-label="Needs you today" data-testid="trainer-needs">
+        <h2 className="px-5 pt-5 text-lg font-semibold text-sl-ink">
+          Needs you today{!homeLoading && <span className="font-normal text-sl-muted"> · {needs.length}</span>}
+        </h2>
+        {homeLoading ? (
+          <div className="p-5"><Bars rows={3} /></div>
+        ) : needs.length === 0 ? (
+          <p className="px-5 pb-4 pt-2 text-sm text-sl-muted">Nothing needs you today. Missing lesson files, Fellows who have not started and approvals appear here.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-sl-line border-t border-sl-line">
+            {shownNeeds.map((need) => (
+              <li key={need.key} className="flex flex-wrap items-center gap-3 px-5 py-4">
+                <Chip tone={need.tone}>{need.chip}</Chip>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sl-ink">{need.title}</p>
+                  <p className="text-sm text-sl-muted">{need.detail}</p>
                 </div>
-                {batches.length === 0 ? (
-                  <div className="rounded-2xl border bg-card p-6 text-center text-sm text-muted-foreground">
-                    <PlaceCover place="hall" className="mb-3 h-28 rounded-xl" />
-                    No cohorts on this desk yet
-                  </div>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {batchPager.slice.map((batch: any, index: number) => {
-                      const tone = ["#1d4e89", "#0f7a6c", "#c45b78", "#7c5cbf", "#c47b2b", "#2f7eae"][index % 6];
-                      const selected = selectedBatch?.id === batch.id;
-                      return (
-                        <button
-                          key={batch.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedBatch(batch);
-                            setActiveTab("progress");
-                          }}
-                          className="rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5"
-                          style={{ borderColor: selected ? tone : "transparent", boxShadow: selected ? `0 0 0 2px ${tone}` : undefined }}
-                          data-testid={`button-batch-${batch.id}`}
-                        >
-                          <span className="mb-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ background: tone }}>
-                            {batch.teacherCount || 0} teachers
-                          </span>
-                          <p className="font-semibold text-[#17233c]">{batch.name}</p>
-                          {batch.track && (
-                            <p className="mt-1 text-xs font-medium uppercase tracking-wide" style={{ color: tone }}>
-                              {batch.track === "secondary" ? "Secondary" : "Primary"}
-                            </p>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <PageStrip page={batchPager.page} pages={batchPager.pages} setPage={batchPager.setPage} />
-              </div>
+                {need.action}
+              </li>
+            ))}
+          </ul>
+        )}
+        {needs.length > shownNeeds.length && (
+          <div className="border-t border-sl-line px-5 py-3">
+            <button type="button" className="min-h-11 text-sm font-semibold text-sl-accent underline" onClick={() => setShowAllNeeds(true)}>
+              Show all {needs.length}
+            </button>
+          </div>
+        )}
+        <p className="border-t border-sl-line px-5 py-3 text-sm text-sl-muted" data-testid="trainer-today-line">
+          Open answers to mark: {pendingReviews.length === 0 ? "none" : pendingReviews.length}
+          <span className="ml-5">Sessions today: {sessionsToday.length === 0 ? "none scheduled" : sessionsToday.length}</span>
+          <span className="ml-5">
+            <Link href="/approvals" className="text-sl-accent underline" data-testid="link-trainer-approvals">
+              Approvals: {pendingFellows.length === 0 ? "none waiting" : `${pendingFellows.length} waiting`}
+            </Link>
+          </span>
+        </p>
+      </section>
+
+      <Panel title="Quizzes waiting for your approval" testId="trainer-drafts">
+        {fileQuizzesLoading ? (
+          <Bars rows={1} />
+        ) : draftQuizzes.length === 0 ? (
+          <p className="text-sm text-sl-muted">None yet. When you upload a lesson file, its AI-drafted quiz waits here; Fellows see it only after you approve it.</p>
+        ) : (
+          <>
+            <ul className="space-y-3">{draftQuizzes.slice(0, 3).map(draftRow)}</ul>
+            {draftQuizzes.length > 3 && (
+              <button type="button" className="mt-3 min-h-11 text-sm font-semibold text-sl-accent underline" onClick={() => goTo("assessments")}>
+                See all {draftQuizzes.length} in Assessments
+              </button>
             )}
-          {activeTab !== "desk" && activeTab !== "cohorts" && (selectedBatch ? (
-            <div className="border rounded-2xl bg-card overflow-hidden flex flex-col min-h-[28rem]">
-              {/* Header */}
-              <div className="p-4 border-b flex justify-between items-start">
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold">{selectedBatch.name}</h2>
-                  {selectedBatch.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{selectedBatch.description}</p>
-                  )}
-                  {selectedBatchCourses.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {selectedBatchCourses.map((course: any) => (
-                        <Link
-                          key={course.id}
-                          href={`/courses/${course.id}`}
-                          className="text-sm font-medium text-primary underline"
-                          data-testid={`link-batch-course-${course.id}`}
+          </>
+        )}
+      </Panel>
+
+      <section className={`${PANEL} overflow-hidden`} aria-label="Your cohorts">
+        <h2 className="px-5 pt-5 text-lg font-semibold text-sl-ink">Your cohorts <span className="font-normal text-sl-muted">· {batches.length}</span></h2>
+        {batches.length === 0 ? (
+          <p className="px-5 pb-5 pt-2 text-sm text-sl-muted">No cohorts on this desk yet. Your Admin adds them.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[34rem] text-left text-sm">
+              <thead>
+                <tr className="border-y border-sl-line text-sl-muted">
+                  <th scope="col" className="px-5 py-3 font-normal">Cohort</th>
+                  <th scope="col" className="px-3 py-3 font-normal">Fellows</th>
+                  <th scope="col" className="px-3 py-3 font-normal">Steps</th>
+                  <th scope="col" className="px-5 py-3 font-normal">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.slice(0, 4).map((batch: any) => {
+                  const steps = stepsOf(batch.id);
+                  return (
+                    <tr key={batch.id} className="border-b border-sl-line last:border-b-0">
+                      <td className="px-5 py-3">
+                        <button
+                          type="button"
+                          className="font-semibold text-sl-accent underline-offset-2 hover:underline"
+                          onClick={() => { chooseBatch(batch.id); goTo("cohorts"); }}
+                          data-testid={`link-home-cohort-${batch.id}`}
                         >
-                          {course.name}
-                        </Link>
-                      ))}
+                          {batch.name}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3 text-sl-ink">{batch.teacherCount || 0}</td>
+                      <td className="px-3 py-3 text-sl-ink">{steps.length === 0 ? "No steps yet" : plural(steps.length, "step")}</td>
+                      <td className="px-5 py-3 text-sl-ink">
+                        {batch.status === "closed" ? "Closed" : batch.quizzesStatus === "stopped" ? "Open · quizzes stopped" : "Open · quizzes on"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="border-t border-sl-line px-5 py-3 text-sm text-sl-muted">
+          Showing {Math.min(4, batches.length)} of {batches.length}.{" "}
+          <button type="button" className="font-semibold text-sl-accent underline" onClick={() => goTo("cohorts")}>See all cohorts</button>
+        </p>
+      </section>
+
+      <section aria-label="This term" data-testid="trainer-kpis">
+        <h2 className="mb-3 text-lg font-semibold text-sl-ink">This term</h2>
+        <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-1 px-5 py-4 text-sl-muted`}>
+          <span>Fellows <b className="text-sl-ink">{desk?.teacherCount ?? "—"}</b></span>
+          <span>Quizzes open <b className="text-sl-ink">{desk?.openQuizzes ?? "—"}</b></span>
+          <span>Assessments <b className="text-sl-ink">{desk?.paperExams ?? "—"}</b></span>
+          <span>Attendance <b className="text-sl-ink">{desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`}</b></span>
+        </p>
+      </section>
+    </div>
+  );
+
+  // ---------- Cohorts ----------
+  const fellowRow = (teacher: any) => {
+    const row = progressFor(teacher.id);
+    const status = learningStatus({ percentage: row?.overallPercentage || 0 });
+    return (
+      <li key={teacher.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-sl-line p-3" data-testid={`row-fellow-${teacher.id}`}>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 font-semibold text-sl-ink">
+            {teacher.name}
+            {row && <Chip tone={statusTone(status)}>{status}</Chip>}
+          </p>
+          <p className="text-sm text-sl-muted">{row ? `${row.overallPercentage || 0}% of courses complete` : teacher.email}</p>
+        </div>
+        <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => openMail(selectedBatch, teacher.id)} data-testid={`button-message-teacher-${teacher.id}`}>
+          Message
+        </Button>
+        <Button
+          variant="outline"
+          className={SECONDARY_BUTTON}
+          onClick={() => { setCommentTeacher(teacher); setCommentDialogOpen(true); }}
+          data-testid={`button-comment-teacher-${teacher.id}`}
+        >
+          Feedback
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className={`${SECONDARY_BUTTON} w-11 px-0`} aria-label={`More actions for ${teacher.name}`} data-testid={`button-more-teacher-${teacher.id}`}>
+              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() => {
+                const detail = row || {};
+                setSelectedTeacher({ ...detail, teacherName: teacher.name, teacherEmail: teacher.email, id: teacher.id, teacherId: teacher.id });
+                setViewTeacherAttemptsOpen(true);
+              }}
+              data-testid={`button-view-attempts-${teacher.id}`}
+            >
+              View details
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11"
+              disabled={starMutation.isPending}
+              onSelect={() => starMutation.mutate({ teacherId: teacher.id, give: !row?.trainerStar })}
+              data-testid={`button-give-star-${teacher.id}`}
+            >
+              {row?.trainerStar ? "Take the star back" : "Give a star"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="min-h-11 text-sl-risk focus:text-sl-risk"
+              onSelect={() => { setDisqualifyTeacher(teacher); setDisqualifyDialogOpen(true); }}
+              data-testid={`button-disqualify-teacher-${teacher.id}`}
+            >
+              Disqualify…
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11 text-sl-risk focus:text-sl-risk"
+              onSelect={() => { if (confirm(`Remove ${teacher.name} from this cohort?`)) removeTeacherMutation.mutate({ batchId: selectedBatch.id, teacherId: teacher.id }); }}
+              data-testid={`button-remove-teacher-${teacher.id}`}
+            >
+              Remove from cohort…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </li>
+    );
+  };
+
+  const renderCohorts = () => {
+    const steps = selectedBatch ? stepsOf(selectedBatch.id) : [];
+    return (
+      <div className="space-y-6" data-tour="trainer-batches">
+        <PageHead title="Cohorts" sub={`The ${plural(batches.length, "cohort")} you run. Admins create, close and delete cohorts and place courses on them.`} />
+        {batches.length === 0 ? (
+          <Panel title="No cohorts on this desk yet">
+            <p className="text-sm text-sl-muted">Your Admin adds a cohort and places you on it. It then appears here.</p>
+          </Panel>
+        ) : (
+          <div className="grid gap-5 lg:grid-cols-[minmax(15rem,21rem)_minmax(0,1fr)] lg:items-start">
+            <div className={`${PANEL} overflow-hidden`}>
+              <div className="space-y-1 p-4">
+                <Label htmlFor="cohort-search" className="text-sm font-normal text-sl-muted">Find a cohort</Label>
+                <Input
+                  id="cohort-search"
+                  className="min-h-11 border-sl-control bg-sl-surface"
+                  value={listQuery}
+                  onChange={(event) => setListQuery(event.target.value)}
+                  placeholder="Cohort name"
+                  data-testid="input-list-search"
+                />
+              </div>
+              <ul className="border-t border-sl-line">
+                {filteredBatches.length === 0 && <li className="p-4 text-sm text-sl-muted">No cohort matches that name.</li>}
+                {filteredBatches.map((batch: any) => {
+                  const selected = selectedBatch?.id === batch.id;
+                  const count = stepsOf(batch.id).length;
+                  return (
+                    <li key={batch.id} className="border-b border-sl-line last:border-b-0">
+                      <button
+                        type="button"
+                        onClick={() => chooseBatch(batch.id)}
+                        aria-current={selected ? "true" : undefined}
+                        className={`block min-h-11 w-full px-4 py-3 text-left ${selected ? "bg-sl-accent-soft" : "hover:bg-sl-neutral-soft"}`}
+                        data-testid={`button-batch-${batch.id}`}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-sl-ink">{batch.name}</span>
+                          {batch.status === "closed" && <Chip>Closed</Chip>}
+                        </span>
+                        <span className="text-sm text-sl-muted">
+                          {plural(Number(batch.teacherCount || 0), "Fellow")} · {count === 0 ? "no steps yet" : plural(count, "step")}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {selectedBatch && (
+              <section className={`${PANEL} space-y-6 p-6`} aria-label={selectedBatch.name} data-testid="trainer-cohort-detail">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-2xl font-semibold text-sl-ink">{selectedBatch.name}</h2>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Chip tone={selectedBatch.status === "closed" ? "neutral" : "done"}>{selectedBatch.status === "closed" ? "Closed" : "Open"}</Chip>
+                      <Chip tone={selectedBatch.quizzesStatus === "stopped" ? "neutral" : "done"}>
+                        {selectedBatch.quizzesStatus === "stopped" ? "Quizzes stopped" : "Quizzes on"}
+                      </Chip>
+                    </div>
+                    {selectedBatch.description && <p className="mt-2 text-sm text-sl-muted">{selectedBatch.description}</p>}
+                  </div>
+                  <Button className={PRIMARY_BUTTON} onClick={() => setLocation(`/cohorts/${selectedBatch.id}`)} data-testid="button-open-cohort-room">
+                    Open cohort room
+                  </Button>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-sl-ink">Finishing</h3>
+                  <p className="text-sm text-sl-muted">A Fellow finishes the academy after the number of cohorts your Admin sets.</p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-sl-ink">Steps <span className="font-normal text-sl-muted">· run in order</span></h3>
+                  {steps.length === 0 ? (
+                    <p className="text-sm text-sl-muted">No steps yet. Your Admin adds the steps of a cohort.</p>
+                  ) : steps.map((step, index) => (
+                    <div key={step.id} className="rounded-lg border border-sl-line p-4" data-testid={`step-${step.id}`}>
+                      <p className="font-semibold text-sl-ink">Step {index + 1} · {step.name}</p>
+                      {selectedBatchCourses.length === 0 && (
+                        <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-sl-muted">
+                          <Chip>No course yet</Chip> Ask your Admin to place one.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {selectedBatchCourses.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-sl-muted">Courses on this cohort, placed on its steps by your Admin:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedBatchCourses.map((course: any) => (
+                          <Link
+                            key={course.id}
+                            href={`/courses/${course.id}`}
+                            className="inline-flex min-h-11 items-center rounded-lg border border-sl-control bg-sl-accent-soft px-3 text-sm font-medium text-sl-accent"
+                            data-testid={`link-batch-course-${course.id}`}
+                          >
+                            {course.name}
+                          </Link>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-lg font-semibold text-sl-ink">Fellows <span className="font-normal text-sl-muted">· {teachers.length}</span></h3>
+                    <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => setAddTeacherOpen(true)} data-testid="button-add-teacher">
+                      Add a Fellow
+                    </Button>
+                  </div>
+                  {teachers.length === 0 ? (
+                    <p className="text-sm text-sl-muted">No Fellows in this cohort yet. Add one by Fellow ID, name or email.</p>
+                  ) : (
+                    <ul className="space-y-3">{teachers.map(fellowRow)}</ul>
+                  )}
+                  <p className="text-sm text-sl-muted">Message opens desk mail with the Fellow. Feedback adds a comment they can read but not reply to.</p>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ---------- Assessments ----------
+  const cohortQuizzes: any[] = quizQueries.flatMap((query, index) =>
+    ((query.data as any[]) || []).map((quiz: any) => ({ ...quiz, cohortName: batches[index]?.name || "Cohort" })));
+  const examList = cohortQuizzes.filter((quiz) => isWritingExam(quiz));
+  const lessonQuizList = cohortQuizzes.filter((quiz) => !isWritingExam(quiz));
+  const quizzesLoading = quizQueries.some((query) => query.isLoading);
+  const givenTo = (quiz: any) => (quiz.teacherIds?.length ? plural(quiz.teacherIds.length, "Fellow") : "Whole cohort");
+
+  const renderAssessments = () => (
+    <div className="space-y-6">
+      <PageHead
+        title="Assessments"
+        sub={`Quizzes to approve, exams you set, and lesson quizzes on your ${plural(batches.length, "cohort")} · pass mark 80% · 3 tries`}
+      />
+
+      <Panel
+        title="Quizzes waiting for your approval"
+        testId="trainer-drafts"
+        sub={draftQuizzes.length === 0 && !fileQuizzesLoading
+          ? "None waiting. When a lesson file is uploaded to a course on your cohorts, AI drafts its quiz and the draft waits here. Fellows see it only after you approve it."
+          : undefined}
+      >
+        {fileQuizzesLoading ? <Bars rows={1} /> : draftQuizzes.length > 0 && <ul className="space-y-3">{draftQuizzes.map(draftRow)}</ul>}
+      </Panel>
+
+      <div data-testid="trainer-assessments">
+      <Panel
+        title="Exams"
+        sub="Give an exam to a whole cohort or only to the Fellows you tick. Fellows see the correct answers after their last try."
+        action={
+          <>
+            <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => { setTaskKind("assessment"); setTaskOpen(true); }} data-testid="button-upload-assessment">
+              Upload an assessment
+            </Button>
+            <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => setUploadExamOpen(true)} data-testid="button-upload-exam">
+              <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+              Upload a paper exam
+            </Button>
+            <Button className={PRIMARY_BUTTON} onClick={() => setWriteExamOpen(true)} data-testid="button-write-exam">
+              Write an exam
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {quizzesLoading ? <Bars rows={2} /> : examList.length === 0 && (
+            <p className="text-sm text-sl-muted">No exams yet.</p>
+          )}
+          {examList.map((quiz: any) => (
+            <div key={quiz.id} className="rounded-lg border border-sl-line p-4" data-testid={`card-assessment-${quiz.id}`}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sl-ink">{quiz.title}</p>
+                  <p className="text-sm text-sl-muted">
+                    {quiz.cohortName} · {quiz.paperUrl ? "Uploaded paper" : "Written exam"} · {dueLabel(quiz.dueDate)} · Given to {givenTo(quiz)}
+                  </p>
+                </div>
                 <Button
                   variant="outline"
-                  size="sm"
-                  onClick={() => setLocation(`/cohorts/${selectedBatch.id}`)}
+                  className={`${SECONDARY_BUTTON} w-11 px-0 text-sl-risk`}
+                  aria-label={`Delete ${quiz.title}`}
+                  onClick={() => deleteQuizMutation.mutate(quiz.id)}
+                  data-testid={`button-delete-quiz-${quiz.id}`}
                 >
-                  Open cohort room
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </Button>
+              </div>
+              <WorkDeadlineEditor
+                current={quiz.dueDate}
+                pending={saveQuizDeadlineMutation.isPending}
+                testId={`quiz-deadline-${quiz.id}`}
+                onSave={(dueDate) => saveQuizDeadlineMutation.mutate({ quizId: quiz.id, dueDate })}
+              />
+            </div>
+          ))}
+          {batches.map((batch: any) => <AssessmentDesk key={batch.id} batchId={batch.id} cohortName={batch.name} />)}
+        </div>
+      </Panel>
+      </div>
+
+      <div data-testid="trainer-quizzes">
+      <Panel
+        title="Lesson quizzes on your cohorts"
+        sub={approvedFileQuizzes.length === 0 && lessonQuizList.length === 0 && !quizzesLoading && !fileQuizzesLoading
+          ? "None yet. Each quiz you approve appears here with its course, module and lesson file."
+          : undefined}
+        action={
+          <>
+            <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => setAssignCheckpointQuizOpen(true)} data-testid="button-assign-checkpoint-quiz">
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              Checkpoint quiz
+            </Button>
+            <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => setAssignFileQuizOpen(true)} data-testid="button-assign-file-quiz">
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              File quiz
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {approvedFileQuizzes.map((quiz: any) => (
+            <div key={quiz.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-sl-line p-4" data-testid={`file-quiz-${quiz.id}`}>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sl-ink">Quiz for {quiz.file_name || "a lesson file"}</p>
+                <p className="text-sm text-sl-muted">{quiz.course_name} · Module {quiz.week_number} · {plural(Number(quiz.question_count || 0), "question")} · {quiz.cohorts.join(", ")}</p>
+              </div>
+              <Chip tone="done">Approved</Chip>
+              <Button variant="outline" className={SECONDARY_BUTTON} onClick={() => setReviewQuiz(quiz)} data-testid={`button-edit-file-quiz-${quiz.id}`}>Edit</Button>
+            </div>
+          ))}
+          {lessonQuizList.map((quiz: any) => (
+            <div
+              key={quiz.id}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer rounded-lg border border-sl-line p-4 hover:bg-sl-neutral-soft"
+              onClick={() => { setSelectedQuizId(quiz.id); setViewQuizDetailsOpen(true); }}
+              onKeyDown={(event) => { if (event.key === "Enter") { setSelectedQuizId(quiz.id); setViewQuizDetailsOpen(true); } }}
+              data-testid={`card-quiz-${quiz.id}`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-2 font-semibold text-sl-ink">
+                    {quiz.title}
+                    <Chip>{quiz.paperUrl ? "Paper" : quiz.weekId ? "Module" : "Written"}</Chip>
+                    <Chip>{givenTo(quiz)}</Chip>
+                  </p>
+                  <p className="mt-1 text-sm text-sl-muted">{quiz.cohortName} · {quiz.description || "No description"} · {dueLabel(quiz.dueDate)}</p>
+                  <WorkDeadlineEditor
+                    current={quiz.dueDate}
+                    pending={saveQuizDeadlineMutation.isPending}
+                    testId={`quiz-deadline-${quiz.id}`}
+                    onSave={(dueDate) => saveQuizDeadlineMutation.mutate({ quizId: quiz.id, dueDate })}
+                  />
+                </div>
+                <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                  <Button
+                    variant="outline"
+                    className={`${SECONDARY_BUTTON} w-11 px-0`}
+                    aria-label={`Fellow attempts for ${quiz.title}`}
+                    title="View Fellow attempts"
+                    onClick={() => { setSelectedQuizForAttempts(quiz); setQuizAttemptsOpen(true); }}
+                    data-testid={`button-quiz-attempts-${quiz.id}`}
+                  >
+                    <Users className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`${SECONDARY_BUTTON} w-11 px-0`}
+                    aria-label={`Edit questions of ${quiz.title}`}
+                    title="Edit questions"
+                    onClick={() => { setEditingQuiz({ ...quiz, batchId: quiz.batchId }); setEditQuizOpen(true); }}
+                    data-testid={`button-edit-quiz-${quiz.id}`}
+                  >
+                    <FileText className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`${SECONDARY_BUTTON} w-11 px-0 text-sl-risk`}
+                    aria-label={`Delete ${quiz.title}`}
+                    onClick={() => deleteQuizMutation.mutate(quiz.id)}
+                    data-testid={`button-delete-quiz-${quiz.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
                 </div>
               </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      </div>
 
-              <div className="flex gap-2 overflow-x-auto border-b px-4 py-3">
-                {batches.map((batch: any) => {
-                  const selected = selectedBatch?.id === batch.id;
-                  return (
-                    <button
-                      key={batch.id}
-                      type="button"
-                      onClick={() => setSelectedBatch(batch)}
-                      className="shrink-0 rounded-full px-3 py-1 text-sm font-medium"
-                      style={selected
-                        ? { background: "#1d4e89", color: "#fffaf4" }
-                        : { background: "#e8eef8", color: "#1d3f73" }}
-                      data-testid={`button-batch-${batch.id}`}
-                    >
-                      {batch.name}
-                    </button>
-                  );
-                })}
+      {pendingReviews.length > 0 && (
+        <Panel title="Open answers to mark" titleSuffix={pendingReviews.length} testId="trainer-open-reviews">
+          <ul className="space-y-3">
+            {pendingReviews.map((review: any) => {
+              const mark = async (passed: boolean) => {
+                await apiRequest("POST", `/api/quiz-attempts/${review.attemptId}/review-open-ended`, {
+                  reviews: [{
+                    questionId: review.questionId,
+                    assignedQuizId: review.assignedQuizId,
+                    teacherId: review.teacherId,
+                    questionText: review.questionText,
+                    teacherAnswer: review.teacherAnswer,
+                    passed,
+                  }],
+                });
+                queryClient.invalidateQueries({ queryKey: ["/api/trainer/pending-reviews"] });
+                toast({ title: passed ? "Marked as passed" : "Marked as failed" });
+              };
+              return (
+                <li key={review.id} className="rounded-lg border border-sl-line p-4">
+                  <p className="text-sm font-medium text-sl-ink">{review.questionText}</p>
+                  <p className="mt-1 text-sm italic text-sl-muted">{review.teacherAnswer || "(no answer)"}</p>
+                  <div className="mt-3 flex gap-2">
+                    <Button variant="outline" className={`${SECONDARY_BUTTON} border-sl-done text-sl-done`} onClick={() => mark(true)}>
+                      <CheckCircle className="mr-1 h-4 w-4" aria-hidden="true" /> Pass
+                    </Button>
+                    <Button variant="outline" className={`${SECONDARY_BUTTON} border-sl-risk text-sl-risk`} onClick={() => mark(false)}>
+                      <X className="mr-1 h-4 w-4" aria-hidden="true" /> Fail
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
+    </div>
+  );
+
+  // ---------- Progress ----------
+  const progressCourseCell = (row: any, course: any) => {
+    const mods = modulesByCourse[course.id];
+    if (!mods) return <Skeleton className="h-6 w-24 bg-sl-neutral-soft" />;
+    if (mods.length === 0) return <Chip>No modules yet</Chip>;
+    if (!mods.some((mod: any) => mod.deckFiles?.length)) return <Chip tone="attention">No lesson files yet</Chip>;
+    const done = (row.courseCompletions || []).find((item: any) => item.courseId === course.id);
+    const status = learningStatus({
+      percentage: done?.percentage || 0,
+      passed: done?.status === "completed" ? true : undefined,
+    });
+    return <Chip tone={statusTone(status)}>{status}{done?.percentage && status === "In Progress" ? ` · ${done.percentage}%` : ""}</Chip>;
+  };
+  const progressAverage = batchProgress.length
+    ? Math.round(batchProgress.reduce((sum: number, row: any) => sum + (row.overallPercentage || 0), 0) / batchProgress.length)
+    : 0;
+  const quizzesPassed = batchProgress.reduce((sum: number, row: any) => sum + (row.reportCard?.totalQuizzesPassed || 0), 0);
+  const needSupport = batchProgress.filter((row: any) => (row.overallPercentage || 0) > 0 && (row.overallPercentage || 0) < 30).length;
+
+  const renderProgress = () => (
+    <div className="space-y-6">
+      <PageHead
+        title="Progress"
+        sub="Where each Fellow is in each course of a cohort"
+        action={selectedBatch && (
+          <a
+            href={`/api/batches/${selectedBatch.id}/gradebook.csv`}
+            download
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-sl-accent underline"
+            data-testid="link-download-csv"
+          >
+            Download CSV
+          </a>
+        )}
+      />
+      {batches.length === 0 ? (
+        <Panel title="No cohorts on this desk yet" />
+      ) : (
+        <>
+          <div className="max-w-md space-y-1">
+            <Label htmlFor="progress-cohort">Cohort</Label>
+            {cohortSelect("progress-cohort")}
+          </div>
+          <Panel
+            title={selectedBatchCourses.length === 0 ? "Courses" : `Courses on ${selectedBatch?.name}`}
+            testId="trainer-progress-matrix"
+            sub={selectedBatchCourses.length === 0
+              ? "No course has been placed on this cohort yet, so there are no columns. Your Admin places courses on a step."
+              : "Your Admin places courses on a step. A step with no course has no columns."}
+          >
+            {isLoadingProgress ? (
+              <Bars rows={3} />
+            ) : batchProgress.length === 0 ? (
+              <p className="text-sm text-sl-muted">No Fellows in this cohort yet. Add one on Cohorts and their progress fills in here.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[32rem] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-sl-line align-bottom text-sl-muted">
+                      <th scope="col" className="py-3 pr-4 font-normal">Fellow</th>
+                      {selectedBatchCourses.map((course: any) => (
+                        <th key={course.id} scope="col" className="px-3 py-3 font-normal">
+                          <Link href={`/courses/${course.id}`} className="text-sl-muted hover:text-sl-accent" data-testid={`link-batch-course-${course.id}`}>{course.name}</Link>
+                        </th>
+                      ))}
+                      <th scope="col" className="px-3 py-3 font-normal">Medals</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchProgress.map((row: any) => {
+                      const fellow = row.teacher || { id: row.teacherId, name: row.teacherName, email: row.teacherEmail };
+                      const earned = (row.medals || []).filter((medal: any) => medal.earned);
+                      return (
+                        <tr key={fellow.id} className="border-b border-sl-line last:border-b-0">
+                          <td className="py-3 pr-4">
+                            <button
+                              type="button"
+                              className="min-h-11 text-left font-semibold text-sl-accent hover:underline"
+                              onClick={() => {
+                                setSelectedTeacher({ ...row, teacherName: fellow.name, teacherEmail: fellow.email, id: fellow.id, teacherId: fellow.id });
+                                setViewTeacherAttemptsOpen(true);
+                              }}
+                              data-testid={`button-view-attempts-${fellow.id}`}
+                            >
+                              {fellow.name}
+                            </button>
+                          </td>
+                          {selectedBatchCourses.map((course: any) => (
+                            <td key={course.id} className="px-3 py-3">{progressCourseCell(row, course)}</td>
+                          ))}
+                          <td className="px-3 py-3 text-sl-muted">
+                            <span className="font-semibold text-sl-ink">{earned.length} of {(row.medals || []).length}</span>
+                            {earned.length > 0 && <span className="block">{earned.map((medal: any) => medal.title).join(", ")}</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            )}
+            {selectedBatchCourses.length > 0 && batchProgress.length > 0 && (
+              <p className="mt-3 text-sm text-sl-muted">A course with no modules does not hold a Fellow up. A course needs at least one lesson file before it can be complete.</p>
+            )}
+          </Panel>
+          <section aria-label="Cohort in figures" data-testid="trainer-progress-figures">
+            <h2 className="mb-3 text-lg font-semibold text-sl-ink">{selectedBatch?.name} in figures</h2>
+            <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-1 px-5 py-4 text-sl-muted`}>
+              <span>Fellows <b className="text-sl-ink">{batchProgress.length}</b></span>
+              <span>Average completion <b className="text-sl-ink">{progressAverage}%</b></span>
+              <span>Quizzes passed <b className="text-sl-ink">{quizzesPassed}</b></span>
+              <span>Needs support <b className="text-sl-ink">{needSupport}</b></span>
+            </p>
+          </section>
+        </>
+      )}
+    </div>
+  );
 
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
+  // ---------- Attendance ----------
+  const MARKS = [
+    { value: "present", label: "Present", on: "border-sl-done bg-sl-done-soft text-sl-done" },
+    { value: "late", label: "Late", on: "border-sl-attention bg-sl-attention-soft text-sl-attention" },
+    { value: "absent", label: "Absent", on: "border-sl-risk bg-sl-risk-soft text-sl-risk" },
+    { value: "excused", label: "Excused", on: "border-sl-neutral bg-sl-neutral-soft text-sl-neutral" },
+  ] as const;
+  const markTone: Record<string, Tone> = { present: "done", late: "attention", absent: "risk", excused: "neutral" };
+  const todayValue = new Date().toISOString().split("T")[0];
+  const attendanceDayWord = attendanceDate === todayValue ? "today" : new Date(`${attendanceDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+  const nameOf = (id: string) => teachers.find((teacher: any) => teacher.id === id)?.name || "Fellow";
+  const marksByNewest = [...recentMarks].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const markTotal = batchAttendanceSummary.reduce((sum: number, row: any) => sum + Number(row.total_days || 0), 0);
+  const markPresent = batchAttendanceSummary.reduce((sum: number, row: any) => sum + Number(row.present_days || 0), 0);
+  const markCounted = batchAttendanceSummary.reduce((sum: number, row: any) => sum + Number(row.present_days || 0) + Number(row.late_days || 0), 0);
+
+  const renderAttendance = () => (
+    <div className="space-y-6">
+      <PageHead title="Attendance" sub="Mark who came, one cohort and one day at a time" />
+      {batches.length === 0 ? (
+        <Panel title="No cohorts on this desk yet" />
+      ) : (
+        <>
+          <Panel title={`Mark attendance for ${attendanceDayWord}`} testId="trainer-mark-attendance">
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
+              <div className="space-y-1">
+                <Label htmlFor="attendance-cohort">Cohort</Label>
+                {cohortSelect("attendance-cohort")}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="attendance-date">Date</Label>
+                <input
+                  id="attendance-date"
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(event) => setAttendanceDate(event.target.value)}
+                  className={FIELD}
+                  max={todayValue}
+                  data-testid="input-attendance-date"
+                />
+              </div>
+            </div>
+            <div className="mt-5 space-y-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="font-semibold text-sl-ink">Fellows in {selectedBatch?.name} <span className="font-normal text-sl-muted">· {teachers.length}</span></h3>
+                <p className="text-sm text-sl-muted" data-testid="text-attendance-status">
+                  {dailyAttendance.length === 0 ? "Nobody is marked for this date yet" : `${dailyAttendance.length} of ${teachers.length} marked for this date`}
+                </p>
+              </div>
+              {teachers.length === 0 ? (
+                <p className="text-sm text-sl-muted">No Fellows enrolled in this cohort.</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-sl-muted">Set everyone:</span>
+                    {MARKS.map((mark) => (
+                      <Button
+                        key={mark.value}
+                        variant="outline"
+                        className={`${SECONDARY_BUTTON} text-sm`}
+                        onClick={() => {
+                          const all: Record<string, string> = {};
+                          teachers.forEach((teacher: any) => { all[teacher.id] = mark.value; });
+                          setAttendanceRecordsState(all);
+                        }}
+                      >
+                        All {mark.value}
+                      </Button>
+                    ))}
+                  </div>
+                  <ul className="space-y-3">
+                    {teachers.map((teacher: any) => (
+                      <li key={teacher.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sl-line p-3">
+                        <span className="font-semibold text-sl-ink">{teacher.name}</span>
+                        <div role="radiogroup" aria-label={`Attendance for ${teacher.name}`} className="flex flex-wrap gap-2">
+                          {MARKS.map((mark) => {
+                            const picked = attendanceRecordsState[teacher.id] === mark.value;
+                            return (
+                              <button
+                                key={mark.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={picked}
+                                onClick={() => setAttendanceRecordsState((prev) => ({ ...prev, [teacher.id]: mark.value }))}
+                                className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm ${picked ? `${mark.on} font-semibold` : "border-sl-control bg-sl-surface text-sl-ink"}`}
+                                data-testid={`mark-${mark.value}-${teacher.id}`}
+                              >
+                                <span aria-hidden="true" className={`h-4 w-4 rounded-full border-2 ${picked ? "border-current bg-current" : "border-sl-control"}`} />
+                                {mark.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    className={PRIMARY_BUTTON}
+                    disabled={submitAttendanceMutation.isPending || Object.keys(attendanceRecordsState).length === 0}
+                    onClick={() => {
+                      const records = Object.entries(attendanceRecordsState).map(([teacherId, status]) => ({ teacherId, status }));
+                      submitAttendanceMutation.mutate({ batchId: selectedBatch.id, date: attendanceDate, records });
+                    }}
+                    data-testid="button-save-attendance"
+                  >
+                    {submitAttendanceMutation.isPending ? "Saving..." : "Save attendance"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </Panel>
+
+          <section className={`${PANEL} overflow-hidden`} aria-label="Recent marks" data-testid="trainer-recent-marks">
+            <div className="p-5 pb-3">
+              <h2 className="text-lg font-semibold text-sl-ink">Recent marks</h2>
+              <p className="text-sm text-sl-muted">{selectedBatch?.name} · {plural(recentMarks.length, "mark")}</p>
+            </div>
+            {recentMarks.length === 0 ? (
+              <p className="border-t border-sl-line px-5 py-4 text-sm text-sl-muted">No marks yet. Marks you save above appear here, newest first.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[26rem] text-left text-sm">
+                  <thead>
+                    <tr className="border-y border-sl-line text-sl-muted">
+                      <th scope="col" className="px-5 py-3 font-normal">Date</th>
+                      <th scope="col" className="px-3 py-3 font-normal">Fellow</th>
+                      <th scope="col" className="px-5 py-3 font-normal">Mark</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {marksByNewest.slice(0, 10).map((mark: any) => (
+                      <tr key={mark.id || `${mark.teacherId}-${mark.date}`} className="border-b border-sl-line last:border-b-0">
+                        <td className="px-5 py-3 text-sl-muted">{new Date(mark.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}</td>
+                        <td className="px-3 py-3 font-semibold text-sl-ink">{nameOf(mark.teacherId)}</td>
+                        <td className="px-5 py-3"><Chip tone={markTone[mark.status] || "neutral"}>{String(mark.status).charAt(0).toUpperCase() + String(mark.status).slice(1)}</Chip></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section aria-label="Attendance in figures" data-testid="trainer-attendance-figures">
+            <h2 className="mb-3 text-lg font-semibold text-sl-ink">Attendance in figures</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className={`${PANEL} p-4`}>
+                <p className="text-sm text-sl-muted">Attendance rate</p>
+                <p className="text-3xl font-semibold text-sl-ink">{markTotal === 0 ? "—" : `${Math.round((markCounted / markTotal) * 100)}%`}</p>
+                <p className="text-sm text-sl-muted">{selectedBatch?.name}</p>
+              </div>
+              <div className={`${PANEL} p-4`}>
+                <p className="text-sm text-sl-muted">Marks</p>
+                <p className="text-3xl font-semibold text-sl-ink">{markTotal}</p>
+                <p className="text-sm text-sl-muted">{markPresent} Present</p>
+              </div>
+              <div className={`${PANEL} p-4`}>
+                <p className="text-sm text-sl-muted">Fellows marked</p>
+                <p className="text-3xl font-semibold text-sl-ink">{batchAttendanceSummary.length}</p>
+                <p className="text-sm text-sl-muted">of {teachers.length}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-sl-muted">Only Fellows are marked; trainers are not.</p>
+          </section>
+        </>
+      )}
+    </div>
+  );
+
+  // ---------- Messages ----------
+  const renderMessages = () => (
+    <div className="space-y-6">
+      <PageHead title="Messages" sub="Desk mail with your Fellows, cohort notes, and feedback comments" />
+      <div data-testid="trainer-messages">
+        <TrainerMessages
+          batches={batches}
+          selectedBatchId={selectedBatch?.id || ""}
+          onSelectBatch={chooseBatch}
+          teachers={teachers}
+          expandedId={expandedTeacherId}
+          onPick={setExpandedTeacherId}
+          selfLabel={user ? deskName(user) : "Trainer"}
+        />
+      </div>
+    </div>
+  );
+
+  // ---------- Schedule ----------
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7) + weekOffset * 7);
+  const weekDays = Array.from({ length: 7 }, (_, index) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index));
+  const weekTitle = `${weekDays[0].toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" })} – ${weekDays[6].toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}`;
+  const eventTime = (event: any) => {
+    const clock = (value: string) => new Date(value).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    return `${clock(event.startDate)}${event.endDate ? ` – ${clock(event.endDate)}` : ""}`;
+  };
+
+  const renderSchedule = () => (
+    <div className="space-y-6">
+      <PageHead
+        title="Schedule"
+        sub={`Sessions and deadlines on your ${plural(batches.length, "cohort")}`}
+        action={<Button className={PRIMARY_BUTTON} onClick={openAddEvent} data-testid="button-add-session">Add a session</Button>}
+      />
+      <section className={`${PANEL} overflow-hidden`} aria-label="This week" data-testid="trainer-week">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <h2 className="text-lg font-semibold text-sl-ink">{weekTitle}</h2>
+          <div className="flex gap-2">
+            <Button variant="outline" className={`${SECONDARY_BUTTON} w-11 px-0`} aria-label="Previous week" onClick={() => setWeekOffset((value) => value - 1)} data-testid="button-week-previous">
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button variant="outline" className={SECONDARY_BUTTON} disabled={weekOffset === 0} onClick={() => setWeekOffset(0)} data-testid="button-week-current">This week</Button>
+            <Button variant="outline" className={`${SECONDARY_BUTTON} w-11 px-0`} aria-label="Next week" onClick={() => setWeekOffset((value) => value + 1)} data-testid="button-week-next">
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+        {eventQueries.some((query) => query.isLoading) ? (
+          <div className="border-t border-sl-line p-5"><Bars rows={3} /></div>
+        ) : (
+          <ol className="border-t border-sl-line">
+            {weekDays.map((day) => {
+              const isToday = dayKey(day) === todayKey;
+              const dayEvents = events
+                .filter((event) => dayKey(new Date(event.startDate)) === dayKey(day))
+                .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+              return (
+                <li key={dayKey(day)} className={`flex flex-wrap gap-x-6 gap-y-2 border-b border-sl-line px-5 py-3 last:border-b-0 ${isToday ? "bg-sl-neutral-soft" : ""}`} aria-current={isToday ? "date" : undefined}>
+                  <p className="w-36 shrink-0 font-semibold text-sl-ink">{day.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" })}</p>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    {isToday && <Chip tone="accent">Today</Chip>}
+                    {dayEvents.length === 0 && <span className={`text-sm text-sl-muted ${isToday ? "ml-3" : ""}`}>Nothing scheduled</span>}
+                    {dayEvents.map((event) => (
+                      <div key={event.id} className="flex items-start justify-between gap-3 rounded-lg border border-sl-line bg-sl-surface p-3" data-testid={`event-${event.id}`}>
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-2 font-semibold text-sl-ink">
+                            <Chip>{String(event.eventType).charAt(0).toUpperCase() + String(event.eventType).slice(1)}</Chip>
+                            {event.title}
+                          </p>
+                          <p className="mt-1 text-sm text-sl-muted">{event.cohortName} · {eventTime(event)}</p>
+                          {event.description && <p className="text-sm text-sl-muted">{event.description}</p>}
+                        </div>
+                        <Button
+                          variant="outline"
+                          className={`${SECONDARY_BUTTON} w-11 shrink-0 px-0 text-sl-risk`}
+                          aria-label={`Remove ${event.title}`}
+                          onClick={() => deleteEventMutation.mutate(event.id)}
+                          data-testid={`button-delete-event-${event.id}`}
+                        >
+                          <X className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+
+  const SECTIONS: Record<SectionKey, () => ReactNode> = {
+    home: renderHome,
+    cohorts: renderCohorts,
+    assessments: renderAssessments,
+    progress: renderProgress,
+    attendance: renderAttendance,
+    messages: renderMessages,
+    schedule: renderSchedule,
+  };
+
+  return (
+    <AcademyShell
+      title="Silverleaf Academy"
+      userLabel={user ? deskName(user) : ""}
+      onLogout={() => logoutMutation.mutate()}
+      actions={<TourButton onClick={tour.replay} testId="button-trainer-tour" tone="light" />}
+      desk="trainer"
+      current={section}
+      onNavigate={(key) => goTo(key as SectionKey)}
+    >
+      {SECTIONS[section]()}
+
                 <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
                   <DialogContent>
                     <DialogHeader>
@@ -1112,6 +2067,7 @@ export default function TrainerBatches() {
                       <DialogDescription>This goes to the Fellow Work page. It is not a quiz.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
+{cohortField("task-cohort")}
                       <div className="space-y-2">
                         <Label htmlFor="task-title">Title</Label>
                         <Input id="task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} data-testid="input-task-title" />
@@ -1135,31 +2091,14 @@ export default function TrainerBatches() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <TabsContent value="assessments" className="flex-1 overflow-y-auto p-4">
-                <div className="space-y-4" data-testid="trainer-assessments">
-                  <div className="rounded-2xl p-4" style={{ background: "#fff1e0", color: "#9a5b16" }}>
-                    <p className="text-lg font-semibold">Assessments</p>
-                    <p className="mt-1 text-sm">Paper exams and written exams. Lesson quizzes follow below.</p>
-                  </div>
-                  <AssessmentDesk batchId={selectedBatch.id} />
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" data-testid="button-upload-assessment" onClick={() => { setTaskKind("assessment"); setTaskOpen(true); }}>
-                      <ClipboardCheck className="mr-2 h-4 w-4" />
-                      Upload assessment
-                    </Button>
                     <Dialog open={writeExamOpen} onOpenChange={(open) => { setWriteExamOpen(open); if (!open) clearExamForm(); }}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" variant="outline" data-testid="button-write-exam">
-                          <FileText className="mr-2 h-4 w-4" />
-                          Write exam
-                        </Button>
-                      </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Write an exam</DialogTitle>
                           <DialogDescription>Fellows open this as a document and write their answers beside it.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
+{cohortField("write-exam-cohort")}
                           <div className="space-y-2">
                             <Label htmlFor="open-exam-title">Title</Label>
                             <Input id="open-exam-title" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} data-testid="input-open-exam-title" />
@@ -1180,18 +2119,13 @@ export default function TrainerBatches() {
                       </DialogContent>
                     </Dialog>
                     <Dialog open={uploadExamOpen} onOpenChange={(open) => { setUploadExamOpen(open); if (!open) clearExamForm(); }}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" data-testid="button-upload-exam" className="bg-[#e09a3e] hover:bg-[#9a5b16]">
-                          <Upload className="mr-2 h-4 w-4" />
-                          Upload paper
-                        </Button>
-                      </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Upload a paper exam</DialogTitle>
                           <DialogDescription>Fellows see the paper on one side and write answers on the other.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
+{cohortField("paper-exam-cohort")}
                           <div className="space-y-2">
                             <Label htmlFor="paper-exam-title">Title</Label>
                             <Input id="paper-exam-title" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} data-testid="input-paper-exam-title" />
@@ -1221,57 +2155,14 @@ export default function TrainerBatches() {
                         </div>
                       </DialogContent>
                     </Dialog>
-                  </div>
-                  {assignedQuizzes.filter((quiz: any) => isWritingExam(quiz)).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No assessments in this cohort yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {assignedQuizzes.filter((quiz: any) => isWritingExam(quiz)).map((quiz: any) => (
-                        <Card key={quiz.id} data-testid={`card-assessment-${quiz.id}`}>
-                          <CardContent className="space-y-2 py-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="font-semibold">{quiz.title}</p>
-                                <p className="text-sm text-muted-foreground">{quiz.paperUrl ? "Uploaded paper" : "Written exam"} · {dueLabel(quiz.dueDate)}</p>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => deleteQuizMutation.mutate(quiz.id)}
-                                data-testid={`button-delete-quiz-${quiz.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <WorkDeadlineEditor
-                              current={quiz.dueDate}
-                              pending={saveQuizDeadlineMutation.isPending}
-                              testId={`quiz-deadline-${quiz.id}`}
-                              onSave={(dueDate) => saveQuizDeadlineMutation.mutate({ quizId: quiz.id, dueDate })}
-                            />
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="mt-8 space-y-4 border-t pt-6" data-testid="trainer-quizzes">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 className="text-lg font-semibold">Lesson quizzes</h3>
-                    <div className="flex flex-wrap gap-2">
                       <Dialog open={assignCheckpointQuizOpen} onOpenChange={setAssignCheckpointQuizOpen}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline" data-testid="button-assign-checkpoint-quiz">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Checkpoint
-                          </Button>
-                        </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>Assign module quiz</DialogTitle>
                             <DialogDescription>Generate and assign a new module quiz</DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
+{cohortField("checkpoint-cohort")}
                             <div className="space-y-2">
                               <Label htmlFor="quiz-title">Quiz Title</Label>
                               <Input
@@ -1339,7 +2230,7 @@ export default function TrainerBatches() {
                                 value={ownQuestion}
                                 onChange={(e) => setOwnQuestion(e.target.value)}
                               />
-                              <p className="text-xs text-muted-foreground">Correct answer is True. Works even when no model key is set.</p>
+                              <p className="text-xs text-sl-muted">Correct answer is True. Works even when no model key is set.</p>
                             </div>
                             <TeacherAudience
                               teachers={batchDetails?.teachers || []}
@@ -1359,18 +2250,13 @@ export default function TrainerBatches() {
                         </DialogContent>
                       </Dialog>
                       <Dialog open={assignFileQuizOpen} onOpenChange={setAssignFileQuizOpen}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline" data-testid="button-assign-file-quiz">
-                            <Plus className="mr-2 h-4 w-4" />
-                            File Quiz
-                          </Button>
-                        </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>Assign File Quiz</DialogTitle>
                             <DialogDescription>Generate a quiz from presentation files</DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
+{cohortField("file-quiz-cohort")}
                             <div className="space-y-2">
                               <Label htmlFor="file-quiz-title">Quiz Title</Label>
                               <Input
@@ -1450,196 +2336,7 @@ export default function TrainerBatches() {
                           </div>
                         </DialogContent>
                       </Dialog>
-                    </div>
-                  </div>
-                  {assignedQuizzes.filter((quiz: any) => !isWritingExam(quiz)).length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No quizzes assigned yet
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {assignedQuizzes.filter((quiz: any) => !isWritingExam(quiz)).map((quiz: any) => (
-                        <Card
-                          key={quiz.id}
-                          className="cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => {
-                            setSelectedQuizId(quiz.id);
-                            setViewQuizDetailsOpen(true);
-                          }}
-                          data-testid={`card-quiz-${quiz.id}`}
-                        >
-                          <CardContent className="py-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-semibold truncate">{quiz.title}</p>
-                                  <Badge variant="outline" className="text-xs flex-shrink-0">
-                                    {quiz.paperUrl ? "Paper" : quiz.weekId ? "Module" : "Written"}
-                                  </Badge>
-                                  <Badge variant="secondary" className="text-xs flex-shrink-0">
-                                    {quiz.teacherIds?.length ? `${quiz.teacherIds.length} Fellows` : "Whole cohort"}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  {quiz.description || "No description"} · {dueLabel(quiz.dueDate)}
-                                </p>
-                                <WorkDeadlineEditor
-                                  current={quiz.dueDate}
-                                  pending={saveQuizDeadlineMutation.isPending}
-                                  testId={`quiz-deadline-${quiz.id}`}
-                                  onSave={(dueDate) => saveQuizDeadlineMutation.mutate({ quizId: quiz.id, dueDate })}
-                                />
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  title="View Fellow attempts"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedQuizForAttempts(quiz);
-                                    setQuizAttemptsOpen(true);
-                                  }}
-                                >
-                                  <Users className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  title="Edit questions"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingQuiz(quiz);
-                                    setEditQuizOpen(true);
-                                  }}
-                                  data-testid={`button-edit-quiz-${quiz.id}`}
-                                >
-                                  <FileText className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteQuizMutation.mutate(quiz.id);
-                                  }}
-                                  data-testid={`button-delete-quiz-${quiz.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Pending open-ended reviews */}
-                  {pendingReviews.length > 0 && (
-                    <div className="mt-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <h4 className="font-semibold text-base">Pending Open-Ended Reviews</h4>
-                        <Badge variant="destructive" className="text-xs">{pendingReviews.length}</Badge>
-                      </div>
-                      <div className="space-y-3">
-                        {pendingReviews.map((review: any) => (
-                          <Card key={review.id} className="border-yellow-300">
-                            <CardContent className="py-4 space-y-2">
-                              <p className="text-sm font-medium">{review.questionText}</p>
-                              <p className="text-sm text-muted-foreground italic">{review.teacherAnswer || "(no answer)"}</p>
-                              <div className="flex gap-2 pt-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-green-600 border-green-300 hover:bg-green-50"
-                                  onClick={async () => {
-                                    await apiRequest("POST", `/api/quiz-attempts/${review.attemptId}/review-open-ended`, {
-                                      reviews: [{
-                                        questionId: review.questionId,
-                                        assignedQuizId: review.assignedQuizId,
-                                        teacherId: review.teacherId,
-                                        questionText: review.questionText,
-                                        teacherAnswer: review.teacherAnswer,
-                                        passed: true,
-                                      }],
-                                    });
-                                    queryClient.invalidateQueries({ queryKey: ["/api/trainer/pending-reviews"] });
-                                    toast({ title: "Marked as passed" });
-                                  }}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-1" /> Pass
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-red-600 border-red-300 hover:bg-red-50"
-                                  onClick={async () => {
-                                    await apiRequest("POST", `/api/quiz-attempts/${review.attemptId}/review-open-ended`, {
-                                      reviews: [{
-                                        questionId: review.questionId,
-                                        assignedQuizId: review.assignedQuizId,
-                                        teacherId: review.teacherId,
-                                        questionText: review.questionText,
-                                        teacherAnswer: review.teacherAnswer,
-                                        passed: false,
-                                      }],
-                                    });
-                                    queryClient.invalidateQueries({ queryKey: ["/api/trainer/pending-reviews"] });
-                                    toast({ title: "Marked as failed" });
-                                  }}
-                                >
-                                  <X className="h-4 w-4 mr-1" /> Fail
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                </TabsContent>
-
-                {/* Messages Tab */}
-                <TabsContent value="messages" className="space-y-4 flex-1 overflow-y-auto p-4" data-testid="trainer-messages">
-                  <TrainerMessages
-                    teachers={batchDetails?.teachers || []}
-                    expandedId={expandedTeacherId}
-                    onPick={setExpandedTeacherId}
-                    selfLabel={user ? deskName(user) : "Trainer"}
-                  />
-                </TabsContent>
-
-                <TabsContent value="progress" className="space-y-4 flex-1 overflow-y-auto p-4">
-                  <h3 className="text-lg font-semibold">Cohort overview</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
-                    {(() => {
-                      const statuses = batchProgress.map((row: any) => learningStatus({ percentage: row.overallPercentage || 0 }));
-                      const cells = [
-                        ["Total learners", batchProgress.length],
-                        ["Completed", statuses.filter((s) => s === "Completed" || s === "Passed").length],
-                        ["In Progress", statuses.filter((s) => s === "In Progress").length],
-                        ["Not Started", statuses.filter((s) => s === "Not Started").length],
-                        ["Needs support", batchProgress.filter((row: any) => (row.overallPercentage || 0) > 0 && (row.overallPercentage || 0) < 30).length],
-                      ];
-                      return cells.map(([label, value]) => (
-                        <div key={String(label)} className="text-center p-3 bg-muted rounded sl-stat-card">
-                          <p className="text-muted-foreground text-xs">{label}</p>
-                          <p className="font-semibold text-lg">{value}</p>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Fellow progress</h3>
                     <Dialog open={addTeacherOpen} onOpenChange={setAddTeacherOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" data-testid="button-add-teacher">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Fellows
-                        </Button>
-                      </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
                           <DialogTitle>Add Fellows to {selectedBatch?.name}</DialogTitle>
@@ -1673,13 +2370,13 @@ export default function TrainerBatches() {
 
                           <div className="relative">
                             <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">or select multiple</span></div>
+                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-sl-muted">or select multiple</span></div>
                           </div>
 
                           {/* Bulk select */}
                           <div className="space-y-2">
                             <div className="relative">
-                              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-sl-muted" />
                               <Input
                                 placeholder="Search Fellows..."
                                 value={teacherSearch}
@@ -1690,13 +2387,13 @@ export default function TrainerBatches() {
                             <ScrollArea className="h-48 border rounded-md">
                               <div className="p-2 space-y-1">
                                 {searchedTeachers.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground text-center py-4">No Fellows found</p>
+                                  <p className="text-sm text-sl-muted text-center py-4">No Fellows found</p>
                                 ) : (
                                   searchedTeachers.map((t: any) => {
                                     const alreadyEnrolled = batchDetails?.teachers?.some((bt: any) => bt.id === t.id);
                                     const checked = selectedTeacherIds.includes(t.id);
                                     return (
-                                      <label key={t.id} className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-muted/50 ${alreadyEnrolled ? "opacity-50" : ""}`}>
+                                      <label key={t.id} className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-sl-neutral-soft ${alreadyEnrolled ? "opacity-50" : ""}`}>
                                         <input
                                           type="checkbox"
                                           checked={checked}
@@ -1710,7 +2407,7 @@ export default function TrainerBatches() {
                                         />
                                         <div className="flex-1 min-w-0">
                                           <div className="font-medium text-sm truncate">{t.name}</div>
-                                          <div className="text-xs text-muted-foreground">ID: {t.teacherId} · {t.email}</div>
+                                          <div className="text-xs text-sl-muted">ID: {t.teacherId} · {t.email}</div>
                                         </div>
                                         {alreadyEnrolled && <Badge variant="secondary" className="text-xs">Enrolled</Badge>}
                                       </label>
@@ -1733,353 +2430,6 @@ export default function TrainerBatches() {
                         </div>
                       </DialogContent>
                     </Dialog>
-                  </div>
-                  {isLoadingProgress ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Loading progress...
-                    </div>
-                  ) : batchProgress.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No progress data available
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {batchProgress.map((teacherProgress: any) => {
-                        const teacher = teacherProgress.teacher || {
-                          id: teacherProgress.teacherId,
-                          name: teacherProgress.teacherName,
-                          email: teacherProgress.teacherEmail,
-                        };
-                        return (
-                        <Card key={teacher.id || teacherProgress.teacherId}>
-                          <CardHeader>
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <CardTitle className="text-base">{teacher.name}</CardTitle>
-                                <CardDescription>{teacher.email}</CardDescription>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedTeacher({ ...teacherProgress, id: teacher.id, teacherId: teacher.id });
-                                  setViewTeacherAttemptsOpen(true);
-                                }}
-                                data-testid={`button-view-attempts-${teacher.id}`}
-                              >
-                                View Details
-                              </Button>
-                              <Button variant="ghost" size="sm" title="Add Comment" onClick={() => { setCommentTeacher(teacher); setCommentDialogOpen(true); }} data-testid={`button-comment-teacher-${teacher.id}`}>
-                                <MessageSquare className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" title="Disqualify Fellow" className="text-red-500 hover:text-red-700" onClick={() => { setDisqualifyTeacher(teacher); setDisqualifyDialogOpen(true); }} data-testid={`button-disqualify-teacher-${teacher.id}`}>
-                                <Ban className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" title="Remove from cohort" onClick={() => { if (confirm(`Remove ${teacher.name} from this cohort?`)) removeTeacherMutation.mutate({ batchId: selectedBatch.id, teacherId: teacher.id }); }} data-testid={`button-remove-teacher-${teacher.id}`}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Overall Progress</span>
-                                <span className="font-semibold">{teacherProgress.overallPercentage || 0}%</span>
-                              </div>
-                              <Progress value={teacherProgress.overallPercentage || 0} className="h-2" />
-                            </div>
-                            {(teacherProgress.courseCompletions || []).length > 0 && (
-                              <div className="space-y-2">
-                                {teacherProgress.courseCompletions.map((c: any) => (
-                                  <div key={c.courseId} className="flex justify-between text-sm gap-2">
-                                    <span className="truncate">{c.courseName}</span>
-                                    <Badge variant={learningStatusBadgeVariant(learningStatus({ percentage: c.percentage || 0, passed: c.status === "completed" ? true : undefined }))}>
-                                      {learningStatus({ percentage: c.percentage || (c.status === "completed" ? 100 : 0), passed: c.status === "completed" ? true : undefined })}
-                                    </Badge>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <CohortMedals medals={teacherProgress.medals || []} />
-                            <Button
-                              size="sm"
-                              variant={teacherProgress.trainerStar ? "secondary" : "default"}
-                              className={teacherProgress.trainerStar ? "" : "bg-[#b8860b] text-white hover:bg-[#9a7209]"}
-                              disabled={starMutation.isPending}
-                              onClick={() => starMutation.mutate({
-                                teacherId: teacher.id,
-                                give: !teacherProgress.trainerStar,
-                              })}
-                              data-testid={`button-give-star-${teacher.id}`}
-                            >
-                              <Star className="h-4 w-4 mr-1" />
-                              {teacherProgress.trainerStar ? "Take the star back" : "Give a star"}
-                            </Button>
-                            <div className="grid grid-cols-4 gap-2 text-sm">
-                              <div className="text-center p-2 bg-muted rounded">
-                                <p className="text-muted-foreground text-xs">Completed</p>
-                                <p className="font-semibold">{teacherProgress.completedCount || 0}</p>
-                              </div>
-                              <div className="text-center p-2 bg-muted rounded">
-                                <p className="text-muted-foreground text-xs">In Progress</p>
-                                <p className="font-semibold">{teacherProgress.inProgressCount || 0}</p>
-                              </div>
-                              <div className="text-center p-2 bg-muted rounded">
-                                <p className="text-muted-foreground text-xs">Not Started</p>
-                                <p className="font-semibold">{teacherProgress.notStartedCount || 0}</p>
-                              </div>
-                              <div className="text-center p-2 bg-muted rounded">
-                                <p className="text-muted-foreground text-xs">Quizzes Passed</p>
-                                <p className="font-semibold">{teacherProgress.reportCard?.totalQuizzesPassed || 0}</p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        );
-                      })}
-                    </div>
-                  )}
-                </TabsContent>
-
-                {/* Attendance Tab */}
-                <TabsContent value="attendance" className="space-y-4 flex-1 overflow-y-auto p-4">
-                  <h3 className="text-lg font-semibold">Attendance Tracking</h3>
-
-                  {/* Mark Attendance for a date */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Mark Attendance</CardTitle>
-                      <CardDescription>Select a date and record attendance for all enrolled Fellows</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Label className="flex-shrink-0">Date</Label>
-                        <input
-                          type="date"
-                          value={attendanceDate}
-                          onChange={(e) => setAttendanceDate(e.target.value)}
-                          className="border rounded px-3 py-1.5 text-sm bg-background"
-                          max={new Date().toISOString().split('T')[0]}
-                        />
-                      </div>
-
-                      {(batchDetails?.teachers || []).length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No Fellows enrolled in this cohort.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Quick select all buttons */}
-                          <div className="flex gap-2 flex-wrap">
-                            <span className="text-xs text-muted-foreground self-center">Quick set all:</span>
-                            {['present', 'absent', 'late', 'excused'].map((s) => (
-                              <Button key={s} size="sm" variant="outline" className="h-7 text-xs capitalize"
-                                onClick={() => {
-                                  const all: Record<string, string> = {};
-                                  (batchDetails?.teachers || []).forEach((t: any) => { all[t.id] = s; });
-                                  setAttendanceRecordsState(all);
-                                }}>
-                                All {s}
-                              </Button>
-                            ))}
-                          </div>
-
-                          {(batchDetails?.teachers || []).map((teacher: any) => (
-                            <div key={teacher.id} className="flex items-center justify-between p-2 border rounded-lg">
-                              <span className="text-sm font-medium">{teacher.name}</span>
-                              <div className="flex gap-1">
-                                {[
-                                  { value: 'present', label: 'P', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-300' },
-                                  { value: 'absent', label: 'A', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-300' },
-                                  { value: 'late', label: 'L', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-300' },
-                                  { value: 'excused', label: 'E', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300' },
-                                ].map(({ value, label, color }) => (
-                                  <button key={value}
-                                    onClick={() => setAttendanceRecordsState(prev => ({ ...prev, [teacher.id]: value }))}
-                                    className={`w-8 h-8 rounded text-xs font-bold border-2 transition-all ${
-                                      attendanceRecordsState[teacher.id] === value
-                                        ? color + ' border-current scale-110 shadow'
-                                        : 'border-border bg-muted/50 text-muted-foreground hover:border-current'
-                                    }`}>
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-
-                          <Button
-                            className="w-full mt-2"
-                            disabled={submitAttendanceMutation.isPending || Object.keys(attendanceRecordsState).length === 0}
-                            onClick={() => {
-                              const records = Object.entries(attendanceRecordsState).map(([teacherId, status]) => ({ teacherId, status }));
-                              submitAttendanceMutation.mutate({ batchId: selectedBatch.id, date: attendanceDate, records });
-                            }}>
-                            {submitAttendanceMutation.isPending ? "Saving..." : "Save Attendance"}
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Attendance Summary per teacher */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Attendance Summary</CardTitle>
-                      <CardDescription>Cumulative attendance rates for all Fellows in this cohort</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {batchAttendanceSummary.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">No attendance data yet. Start marking attendance above.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {batchAttendanceSummary.map((row: any) => (
-                            <div key={row.teacher_id} className="space-y-1">
-                              <div className="flex justify-between items-center text-sm">
-                                <span className="font-medium">{row.teacher_name}</span>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <span className="text-green-600">P:{row.present_days}</span>
-                                  <span className="text-red-600">A:{row.absent_days}</span>
-                                  <span className="text-yellow-600">L:{row.late_days}</span>
-                                  <span className="font-semibold text-foreground">{row.attendance_rate}%</span>
-                                </div>
-                              </div>
-                              <Progress value={parseFloat(row.attendance_rate || '0')} className="h-1.5" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                {/* Schedule Tab */}
-                <TabsContent value="schedule" className="space-y-4 flex-1 overflow-y-auto p-4">
-                  <h3 className="text-lg font-semibold">Cohort schedule</h3>
-
-                  {/* Add Event */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Schedule New Event</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1 col-span-2">
-                          <Label>Title</Label>
-                          <input
-                            type="text"
-                            value={newEventTitle}
-                            onChange={(e) => setNewEventTitle(e.target.value)}
-                            placeholder="e.g. Session 3"
-                            className="w-full border rounded px-3 py-1.5 text-sm bg-background"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Type</Label>
-                          <select
-                            value={newEventType}
-                            onChange={(e) => setNewEventType(e.target.value)}
-                            className="w-full border rounded px-3 py-1.5 text-sm bg-background">
-                            <option value="session">Session</option>
-                            <option value="assessment">Assessment</option>
-                            <option value="deadline">Deadline</option>
-                            <option value="holiday">Holiday</option>
-                            <option value="other">Other</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Start Date/Time</Label>
-                          <input
-                            type="datetime-local"
-                            value={newEventStart}
-                            onChange={(e) => setNewEventStart(e.target.value)}
-                            className="w-full border rounded px-3 py-1.5 text-sm bg-background"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>End Date/Time (optional)</Label>
-                          <input
-                            type="datetime-local"
-                            value={newEventEnd}
-                            onChange={(e) => setNewEventEnd(e.target.value)}
-                            className="w-full border rounded px-3 py-1.5 text-sm bg-background"
-                          />
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                          <Label>Description (optional)</Label>
-                          <input
-                            type="text"
-                            value={newEventDesc}
-                            onChange={(e) => setNewEventDesc(e.target.value)}
-                            placeholder="Additional details..."
-                            className="w-full border rounded px-3 py-1.5 text-sm bg-background"
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        className="w-full"
-                        disabled={createEventMutation.isPending || !newEventTitle.trim() || !newEventStart}
-                        onClick={() => createEventMutation.mutate({
-                          title: newEventTitle,
-                          eventType: newEventType,
-                          startDate: newEventStart,
-                          endDate: newEventEnd || undefined,
-                          description: newEventDesc || undefined,
-                        })}>
-                        {createEventMutation.isPending ? "Scheduling..." : "Schedule Event"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  {/* Events list */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Upcoming Events</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {batchEvents.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">No events scheduled yet.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {batchEvents.map((event: any) => (
-                            <div key={event.id} className="flex items-start justify-between p-3 border rounded-lg">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs capitalize flex-shrink-0">{event.eventType}</Badge>
-                                  <span className="font-medium text-sm truncate">{event.title}</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {new Date(event.startDate).toLocaleString()}
-                                  {event.endDate && ` → ${new Date(event.endDate).toLocaleString()}`}
-                                </p>
-                                {event.description && <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>}
-                              </div>
-                              <Button
-                                variant="ghost" size="icon"
-                                className="h-7 w-7 text-destructive flex-shrink-0 ml-2"
-                                onClick={() => deleteEventMutation.mutate(event.id)}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-              </Tabs>
-            </div>
-          ) : (
-            <div className="flex min-h-[18rem] items-center justify-center rounded-2xl border bg-card">
-              <div className="text-center">
-                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">Open Cohorts and choose one.</p>
-              </div>
-            </div>
-          ))}
-          </div>
-        </div>
-      </main>
-
       {/* Quiz Teacher Attempts Dialog */}
       <Dialog open={quizAttemptsOpen} onOpenChange={setQuizAttemptsOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
@@ -2090,14 +2440,14 @@ export default function TrainerBatches() {
             </DialogDescription>
           </DialogHeader>
           {quizTeacherAttempts.length === 0 ? (
-            <p className="text-center py-6 text-muted-foreground text-sm">No Fellows have attempted this quiz yet.</p>
+            <p className="text-center py-6 text-sl-muted text-sm">No Fellows have attempted this quiz yet.</p>
           ) : (
             <div className="space-y-2">
               {quizTeacherAttempts.map((t: any) => (
                 <div key={t.teacherId} className="flex items-center justify-between border rounded px-3 py-2">
                   <div>
                     <p className="text-sm font-medium">{t.teacherName}</p>
-                    <p className="text-xs text-muted-foreground">{t.teacherEmail}</p>
+                    <p className="text-xs text-sl-muted">{t.teacherEmail}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge
                         variant={t.passed ? "default" : t.exhausted ? "destructive" : "secondary"}
@@ -2106,7 +2456,7 @@ export default function TrainerBatches() {
                         {t.passed ? "Passed" : t.exhausted ? "Exhausted (3/3)" : `${t.attempts}/3 attempts`}
                       </Badge>
                       {t.latestScore !== null && (
-                        <span className="text-xs text-muted-foreground">Latest: {t.latestScore}%</span>
+                        <span className="text-xs text-sl-muted">Latest: {t.latestScore}%</span>
                       )}
                     </div>
                   </div>
@@ -2149,7 +2499,7 @@ export default function TrainerBatches() {
             </DialogDescription>
           </DialogHeader>
           {!quizDetails ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-sl-muted">
               Loading quiz details...
             </div>
           ) : (
@@ -2168,22 +2518,22 @@ export default function TrainerBatches() {
                       </div>
                       
                       <div className="space-y-2">
-                        <p className="text-sm font-medium text-muted-foreground">Options:</p>
+                        <p className="text-sm font-medium text-sl-muted">Options:</p>
                         <div className="space-y-2">
                           {question.options?.map((option: string, optionIndex: number) => (
                             <div
                               key={optionIndex}
                               className={`p-3 rounded-lg border ${
                                 option === question.correctAnswer
-                                  ? "bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-700"
-                                  : "bg-muted/50 border-border"
+                                  ? "bg-sl-done-soft border-sl-done"
+                                  : "bg-sl-neutral-soft border-sl-line"
                               }`}
                             >
                               <div className="flex items-center gap-2">
                                 {option === question.correctAnswer && (
-                                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                  <CheckCircle className="h-4 w-4 text-sl-done flex-shrink-0" />
                                 )}
-                                <span className={option === question.correctAnswer ? "font-semibold text-green-700 dark:text-green-300" : ""}>
+                                <span className={option === question.correctAnswer ? "font-semibold text-sl-done" : ""}>
                                   {option}
                                 </span>
                               </div>
@@ -2194,8 +2544,8 @@ export default function TrainerBatches() {
 
                       <div className="pt-2 border-t">
                         <p className="text-sm">
-                          <span className="font-semibold text-muted-foreground">Correct Answer: </span>
-                          <span className="text-green-600 dark:text-green-400 font-semibold">{question.correctAnswer}</span>
+                          <span className="font-semibold text-sl-muted">Correct Answer: </span>
+                          <span className="text-sl-done font-semibold">{question.correctAnswer}</span>
                         </p>
                       </div>
                     </div>
@@ -2214,8 +2564,9 @@ export default function TrainerBatches() {
             <DialogTitle>{selectedTeacher?.teacherName} - Quiz Attempts</DialogTitle>
             <DialogDescription>{selectedTeacher?.teacherEmail}</DialogDescription>
           </DialogHeader>
+          {(selectedTeacher?.medals || []).length > 0 && <CohortMedals medals={selectedTeacher.medals} />}
           {teacherAttempts.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-sl-muted">
               No quiz attempts yet
             </div>
           ) : (
@@ -2241,18 +2592,18 @@ export default function TrainerBatches() {
                     <CardContent>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Score:</span>
+                          <span className="text-sl-muted">Score:</span>
                           <span className="ml-2 font-semibold">{attempt.score}/{attempt.totalQuestions}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Attempt:</span>
+                          <span className="text-sl-muted">Attempt:</span>
                           <span className="ml-2 font-semibold">{attempt.attemptNumber}</span>
                         </div>
                       </div>
                       {attempt.quiz?.weekId && selectedTeacher?.id && (
                         <Link
                           href={`/trainer/teachers/${selectedTeacher.id}/weeks/${attempt.quiz.weekId}/content-history`}
-                          className="mt-3 inline-block text-sm font-medium text-primary underline"
+                          className="mt-3 inline-block text-sm font-medium text-sl-accent underline"
                           data-testid={`link-content-history-${attempt.id}`}
                         >
                           Lesson file history for this module
@@ -2325,7 +2676,7 @@ export default function TrainerBatches() {
       <Dialog open={disqualifyDialogOpen} onOpenChange={setDisqualifyDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-red-600">Disqualify {disqualifyTeacher?.name}</DialogTitle>
+            <DialogTitle className="text-sl-risk">Disqualify {disqualifyTeacher?.name}</DialogTitle>
             <DialogDescription>This action will mark the Fellow as disqualified from this cohort. Please provide a reason.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -2361,6 +2712,84 @@ export default function TrainerBatches() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Add a session */}
+      <Dialog open={addEventOpen} onOpenChange={setAddEventOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a session</DialogTitle>
+            <DialogDescription>A session is a calendar meeting. Fellows of the cohort see it on their calendar. Deadlines and holidays go here too.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="event-cohort">Cohort</Label>
+              <select id="event-cohort" className={FIELD} value={eventBatchId} onChange={(event) => setEventBatchId(event.target.value)} data-testid="select-event-cohort">
+                {batches.map((batch: any) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event-title">Title</Label>
+              <Input id="event-title" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} placeholder="e.g. Session 3" data-testid="input-event-title" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event-type">Type</Label>
+              <select id="event-type" className={FIELD} value={newEventType} onChange={(e) => setNewEventType(e.target.value)} data-testid="select-event-type">
+                <option value="session">Session</option>
+                <option value="assessment">Assessment</option>
+                <option value="deadline">Deadline</option>
+                <option value="holiday">Holiday</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="event-start">Start date and time</Label>
+                <input id="event-start" type="datetime-local" className={FIELD} value={newEventStart} onChange={(e) => setNewEventStart(e.target.value)} data-testid="input-event-start" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="event-end">End date and time (optional)</Label>
+                <input id="event-end" type="datetime-local" className={FIELD} value={newEventEnd} onChange={(e) => setNewEventEnd(e.target.value)} data-testid="input-event-end" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="event-description">Description (optional)</Label>
+              <Input id="event-description" value={newEventDesc} onChange={(e) => setNewEventDesc(e.target.value)} placeholder="Additional details..." data-testid="input-event-description" />
+            </div>
+            <Button
+              className={PRIMARY_BUTTON}
+              disabled={createEventMutation.isPending || !eventBatchId || !newEventTitle.trim() || !newEventStart}
+              onClick={() => createEventMutation.mutate({
+                title: newEventTitle,
+                eventType: newEventType,
+                startDate: newEventStart,
+                endDate: newEventEnd || undefined,
+                description: newEventDesc || undefined,
+              })}
+              data-testid="button-submit-event"
+            >
+              {createEventMutation.isPending ? "Adding..." : "Add to the schedule"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review and approve a lesson file's quiz */}
+      {reviewQuiz && !isLoadingReviewQuiz && (
+        <FileQuizEditDialog
+          open
+          onClose={() => setReviewQuiz(null)}
+          weekId={reviewQuiz.week_id}
+          fileId={reviewQuiz.deck_file_id}
+          fileName={reviewQuiz.file_name || "Lesson file"}
+          initialQuestions={reviewQuizStatus?.[reviewQuiz.deck_file_id]?.questions ?? NO_QUESTIONS}
+          approved={Boolean(reviewQuiz.approved)}
+          onQuizStatusChange={() => {
+            queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "/api/batches" && query.queryKey[2] === "file-quizzes" });
+            queryClient.invalidateQueries({ queryKey: ["/api/training-weeks", reviewQuiz.week_id, "quiz-status"] });
+          }}
+        />
+      )}
+
       <GuidedTour
         open={tour.open}
         steps={TRAINER_TOUR}
@@ -2368,6 +2797,6 @@ export default function TrainerBatches() {
         onIndex={tour.setIndex}
         onClose={tour.close}
       />
-    </SceneBackdrop>
+    </AcademyShell>
   );
 }

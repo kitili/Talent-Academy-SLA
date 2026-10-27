@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Admin Fellow detail page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 16px; font-weight: 600">Silverleaf Academy</span>
+<span style="font-size: 12px; font-weight: 600; color: #0A48A5; background: #E8F0FB; border-radius: 999px; padding: 3px 10px">Admin</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #374151; background: none; border: 0; padding: 10px 12px; border-radius: 8px">Help</button>
+<button type="button" aria-label="Notifications, 1 unread" style="position: relative; width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span style="position: absolute; top: 7px; right: 7px; min-width: 16px; height: 16px; border-radius: 8px; background: #0A48A5; color: #FFFFFF; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">1</span></button>
+<button type="button" aria-label="Switch to dark mode" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+<span style="font-size: 14px; font-weight: 600; padding: 0 8px">Admin</span>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 9px 14px">Log out</button>
+</div>
+</header>
+<div style="display: flex; flex-wrap: wrap; flex: 1 1 auto">
+<nav aria-label="Admin desk" style="flex: 1 1 232px; max-width: 280px; background: #FFFFFF; border-right: 1px solid #E3E6EB; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<a href="#home" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Home</a>
+<a href="#approvals" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Approvals</a>
+<a href="#people" aria-current="page" style="text-decoration: none; background: #E8F0FB; color: #0A48A5; font-weight: 600; border-radius: 8px; padding: 10px 12px">People</a>
+<a href="#cohorts" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between">Cohorts</a>
+<a href="#attendance" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Attendance</a>
+<a href="#analytics" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Analytics</a>
+<a href="#certificates" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Certificates</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 32px 40px 48px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1040px">
+<nav aria-label="Breadcrumb" style="font-size: 14px; color: #4B5563; display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+<a href="#people">People</a>
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4B5563" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+<a href="#fellows">Fellows</a>
+<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4B5563" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+<span aria-current="page">Amina Teacher</span>
+</nav>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; position: relative">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Amina Teacher</h1>
+<span style="font-size: 12px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 3px 10px">Approved</span>
+</div>
+<span style="font-size: 14px; color: #4B5563">Fellow · Fellow ID 7110 · teacher@test.com</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 14px; min-height: 44px">Reset password…</button>
+<button type="button" aria-haspopup="menu" aria-expanded="false" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 14px; min-height: 44px">More actions ▾</button>
+</div>
+</div>
+<section aria-labelledby="cohorts" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<h2 id="cohorts" style="margin: 0; font-size: 18px; font-weight: 600; padding: 16px 20px; border-bottom: 1px solid #E3E6EB">Cohorts and steps <span style="font-weight: 500; color: #4B5563">· 2</span></h2>
+<ul style="margin: 0; padding: 0; list-style: none">
+<sc-for list="{{cohorts}}" as="c" hint-placeholder-count="2">
+<li style="padding: 16px 20px; border-bottom: 1px solid #EEF0F3; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: baseline">
+<a href="#cohort" style="font-size: 15px; font-weight: 600; text-decoration: none">{{c.name}}</a>
+<span style="font-size: 13px; color: #4B5563">{{c.meta}}</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{c.steps}}" as="s" hint-placeholder-count="3">
+<span style="font-size: 13px; color: #111827; background: #F6F7F9; border: 1px solid #E3E6EB; border-radius: 8px; padding: 5px 10px">{{s}}</span>
+</sc-for>
+</div>
+<sc-if value="{{c.flag}}" hint-placeholder-val="{{ true }}">
+<span style="align-self: flex-start; font-size: 12px; font-weight: 600; color: {{c.flagInk}}; background: {{c.flagBg}}; border-radius: 999px; padding: 3px 10px">{{c.flag}}</span>
+</sc-if>
+</li>
+</sc-for>
+</ul>
+</section>
+<section aria-labelledby="courses" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; padding: 16px 20px; border-bottom: 1px solid #E3E6EB">
+<h2 id="courses" style="margin: 0; font-size: 18px; font-weight: 600">Course progress <span style="font-weight: 500; color: #4B5563">· 4 courses</span></h2>
+<span style="font-size: 13px; color: #4B5563">Climate and Culture · Step 1</span>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; min-width: 600px; border-collapse: collapse; font-size: 14px">
+<thead>
+<tr style="text-align: left; color: #4B5563">
+<th scope="col" style="font-weight: 500; padding: 10px 20px">Course</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Modules</th>
+<th scope="col" style="font-weight: 500; padding: 10px 20px">Status</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{courses}}" as="row" hint-placeholder-count="4">
+<tr style="border-top: 1px solid #EEF0F3">
+<th scope="row" style="text-align: left; font-weight: 500; padding: 12px 20px">{{row.name}}</th>
+<td style="padding: 12px; color: #4B5563">{{row.modules}}</td>
+<td style="padding: 12px 20px"><span style="font-size: 12px; font-weight: 600; color: {{row.ink}}; background: {{row.bg}}; border-radius: 999px; padding: 3px 10px">{{row.status}}</span></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<p style="margin: 0; padding: 12px 20px; font-size: 13px; line-height: 1.5; color: #4B5563; border-top: 1px solid #EEF0F3">No course can be complete yet: three have no modules, and Setting clear Expectations has no lesson file. A course needs at least one lesson file.</p>
+</section>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+<section aria-labelledby="attendance" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 id="attendance" style="margin: 0; font-size: 18px; font-weight: 600">Attendance</h2>
+<div style="display: flex; align-items: baseline; gap: 10px">
+<span style="font-size: 26px; font-weight: 600">100%</span>
+<span style="font-size: 14px; color: #4B5563">2 present of 2 marks</span>
+</div>
+<span style="font-size: 14px; color: #4B5563">0 late · 0 absent · 0 excused · all in Climate and Culture</span>
+<a href="#attendance" style="font-size: 14px">See her marks</a>
+</section>
+<section aria-labelledby="certificates" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 id="certificates" style="margin: 0; font-size: 18px; font-weight: 600">Certificates</h2>
+<span style="font-size: 15px">None issued yet.</span>
+<span style="font-size: 14px; line-height: 1.5; color: #4B5563">Academy path: 0 of 2 cohorts completed. Fellowship and Advanced Level wait for the path; a course certificate waits for every module.</span>
+<a href="#certificates" style="font-size: 14px">Go to Certificates</a>
+</section>
+<section aria-labelledby="quizzes" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 id="quizzes" style="margin: 0; font-size: 18px; font-weight: 600">Quizzes</h2>
+<span style="font-size: 15px">None taken yet.</span>
+<span style="font-size: 14px; line-height: 1.5; color: #4B5563">Her courses have no approved quiz yet. Tries and scores appear here once she takes one.</span>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1088}}'>
+class Component extends DCLogic {
+renderVals() {
+const calm = { ink: '#374151', bg: '#EEF0F3' };
+const warn = { ink: '#B54708', bg: '#FFFAEB' };
+return {
+cohorts: [
+{ name: 'Climate and Culture', meta: 'Trainers: Anthonia Peter, Test Trainer · medals 3 of 7', steps: ['Step 1 · Culture of Achievemment', 'Step 2 · Systems and Procedures', 'Step 3 · Rules and Consequences'], flag: '', flagInk: '', flagBg: '' },
+{ name: 'cohort2', meta: 'No trainer · medals 0 of 7', steps: ['Step 1 · Batch One'], flag: 'No trainer · Batch One has no course', flagInk: '#B42318', flagBg: '#FEF3F2' }
+],
+courses: [
+{ ...calm, name: 'Designs behavior plan', modules: '0', status: 'No modules yet' },
+{ ...calm, name: 'Projects strong, calm presence', modules: '0', status: 'No modules yet' },
+{ ...calm, name: 'Responds to level of students Engagement', modules: '0', status: 'No modules yet' },
+{ ...warn, name: 'Setting clear Expectations', modules: '1 · Sets clear Expectations', status: 'No lesson files yet' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

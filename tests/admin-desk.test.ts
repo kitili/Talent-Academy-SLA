@@ -16,7 +16,9 @@ const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 describe("admin desk", () => {
   it("puts admin links in a side menu, joins trainers and teachers, and drops the handover card", () => {
-    const nav = read("client/src/components/AdminNav.tsx");
+    // The Admin menu is the shared desk menu now; the shell draws it as a side column (design/board/Shell.dc.html).
+    const nav = read("client/src/components/deskMenu.ts");
+    const shell = read("client/src/components/AcademyShell.tsx");
     const home = read("client/src/pages/admin-home.tsx");
     for (const label of ["Approvals", "People", "Cohorts", "Attendance", "Analytics", "Certificates"]) {
       assert.match(nav, new RegExp(label));
@@ -24,17 +26,22 @@ describe("admin desk", () => {
     assert.equal(nav.includes('href: "/courses"'), false);
     assert.equal(nav.includes('label: "Trainers"'), false);
     assert.equal(nav.includes('label: "Teachers"'), false);
-    assert.match(nav, /lg:fixed/);
+    assert.match(shell, /DESK_MENUS\[desk\]\.map/);
+    assert.match(shell, /lg:flex-col/);
+    assert.match(shell, /aria-current=\{on \? "page" : undefined\}/);
     assert.equal(nav.toLowerCase().includes("handover"), false);
     assert.equal(nav.includes("rounded-full"), false);
     assert.equal(home.includes("/admin/handover"), false);
     assert.equal(home.includes("showAdminNav"), true);
-    assert.match(home, /PlaceCover/);
-    assert.match(home, /place: "certificate"/);
+    // The redesigned Home (design/board/AdminHome.dc.html) has no picture tiles: the menu opens each part.
+    assert.equal(home.includes("PlaceArt"), false);
+    assert.match(home, /Needs attention/);
+    assert.match(home, /The academy at a glance/);
+    assert.match(home, /Clear previous activity…/);
     const auth = read("client/src/pages/unified-auth.tsx");
-    assert.match(auth, /\/bg-library.jpg/);
-    assert.match(auth, /PLACES\[place\]/);
-    assert.match(auth, /sl-sign-role/);
+    assert.equal(auth.includes("bg-library.jpg"), false);
+    assert.equal(auth.includes("PlaceArt"), false);
+    assert.match(auth, /bg-sl-ground/);
     assert.equal(auth.toLowerCase().includes("adult teacher"), false);
     assert.equal(home.includes("LearningPath"), false);
     assert.equal(home.includes("Total Trainers"), false);

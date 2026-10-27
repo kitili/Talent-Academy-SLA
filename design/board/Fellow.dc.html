@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fellow desk today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#12306B}a:hover{color:#0B1F47}
+</style>
+</helmet>
+<div style="width: 1480px; height: 2200px; box-sizing: border-box; padding: 64px; background: #F2F3F5; font-family: Inter, system-ui, sans-serif; color: #14171C; display: flex; flex-direction: column; gap: 32px">
+<header style="display: flex; flex-direction: column; gap: 8px">
+<p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #12306B">Fellow desk (labelled "Teacher" today) · 4 screens at 726 px, 1 at 375 px</p>
+<h1 style="margin: 0; font-size: 36px; font-weight: 700">A clear home, then four views of the same progress</h1>
+</header>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; align-items: start">
+<sc-for list="{{tablet}}" as="shot" hint-placeholder-count="4">
+<article style="background: #FFFFFF; border: 1px solid #D9DCE1; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column">
+<div style="padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #E6E8EC">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">{{shot.title}}</h2>
+<span style="font-size: 13px; color: #4B5563">726 px</span>
+</div>
+<img src="{{shot.src}}" alt="{{shot.alt}}" style="width: 100%; display: block; border-bottom: 1px solid #E6E8EC">
+<ul style="margin: 0; padding: 16px 20px 20px 20px; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{shot.notes}}" as="note" hint-placeholder-count="2">
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33">
+<span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span>
+<span>{{note}}</span>
+</li>
+</sc-for>
+</ul>
+</article>
+</sc-for>
+</div>
+<h2 style="margin: 8px 0 0 0; font-size: 22px; font-weight: 600">At phone width</h2>
+<div style="display: flex; gap: 40px; align-items: flex-start">
+<article style="flex: 0 0 260px; background: #FFFFFF; border: 1px solid #D9DCE1; border-radius: 12px; overflow: hidden">
+<div style="padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #E6E8EC">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">Home</h2>
+<span style="font-size: 13px; color: #4B5563">375 px</span>
+</div>
+<div style="width: 260px; height: 563px; overflow: hidden; border-bottom: 1px solid #E6E8EC">
+<img src="/_blob/de478de04225ea694bad628dc324e132" alt="Fellow home at phone width with a cut-off header, six header icons, scrolling top tabs and a bottom tab bar" style="width: 312px; display: block">
+</div>
+<ul style="margin: 0; padding: 16px 20px 20px 20px; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span><span>The title shrinks to "S…" beside six icons.</span></li>
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33"><span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span><span>Two navigations at once: scrolling tabs on top, a bottom bar with four of seven sections.</span></li>
+</ul>
+</article>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1480,"height":2200}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+tablet: [
+{ title: 'Home', src: '/_blob/b1c6c85f1ce542371b5ddd26891a5217', alt: 'Fellow home with tabs, a photo banner with white welcome text, a To do card and a Continue learning card', notes: [
+'White welcome text on a busy photo.',
+'Internal note on screen: "the way Canvas and Moodle keep the desk short".'
+] },
+{ title: 'Learning, top', src: '/_blob/52876474a000c369b358b13140ddcc0c', alt: 'Learning materials with three early-years lessons', notes: [
+'"Learning materials" are early-years lessons unrelated to the course (D12 removes them).'
+] },
+{ title: 'Learning, lower', src: '/_blob/1af5b8011103efe6cfa2b196e5f2721b', alt: 'Medals per cohort and a My learning table with a Mark complete and open the next button at 0%', notes: [
+'3 of 7 medals at 0% progress; a cohort the trainer cannot see ("cohort2").',
+'"Mark complete and open the next" beside 0%: allowed while the course has no approved quiz.'
+] },
+{ title: 'A module', src: '/_blob/61c4067e9b7309f3542bf31cc1b6e8aa', alt: 'Module page with an empty navy lesson viewer and a Module discussion box', notes: [
+'The empty lesson viewer is a navy block with near-invisible text.',
+'"Your trainer can reply here" is not true (D11 rewrites it).'
+] }
+]
+};
+}
+}
+</script>
+</body>
+</html>

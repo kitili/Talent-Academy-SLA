@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Cohort room</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 16px; font-weight: 600">Silverleaf Academy</span>
+<span style="font-size: 12px; font-weight: 600; color: #0A48A5; background: #E8F0FB; border-radius: 999px; padding: 3px 10px">Trainer</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #374151; background: none; border: 0; padding: 10px 12px; border-radius: 8px">Help</button>
+<button type="button" aria-label="Notifications, none unread" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></button>
+<button type="button" aria-label="Switch to dark mode" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+<span style="font-size: 14px; font-weight: 600; padding: 0 8px">Test Trainer</span>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 9px 14px">Log out</button>
+</div>
+</header>
+<div style="display: flex; flex-wrap: wrap; flex: 1 1 auto">
+<nav aria-label="Trainer desk" style="flex: 1 1 232px; max-width: 280px; background: #FFFFFF; border-right: 1px solid #E3E6EB; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<a href="#home" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Home</a>
+<a href="#cohorts" aria-current="page" style="text-decoration: none; background: #E8F0FB; color: #0A48A5; font-weight: 600; border-radius: 8px; padding: 10px 12px">Cohorts</a>
+<a href="#assessments" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Assessments</a>
+<a href="#progress" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Progress</a>
+<a href="#attendance" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Attendance</a>
+<a href="#messages" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Messages</a>
+<a href="#schedule" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Schedule</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 24px 40px 48px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1120px">
+<a href="#cohorts" style="align-self: flex-start; display: flex; align-items: center; gap: 4px; font-size: 14px; text-decoration: none; padding: 10px 0"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A48A5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>Back to cohorts</a>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Climate and Culture</h1>
+<span style="font-size: 12px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 3px 10px">Open</span>
+<span style="font-size: 12px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 3px 10px">Quizzes on</span>
+</div>
+</div>
+<div role="tablist" aria-label="Cohort room" style="display: flex; gap: 4px; border-bottom: 1px solid #E3E6EB; overflow-x: auto">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="8">
+<button type="button" role="tab" id="{{t.id}}" aria-selected="{{t.selected}}" aria-controls="panel-people" tabindex="{{t.tabindex}}" style="font: inherit; font-size: 15px; font-weight: {{t.weight}}; color: {{t.ink}}; background: none; border: 0; border-bottom: 2px solid {{t.line}}; margin-bottom: -1px; padding: 12px 14px; min-height: 44px; white-space: nowrap">{{t.label}}</button>
+</sc-for>
+</div>
+<section role="tabpanel" id="panel-people" aria-labelledby="tab-people" style="display: flex; flex-direction: column; gap: 22px">
+<div style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<div style="padding: 14px 20px; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">Roster <span style="font-weight: 500; color: #4B5563">· 1 Fellow</span></h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 14px; min-height: 44px">Import a roster (CSV)</button>
+<button type="button" style="font: inherit; font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; border: 0; border-radius: 8px; padding: 11px 18px">Add a Fellow</button>
+</div>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px">
+<thead>
+<tr style="text-align: left; color: #4B5563">
+<th scope="col" style="font-weight: 500; padding: 10px 20px">Fellow</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Email</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Fellow ID</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Step</th>
+<th scope="col" style="font-weight: 500; padding: 10px 20px">Status</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{roster}}" as="r" hint-placeholder-count="1">
+<tr style="border-top: 1px solid #EEF0F3">
+<th scope="row" style="text-align: left; padding: 14px 20px"><a href="#fellow" style="font-weight: 600; text-decoration: none">{{r.name}}</a></th>
+<td style="padding: 14px 12px">{{r.email}}</td>
+<td style="padding: 14px 12px">{{r.id}}</td>
+<td style="padding: 14px 12px">{{r.step}}</td>
+<td style="padding: 14px 20px"><span style="font-size: 12px; font-weight: 600; color: #374151; background: #EEF0F3; border-radius: 999px; padding: 3px 10px; white-space: nowrap">{{r.status}}</span></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">This cohort in figures</h2>
+<div style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 15px">
+<sc-for list="{{figures}}" as="fig" hint-placeholder-count="5">
+<span><span style="color: #4B5563">{{fig.label}}</span> <span style="font-weight: 600">{{fig.value}}</span></span>
+</sc-for>
+</div>
+</div>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":588}}'>
+class Component extends DCLogic {
+renderVals() {
+const tab = (label, selected) => ({ label, id: 'tab-' + label.toLowerCase(), selected: selected ? 'true' : 'false', tabindex: selected ? '0' : '-1', weight: selected ? '600' : '400', ink: selected ? '#0A48A5' : '#374151', line: selected ? '#0A48A5' : 'transparent' });
+return {
+tabs: [tab('People', true), tab('Quizzes', false), tab('Gradebook', false), tab('Graduates', false), tab('Announce', false), tab('Calendar', false), tab('Assessments', false), tab('Import', false)],
+roster: [
+{ name: 'Amina Teacher', email: 'teacher@test.com', id: '7110', step: 'Step 1 · Culture of Achievemment', status: 'Not started' }
+],
+figures: [
+{ label: 'Fellows', value: '1' },
+{ label: 'Quizzes', value: '0' },
+{ label: 'In progress', value: '0' },
+{ label: 'Completed', value: '0' },
+{ label: 'Needs support', value: '0' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

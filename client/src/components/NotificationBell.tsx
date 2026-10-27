@@ -70,13 +70,16 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
       <Button
         variant="ghost"
         size="icon"
-        className={`relative h-9 w-9 ${tone === "light" ? "text-[#17233c] hover:bg-[#102448]/5 dark:text-[#f6f1e8] dark:hover:bg-white/10" : "text-white hover:bg-white/10"}`}
+        className={`relative h-11 w-11 ${tone === "light" ? "text-sl-neutral" : "text-white hover:bg-white/10"}`}
         onClick={handleOpen}
-        aria-label="Notifications"
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-5 w-5" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold leading-none">
+          <span
+            aria-hidden="true"
+            className="absolute right-[7px] top-[7px] flex h-4 min-w-4 items-center justify-center rounded-full bg-sl-accent-strong px-1 text-[11px] font-semibold leading-none text-white"
+          >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -113,7 +116,7 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
                   <div
                     key={n.id}
                     className={`px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${
-                      n.isRead === "no" ? "bg-primary/5 border-l-2 border-l-primary" : ""
+                      n.isRead === "no" ? "bg-sl-accent-soft" : ""
                     }`}
                     onClick={() => {
                       if (n.isRead === "no") markReadMutation.mutate(n.id);
@@ -124,7 +127,7 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium truncate">{n.title}</p>
                           {n.isRead === "no" && (
-                            <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                            <span className="h-2 w-2 rounded-full bg-sl-accent flex-shrink-0" aria-label="Unread" />
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>

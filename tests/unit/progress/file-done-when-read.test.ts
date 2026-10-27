@@ -64,9 +64,9 @@ test('mark read writes markReadProgress for the file and runs the completion syn
     assert.match(viewed, /if \(!file \|\| file\.locked\) \{/)
 })
 
-test('the content view offers "Mark read to continue" on files with no approved quiz', () => {
+test('the content view offers "Mark as read" on files with no approved quiz', () => {
     const page = source('client/src/pages/teacher-content-view.tsx')
-    assert.match(page, /Mark read to continue/)
-    assert.equal((page.match(/<MarkReadButton\r?\n/g) || []).length, 2, 'mobile and desktop lists')
+    assert.match(page, /Mark as read/)
+    assert.equal((page.match(/<MarkReadButton\r?\n/g) || []).length, 1, 'one lesson file list')
     assert.match(page, /const isLocked = file\.status === "locked";/)
 })

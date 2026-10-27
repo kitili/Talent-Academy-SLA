@@ -25,11 +25,10 @@ describe("desk name", () => {
     assert.equal(wallLabel({ username: "john.doe_trainer1" }), "John Doe");
   });
 
-  it("keeps the wall mark quiet: a leaf, a serif name, and no comic fonts", () => {
+  it("draws no wall mark: the desks have no photo to write on (design/board/Shell.dc.html)", () => {
     const wall = readFileSync(join(root, "client/src/components/DeskGraffiti.tsx"), "utf8");
-    assert.match(wall, /wallLabel/);
-    assert.match(wall, /font-serif/);
-    assert.match(wall, /LeafMark/);
+    assert.match(wall, /return null;/);
+    assert.equal(wall.includes("fixed inset-0"), false);
     assert.equal(wall.includes("Comic Sans"), false);
     assert.equal(wall.includes("Segoe Print"), false);
     assert.equal(wall.includes("Screenshot"), false);

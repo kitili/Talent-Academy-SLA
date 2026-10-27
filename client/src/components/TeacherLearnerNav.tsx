@@ -1,35 +1,11 @@
-import { useLocation } from "wouter";
-import { BookOpen, ClipboardCheck, GraduationCap, Home } from "lucide-react";
+import { DeskPhoneBar, useInsideShell } from "@/components/AcademyShell";
 
+/**
+ * The Fellow's phone bar for pages that are not yet inside AcademyShell: Home, Learning, Work, Messages and More
+ * (design/board/FellowPhone.dc.html). Inside the shell it draws nothing, because the shell draws the same bar.
+ */
 export function TeacherLearnerNav() {
-  const [location, navigate] = useLocation();
-  const items = [
-    { href: "/teacher/dashboard", label: "Home", icon: Home },
-    { href: "/teacher/dashboard#my-learning", label: "Learning", icon: BookOpen },
-    { href: "/teacher/dashboard#my-work", label: "Work", icon: ClipboardCheck },
-    { href: "/teacher/certificates", label: "Certificates", icon: GraduationCap },
-  ];
-  return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-[#102448]/10 bg-white/95 backdrop-blur sm:hidden">
-      <div className="grid grid-cols-4">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = item.href.startsWith("/teacher/certificates")
-            ? location.startsWith("/teacher/certificates")
-            : location.startsWith("/teacher/dashboard") || location.startsWith("/teacher/week");
-          return (
-            <button
-              key={item.href}
-              type="button"
-              className={`flex flex-col items-center gap-1 py-2 text-xs ${active ? "text-primary font-semibold" : "text-muted-foreground"}`}
-              onClick={() => navigate(item.href.replace("#my-learning", ""))}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
+  const insideShell = useInsideShell();
+  if (insideShell) return null;
+  return <DeskPhoneBar desk="fellow" />;
 }

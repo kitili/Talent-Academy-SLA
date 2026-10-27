@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Admin Approvals page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 16px; font-weight: 600">Silverleaf Academy</span>
+<span style="font-size: 12px; font-weight: 600; color: #0A48A5; background: #E8F0FB; border-radius: 999px; padding: 3px 10px">Admin</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #374151; background: none; border: 0; padding: 10px 12px; border-radius: 8px">Help</button>
+<button type="button" aria-label="Notifications, 1 unread" style="position: relative; width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span style="position: absolute; top: 7px; right: 7px; min-width: 16px; height: 16px; border-radius: 8px; background: #0A48A5; color: #FFFFFF; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">1</span></button>
+<button type="button" aria-label="Switch to dark mode" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+<span style="font-size: 14px; font-weight: 600; padding: 0 8px">Admin</span>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 9px 14px">Log out</button>
+</div>
+</header>
+<div style="display: flex; flex-wrap: wrap; flex: 1 1 auto">
+<nav aria-label="Admin desk" style="flex: 1 1 232px; max-width: 280px; background: #FFFFFF; border-right: 1px solid #E3E6EB; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<a href="#home" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Home</a>
+<a href="#approvals" aria-current="page" style="text-decoration: none; background: #E8F0FB; color: #0A48A5; font-weight: 600; border-radius: 8px; padding: 10px 12px">Approvals</a>
+<a href="#people" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">People</a>
+<a href="#cohorts" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between">Cohorts</a>
+<a href="#attendance" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Attendance</a>
+<a href="#analytics" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Analytics</a>
+<a href="#certificates" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Certificates</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 32px 40px 48px 40px; display: flex; flex-direction: column; gap: 22px; max-width: 1040px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Approvals</h1>
+<span style="font-size: 14px; color: #4B5563">People who asked for a desk. After you approve, they set their own password.</span>
+</div>
+<div style="display: flex; gap: 4px; font-size: 15px">
+<a href="#trainers" aria-current="page" style="text-decoration: none; font-weight: 600; color: #0A48A5; border-bottom: 2px solid #0A48A5; padding: 6px 4px">Trainers waiting · 0</a>
+<a href="#fellows" style="text-decoration: none; color: #374151; padding: 6px 12px">Fellows waiting · 0</a>
+</div>
+</div>
+<a href="#export" style="font-size: 14px; padding: 10px 4px">Export approval history</a>
+</div>
+<section aria-labelledby="waiting" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 20px 20px; display: flex; flex-direction: column; gap: 6px">
+<h2 id="waiting" style="margin: 0; font-size: 18px; font-weight: 600">Nobody is waiting</h2>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #4B5563">No Trainer or Fellow has asked for a desk. New requests from the sign-in page appear here, oldest first.</p>
+</section>
+<section aria-labelledby="example" style="background: #FFFFFF; border: 1px dashed #C9D6EA; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px">
+<p style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #4B5563">Example state · two requests waiting</p>
+<h2 id="example" style="margin: 0; font-size: 17px; font-weight: 600">Waiting <span style="font-weight: 500; color: #4B5563">· 2</span></h2>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{requests}}" as="r" hint-placeholder-count="2">
+<li style="border: 1px solid #E3E6EB; border-radius: 10px; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between">
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 380px; min-width: 0">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center">
+<span style="font-size: 15px; font-weight: 600">{{r.name}}</span>
+<span style="font-size: 12px; font-weight: 600; color: #374151; background: #EEF0F3; border-radius: 999px; padding: 3px 10px">{{r.role}}</span>
+</div>
+<span style="font-size: 14px; color: #4B5563">{{r.email}} · asked {{r.date}}</span>
+<span style="font-size: 14px; line-height: 1.45; color: #374151">Note: {{r.note}}</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; font-weight: 600; color: #FFFFFF; background: #0A48A5; border: 0; border-radius: 8px; padding: 11px 16px; min-height: 44px">Approve</button>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 16px; min-height: 44px">Decline…</button>
+</div>
+</li>
+</sc-for>
+</ul>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 15px; font-weight: 600">Recent decisions</h3>
+<div style="overflow-x: auto; border: 1px solid #E3E6EB; border-radius: 10px">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px">
+<thead>
+<tr style="text-align: left; color: #4B5563">
+<th scope="col" style="font-weight: 500; padding: 10px 16px">Date</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Person</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Role</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Decision</th>
+<th scope="col" style="font-weight: 500; padding: 10px 16px">By</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{history}}" as="h" hint-placeholder-count="3">
+<tr style="border-top: 1px solid #EEF0F3">
+<td style="padding: 12px 16px; color: #4B5563">{{h.date}}</td>
+<td style="padding: 12px">{{h.person}}</td>
+<td style="padding: 12px">{{h.role}}</td>
+<td style="padding: 12px"><span style="font-size: 12px; font-weight: 600; color: {{h.ink}}; background: {{h.bg}}; border-radius: 999px; padding: 3px 10px">{{h.decision}}</span></td>
+<td style="padding: 12px 16px">{{h.by}}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":912}}'>
+class Component extends DCLogic {
+renderVals() {
+const yes = { ink: '#067647', bg: '#ECFDF3' };
+const no = { ink: '#374151', bg: '#EEF0F3' };
+return {
+requests: [
+{ name: '[Full name]', role: 'Trainer', email: '[email]', date: '[date]', note: '[Anything the Admin should know]' },
+{ name: '[Full name]', role: 'Fellow', email: '[email]', date: '[date]', note: '[School or cohort they were told to join]' }
+],
+history: [
+{ ...yes, date: '[date]', person: '[Full name]', role: 'Fellow', decision: 'Approved', by: 'Admin' },
+{ ...no, date: '[date]', person: '[Full name]', role: 'Trainer', decision: 'Declined', by: 'Admin' },
+{ ...yes, date: '[date]', person: '[Full name]', role: 'Trainer', decision: 'Approved', by: 'Admin' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

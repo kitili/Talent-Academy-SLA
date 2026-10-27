@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overview — the three desks today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#12306B}a:hover{color:#0B1F47}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1180px; box-sizing: border-box; padding: 64px; background: #F2F3F5; font-family: Inter, system-ui, sans-serif; color: #14171C; display: flex; flex-direction: column; gap: 40px">
+<header style="display: flex; flex-direction: column; gap: 12px; max-width: 1100px">
+<p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #12306B">Silverleaf Academy LMS · design board · as it is today</p>
+<h1 style="margin: 0; font-size: 48px; line-height: 1.1; font-weight: 700">Three desks, three different products</h1>
+<p style="margin: 0; font-size: 18px; line-height: 1.5; color: #3F4652">Each desk has its own header, navigation and colour scheme, and each opens on photos and figures before the next task. The boards to the right show every screen with its findings beside it.</p>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #4B5563">Captured 27 Oct 2026 from the local app (branch feat/improvements) against the live database. It matches production except the merged sign-in and quiz fixes and a little early "Fellow" wording. Widths: 726 px (tablet) and 375 px (phone). Desktop width (1200 px and up) is not captured yet.</p>
+</header>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; align-items: start">
+<sc-for list="{{desks}}" as="desk" hint-placeholder-count="3">
+<article style="background: #FFFFFF; border: 1px solid #D9DCE1; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column">
+<div style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #E6E8EC">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">{{desk.title}}</h2>
+<span style="font-size: 13px; color: #4B5563">{{desk.width}}</span>
+</div>
+<img src="{{desk.src}}" alt="{{desk.alt}}" style="width: 100%; display: block; border-bottom: 1px solid #E6E8EC">
+<ul style="margin: 0; padding: 16px 20px 20px 20px; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{desk.notes}}" as="note" hint-placeholder-count="3">
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33">
+<span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span>
+<span>{{note}}</span>
+</li>
+</sc-for>
+</ul>
+</article>
+</sc-for>
+</div>
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 600">Across every desk</h2>
+<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.5; color: #252A33">
+<li>Four shells: cream with tabs (admin), navy with no menu (cohort room), navy-to-teal gradient with coloured pills (trainer), blue header with tabs plus a bottom bar (Fellow).</li>
+<li>Colour carries no meaning: every tile and pill has its own hue, so status has nowhere to go.</li>
+<li>White text sits on busy photos on the trainer and Fellow desks.</li>
+<li>Figures show 0 while loading, or when a request is cancelled, instead of a loading state.</li>
+<li>Icon-only buttons (help, theme, logout) have no accessible names.</li>
+</ul>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 600">How to read this board</h2>
+<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.5; color: #252A33">
+<li>One board per role: Sign-in, Admin, Trainer and Fellow. Each capture has its findings below it.</li>
+<li>Orange dots are design findings, from the Design Feedback doc and from this capture pass.</li>
+<li>Frames titled "Today" are the screens as they are; frames titled "Proposed" are the redesigns. The shared shell sits to the right of this overview. Each row below starts with a Today board, followed by every proposed page for that desk, in menu order: sign-in first, then Admin, Trainer and Fellow. Certificate samples sit beside Admin Certificates, and extra Fellow example states close the Fellow row. The glossary beside the shell names each thing once.</li>
+</ul>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+desks: [
+{ title: 'Admin desk', width: '726 px', src: '/_blob/41982fbddf28c26707d2021789238c9a', alt: 'Admin desk: a grid of photo cards for Approvals, People, Cohorts and Attendance under a cream header with text tabs', notes: [
+'Six photo cards repeat the seven tabs above them; Cohorts reuses the Approvals photo.',
+'The only figures are "2 trainers" and "1 teachers"; nothing shows what needs attention.'
+] },
+{ title: 'Trainer desk', width: '726 px', src: '/_blob/3de052302fd602772acf6ede76691ce3', alt: 'Trainer desk: a gradient header, a row of coloured pill tabs, a photo banner, a gradient greeting card and seven pastel stat tiles', notes: [
+'A photo banner, a gradient greeting and seven pastel tiles come before any task.',
+'"For you today" holds a slogan, not work to do.',
+'The pill tabs scroll sideways with a visible scrollbar.'
+] },
+{ title: 'Fellow desk', width: '726 px', src: '/_blob/b1c6c85f1ce542371b5ddd26891a5217', alt: 'Fellow desk: text tabs, a photo banner with white welcome text, a To do card and a Continue learning card', notes: [
+'White welcome text sits directly on a busy photo.',
+'An internal note shows on screen: "the way Canvas and Moodle keep the desk short".',
+'This is the clearest desk: one To do and one Continue learning card.'
+] }
+]
+};
+}
+}
+</script>
+</body>
+</html>

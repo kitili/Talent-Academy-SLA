@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -12,7 +10,7 @@ import {
 import { PageStrip } from "@/components/PageStrip";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Download } from "lucide-react";
+import { Chip, linkClass } from "@/components/AdminParts";
 
 type HistoryItem = {
   id: string;
@@ -47,7 +45,7 @@ export function BatchApprovalHistory({ batchId }: { batchId: string }) {
   });
 
   return (
-    <div className="mt-4 border-t pt-4">
+    <div className="flex flex-col gap-1">
       <Select
         value={choice}
         onValueChange={(value) => {
@@ -55,11 +53,11 @@ export function BatchApprovalHistory({ batchId }: { batchId: string }) {
           setPage(1);
         }}
       >
-        <SelectTrigger className="w-[220px]" data-testid={`select-approval-history-${batchId}`}>
-          <SelectValue placeholder="Batch records" />
+        <SelectTrigger className="min-h-[44px] w-[220px] border-sl-control bg-sl-surface text-sl-ink" data-testid={`select-approval-history-${batchId}`}>
+          <SelectValue placeholder="Cohort records" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="closed">Batch records</SelectItem>
+          <SelectItem value="closed">Cohort records</SelectItem>
           <SelectItem value="history">Approval history</SelectItem>
         </SelectContent>
       </Select>
@@ -67,34 +65,32 @@ export function BatchApprovalHistory({ batchId }: { batchId: string }) {
       {open && (
         <div className="mt-3 space-y-3" data-testid={`approval-history-${batchId}`}>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              {data ? `${data.total} saved in this batch` : "Loading the saved history"}
+            <p className="text-sm text-sl-muted">
+              {data ? `${data.total} saved in this cohort` : "Loading the saved history"}
             </p>
-            <Button variant="outline" size="sm" asChild>
-              <a
-                href={`/api/batches/${batchId}/approval-history?format=csv`}
-                data-testid={`button-export-history-${batchId}`}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </a>
-            </Button>
+            <a
+              href={`/api/batches/${batchId}/approval-history?format=csv`}
+              className={`${linkClass} inline-flex min-h-[44px] items-center text-sm`}
+              data-testid={`button-export-history-${batchId}`}
+            >
+              Export approval history
+            </a>
           </div>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading history...</p>
+            <p className="text-sm text-sl-muted">Loading history...</p>
           ) : !data || data.items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No approval history for this batch yet.</p>
+            <p className="text-sm text-sl-muted">No approval history for this cohort yet.</p>
           ) : (
             <div className="space-y-2">
               {data.items.map((item) => (
-                <div key={item.id} className="rounded-lg border p-3" data-testid={`history-item-${item.id}`}>
+                <div key={item.id} className="rounded-lg border border-sl-line bg-sl-surface p-3" data-testid={`history-item-${item.id}`}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{item.targetName}</span>
-                    <Badge variant="outline">{item.targetType}</Badge>
-                    <Badge variant={item.action === "approved" ? "default" : "destructive"}>{item.action}</Badge>
+                    <span className="font-medium text-sl-ink">{item.targetName}</span>
+                    <Chip>{item.targetType === "teacher" ? "Fellow" : "Trainer"}</Chip>
+                    <Chip tone={item.action === "approved" ? "done" : "neutral"}>{item.action === "approved" ? "Approved" : "Declined"}</Chip>
                   </div>
-                  {item.targetEmail && <p className="text-sm text-muted-foreground">{item.targetEmail}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">
+                  {item.targetEmail && <p className="text-sm text-sl-muted">{item.targetEmail}</p>}
+                  <p className="mt-1 text-xs text-sl-muted">
                     By {item.performedByName} ({item.performedByRole})
                     {item.createdAt ? ` · ${format(new Date(item.createdAt), "MMM d, yyyy 'at' h:mm a")}` : ""}
                   </p>

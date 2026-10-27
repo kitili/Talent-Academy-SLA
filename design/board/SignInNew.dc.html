@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed sign-in page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 64px 16px; box-sizing: border-box">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 18px; font-weight: 600">Silverleaf Academy</span>
+</div>
+<main style="width: 100%; max-width: 420px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 32px 32px 28px 32px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Sign in</h1>
+<p style="margin: 0; font-size: 15px; color: #4B5563">Admins, Trainers and Fellows all sign in here.</p>
+</div>
+<form aria-label="Sign in" style="display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="signin-id" style="font-size: 14px; font-weight: 600">Email or username</label>
+<input id="signin-id" name="identifier" type="text" autocomplete="username" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 11px 12px; min-height: 44px; box-sizing: border-box">
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="signin-password" style="font-size: 14px; font-weight: 600">Password</label>
+<div style="display: flex; align-items: stretch; border: 1px solid #D5D9E0; border-radius: 8px; overflow: hidden">
+<input id="signin-password" name="password" type="password" autocomplete="current-password" style="flex: 1 1 auto; min-width: 0; font: inherit; font-size: 15px; border: 0; padding: 11px 12px; min-height: 44px; box-sizing: border-box">
+<button type="button" aria-label="Show password" aria-pressed="false" aria-controls="signin-password" style="flex: 0 0 44px; width: 44px; background: #FFFFFF; border: 0; border-left: 1px solid #E3E6EB; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+</div>
+</div>
+<button type="submit" style="font: inherit; font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; border: 0; border-radius: 8px; padding: 12px 18px; min-height: 44px">Sign in</button>
+<p style="margin: 0; font-size: 14px; color: #4B5563">Forgot your password? Ask your Admin to reset it.</p>
+</form>
+<div style="height: 1px; background: #E3E6EB"></div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<p style="margin: 0; font-size: 14px; color: #4B5563">New to the academy? Ask for a Trainer or Fellow desk. An Admin approves it.</p>
+<a href="#request" style="font-size: 15px; font-weight: 600; text-decoration: none; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 11px 18px; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center">Request a desk</a>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+footnote: 'Trainers, Fellows and Admins all sign in here. You go straight to your own desk.'
+};
+}
+}
+</script>
+</body>
+</html>

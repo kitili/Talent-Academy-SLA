@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Admin Analytics page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 16px; font-weight: 600">Silverleaf Academy</span>
+<span style="font-size: 12px; font-weight: 600; color: #0A48A5; background: #E8F0FB; border-radius: 999px; padding: 3px 10px">Admin</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #374151; background: none; border: 0; padding: 10px 12px; border-radius: 8px">Help</button>
+<button type="button" aria-label="Notifications, 1 unread" style="position: relative; width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span style="position: absolute; top: 7px; right: 7px; min-width: 16px; height: 16px; border-radius: 8px; background: #0A48A5; color: #FFFFFF; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">1</span></button>
+<button type="button" aria-label="Switch to dark mode" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+<span style="font-size: 14px; font-weight: 600; padding: 0 8px">Admin</span>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 9px 14px">Log out</button>
+</div>
+</header>
+<div style="display: flex; flex-wrap: wrap; flex: 1 1 auto">
+<nav aria-label="Admin desk" style="flex: 1 1 232px; max-width: 280px; background: #FFFFFF; border-right: 1px solid #E3E6EB; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<a href="#home" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Home</a>
+<a href="#approvals" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Approvals</a>
+<a href="#people" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">People</a>
+<a href="#cohorts" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between">Cohorts</a>
+<a href="#attendance" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Attendance</a>
+<a href="#analytics" aria-current="page" style="text-decoration: none; background: #E8F0FB; color: #0A48A5; font-weight: 600; border-radius: 8px; padding: 10px 12px">Analytics</a>
+<a href="#certificates" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Certificates</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 32px 40px 48px 40px; display: flex; flex-direction: column; gap: 22px; max-width: 1120px">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Analytics</h1>
+<span style="font-size: 14px; color: #4B5563">The whole academy, as of Tuesday 27 October. To-dos are on <a href="#home">Home</a>.</span>
+</div>
+<nav aria-label="Analytics views" style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 15px; border-bottom: 1px solid #E3E6EB">
+<sc-for list="{{tabs}}" as="tab" hint-placeholder-count="7">
+<a href="#view" aria-current="{{tab.current}}" style="text-decoration: none; color: {{tab.ink}}; font-weight: {{tab.weight}}; border-bottom: 2px solid {{tab.line}}; padding: 10px 10px; margin-bottom: -1px">{{tab.label}}</a>
+</sc-for>
+</nav>
+</div>
+<section aria-labelledby="figures" style="display: flex; flex-direction: column; gap: 14px">
+<h2 id="figures" style="margin: 0; font-size: 18px; font-weight: 600">Overview</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px">
+<sc-for list="{{figures}}" as="fig" hint-placeholder-count="8">
+<div style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; color: #4B5563">{{fig.label}}</span>
+<span style="font-size: {{fig.size}}; font-weight: 600">{{fig.value}}</span>
+<span style="font-size: 13px; color: #4B5563">{{fig.note}}</span>
+</div>
+</sc-for>
+</div>
+</section>
+<section aria-labelledby="by-cohort" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<h2 id="by-cohort" style="margin: 0; font-size: 18px; font-weight: 600; padding: 16px 20px; border-bottom: 1px solid #E3E6EB">Cohorts <span style="font-weight: 500; color: #4B5563">· 8 open</span></h2>
+<div style="overflow-x: auto">
+<table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px">
+<caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap">Open cohorts with trainers, Fellows, steps and attendance</caption>
+<thead>
+<tr style="text-align: left; color: #4B5563">
+<th scope="col" style="font-weight: 500; padding: 10px 20px">Cohort</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Trainers</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Fellows</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Steps</th>
+<th scope="col" style="font-weight: 500; padding: 10px 20px">Attendance</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{cohorts}}" as="row" hint-placeholder-count="8">
+<tr style="border-top: 1px solid #EEF0F3">
+<th scope="row" style="text-align: left; font-weight: 600; padding: 12px 20px"><a href="#cohort" style="text-decoration: none">{{row.name}}</a></th>
+<td style="padding: 12px; color: {{row.trainerInk}}">{{row.trainers}}</td>
+<td style="padding: 12px">{{row.fellows}}</td>
+<td style="padding: 12px; color: #4B5563">{{row.steps}}</td>
+<td style="padding: 12px 20px; color: {{row.attInk}}">{{row.attendance}}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+<section aria-labelledby="trend" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 id="trend" style="margin: 0; font-size: 18px; font-weight: 600">Course completion over time</h2>
+<div style="height: 160px; border: 1px dashed #D5D9E0; border-radius: 10px; background: #F6F7F9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; text-align: center">
+<span style="font-size: 15px; font-weight: 600; color: #374151">Not enough data yet</span>
+<span style="font-size: 14px; color: #4B5563">No Fellow has completed a course. The line appears after the first completion.</span>
+</div>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1252}}'>
+class Component extends DCLogic {
+renderVals() {
+const names = ['Overview', 'Cohorts', 'Engagement', 'Retention', 'Demographics', 'Performance', 'People'];
+const risk = { ink: '#B42318', bg: '#FEF3F2' };
+const warn = { ink: '#B54708', bg: '#FFFAEB' };
+const big = '26px';
+const small = '18px';
+const quiet = '#4B5563';
+const ink = '#111827';
+const batch = (name) => ({ name, trainers: 'Test Trainer', trainerInk: ink, fellows: '0', steps: 'No steps yet', attendance: 'No marks yet', attInk: quiet });
+return {
+tabs: names.map((label, i) => ({
+label,
+current: i === 0 ? 'page' : 'false',
+ink: i === 0 ? '#0A48A5' : '#374151',
+weight: i === 0 ? '600' : '400',
+line: i === 0 ? '#0A48A5' : 'transparent'
+})),
+attention: [
+{ ...risk, tag: 'No trainer', title: 'cohort2 has no trainer', detail: '1 Fellow is enrolled. No Trainer sees this cohort until one is assigned.', action: 'Assign a trainer' },
+{ ...warn, tag: 'Empty steps', title: 'Climate and Culture: Steps 2 and 3 have no course', detail: 'Systems and Procedures, and Rules and Consequences, hold no course yet.', action: 'Place a course' },
+{ ...warn, tag: 'No lesson file', title: 'Setting clear Expectations has no lesson file', detail: 'Its one module, Sets clear Expectations, is empty, so the course cannot be complete.', action: 'Open the course' }
+],
+figures: [
+{ label: 'Fellows', value: '1', note: 'approved', size: big },
+{ label: 'Trainers', value: '2', note: 'approved', size: big },
+{ label: 'Open cohorts', value: '8', note: '0 closed', size: big },
+{ label: 'Courses', value: '4', note: 'on cohorts', size: big },
+{ label: 'Average completion', value: '0%', note: 'no course can be complete yet', size: big },
+{ label: 'Attendance', value: '100%', note: '2 marks', size: big },
+{ label: 'Reflections', value: '0', note: 'none written yet', size: big },
+{ label: 'Average rating', value: 'No ratings yet', note: 'none given yet', size: small }
+],
+cohorts: [
+{ name: 'Climate and Culture', trainers: 'Anthonia Peter, Test Trainer', trainerInk: ink, fellows: '1', steps: '3 · Step 1 has 4 courses', attendance: '100% · 2 marks', attInk: ink },
+{ name: 'cohort2', trainers: 'No trainer', trainerInk: '#B42318', fellows: '1', steps: '1 · no course', attendance: 'No marks yet', attInk: quiet },
+batch('Batch 2 — Early years'),
+batch('Batch 3 — Lower primary'),
+batch('Batch 4 — Upper primary'),
+batch('Batch 5 — Literacy'),
+batch('Batch 6 — Numeracy'),
+batch('Batch 7 — Staff practice')
+]
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Admin People page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 16px; font-weight: 600">Silverleaf Academy</span>
+<span style="font-size: 12px; font-weight: 600; color: #0A48A5; background: #E8F0FB; border-radius: 999px; padding: 3px 10px">Admin</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #374151; background: none; border: 0; padding: 10px 12px; border-radius: 8px">Help</button>
+<button type="button" aria-label="Notifications, 1 unread" style="position: relative; width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span style="position: absolute; top: 7px; right: 7px; min-width: 16px; height: 16px; border-radius: 8px; background: #0A48A5; color: #FFFFFF; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">1</span></button>
+<button type="button" aria-label="Switch to dark mode" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+<span style="font-size: 14px; font-weight: 600; padding: 0 8px">Admin</span>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 9px 14px">Log out</button>
+</div>
+</header>
+<div style="display: flex; flex-wrap: wrap; flex: 1 1 auto">
+<nav aria-label="Admin desk" style="flex: 1 1 232px; max-width: 280px; background: #FFFFFF; border-right: 1px solid #E3E6EB; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<a href="#home" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Home</a>
+<a href="#approvals" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Approvals</a>
+<a href="#people" aria-current="page" style="text-decoration: none; background: #E8F0FB; color: #0A48A5; font-weight: 600; border-radius: 8px; padding: 10px 12px">People</a>
+<a href="#cohorts" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between">Cohorts</a>
+<a href="#attendance" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Attendance</a>
+<a href="#analytics" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Analytics</a>
+<a href="#certificates" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Certificates</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 32px 40px 48px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1120px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">People</h1>
+<div style="display: flex; gap: 4px; font-size: 15px">
+<a href="#trainers" aria-current="page" style="text-decoration: none; font-weight: 600; color: #0A48A5; border-bottom: 2px solid #0A48A5; padding: 6px 4px">Trainers · 2</a>
+<a href="#fellows" style="text-decoration: none; color: #374151; padding: 6px 12px">Fellows · 1</a>
+</div>
+</div>
+<button type="button" style="font: inherit; font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; border: 0; border-radius: 8px; padding: 11px 18px">Add a trainer</button>
+</div>
+<section aria-labelledby="trainers-list" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #E3E6EB">
+<h2 id="trainers-list" style="margin: 0; font-size: 18px; font-weight: 600">Active trainers <span style="font-weight: 500; color: #4B5563">· 2</span></h2>
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 0 1 320px; min-width: 220px">
+<label for="people-search" style="font-size: 13px; color: #4B5563">Find a trainer</label>
+<input id="people-search" type="search" placeholder="Name, username or email" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box">
+</div>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 14px">
+<thead>
+<tr style="text-align: left; color: #4B5563">
+<th scope="col" style="font-weight: 500; padding: 10px 20px">Trainer</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Email</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Cohorts</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Fellows</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Last active</th>
+<th scope="col" style="font-weight: 500; padding: 10px 12px">Status</th>
+<th scope="col" style="font-weight: 500; padding: 10px 20px"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap">Actions</span></th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{trainers}}" as="t" hint-placeholder-count="2">
+<tr style="border-top: 1px solid #EEF0F3">
+<th scope="row" style="text-align: left; font-weight: 600; padding: 14px 20px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span>{{t.name}}</span><sc-if value="{{t.username}}" hint-placeholder-val="{{ true }}"><span style="font-size: 13px; font-weight: 400; color: #4B5563">{{t.username}}</span></sc-if></span>
+</th>
+<td style="padding: 14px 12px">{{t.email}}</td>
+<td style="padding: 14px 12px">{{t.cohorts}}</td>
+<td style="padding: 14px 12px">{{t.fellows}}</td>
+<td style="padding: 14px 12px; color: #4B5563">Not recorded</td>
+<td style="padding: 14px 12px"><span style="font-size: 12px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 3px 10px">Approved</span></td>
+<td style="padding: 6px 20px; text-align: right"><a href="#trainer" aria-label="{{t.openLabel}}" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-weight: 600">Open</a></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<details style="border-top: 1px solid #E3E6EB">
+<summary style="cursor: pointer; padding: 14px 20px; font-size: 15px; font-weight: 600; color: #374151; min-height: 44px; box-sizing: border-box">Inactive desks · 0</summary>
+<p style="margin: 0; padding: 0 20px 16px 20px; font-size: 14px; line-height: 1.5; color: #4B5563">No inactive trainer desks. A deactivated desk folds in here; it is not deleted.</p>
+</details>
+</section>
+<p style="margin: 0; font-size: 14px; color: #4B5563">Last active is not recorded yet for any trainer. Fellows are on the <a href="#fellows">Fellows</a> tab.</p>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":596}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+trainers: [
+{ name: 'Test Trainer', username: 'trainer1', email: 'trainer@test.com', cohorts: '7', fellows: '1', openLabel: 'Open Test Trainer' },
+{ name: 'Anthonia Peter', username: '',email: 'anthonia@silverleaf.co.tz', cohorts: '1', fellows: '1', openLabel: 'Open Anthonia Peter' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

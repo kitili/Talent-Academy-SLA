@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Award } from "lucide-react";
 import { AcademyShell } from "@/components/AcademyShell";
 import { SilverleafCertificate } from "@/components/SilverleafCertificate";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   CERTIFICATE_DESIGNS,
   CERTIFICATE_SIGNERS,
+  designFromCertificate,
   wordingForIssue,
   type CertificateDesignId,
   type CertificateOccasion,
@@ -58,6 +58,20 @@ async function issueCertificate(body: Record<string, unknown>) {
   return data;
 }
 
+const FIELD_TRIGGER = "min-h-11 border-sl-control bg-sl-surface text-[15px] text-sl-ink";
+const PRIMARY_BUTTON = "min-h-11 bg-sl-accent-strong px-5 text-[15px] font-semibold text-white hover:bg-sl-accent-strong/90";
+
+/** What the Issued list calls a certificate: the board's three kinds. */
+function kindLabel(cert: { design?: string | null; kind?: string | null }) {
+  if (cert.kind === "course") return "Course certificate";
+  return designFromCertificate(cert) === "advanced" ? "Advanced Level" : "Fellowship";
+}
+
+function issuedDate(iso: string) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export default function AdminCertificates() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
@@ -83,6 +97,22 @@ export default function AdminCertificates() {
   const readyForGraduation = (eligible ?? []).filter((row) => row.path.done);
   const readyForCourse = (eligible ?? []).flatMap((row) =>
     row.courses.filter((item) => item.complete).map((item) => ({ fellow: row, course: item })));
+  // Why a Fellow is not ready, from the same eligible list the ready rows come from.
+  const notReady = (eligible ?? []).flatMap((row) => {
+    const reasons: Array<{ key: string; who: string; why: string }> = [];
+    if (!row.path.done) {
+      reasons.push({
+        key: `path-${row.teacherId}`,
+        who: `${row.name} · Fellowship or Advanced Level`,
+        why: `Academy path: ${row.path.cohortsCompleted} of ${row.path.cohortsRequired} cohorts completed`,
+      });
+    }
+    if (!row.courses.some((item) => item.complete)) {
+      reasons.push({ key: `course-${row.teacherId}`, who: `${row.name} · course certificates`, why: "No course is complete yet" });
+    }
+    return reasons;
+  });
+  const nothingReady = readyForGraduation.length === 0 && readyForCourse.length === 0;
   const selectionEligible = occasion === "graduation" ? fellowStatus?.path.done === true : courseStatus?.complete === true;
   const selectionStatus = !teacherId || !fellowStatus
     ? ""
@@ -96,6 +126,11 @@ export default function AdminCertificates() {
     setOccasion(nextOccasion);
     setCourseId(nextCourseId);
     setRefusalText("");
+  };
+  /** A ready row fills the form below and brings it into view; issuing is still the button there. */
+  const chooseAndShow = (nextTeacherId: string, nextOccasion: CertificateOccasion, nextCourseId = "") => {
+    choose(nextTeacherId, nextOccasion, nextCourseId);
+    document.getElementById("issue")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   };
   const previewName = teacher?.name || "";
   const previewBody = useMemo(
@@ -125,200 +160,255 @@ export default function AdminCertificates() {
   if (user && user.role !== "admin") {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-[#3a4a60]">Only an admin can issue Silverleaf certificates.</p>
+        <p className="text-sm text-sl-muted">Only an admin can issue Silverleaf certificates.</p>
       </div>
     );
   }
 
   const canIssue = Boolean(teacherId) && (occasion === "graduation" || Boolean(courseId));
+  const cardClass = (on: boolean) =>
+    `flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-[15px] text-sl-ink ${on ? "border-sl-accent bg-sl-accent-soft" : "border-sl-control bg-sl-surface"}`;
+  // Course certificate keeps whichever template was last chosen; Fellowship and Advanced Level choose the template.
+  const kinds = [
+    { value: "course", label: "Course certificate", on: occasion === "course", pick: () => choose(teacherId, "course"), testId: "radio-certificate-kind-course" },
+    ...(Object.keys(CERTIFICATE_DESIGNS) as CertificateDesignId[]).map((id) => ({
+      value: id,
+      label: CERTIFICATE_DESIGNS[id].label,
+      on: occasion === "graduation" && design === id,
+      pick: () => { setDesign(id); choose(teacherId, "graduation"); },
+      testId: `button-template-${id}`,
+    })),
+  ];
 
   return (
     <AcademyShell
       title="Certificates"
-      subtitle="Official Silverleaf templates. A course certificate needs every module of the course complete; Fellowship and Advanced need the academy path done."
+      subtitle="Official Silverleaf templates"
       userLabel={user?.username}
       onLogout={() => logoutMutation.mutate()}
       showAdminNav
+      desk="admin"
+      current="certificates"
       scene="paper"
     >
       <style>{PRINT_CSS}</style>
-      <div className="grid gap-6 xl:grid-cols-[22rem_1fr]" data-testid="admin-certificates">
-        <section className="space-y-4 rounded-2xl border border-[#102448]/10 bg-white p-4 text-[#17233c] dark:bg-[#162033] dark:text-[#f6f1e8]">
-          <div>
-            <p className="text-sm font-semibold">Template</p>
-            <p className="text-xs text-muted-foreground mt-1">Signatures stay as {CERTIFICATE_SIGNERS.left.name} and {CERTIFICATE_SIGNERS.right.name}.</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {(Object.keys(CERTIFICATE_DESIGNS) as CertificateDesignId[]).map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  data-testid={`button-template-${id}`}
-                  onClick={() => setDesign(id)}
-                  className={`overflow-hidden rounded-lg border text-left ${
-                    design === id ? "border-[#c4842a] ring-2 ring-[#c4842a]/40" : "border-[#102448]/15"
-                  }`}
-                >
-                  <SilverleafCertificate design={id} name="" body={CERTIFICATE_DESIGNS[id].body} />
-                  <span className="block px-2 py-1.5 text-xs font-semibold">{CERTIFICATE_DESIGNS[id].label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Fellow</Label>
-            <Select value={teacherId} onValueChange={(value) => choose(value, occasion)}>
-              <SelectTrigger data-testid="select-certificate-teacher">
-                <SelectValue placeholder="Choose who this is for" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeTeachers.map((row) => (
-                  <SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">The name stays blank on the template until you choose someone.</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>When</Label>
-            <Select value={occasion} onValueChange={(value) => choose(teacherId, value as CertificateOccasion)}>
-              <SelectTrigger data-testid="select-certificate-occasion">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="graduation">Graduation</SelectItem>
-                <SelectItem value="course">Course completion</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {occasion === "course" && (
-            <div className="space-y-2">
-              <Label>Course</Label>
-              <Select value={courseId} onValueChange={(value) => choose(teacherId, "course", value)}>
-                <SelectTrigger data-testid="select-certificate-course">
-                  <SelectValue placeholder="Choose the completed course" />
-                </SelectTrigger>
-                <SelectContent>
-                  {courseChoices.map((row) => (
-                    <SelectItem key={row.id} value={row.id}>
-                      {row.name}
-                      {row.status ? ` (${row.status.doneModules} of ${row.status.totalModules} modules)` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {selectionStatus && (
-            <p
-              className={`text-xs ${selectionEligible ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}
-              data-testid="text-certificate-eligibility"
-            >
-              {selectionStatus}
-            </p>
-          )}
-
-          <div className="space-y-2">
-            <Label>Words that will be written</Label>
-            <p className="rounded-md border border-[#102448]/10 bg-[#fffaf4] p-3 text-xs leading-relaxed dark:bg-[#1c2740]" data-testid="text-generated-wording">
-              {previewBody}
-            </p>
-          </div>
-
-          <Button
-            className="w-full"
-            disabled={!canIssue || issueMutation.isPending}
-            onClick={() => issueMutation.mutate()}
-            data-testid="button-issue-certificate"
-          >
-            <Award className="mr-2 h-4 w-4" />
-            Issue certificate
-          </Button>
-          {refusalText && (
-            <p className="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200" role="alert" data-testid="text-certificate-refusal">
-              {refusalText}
-            </p>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => window.print()}
-            disabled={!canIssue || !selectionEligible}
-            data-testid="button-print-certificate"
-          >
-            Print / save PDF
-          </Button>
-        </section>
-
-        <section className="min-w-0 space-y-4">
-          <div id="certificate-print">
-            <SilverleafCertificate design={design} name={previewName} body={previewBody} />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {CERTIFICATE_SIGNERS.left.name}, {CERTIFICATE_SIGNERS.left.title} · {CERTIFICATE_SIGNERS.right.name}, {CERTIFICATE_SIGNERS.right.title}
+      <div className="flex max-w-[1120px] flex-col gap-6" data-testid="admin-certificates">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[28px] font-semibold text-sl-ink">Certificates</h1>
+          <p className="text-sm leading-relaxed text-sl-muted">
+            Issued by hand. The server checks each one: a course certificate needs every module complete; Fellowship and Advanced Level need the academy path done.
           </p>
+        </div>
 
-          <div className="rounded-2xl border border-[#102448]/10 bg-white p-4 dark:bg-[#162033]" data-testid="certificate-eligible">
-            <p className="font-semibold">Ready for a certificate</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Worked out from each Fellow's progress, by the same rules the server checks when you issue.
-            </p>
-            {eligibilityFailed ? (
-              <p className="mt-2 text-sm text-muted-foreground">Could not load who is ready. You can still issue; the server checks each certificate.</p>
-            ) : !eligible ? (
-              <p className="mt-2 text-sm text-muted-foreground">Working out who is ready...</p>
-            ) : readyForGraduation.length === 0 && readyForCourse.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">No Fellow has finished a course or the academy path yet.</p>
-            ) : (
-              <ul className="mt-3 space-y-2">
+        <section aria-labelledby="ready" className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" data-testid="certificate-eligible">
+          <div className="flex flex-col gap-1 border-b border-sl-line px-5 py-4">
+            <h2 id="ready" className="text-lg font-semibold text-sl-ink">Who is ready</h2>
+            <span className="text-sm text-sl-muted">Worked out by the server from each Fellow's progress.</span>
+          </div>
+          {eligibilityFailed ? (
+            <p className="px-5 py-4 text-sm text-sl-muted">Could not load who is ready. You can still issue; the server checks each certificate.</p>
+          ) : !eligible ? (
+            <p className="px-5 py-4 text-sm text-sl-muted">Working out who is ready...</p>
+          ) : (
+            <>
+              {eligible.length === 0 ? (
+                <p className="px-5 py-4 text-sm text-sl-muted">No approved Fellow is on the list yet.</p>
+              ) : (
+                nothingReady && <p className="px-5 pb-1 pt-3.5 text-[15px] font-semibold text-sl-ink">Nobody is ready yet.</p>
+              )}
+              <ul>
                 {readyForGraduation.map((row) => (
-                  <li key={`path-${row.teacherId}`} className="flex items-center justify-between gap-2 rounded-lg border border-[#102448]/10 px-3 py-2 text-sm">
-                    <span>
-                      <span className="font-medium">{row.name}</span>
-                      <span className="text-muted-foreground"> · Academy path done (Fellowship or Advanced)</span>
+                  <li key={`path-${row.teacherId}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-sl-neutral-soft px-5 py-3">
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-[15px] font-semibold text-sl-ink">{row.name} · Fellowship or Advanced Level</span>
+                      <span className="text-sm text-sl-muted">Academy path done</span>
                     </span>
-                    <Button size="sm" variant="outline" onClick={() => choose(row.teacherId, "graduation")} data-testid={`button-choose-graduation-${row.teacherId}`}>
-                      Choose
+                    <Button
+                      type="button"
+                      className={PRIMARY_BUTTON}
+                      onClick={() => chooseAndShow(row.teacherId, "graduation")}
+                      data-testid={`button-choose-graduation-${row.teacherId}`}
+                    >
+                      Issue…
                     </Button>
                   </li>
                 ))}
                 {readyForCourse.map(({ fellow, course: item }) => (
-                  <li key={`course-${fellow.teacherId}-${item.courseId}`} className="flex items-center justify-between gap-2 rounded-lg border border-[#102448]/10 px-3 py-2 text-sm">
-                    <span>
-                      <span className="font-medium">{fellow.name}</span>
-                      <span className="text-muted-foreground"> · {item.courseName} complete</span>
+                  <li key={`course-${fellow.teacherId}-${item.courseId}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-sl-neutral-soft px-5 py-3">
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-[15px] font-semibold text-sl-ink">{fellow.name} · course certificate</span>
+                      <span className="text-sm text-sl-muted">{item.courseName}: every module complete</span>
                     </span>
-                    <Button size="sm" variant="outline" onClick={() => choose(fellow.teacherId, "course", item.courseId)} data-testid={`button-choose-course-${fellow.teacherId}-${item.courseId}`}>
-                      Choose
+                    <Button
+                      type="button"
+                      className={PRIMARY_BUTTON}
+                      onClick={() => chooseAndShow(fellow.teacherId, "course", item.courseId)}
+                      data-testid={`button-choose-course-${fellow.teacherId}-${item.courseId}`}
+                    >
+                      Issue…
                     </Button>
                   </li>
                 ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-[#102448]/10 bg-white p-4 dark:bg-[#162033]">
-            <p className="font-semibold">Issued</p>
-            {issued.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">None yet. Issue at graduation or when a course is complete.</p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {issued.map((cert) => (
-                  <li key={cert.id} className="rounded-lg border border-[#102448]/10 px-3 py-2 text-sm" data-testid={`issued-cert-${cert.id}`}>
-                    <span className="font-medium">{cert.teacherName}</span>
-                    <span className="text-muted-foreground"> · {cert.courseName}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {new Date(cert.generatedAt).toLocaleDateString()} · {cert.design === "advanced" || cert.kind === "distinction" ? "Advanced Level" : cert.kind === "course" ? "Course completion" : "Graduation"}
+                {notReady.slice(0, 6).map((row) => (
+                  <li key={row.key} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 border-b border-sl-neutral-soft px-5 py-3">
+                    <span className="text-[15px] text-sl-ink">{row.who}</span>
+                    <span className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-sm text-sl-muted">{row.why}</span>
+                      <span className="rounded-full bg-sl-neutral-soft px-2.5 py-0.5 text-xs font-semibold text-sl-neutral">Not ready</span>
                     </span>
                   </li>
                 ))}
               </ul>
-            )}
+              {notReady.length > 6 && <p className="px-5 py-3 text-[13px] text-sl-muted">{notReady.length - 6} more are not ready yet.</p>}
+            </>
+          )}
+        </section>
+
+        <section id="issue" aria-labelledby="issue-heading" className="flex scroll-mt-4 flex-col gap-5 rounded-xl border border-sl-line bg-sl-surface p-5">
+          <h2 id="issue-heading" className="text-lg font-semibold text-sl-ink">Issue a certificate</h2>
+          <div className="flex flex-wrap items-start gap-6">
+            <form
+              aria-labelledby="issue-heading"
+              className="flex min-w-0 flex-[1_1_300px] flex-col gap-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (canIssue && !issueMutation.isPending) issueMutation.mutate();
+              }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label>Fellow</Label>
+                <Select value={teacherId} onValueChange={(value) => choose(value, occasion)}>
+                  <SelectTrigger className={FIELD_TRIGGER} data-testid="select-certificate-teacher" aria-label="Fellow">
+                    <SelectValue placeholder="Choose a Fellow" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeTeachers.map((row) => (
+                      <SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-[13px] text-sl-muted">The name stays blank on the template until you choose someone.</span>
+              </div>
+
+              <fieldset className="m-0 flex flex-col gap-2 border-0 p-0" data-testid="select-certificate-occasion">
+                <legend className="mb-2 p-0 text-sm font-semibold text-sl-ink">Kind</legend>
+                {kinds.map((item) => (
+                  <label key={item.value} htmlFor={`kind-${item.value}`} className={cardClass(item.on)}>
+                    <input
+                      id={`kind-${item.value}`}
+                      type="radio"
+                      name="cert-kind"
+                      value={item.value}
+                      checked={item.on}
+                      onChange={item.pick}
+                      className="m-0 h-[18px] w-[18px] accent-[rgb(var(--sl-accent-strong))]"
+                      data-testid={item.testId}
+                    />
+                    {item.label}
+                  </label>
+                ))}
+              </fieldset>
+
+              <div className="flex flex-col gap-1.5">
+                <Label>Course</Label>
+                <Select value={courseId} onValueChange={(value) => choose(teacherId, "course", value)} disabled={occasion !== "course"}>
+                  <SelectTrigger className={FIELD_TRIGGER} data-testid="select-certificate-course" aria-label="Course">
+                    <SelectValue placeholder="Choose a course" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courseChoices.map((row) => (
+                      <SelectItem key={row.id} value={row.id}>
+                        {row.name}
+                        {row.status ? ` (${row.status.doneModules} of ${row.status.totalModules} modules)` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-[13px] text-sl-muted">Only for a course certificate.</span>
+              </div>
+
+              {selectionStatus && (
+                <p className={`text-sm ${selectionEligible ? "text-sl-done" : "text-sl-muted"}`} data-testid="text-certificate-eligibility">
+                  {selectionStatus}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-3">
+                <Button type="submit" className={PRIMARY_BUTTON} disabled={!canIssue || issueMutation.isPending} data-testid="button-issue-certificate">
+                  Issue certificate
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 border-sl-control bg-sl-surface px-5 text-[15px] text-sl-ink"
+                  onClick={() => window.print()}
+                  disabled={!canIssue || !selectionEligible}
+                  data-testid="button-print-certificate"
+                >
+                  Print / save PDF
+                </Button>
+              </div>
+              {refusalText && (
+                <div className="flex items-start gap-3 rounded-lg border border-sl-risk/30 bg-sl-risk-soft px-4 py-3.5" role="alert">
+                  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="mt-px flex-none text-sl-risk">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v6" />
+                    <path d="M12 16.5v.5" />
+                  </svg>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[15px] font-semibold text-sl-risk">Not issued</span>
+                    <span className="text-sm leading-relaxed text-sl-ink" data-testid="text-certificate-refusal">{refusalText}</span>
+                  </div>
+                </div>
+              )}
+            </form>
+
+            <figure aria-labelledby="preview-label" className="m-0 flex min-w-0 flex-[1_1_380px] flex-col gap-2">
+              <figcaption id="preview-label" className="text-[13px] font-semibold text-sl-muted">
+                Preview · {occasion === "course" ? "course certificate" : `${CERTIFICATE_DESIGNS[design].label} certificate`}, on the {CERTIFICATE_DESIGNS[design].label} template
+              </figcaption>
+              <div id="certificate-print">
+                <SilverleafCertificate design={design} name={previewName} body={previewBody} />
+              </div>
+              <p className="text-[13px] text-sl-muted">
+                {CERTIFICATE_SIGNERS.left.name}, {CERTIFICATE_SIGNERS.left.title} · {CERTIFICATE_SIGNERS.right.name}, {CERTIFICATE_SIGNERS.right.title}
+              </p>
+            </figure>
           </div>
+        </section>
+
+        <section aria-labelledby="issued" className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface">
+          <h2 id="issued" className="px-5 py-4 text-lg font-semibold text-sl-ink">
+            Issued <span className="font-medium text-sl-muted">· {issued.length === 0 ? "none yet" : issued.length}</span>
+          </h2>
+          {issued.length === 0 ? (
+            <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
+              No certificate has been issued. Each one you issue is listed here, and the Fellow sees it on their Certificates page.
+            </p>
+          ) : (
+            <div className="overflow-x-auto border-t border-sl-line">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="text-left text-sl-muted">
+                    <th scope="col" className="px-5 py-2.5 font-medium">Date</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Fellow</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Kind</th>
+                    <th scope="col" className="px-5 py-2.5 font-medium">Course</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {issued.map((cert) => (
+                    <tr key={cert.id} className="border-t border-sl-neutral-soft" data-testid={`issued-cert-${cert.id}`}>
+                      <td className="px-5 py-3 text-sl-muted">{issuedDate(cert.generatedAt)}</td>
+                      <td className="px-3 py-3 text-sl-ink">{cert.teacherName}</td>
+                      <td className="px-3 py-3 text-sl-ink">{kindLabel(cert)}</td>
+                      <td className="px-5 py-3 text-sl-muted">{cert.kind === "course" ? cert.courseName : "Not tied to a course"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </div>
     </AcademyShell>

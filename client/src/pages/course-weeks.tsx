@@ -1,29 +1,19 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import posthog from "posthog-js";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, GripVertical, X, ZoomIn, ZoomOut, Eye, ListChecks } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronRight, Eye, ExternalLink, GripVertical, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ProfileSettingsDialog } from "@/components/ProfileSettingsDialog";
-import { LogOut } from "lucide-react";
-import logoImage from "@assets/image_1760460046116.png";
+import { AcademyShell } from "@/components/AcademyShell";
 import type { Course, QuizQuestion, TrainingWeek } from "@shared/schema";
-import { ACADEMY_TERMS } from "@shared/academyPath";
+import { deskName } from "@shared/deskName";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import type { UploadResult } from "@uppy/core";
 import { FilePreview } from "@/components/FilePreview";
-import { PlaceBanner } from "@/components/PlaceArt";
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
-
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 import {
   DndContext,
   closestCenter,
@@ -44,12 +34,25 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+
+// Buttons, fields and chips follow design/board/CourseEditor.dc.html with the sl-* tokens.
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sl-accent";
+const BTN_PRIMARY = `inline-flex items-center justify-center rounded-lg bg-sl-accent-strong px-4 py-2.5 min-h-[44px] text-[15px] font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const BTN_SECONDARY = `inline-flex items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-3.5 py-2.5 min-h-[44px] text-sm text-sl-ink hover:bg-sl-neutral-soft disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const BTN_ICON = `inline-flex h-11 w-11 items-center justify-center rounded-lg border border-sl-control bg-sl-surface text-sl-neutral hover:bg-sl-neutral-soft disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const FIELD = `w-full rounded-lg border border-sl-control bg-sl-surface px-3 py-2.5 text-[15px] text-sl-ink placeholder:text-sl-muted ${FOCUS}`;
+
+type Tone = "risk" | "attention" | "done" | "neutral";
+const CHIP: Record<Tone, string> = {
+  risk: "bg-sl-risk-soft text-sl-risk",
+  attention: "bg-sl-attention-soft text-sl-attention",
+  done: "bg-sl-done-soft text-sl-done",
+  neutral: "bg-sl-neutral-soft text-sl-neutral",
+};
+
+function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
+  return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${CHIP[tone]}`}>{children}</span>;
+}
 
 // ─── Sortable File Item (must be defined outside parent component) ───────────
 
@@ -58,22 +61,36 @@ type QuizStatus = Record<string, { generated: boolean; questionCount: number; ap
 
 const NO_QUESTIONS: QuizQuestion[] = [];
 
-/** What the quiz button says: Fellows take a quiz only once a person has approved it (D5). */
-function quizLabel(quiz?: { generated: boolean; approved: boolean }) {
-  if (!quiz?.generated) return "No quiz";
-  return quiz.approved ? "Quiz approved" : "Quiz draft";
+/** A lesson file's quiz chip: Fellows take a quiz only once a person has approved it (D5). */
+function quizChip(quiz?: { generated: boolean; questionCount: number; approved: boolean }): { tone: Tone; label: string } | null {
+  if (!quiz) return null;
+  if (!quiz.generated) return { tone: "neutral", label: "No quiz yet" };
+  if (quiz.approved) return { tone: "done", label: `Quiz approved · ${quiz.questionCount} ${quiz.questionCount === 1 ? "question" : "questions"}` };
+  return { tone: "attention", label: "Quiz draft · waiting for you" };
+}
+
+function fileKind(fileName: string) {
+  const name = fileName.toLowerCase();
+  if (name.endsWith(".pdf")) return "PDF";
+  if (name.endsWith(".pptx") || name.endsWith(".ppt")) return "PowerPoint";
+  if (name.endsWith(".docx") || name.endsWith(".doc")) return "Word";
+  if (name.endsWith(".mp4") || name.endsWith(".webm") || name.endsWith(".mov")) return "Video";
+  return "File";
 }
 
 interface SortableFileItemProps {
   file: { id: string; fileName: string; fileUrl: string; fileSize: number };
   weekId: string;
-  quiz?: { generated: boolean; approved: boolean };
+  position: number;
+  count: number;
+  quiz?: { generated: boolean; questionCount: number; approved: boolean };
   onView: () => void;
   onDelete: () => void;
   onEditQuiz: () => void;
+  onMove: (delta: number) => void;
 }
 
-function SortableFileItem({ file, quiz, onView, onDelete, onEditQuiz }: SortableFileItemProps) {
+function SortableFileItem({ file, position, count, quiz, onView, onDelete, onEditQuiz, onMove }: SortableFileItemProps) {
   const {
     attributes,
     listeners,
@@ -89,70 +106,78 @@ function SortableFileItem({ file, quiz, onView, onDelete, onEditQuiz }: Sortable
     opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 50 : undefined,
   };
+  const chip = quizChip(quiz);
+  const isDraft = Boolean(quiz?.generated && !quiz.approved);
 
   return (
-    <div
+    <li
       ref={setNodeRef}
       style={style}
-      className={`flex items-center justify-between p-2 border rounded bg-muted/30 transition-all ${
-        isDragging ? 'shadow-lg scale-105 ring-2 ring-primary' : ''
+      className={`flex flex-wrap items-center justify-between gap-2.5 rounded-[10px] border border-sl-line bg-sl-surface px-3 py-2.5 ${
+        isDragging ? "shadow-lg ring-2 ring-sl-accent" : ""
       }`}
     >
-      <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex gap-1">
+          <button type="button" className={BTN_ICON} aria-label={`Move lesson file ${position} up`} disabled={position === 1} onClick={() => onMove(-1)}>
+            <ChevronUp className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button type="button" className={BTN_ICON} aria-label={`Move lesson file ${position} down`} disabled={position === count} onClick={() => onMove(1)}>
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
         <button
-          className="flex items-center cursor-grab active:cursor-grabbing hover:bg-muted/20 p-1 rounded transition-all touch-none select-none"
+          type="button"
+          className={`${BTN_ICON} cursor-grab touch-none select-none active:cursor-grabbing`}
           {...attributes}
           {...listeners}
           data-testid={`drag-handle-file-${file.id}`}
           aria-label="Drag to reorder"
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          <GripVertical className="h-4 w-4" aria-hidden="true" />
         </button>
-        <span className="text-sm truncate">{file.fileName}</span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-[15px] font-medium text-sl-ink">{file.fileName}</span>
+          <span className="text-[13px] text-sl-muted">{fileKind(file.fileName)}</span>
+        </span>
       </div>
-      <div className="flex gap-1 flex-shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
+      <div className="flex flex-wrap items-center gap-3">
+        {chip && <Chip tone={chip.tone}>{chip.label}</Chip>}
+        <button
+          type="button"
+          className={isDraft ? BTN_PRIMARY : BTN_SECONDARY}
           onClick={onEditQuiz}
-          title={`Review, edit and approve the quiz ${ACADEMY_TERMS.learner.title}s take on this file`}
+          title="Review, edit and approve the quiz Fellows take on this file"
           data-testid={`button-edit-quiz-${file.id}`}
         >
-          <ListChecks className="h-4 w-4 mr-1" />
-          <span className={`text-xs ${quiz?.generated && !quiz.approved ? "text-amber-600" : ""}`}>{quizLabel(quiz)}</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onView}
-          data-testid={`button-view-${file.id}`}
-        >
-          <ExternalLink className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          data-testid={`button-delete-file-${file.id}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+          {isDraft ? "Review and approve" : quiz?.generated ? "Edit quiz" : "Create quiz"}
+        </button>
+        <button type="button" className={BTN_ICON} onClick={onView} aria-label={`Preview ${file.fileName}`} data-testid={`button-view-${file.id}`}>
+          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <button type="button" className={`${BTN_ICON} hover:text-sl-risk`} onClick={onDelete} aria-label={`Delete ${file.fileName}`} data-testid={`button-delete-file-${file.id}`}>
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
-    </div>
+    </li>
   );
 }
 
-// ─── Sortable Week Item (must be defined outside parent component) ────────────
+// ─── Sortable Module Item (must be defined outside parent component) ──────────
 
 interface SortableWeekItemProps {
   week: TrainingWeek;
   isAdmin: boolean;
   courseId: string;
+  position: number;
+  count: number;
   navigate: (path: string) => void;
   sensors: ReturnType<typeof useSensors>;
   activeFileId: string | null;
   isSavingWeek: boolean;
   onDeleteWeek: (id: string) => void;
+  onMoveWeek: (weekId: string, delta: number) => void;
+  onMoveFile: (weekId: string, fileId: string, delta: number) => void;
   onViewFile: (file: { url: string; name: string }) => void;
   onDeleteFile: (weekId: string, fileId: string) => void;
   onGetUploadParams: () => Promise<{ method: "PUT"; url: string }>;
@@ -167,11 +192,15 @@ function SortableWeekItem({
   week,
   isAdmin,
   courseId,
+  position,
+  count,
   navigate,
   sensors,
   activeFileId,
   isSavingWeek,
   onDeleteWeek,
+  onMoveWeek,
+  onMoveFile,
   onViewFile,
   onDeleteFile,
   onGetUploadParams,
@@ -188,6 +217,7 @@ function SortableWeekItem({
   });
   const [editValue, setEditValue] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [uploaderOpen, setUploaderOpen] = useState(false);
   const { toast } = useToast();
   const addYoutube = useMutation({
     mutationFn: async () => {
@@ -252,282 +282,252 @@ function SortableWeekItem({
     setEditValue("");
   };
 
+  const name = week.competencyFocus || "Untitled module";
+  const files = week.deckFiles ?? [];
+
+  // Not an editor: the module is a row that opens its content.
+  if (!isAdmin) {
+    return (
+      <article
+        ref={setNodeRef}
+        style={style}
+        className="rounded-xl border border-sl-line bg-sl-surface"
+        data-testid={`card-week-${week.id}`}
+      >
+        <button
+          type="button"
+          onClick={() => navigate(`/courses/${courseId}/weeks/${week.id}`)}
+          className={`flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl px-5 py-4 text-left hover:bg-sl-neutral-soft ${FOCUS}`}
+          data-testid={`button-open-week-${week.id}`}
+        >
+          <span className="text-[17px] font-semibold text-sl-ink">Module {week.weekNumber} · {name}</span>
+          <ChevronRight className="h-5 w-5 flex-shrink-0 text-sl-muted" aria-hidden="true" />
+        </button>
+      </article>
+    );
+  }
+
+  const editable = (field: "competencyFocus" | "objective", label: string, testKey: string, current: string, empty: string) => (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={`${week.id}-${testKey}`} className="text-sm font-medium text-sl-ink">{label}</label>
+      {editingField === field ? (
+        <div className="space-y-2">
+          <textarea
+            id={`${week.id}-${testKey}`}
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            data-testid={`textarea-${testKey}-${week.id}`}
+            rows={2}
+            className={`${FIELD} min-h-[80px] resize-y`}
+          />
+          <div className="flex gap-2">
+            <button type="button" className={BTN_PRIMARY} onClick={handleCellSave} disabled={isSavingWeek}>
+              Save
+            </button>
+            <button type="button" className={BTN_SECONDARY} onClick={handleCellCancel}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          id={`${week.id}-${testKey}`}
+          onClick={() => handleCellEdit(field, current)}
+          className={`${FIELD} min-h-[44px] cursor-text text-left ${current ? "" : "text-sl-muted"}`}
+          data-testid={`text-${testKey}-${week.id}`}
+        >
+          {current || empty}
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <AccordionItem
+    <article
       ref={setNodeRef}
       style={style}
-      value={week.id}
-      className={`border rounded-lg overflow-hidden transition-all duration-200 ${
-        isDragging
-          ? 'shadow-2xl scale-105 ring-2 ring-primary/50'
-          : 'shadow-md hover:shadow-lg'
+      aria-labelledby={`module-title-${week.id}`}
+      className={`flex flex-col gap-4 rounded-xl border border-sl-line bg-sl-surface px-5 py-[18px] ${
+        isDragging ? "shadow-2xl ring-2 ring-sl-accent" : ""
       }`}
       data-testid={`card-week-${week.id}`}
     >
-      <div className="flex items-stretch rounded-lg overflow-hidden border border-border/50">
-        {isAdmin && (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 id={`module-title-${week.id}`} className="text-[17px] font-semibold text-sl-ink">Module {week.weekNumber} · {name}</h3>
+        <div className="flex gap-1">
+          <button type="button" className={BTN_ICON} aria-label={`Move Module ${week.weekNumber} up`} disabled={position === 1} onClick={() => onMoveWeek(week.id, -1)}>
+            <ChevronUp className="h-[18px] w-[18px]" aria-hidden="true" />
+          </button>
+          <button type="button" className={BTN_ICON} aria-label={`Move Module ${week.weekNumber} down`} disabled={position === count} onClick={() => onMoveWeek(week.id, 1)}>
+            <ChevronDown className="h-[18px] w-[18px]" aria-hidden="true" />
+          </button>
           <button
-            className="flex items-center px-4 cursor-grab active:cursor-grabbing hover:bg-muted/20 bg-muted/30 border-r border-border/50 transition-all touch-none select-none min-w-[48px]"
+            type="button"
+            className={`${BTN_ICON} cursor-grab touch-none select-none active:cursor-grabbing`}
             {...attributes}
             {...listeners}
             data-testid={`drag-handle-${week.id}`}
             aria-label="Drag to reorder"
           >
-            <GripVertical className="h-5 w-5 text-muted-foreground" />
+            <GripVertical className="h-[18px] w-[18px]" aria-hidden="true" />
           </button>
-        )}
-
-        <div className="flex-1 min-w-0">
-          {isAdmin ? (
-            <AccordionTrigger className="w-full px-4 py-3 hover:bg-muted/50">
-              <div className="flex items-center gap-3 text-left w-full">
-                <div className="px-3 py-1 rounded-full bg-primary/10 border border-primary/30 flex-shrink-0">
-                  <span className="text-sm font-bold text-primary">Module {week.weekNumber}</span>
-                </div>
-                <p className="text-muted-foreground truncate text-sm flex-1">
-                  {week.competencyFocus || "No competency focus set"}
-                </p>
-              </div>
-            </AccordionTrigger>
-          ) : (
-            <button
-              onClick={() => navigate(`/courses/${courseId}/weeks/${week.id}`)}
-              className="w-full px-4 py-3 hover:bg-muted/50 flex items-center justify-between"
-              data-testid={`button-open-week-${week.id}`}
-            >
-              <div className="flex items-center gap-3 text-left w-full">
-                <div className="px-3 py-1 rounded-full bg-primary/10 border border-primary/30 flex-shrink-0">
-                  <span className="text-sm font-bold text-primary">Module {week.weekNumber}</span>
-                </div>
-                <p className="text-muted-foreground truncate text-sm flex-1">
-                  {week.competencyFocus || "No competency focus set"}
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-            </button>
-          )}
+          <button
+            type="button"
+            className={BTN_ICON}
+            onClick={() => navigate(`/courses/${courseId}/weeks/${week.id}`)}
+            data-testid={`button-preview-week-${week.id}`}
+            aria-label="Preview module content"
+          >
+            <Eye className="h-[18px] w-[18px]" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={`${BTN_ICON} hover:text-sl-risk`}
+            onClick={() => onDeleteWeek(week.id)}
+            data-testid={`button-delete-week-${week.id}`}
+            aria-label="Delete module"
+          >
+            <Trash2 className="h-[18px] w-[18px]" aria-hidden="true" />
+          </button>
         </div>
-
-        {isAdmin && (
-          <div className="flex items-center gap-1 px-3 border-l border-border/50 bg-muted/10">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/courses/${courseId}/weeks/${week.id}`);
-              }}
-              data-testid={`button-preview-week-${week.id}`}
-              aria-label="Preview week content"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteWeek(week.id);
-              }}
-              className="hover:bg-destructive/10 hover:text-destructive transition-colors"
-              data-testid={`button-delete-week-${week.id}`}
-              aria-label="Delete week"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
       </div>
 
-      {isAdmin && (
-        <AccordionContent className="px-4 py-4 bg-muted/5 border-t">
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground/60 mb-2 block">
-                Competency Focus
-              </label>
-              {editingField === "competencyFocus" ? (
-                <div className="space-y-2">
-                  <Textarea
-                    ref={textareaRef}
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    data-testid={`textarea-competency-${week.id}`}
-                    className="min-h-[80px]"
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleCellSave} disabled={isSavingWeek}>
-                      Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => handleCellEdit("competencyFocus", week.competencyFocus || "")}
-                  className="p-3 rounded border bg-muted/30 text-sm min-h-[60px] flex items-center cursor-text hover:bg-muted/50"
-                  data-testid={`text-competency-${week.id}`}
-                >
-                  {week.competencyFocus || "Click to add competency focus"}
-                </div>
-              )}
-            </div>
+      {editable("competencyFocus", "Module name", "competency", week.competencyFocus || "", "Name this module")}
+      {editable("objective", "Objective", "objective", week.objective || "", "What a Fellow can do after this module")}
 
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground/60 mb-2 block">
-                Objective
-              </label>
-              {editingField === "objective" ? (
-                <div className="space-y-2">
-                  <Textarea
-                    ref={textareaRef}
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    data-testid={`textarea-objective-${week.id}`}
-                    className="min-h-[80px]"
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleCellSave} disabled={isSavingWeek}>
-                      Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCellCancel}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => handleCellEdit("objective", week.objective || "")}
-                  className="p-3 rounded border bg-muted/30 text-sm min-h-[60px] flex items-center cursor-text hover:bg-muted/50"
-                  data-testid={`text-objective-${week.id}`}
-                >
-                  {week.objective || "Click to add objective"}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="text-xs font-bold uppercase text-muted-foreground/60 mb-2 block">
-                Presentation Files
-              </label>
-              <ObjectUploader
-                onGetUploadParameters={onGetUploadParams}
-                onComplete={onUploadComplete(week.id)}
-                maxNumberOfFiles={10}
-                key={`uploader-${week.id}`}
-              />
-              <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                <input
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                  placeholder="YouTube link for this module"
-                  className="flex-1 rounded-md border px-3 py-2 text-sm bg-background"
-                  data-testid={`input-youtube-${week.id}`}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={!youtubeUrl.trim() || addYoutube.isPending}
-                  onClick={() => addYoutube.mutate()}
-                  data-testid={`button-youtube-${week.id}`}
-                >
-                  Add video
-                </Button>
-              </div>
-              <label className="mt-2 inline-flex items-center text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                <input
-                  type="file"
-                  accept=".zip,application/zip"
-                  className="sr-only"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (!file) return;
-                    const form = new FormData();
-                    form.append("package", file);
-                    const res = await fetch(`/api/training-weeks/${week.id}/import-package`, {
-                      method: "POST",
-                      body: form,
-                      credentials: "include",
-                    });
-                    if (!res.ok) {
-                      const data = await res.json().catch(() => ({}));
-                      console.error(data.error || "Import failed");
-                      return;
-                    }
-                    queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
-                  }}
-                />
-                Import SCORM / HTML zip
-              </label>
-              {week.deckFiles && week.deckFiles.length > 0 && (
-                <div className="mt-3">
-                  {isAdmin ? (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragStart={onFileDragStart}
-                      onDragEnd={(event) => onFileDragEnd(event, week.id)}
-                    >
-                      <SortableContext
-                        items={week.deckFiles.map((f) => f.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="space-y-2">
-                          {week.deckFiles.map((file) => (
-                            <SortableFileItem
-                              key={file.id}
-                              file={file}
-                              weekId={week.id}
-                              quiz={quizStatus?.[file.id]}
-                              onEditQuiz={() => onEditQuiz(week.id, { id: file.id, fileName: file.fileName })}
-                              onView={() => {
-                                onViewFile({ url: file.fileUrl, name: file.fileName });
-                                posthog.capture("admin_file_previewed", { weekId: week.id, fileId: file.id, fileName: file.fileName });
-                              }}
-                              onDelete={() => onDeleteFile(week.id, file.id)}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                      <DragOverlay dropAnimation={null}>
-                        {activeFileId ? (
-                          <div className="border rounded overflow-hidden bg-card shadow-2xl ring-2 ring-primary scale-105 opacity-95 p-2 flex items-center gap-2">
-                            <GripVertical className="h-5 w-5 text-primary" />
-                            <span className="text-sm font-semibold">{week.deckFiles.find(f => f.id === activeFileId)?.fileName}</span>
-                          </div>
-                        ) : null}
-                      </DragOverlay>
-                    </DndContext>
-                  ) : (
-                    <div className="space-y-2">
-                      {week.deckFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-2 border rounded bg-muted/30">
-                          <span className="text-sm truncate">{file.fileName}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              onViewFile({ url: file.fileUrl, name: file.fileName });
-                              posthog.capture("admin_file_previewed", { weekId: week.id, fileId: file.id, fileName: file.fileName });
-                            }}
-                            data-testid={`button-view-${file.id}`}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+      <div className="flex flex-col gap-2.5 border-t border-sl-line pt-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-[15px] font-semibold text-sl-ink">Lesson files{files.length === 0 ? ": none yet" : ` · ${files.length}`}</span>
+            {files.length === 0 && (
+              <span className="text-[13px] text-sl-muted">Until this module has a lesson file, the course cannot be complete.</span>
+            )}
           </div>
-        </AccordionContent>
-      )}
-    </AccordionItem>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              className={BTN_PRIMARY}
+              aria-describedby={`upload-hint-${week.id}`}
+              aria-expanded={uploaderOpen}
+              onClick={() => setUploaderOpen((open) => !open)}
+              data-testid={`button-upload-file-${week.id}`}
+            >
+              {uploaderOpen ? "Close the uploader" : "Upload a lesson file"}
+            </button>
+            <span id={`upload-hint-${week.id}`} className="text-[13px] text-sl-muted">PDF or PowerPoint</span>
+          </div>
+        </div>
+        <p className="rounded-lg bg-sl-ground px-3 py-2.5 text-sm leading-relaxed text-sl-muted">
+          After you upload, AI drafts a quiz from the file. The draft waits for you to approve it; Fellows see the quiz only after that.
+        </p>
+
+        {uploaderOpen && (
+          <ObjectUploader
+            onGetUploadParameters={onGetUploadParams}
+            onComplete={(result) => {
+              onUploadComplete(week.id)(result);
+              setUploaderOpen(false);
+            }}
+            maxNumberOfFiles={10}
+            key={`uploader-${week.id}`}
+          />
+        )}
+
+        {files.length > 0 && (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={onFileDragStart}
+            onDragEnd={(event) => onFileDragEnd(event, week.id)}
+          >
+            <SortableContext
+              items={files.map((f) => f.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ol className="m-0 flex list-none flex-col gap-2 p-0">
+                {files.map((file, index) => (
+                  <SortableFileItem
+                    key={file.id}
+                    file={file}
+                    weekId={week.id}
+                    position={index + 1}
+                    count={files.length}
+                    quiz={quizStatus?.[file.id]}
+                    onEditQuiz={() => onEditQuiz(week.id, { id: file.id, fileName: file.fileName })}
+                    onMove={(delta) => onMoveFile(week.id, file.id, delta)}
+                    onView={() => {
+                      onViewFile({ url: file.fileUrl, name: file.fileName });
+                      posthog.capture("admin_file_previewed", { weekId: week.id, fileId: file.id, fileName: file.fileName });
+                    }}
+                    onDelete={() => onDeleteFile(week.id, file.id)}
+                  />
+                ))}
+              </ol>
+            </SortableContext>
+            <DragOverlay dropAnimation={null}>
+              {activeFileId ? (
+                <div className="flex items-center gap-2 rounded-lg border border-sl-line bg-sl-surface p-2 opacity-95 shadow-2xl ring-2 ring-sl-accent">
+                  <GripVertical className="h-5 w-5 text-sl-accent" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-sl-ink">{files.find(f => f.id === activeFileId)?.fileName}</span>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        )}
+
+        <details className="text-sm text-sl-muted">
+          <summary className={`min-h-[44px] cursor-pointer py-3 text-sl-accent ${FOCUS}`}>Add a video link or import a SCORM / HTML zip</summary>
+          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+            <label htmlFor={`youtube-${week.id}`} className="sr-only">YouTube link for this module</label>
+            <input
+              id={`youtube-${week.id}`}
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              placeholder="YouTube link for this module"
+              className={`${FIELD} flex-1`}
+              data-testid={`input-youtube-${week.id}`}
+            />
+            <button
+              type="button"
+              className={BTN_SECONDARY}
+              disabled={!youtubeUrl.trim() || addYoutube.isPending}
+              onClick={() => addYoutube.mutate()}
+              data-testid={`button-youtube-${week.id}`}
+            >
+              Add video
+            </button>
+          </div>
+          <label className={`mt-2 inline-flex min-h-[44px] cursor-pointer items-center text-sl-accent hover:underline ${FOCUS}`}>
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              className="sr-only"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                const form = new FormData();
+                form.append("package", file);
+                const res = await fetch(`/api/training-weeks/${week.id}/import-package`, {
+                  method: "POST",
+                  body: form,
+                  credentials: "include",
+                });
+                if (!res.ok) {
+                  const data = await res.json().catch(() => ({}));
+                  console.error(data.error || "Import failed");
+                  return;
+                }
+                queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
+              }}
+            />
+            Import SCORM / HTML zip
+          </label>
+        </details>
+      </div>
+    </article>
   );
 }
 
@@ -542,11 +542,6 @@ export default function CourseWeeks() {
   const [viewingFile, setViewingFile] = useState<{ url: string; name: string } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [scale, setScale] = useState(1.5);
-  const [numPages, setNumPages] = useState(0);
-  const [documentLoadError, setDocumentLoadError] = useState(false);
-  const [convertedUrl, setConvertedUrl] = useState<string | null>(null);
   const [editQuiz, setEditQuiz] = useState<{ weekId: string; fileId: string; fileName: string } | null>(null);
 
   const sensors = useSensors(
@@ -583,30 +578,6 @@ export default function CourseWeeks() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Handle file URL conversion and reset viewer state
-  useEffect(() => {
-    setPageNumber(1);
-    setNumPages(0);
-    setDocumentLoadError(false);
-    setConvertedUrl(null);
-
-    if (!viewingFile) return;
-
-    const fileName = viewingFile.name.toLowerCase();
-
-    if (fileName.endsWith('.pptx') || fileName.endsWith('.ppt')) {
-      const params = new URLSearchParams({ url: viewingFile.url });
-      setConvertedUrl(`/api/files/convert-to-pdf?${params}`);
-    } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-      const params = new URLSearchParams({ url: viewingFile.url });
-      setConvertedUrl(`/api/files/convert-to-html?${params}`);
-    } else if (fileName.endsWith('.pdf')) {
-      setConvertedUrl(viewingFile.url);
-    } else {
-      setConvertedUrl(viewingFile.url);
-    }
-  }, [viewingFile]);
-
   const { data: courseData, isLoading: isLoadingCourse } = useQuery<Course>({
     queryKey: ["/api/courses", courseId],
     enabled: !!courseId,
@@ -617,6 +588,22 @@ export default function CourseWeeks() {
     queryKey: ["/api/courses", courseId, "weeks"],
     enabled: !!courseId,
   });
+
+  // The cohorts that hold this course (a Trainer sees the ones they run) and, for an Admin, the Step it sits on.
+  const { data: courseCohorts = [] } = useQuery<any[]>({
+    queryKey: ["/api/courses", courseId, "batches"],
+    enabled: !!courseId && isTrainer,
+  });
+  const { data: academyPath } = useQuery<any>({
+    queryKey: ["/api/admin/academy-path"],
+    enabled: isAdmin,
+  });
+  const crumbCohort = courseCohorts.length === 1 ? courseCohorts[0] : null;
+  const crumbStep = useMemo(() => {
+    const steps: any[] = academyPath?.cohorts?.find((cohort: any) => cohort.id === crumbCohort?.id)?.batches ?? [];
+    const index = steps.findIndex((step: any) => (step.courses ?? []).some((c: any) => c.id === courseId));
+    return index === -1 ? null : `Step ${index + 1}`;
+  }, [academyPath, crumbCohort, courseId]);
 
   // The quiz being reviewed: trainers approve their own courses' quizzes here (D5); the server checks the course is theirs.
   const { data: editQuizStatus, isLoading: isLoadingEditQuiz } = useQuery<QuizStatus>({
@@ -637,7 +624,7 @@ export default function CourseWeeks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
-      toast({ title: "Week added" });
+      toast({ title: "Module added" });
     },
   });
 
@@ -647,7 +634,7 @@ export default function CourseWeeks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
-      toast({ title: "Week updated" });
+      toast({ title: "Module updated" });
     },
   });
 
@@ -658,7 +645,7 @@ export default function CourseWeeks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
       setDeleteWeekId(null);
-      toast({ title: "Week deleted" });
+      toast({ title: "Module deleted" });
     },
   });
 
@@ -691,7 +678,7 @@ export default function CourseWeeks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/courses", courseId, "weeks"] });
-      toast({ title: "Week reordered" });
+      toast({ title: "Module reordered" });
     },
   });
 
@@ -741,6 +728,25 @@ export default function CourseWeeks() {
     setActiveFileId(null);
   };
 
+  const sortedWeeks = [...weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+
+  // The up/down buttons use the same reorder routes as dragging.
+  const handleMoveWeek = (weekId: string, delta: number) => {
+    const index = sortedWeeks.findIndex((w) => w.id === weekId);
+    const target = index + delta;
+    if (index === -1 || target < 0 || target >= sortedWeeks.length) return;
+    reorderWeekMutation.mutate({ weekId, newPosition: target + 1 });
+  };
+
+  const handleMoveFile = (weekId: string, fileId: string, delta: number) => {
+    const files = weeks.find((w) => w.id === weekId)?.deckFiles;
+    if (!files) return;
+    const index = files.findIndex((f) => f.id === fileId);
+    const target = index + delta;
+    if (index === -1 || target < 0 || target >= files.length) return;
+    reorderFilesMutation.mutate({ weekId, fileIds: arrayMove(files, index, target).map((f) => f.id) });
+  };
+
   const handleGetUploadParams = async () => {
     try {
       const response = await apiRequest("POST", "/api/objects/upload", {});
@@ -767,176 +773,169 @@ export default function CourseWeeks() {
     updateWeekMutation.mutate({ id: weekId, data: { [field]: value } }, { onSuccess });
   };
 
-  const sortedWeeks = [...weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+  const backHref = user?.role === "admin" ? "/admin/batches" : user?.role === "trainer" ? "/trainer/batches?tab=cohorts" : user?.role === "teacher" ? "/teacher/dashboard" : "/";
+  const cohortHref = crumbCohort ? `/cohorts/${crumbCohort.id}` : null;
+  const goTo = (href: string) => (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    navigate(href);
+  };
+  const LINK = `text-sl-accent no-underline hover:underline ${FOCUS}`;
 
-  if (isLoadingCourse) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
+  const renderWeek = (week: TrainingWeek, index: number) => (
+    <SortableWeekItem
+      key={week.id}
+      week={week}
+      isAdmin={isTrainer}
+      courseId={courseId!}
+      position={index + 1}
+      count={sortedWeeks.length}
+      navigate={navigate}
+      sensors={sensors}
+      activeFileId={activeFileId}
+      isSavingWeek={updateWeekMutation.isPending}
+      onDeleteWeek={setDeleteWeekId}
+      onMoveWeek={handleMoveWeek}
+      onMoveFile={handleMoveFile}
+      onViewFile={setViewingFile}
+      onDeleteFile={(weekId, fileId) => deleteDeckFileMutation.mutate({ weekId, fileId })}
+      onGetUploadParams={handleGetUploadParams}
+      onUploadComplete={handleUploadComplete}
+      onFileDragStart={handleFileDragStart}
+      onFileDragEnd={handleFileDragEnd}
+      onSaveField={onSaveField}
+      onEditQuiz={(weekId, file) => setEditQuiz({ weekId, fileId: file.id, fileName: file.fileName })}
+    />
+  );
 
   return (
-    <div className="sl-page sl-bg-board min-h-screen">
-      <header className="sticky top-0 z-50 bg-primary shadow-md">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="h-12 w-12 sm:h-14 sm:w-14 flex items-center justify-center flex-shrink-0 bg-primary rounded-sm p-1">
-              <img src={logoImage} alt="Logo" className="w-full h-full object-contain" />
+    <AcademyShell
+      title="Silverleaf Academy"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      desk={isAdmin ? "admin" : user?.role === "teacher" ? "fellow" : "trainer"}
+      current={user?.role === "teacher" ? "learning" : "cohorts"}
+      actions={
+        <ProfileSettingsDialog
+          userType="admin"
+          currentEmail={user?.email || undefined}
+        />
+      }
+    >
+      {isLoadingCourse ? (
+        <p className="py-12 text-center text-sl-muted">Loading...</p>
+      ) : (
+        <>
+          <nav aria-label="Breadcrumb">
+            <ol className="m-0 flex list-none flex-wrap items-center gap-1.5 p-0 text-sm text-sl-muted">
+              <li>
+                <a href={backHref} onClick={goTo(backHref)} className={LINK} data-testid="button-back-to-courses">
+                  {user?.role === "teacher" ? "Back to desk" : "Cohorts"}
+                </a>
+              </li>
+              {cohortHref && crumbCohort && (
+                <>
+                  <li aria-hidden="true">›</li>
+                  <li>
+                    <a href={cohortHref} onClick={goTo(cohortHref)} className={LINK}>{crumbCohort.name}</a>
+                  </li>
+                </>
+              )}
+              {crumbStep && (
+                <>
+                  <li aria-hidden="true">›</li>
+                  <li>{crumbStep}</li>
+                </>
+              )}
+              <li aria-hidden="true">›</li>
+              <li aria-current="page" className="text-sl-ink">{course?.name || "Course"}</li>
+            </ol>
+          </nav>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{course?.name || "Course"}</h1>
+              {course && (
+                <Chip tone={course.publishStatus === "published" ? "done" : "neutral"}>
+                  {course.publishStatus === "published" ? "Published" : "Draft"}
+                </Chip>
+              )}
             </div>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-white truncate">
-                {course?.name || "Course"}
-              </h1>
-              <p className="text-xs sm:text-sm text-white/80 hidden sm:block">
-                Weeks & Content
+            {course?.description && <p className="text-sm leading-relaxed text-sl-muted">{course.description}</p>}
+            {!isAdmin && isTrainer && (
+              <p className="text-sm leading-relaxed text-sl-muted">
+                You can edit this course's modules, lesson files and quizzes. Only an Admin can rename or delete the course.
               </p>
+            )}
+            {isTrainer && (
+              <p className="text-xs text-sl-muted" data-testid="lesson-stages">
+                Plan each module as Introduction, Competence development, Design, then Realisation.
+              </p>
+            )}
+          </div>
+
+          <section aria-labelledby="modules-heading" className="flex flex-col gap-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="modules-heading" className="text-lg font-semibold text-sl-ink">
+                Modules{" "}
+                <span className="font-medium text-sl-muted">· {isLoadingWeeks ? "…" : sortedWeeks.length} · Fellows take them in this order</span>
+              </h2>
+              {isTrainer && (
+                <button
+                  type="button"
+                  className={BTN_SECONDARY}
+                  onClick={() => createWeekMutation.mutate()}
+                  disabled={createWeekMutation.isPending}
+                  data-testid="button-add-week"
+                >
+                  Add a module
+                </button>
+              )}
             </div>
-          </div>
-          <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
-            <ProfileSettingsDialog
-              userType="admin"
-              currentEmail={user?.email || undefined}
-            />
-            <div className="text-white">
-              <ThemeToggle />
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-              className="hidden sm:flex bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-              className="sm:hidden h-8 w-8 bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
 
-      <main className="sl-sheet sl-frame my-4 sm:my-6 px-4 sm:px-6 py-4 sm:py-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(user?.role === "admin" ? "/admin/batches" : user?.role === "trainer" ? "/trainer/batches" : user?.role === "teacher" ? "/teacher/dashboard" : "/")}
-            data-testid="button-back-to-courses"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            {user?.role === "teacher" ? "Back to desk" : "Back to Cohorts"}
-          </Button>
-        </div>
-
-        <div className="mb-6 space-y-4">
-          <PlaceBanner
-            place="lessons"
-            title={isLoadingCourse ? "Course" : course?.name || "Course"}
-            subtitle={course?.description || `Course, then module, then lesson file. ${ACADEMY_TERMS.lessonFile.body}`}
-          />
-          <p className="text-xs text-muted-foreground" data-testid="lesson-stages">
-            Plan each module as Introduction, Competence development, Design, then Realisation.
-          </p>
-          {isTrainer && (
-            <Button
-              onClick={() => createWeekMutation.mutate()}
-              disabled={createWeekMutation.isPending}
-              data-testid="button-add-week"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add module
-            </Button>
-          )}
-        </div>
-
-        {isLoadingWeeks ? (
-          <div className="text-center py-12 text-muted-foreground">Loading weeks...</div>
-        ) : sortedWeeks.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            {isTrainer ? "No modules yet. Click Add module to get started." : "No modules in this course yet."}
-          </div>
-        ) : isTrainer ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={sortedWeeks.map((w) => w.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <Accordion type="multiple" className="space-y-4">
-                {sortedWeeks.map((week) => (
-                  <SortableWeekItem
-                    key={week.id}
-                    week={week}
-                    isAdmin={isTrainer}
-                    courseId={courseId!}
-                    navigate={navigate}
-                    sensors={sensors}
-                    activeFileId={activeFileId}
-                    isSavingWeek={updateWeekMutation.isPending}
-                    onDeleteWeek={setDeleteWeekId}
-                    onViewFile={setViewingFile}
-                    onDeleteFile={(weekId, fileId) => deleteDeckFileMutation.mutate({ weekId, fileId })}
-                    onGetUploadParams={handleGetUploadParams}
-                    onUploadComplete={handleUploadComplete}
-                    onFileDragStart={handleFileDragStart}
-                    onFileDragEnd={handleFileDragEnd}
-                    onSaveField={onSaveField}
-                    onEditQuiz={(weekId, file) => setEditQuiz({ weekId, fileId: file.id, fileName: file.fileName })}
-                  />
-                ))}
-              </Accordion>
-            </SortableContext>
-            <DragOverlay dropAnimation={null}>
-              {activeId ? (
-                <div className="border rounded-lg overflow-hidden bg-card shadow-2xl ring-2 ring-primary scale-105 opacity-95">
-                  <div className="flex items-center gap-3 p-4">
-                    <GripVertical className="h-5 w-5 text-primary" />
-                    <div className="px-3 py-1 rounded-full bg-primary/10 border border-primary/30">
-                      <span className="text-sm font-bold text-primary">
-                        Module {sortedWeeks.find(w => w.id === activeId)?.weekNumber}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        ) : (
-          <Accordion type="multiple" className="space-y-4">
-            {sortedWeeks.map((week) => (
-              <SortableWeekItem
-                key={week.id}
-                week={week}
-                isAdmin={isTrainer}
-                courseId={courseId!}
-                navigate={navigate}
+            {isLoadingWeeks ? (
+              <div className="space-y-3" aria-busy="true">
+                <div className="h-24 rounded-xl bg-sl-neutral-soft" />
+              </div>
+            ) : sortedWeeks.length === 0 ? (
+              <p className="py-8 text-sm text-sl-muted">
+                {isTrainer ? "No modules yet. Click Add a module to get started." : "No modules in this course yet."}
+              </p>
+            ) : isTrainer ? (
+              <DndContext
                 sensors={sensors}
-                activeFileId={activeFileId}
-                isSavingWeek={updateWeekMutation.isPending}
-                onDeleteWeek={setDeleteWeekId}
-                onViewFile={setViewingFile}
-                onDeleteFile={(weekId, fileId) => deleteDeckFileMutation.mutate({ weekId, fileId })}
-                onGetUploadParams={handleGetUploadParams}
-                onUploadComplete={handleUploadComplete}
-                onFileDragStart={handleFileDragStart}
-                onFileDragEnd={handleFileDragEnd}
-                onSaveField={onSaveField}
-                onEditQuiz={(weekId, file) => setEditQuiz({ weekId, fileId: file.id, fileName: file.fileName })}
-              />
-            ))}
-          </Accordion>
-        )}
-      </main>
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={sortedWeeks.map((w) => w.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="flex flex-col gap-4">
+                    {sortedWeeks.map(renderWeek)}
+                  </div>
+                </SortableContext>
+                <DragOverlay dropAnimation={null}>
+                  {activeId ? (
+                    <div className="rounded-xl border border-sl-line bg-sl-surface opacity-95 shadow-2xl ring-2 ring-sl-accent">
+                      <div className="flex items-center gap-3 p-4">
+                        <GripVertical className="h-5 w-5 text-sl-accent" aria-hidden="true" />
+                        <span className="text-[17px] font-semibold text-sl-ink">
+                          Module {sortedWeeks.find(w => w.id === activeId)?.weekNumber}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {sortedWeeks.map(renderWeek)}
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       {isTrainer && editQuiz && !isLoadingEditQuiz && (
         <FileQuizEditDialog
@@ -954,43 +953,44 @@ export default function CourseWeeks() {
       )}
 
       {deleteWeekId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-background p-6 rounded-lg max-w-sm">
-            <h3 className="text-lg font-bold mb-2">Delete Week?</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              This action cannot be undone. All content in this week will be deleted.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-module-title">
+          <div className="max-w-sm rounded-xl border border-sl-line bg-sl-surface p-6">
+            <h3 id="delete-module-title" className="mb-2 text-lg font-semibold text-sl-ink">Delete module?</h3>
+            <p className="mb-4 text-sm text-sl-muted">
+              This action cannot be undone. All content in this module will be deleted.
             </p>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDeleteWeekId(null)}>
+            <div className="flex justify-end gap-2">
+              <button type="button" className={BTN_SECONDARY} onClick={() => setDeleteWeekId(null)}>
                 Cancel
-              </Button>
-              <Button
-                variant="destructive"
+              </button>
+              <button
+                type="button"
+                className={`inline-flex min-h-[44px] items-center justify-center rounded-lg bg-sl-risk-soft px-4 py-2.5 text-sm font-semibold text-sl-risk ring-1 ring-sl-risk hover:opacity-90 disabled:opacity-50 ${FOCUS}`}
                 onClick={() => deleteWeekMutation.mutate(deleteWeekId)}
                 disabled={deleteWeekMutation.isPending}
               >
                 Delete
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {viewingFile && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-auto">
-          <div className="bg-background rounded-lg max-w-4xl w-full max-h-screen overflow-auto relative">
-            <div className="sticky top-0 right-0 p-2 flex justify-end z-10 bg-background/95 border-b">
-              <Button
-                variant="ghost"
-                size="sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-black/50 p-4">
+          <div className="relative max-h-screen w-full max-w-4xl overflow-auto rounded-xl border border-sl-line bg-sl-surface">
+            <div className="sticky right-0 top-0 z-10 flex justify-end border-b border-sl-line bg-sl-surface p-2">
+              <button
+                type="button"
+                className={BTN_SECONDARY}
                 onClick={() => setViewingFile(null)}
                 data-testid="button-close-file-preview"
               >
                 Close
-              </Button>
+              </button>
             </div>
             <div className="p-4">
-              <p className="text-sm text-muted-foreground mb-2">{viewingFile.name}</p>
+              <p className="mb-2 text-sm text-sl-muted">{viewingFile.name}</p>
               <FilePreview
                 fileName={viewingFile.name}
                 fileUrl={viewingFile.url}
@@ -1000,6 +1000,6 @@ export default function CourseWeeks() {
           </div>
         </div>
       )}
-    </div>
+    </AcademyShell>
   );
 }

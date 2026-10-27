@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -75,56 +75,61 @@ interface UserActivityStats {
   totalCourses?: number;
 }
 
-// Chart color palette
+// Chart colours: the accent first, then quieter steps of it and of grey. Hue is not used to decorate (status colours mean status).
 const CHART_COLORS = [
-  "hsl(221, 83%, 53%)",  // blue
-  "hsl(262, 83%, 58%)",  // purple
-  "hsl(142, 71%, 45%)",  // green
-  "hsl(38, 92%, 50%)",   // amber
-  "hsl(0, 84%, 60%)",    // red
-  "hsl(199, 89%, 48%)",  // cyan
-  "hsl(330, 81%, 60%)",  // pink
-  "hsl(25, 95%, 53%)",   // orange
+  "rgb(var(--sl-accent-strong))",
+  "rgb(var(--sl-neutral) / 0.7)",
+  "rgb(var(--sl-accent-strong) / 0.6)",
+  "rgb(var(--sl-neutral) / 0.45)",
+  "rgb(var(--sl-accent-strong) / 0.35)",
+  "rgb(var(--sl-neutral) / 0.25)",
+  "rgb(var(--sl-accent-strong) / 0.8)",
+  "rgb(var(--sl-neutral) / 0.55)",
 ];
 
-// KPI Card Component
-function KPICard({ label, value, icon: Icon, subtitle, color = "primary", onClick }: { label: string; value: string | number; icon: any; subtitle?: string; color?: string; onClick?: () => void }) {
-  return (
-    <Card className={`hover-elevate transition-all${onClick ? " cursor-pointer" : ""}`} onClick={onClick}>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-lg bg-${color}/10`}>
-            <Icon className={`w-5 h-5 text-${color}`} />
-          </div>
-          {onClick && <span className="text-xs text-muted-foreground">View all</span>}
-        </div>
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground font-medium">{label}</p>
-          <p className="text-2xl font-bold">{value}</p>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-        </div>
-      </CardContent>
-    </Card>
+// The tab bar: an underline for the current view, in the accent.
+const TAB_LIST = "flex h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b border-sl-line bg-transparent p-0";
+const TAB_TRIGGER = "-mb-px min-h-11 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2.5 text-[15px] text-sl-neutral shadow-none data-[state=active]:border-sl-accent data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-sl-accent data-[state=active]:shadow-none";
+const RISK_COLOR = "rgb(var(--sl-risk))";
+
+// A figure tile: label, value, note. With onClick the whole tile is a button.
+function KPICard({ label, value, subtitle, onClick }: { label: string; value: string | number; icon?: any; subtitle?: string; color?: string; onClick?: () => void }) {
+  const body = (
+    <>
+      <span className="text-[13px] text-sl-muted">{label}</span>
+      <span className="text-[26px] font-semibold leading-tight text-sl-ink">{value}</span>
+      {subtitle && <span className="text-[13px] text-sl-muted">{subtitle}</span>}
+    </>
+  );
+  const box = "flex flex-col gap-1.5 rounded-xl border border-sl-line bg-sl-surface p-4 text-left";
+  return onClick ? (
+    <button type="button" className={`${box} min-h-11 transition-colors hover:border-sl-accent`} onClick={onClick}>{body}</button>
+  ) : (
+    <div className={box}>{body}</div>
   );
 }
 
-// Traffic Light Badge
-function TrafficLightBadge({ status }: { status: string }) {
-  if (status === "green") {
-    return <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> On Track</Badge>;
-  }
-  if (status === "yellow") {
-    return <Badge className="bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Moderate</Badge>;
-  }
-  return <Badge className="bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> At Risk</Badge>;
+/** A status chip; the colour says the status and nothing else. */
+function StatusChip({ tone, children }: { tone: "risk" | "attention" | "done" | "neutral"; children: ReactNode }) {
+  const tones = {
+    risk: "bg-sl-risk-soft text-sl-risk",
+    attention: "bg-sl-attention-soft text-sl-attention",
+    done: "bg-sl-done-soft text-sl-done",
+    neutral: "bg-sl-neutral-soft text-sl-neutral",
+  } as const;
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
-// Batch Status Badge (existing)
+// Traffic light: green is on track, yellow needs attention, red is at risk.
+function TrafficLightBadge({ status }: { status: string }) {
+  if (status === "green") return <StatusChip tone="done">On track</StatusChip>;
+  if (status === "yellow") return <StatusChip tone="attention">Moderate</StatusChip>;
+  return <StatusChip tone="risk">At risk</StatusChip>;
+}
+
+// Cohort status badge (existing)
 function BatchStatusBadge({ status }: { status: "on-track" | "at-risk" }) {
-  if (status === "on-track") {
-    return <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> On Track</Badge>;
-  }
-  return <Badge className="bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> At Risk</Badge>;
+  return status === "on-track" ? <StatusChip tone="done">On track</StatusChip> : <StatusChip tone="risk">At risk</StatusChip>;
 }
 
 export default function AdminAnalytics() {
@@ -400,6 +405,12 @@ export default function AdminAnalytics() {
       if (!response.ok) return [];
       return await response.json();
     },
+  });
+
+  // Trainers per cohort, from the same list the attendance board reads (legacy trainer and cohort_trainers both).
+  const { data: attendanceLists } = useQuery<{ trainers: Array<{ name: string; cohorts: Array<{ id: string; marked: number; rate: number | null }> }> }>({
+    queryKey: ["/api/admin/attendance-summary"],
+    enabled: isAdmin,
   });
 
   // Engagement & Retention Analytics Queries
@@ -807,6 +818,25 @@ export default function AdminAnalytics() {
     );
   }
 
+  const asOf = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const overviewCohorts = (Array.isArray(cohortsData) ? cohortsData : []).map((cohort: any) => {
+    const trainerNames = (attendanceLists?.trainers ?? [])
+      .filter((trainer) => trainer.cohorts.some((item) => item.id === cohort.batchId))
+      .map((trainer) => trainer.name);
+    if (cohort.trainerName && !trainerNames.includes(cohort.trainerName)) trainerNames.push(cohort.trainerName);
+    const marks = (attendanceLists?.trainers ?? []).flatMap((trainer) => trainer.cohorts).find((item) => item.id === cohort.batchId)?.marked ?? 0;
+    return {
+      id: cohort.batchId as string,
+      name: cohort.batchName as string,
+      open: cohort.cohortStatus !== "closed",
+      trainers: trainerNames.join(", "),
+      fellows: cohort.enrollmentCount ?? cohort.enrollment ?? 0,
+      completion: `${cohort.completionPercentage ?? 0}%`,
+      marks,
+      attendance: cohort.attendanceRate == null ? "No marks yet" : `${cohort.attendanceRate}%${marks ? ` · ${marks} mark${marks === 1 ? "" : "s"}` : ""}`,
+    };
+  });
+
   const totalTeachers = Array.isArray(allUsers) ? allUsers.filter((u: any) => u.role === "teacher").length : 0;
   const totalTrainers = Array.isArray(allUsers) ? allUsers.filter((u: any) => u.role === "trainer").length : 0;
 
@@ -828,88 +858,139 @@ export default function AdminAnalytics() {
     <AcademyShell
       scene="lamp"
       title="Analytics"
-      subtitle="Organization overview"
+      subtitle="The whole academy"
       userLabel={user ? deskName(user) : undefined}
       onLogout={() => logoutMutation.mutate()}
       showAdminNav
+      desk="admin"
+      current="analytics"
     >
-      <h1 className="sr-only" data-testid="text-analytics-title">Silver Leaf – Admin Analytics</h1>
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-5">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[28px] font-semibold text-sl-ink" data-testid="text-analytics-title">Analytics</h1>
+          <p className="text-sm text-sl-muted">
+            The whole academy, as of {asOf}. To-dos are on{" "}
+            <Link href="/admin" className="font-medium text-sl-accent hover:underline" data-testid="link-analytics-home">Home</Link>.
+          </p>
+        </div>
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="flex w-full overflow-x-auto mb-8 sm:grid sm:grid-cols-7">
-            <TabsTrigger value="overview" data-testid="tab-overview">
-              <BarChart3 className="w-4 h-4 mr-2 hidden sm:inline" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="cohorts" data-testid="tab-cohorts">
-              <Users className="w-4 h-4 mr-2 hidden sm:inline" />
-              Cohorts
-            </TabsTrigger>
-            <TabsTrigger value="engagement" data-testid="tab-engagement">
-              <Heart className="w-4 h-4 mr-2 hidden sm:inline" />
-              Engagement
-            </TabsTrigger>
-            <TabsTrigger value="retention" data-testid="tab-retention">
-              <Shield className="w-4 h-4 mr-2 hidden sm:inline" />
-              Retention
-            </TabsTrigger>
-            <TabsTrigger value="demographics" data-testid="tab-demographics">
-              <MapPin className="w-4 h-4 mr-2 hidden sm:inline" />
-              Demographics
-            </TabsTrigger>
-            <TabsTrigger value="performance" data-testid="tab-performance">
-              <Activity className="w-4 h-4 mr-2 hidden sm:inline" />
-              Performance
-            </TabsTrigger>
-            <TabsTrigger value="people" data-testid="tab-people">
-              <Users className="w-4 h-4 mr-2 hidden sm:inline" />
-              People
-            </TabsTrigger>
+          <TabsList aria-label="Analytics views" className={TAB_LIST}>
+            <TabsTrigger value="overview" className={TAB_TRIGGER} data-testid="tab-overview">Overview</TabsTrigger>
+            <TabsTrigger value="cohorts" className={TAB_TRIGGER} data-testid="tab-cohorts">Cohorts</TabsTrigger>
+            <TabsTrigger value="engagement" className={TAB_TRIGGER} data-testid="tab-engagement">Engagement</TabsTrigger>
+            <TabsTrigger value="retention" className={TAB_TRIGGER} data-testid="tab-retention">Retention</TabsTrigger>
+            <TabsTrigger value="demographics" className={TAB_TRIGGER} data-testid="tab-demographics">Demographics</TabsTrigger>
+            <TabsTrigger value="performance" className={TAB_TRIGGER} data-testid="tab-performance">Performance</TabsTrigger>
+            <TabsTrigger value="people" className={TAB_TRIGGER} data-testid="tab-people">People</TabsTrigger>
           </TabsList>
 
           {/* ===== TAB 1: OVERVIEW ===== */}
-          <TabsContent value="overview">
-            <div className="mb-8">
-              <div className="mb-4 flex items-end justify-between gap-3 flex-wrap">
-                <div>
-                  <h2 className="text-lg font-semibold">Academy</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Fellows, cohorts, quizzes, attendance, and ratings</p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => navigate("/admin/batches")} data-testid="button-open-cohort-admin">
+          <TabsContent value="overview" className="mt-6">
+            <section aria-labelledby="an-figures" className="mb-6 flex flex-col gap-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="an-figures" className="text-lg font-semibold text-sl-ink">Overview</h2>
+                <Button size="sm" variant="outline" className="min-h-11 border-sl-control bg-sl-surface px-4 text-sl-ink" onClick={() => navigate("/admin/batches")} data-testid="button-open-cohort-admin">
                   Manage cohorts
                 </Button>
               </div>
               {loadingSnapshot ? (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[...Array(4)].map((_, i) => (
-                    <Card key={i} className="animate-pulse"><CardContent className="pt-6 h-28" /></Card>
+                <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="h-24 animate-pulse rounded-xl bg-sl-neutral-soft" />
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <KPICard label="Teachers" value={academySnapshot?.teachers ?? totalTeachers} icon={Users} subtitle={`${academySnapshot?.trainers ?? totalTrainers} trainers`} onClick={() => navigate("/admin/teachers")} />
-                  <KPICard label="Open cohorts" value={academySnapshot?.openCohorts ?? 0} icon={Layers} subtitle={`${academySnapshot?.closedCohorts ?? 0} closed · ${academySnapshot?.batches ?? 0} total`} onClick={() => navigate("/admin/batches")} />
-                  <KPICard label="Avg completion" value={`${academySnapshot?.averageCompletion ?? 0}%`} icon={TrendingUp} subtitle={`${academySnapshot?.atRiskBatches ?? 0} cohorts at risk`} />
-                  <KPICard label="Courses" value={academySnapshot?.courses ?? 0} icon={BookOpen} subtitle={`${academySnapshot?.overdueAssignments ?? 0} overdue written tasks`} onClick={() => navigate("/admin/batches")} />
-                  <KPICard label="Quizzes" value={academySnapshot?.openQuizzes ?? 0} icon={Award} subtitle={`${academySnapshot?.stoppedQuizzes ?? 0} stopped`} />
-                  <KPICard label="Attendance" value={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceRate ?? 0}%` : "—"} icon={CheckCircle} subtitle={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceMarked} marks` : "No attendance marked yet"} />
-                  <KPICard label="Reflections" value={academySnapshot?.reflections ?? 0} icon={FileText} onClick={() => setShowReflectionsDialog(true)} />
-                  <KPICard label="Course rating" value={academySnapshot?.averageRating != null ? `${academySnapshot.averageRating}/5` : "—"} icon={Star} subtitle="Average of submitted ratings" />
+                <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+                  <KPICard label="Fellows" value={academySnapshot?.teachers ?? totalTeachers} subtitle="approved" onClick={() => navigate("/admin/teachers")} />
+                  <KPICard label="Trainers" value={academySnapshot?.trainers ?? totalTrainers} subtitle="approved" onClick={() => navigate("/admin/trainers")} />
+                  <KPICard label="Open cohorts" value={academySnapshot?.openCohorts ?? 0} subtitle={`${academySnapshot?.closedCohorts ?? 0} closed · ${academySnapshot?.batches ?? 0} total`} onClick={() => navigate("/admin/batches")} />
+                  <KPICard label="Courses" value={academySnapshot?.courses ?? 0} subtitle={`${academySnapshot?.overdueAssignments ?? 0} overdue written tasks`} onClick={() => navigate("/admin/batches")} />
+                  <KPICard label="Average completion" value={`${academySnapshot?.averageCompletion ?? 0}%`} subtitle={`${academySnapshot?.atRiskBatches ?? 0} cohorts at risk`} />
+                  <KPICard label="Quizzes" value={academySnapshot?.openQuizzes ?? 0} subtitle={`${academySnapshot?.stoppedQuizzes ?? 0} stopped`} />
+                  <KPICard label="Attendance" value={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceRate ?? 0}%` : "—"} subtitle={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceMarked} marks` : "No attendance marked yet"} />
+                  <KPICard label="Reflections" value={academySnapshot?.reflections ?? 0} subtitle={academySnapshot?.reflections ? "View all" : "none written yet"} onClick={() => setShowReflectionsDialog(true)} />
+                  <KPICard label="Average rating" value={academySnapshot?.averageRating != null ? `${academySnapshot.averageRating}/5` : "No ratings yet"} subtitle={academySnapshot?.averageRating != null ? "Average of submitted ratings" : "none given yet"} />
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="mb-8">
-              <AttendanceBoard />
+            <section aria-labelledby="an-cohorts" className="mb-6 overflow-hidden rounded-xl border border-sl-line bg-sl-surface" data-testid="overview-cohorts">
+              <h2 id="an-cohorts" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">
+                Cohorts <span className="font-medium text-sl-muted">· {overviewCohorts.filter((row) => row.open).length} open</span>
+              </h2>
+              {loadingCohorts ? (
+                <div className="m-5 h-24 animate-pulse rounded-lg bg-sl-neutral-soft" />
+              ) : overviewCohorts.length === 0 ? (
+                <p className="px-5 py-4 text-sm text-sl-muted">No cohorts yet. They appear here once one is created.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <caption className="sr-only">Cohorts with Trainers, Fellows, completion and attendance</caption>
+                    <thead>
+                      <tr className="text-left text-sl-muted">
+                        <th scope="col" className="px-5 py-2.5 font-medium">Cohort</th>
+                        <th scope="col" className="px-3 py-2.5 font-medium">Trainers</th>
+                        <th scope="col" className="px-3 py-2.5 font-medium">Fellows</th>
+                        <th scope="col" className="px-3 py-2.5 font-medium">Completion</th>
+                        <th scope="col" className="px-5 py-2.5 font-medium">Attendance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overviewCohorts.map((row) => (
+                        <tr key={row.id} className="border-t border-sl-neutral-soft" data-testid={`overview-cohort-${row.id}`}>
+                          <th scope="row" className="px-5 py-3 text-left font-semibold">
+                            <Link href={`/cohorts/${row.id}`} className="text-sl-accent hover:underline">{row.name}</Link>
+                          </th>
+                          <td className={`px-3 py-3 ${row.trainers ? "text-sl-ink" : "font-medium text-sl-risk"}`}>{row.trainers || "No trainer"}</td>
+                          <td className="px-3 py-3 text-sl-ink">{row.fellows}</td>
+                          <td className="px-3 py-3 text-sl-muted">{row.completion}</td>
+                          <td className={`px-5 py-3 ${row.marks ? "text-sl-ink" : "text-sl-muted"}`}>{row.attendance}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section aria-labelledby="an-trend" className="mb-6 flex flex-col gap-3 rounded-xl border border-sl-line bg-sl-surface px-5 py-4">
+              <h2 id="an-trend" className="text-lg font-semibold text-sl-ink">Course completion over time</h2>
+              {loadingTrends || !Array.isArray(completionTrends) || !completionTrends.length ? (
+                <div className="flex h-40 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-sl-control bg-sl-ground px-4 text-center">
+                  <span className="text-[15px] font-semibold text-sl-neutral">{loadingTrends ? "Loading…" : "Not enough data yet"}</span>
+                  {!loadingTrends && (
+                    <span className="text-sm text-sl-muted">No Fellow has completed a course. The line appears after the first completion.</span>
+                  )}
+                </div>
+              ) : (
+                <ChartContainer config={completionChartConfig} className="h-[250px] w-full">
+                  <LineChart data={completionTrends}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tickFormatter={(val) => val ? new Date(val).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : ''} />
+                    <YAxis domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line
+                      type="monotone"
+                      dataKey="rate"
+                      stroke={CHART_COLORS[0]}
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </section>
+
+            <div className="mb-6">
+              <AttendanceBoard heading="Attendance" />
             </div>
 
             {/* Pipeline KPIs */}
             <div className="mb-8">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
-                  Pipeline Overview
-                </h2>
+                <h2 className="text-lg font-semibold">Pipeline overview</h2>
                 <p className="text-sm text-muted-foreground mt-1">Key metrics at a glance</p>
               </div>
 
@@ -924,7 +1005,7 @@ export default function AdminAnalytics() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <KPICard
-                    label="Total Candidates"
+                    label="Fellows enrolled"
                     value={pipelineData?.totalCandidates ?? 0}
                     icon={Users}
                     color="blue"
@@ -955,7 +1036,7 @@ export default function AdminAnalytics() {
                     subtitle="Completed all courses"
                   />
                   <KPICard
-                    label="At Risk"
+                    label="At risk"
                     value={pipelineData?.atRiskCount ?? 0}
                     icon={AlertCircle}
                     color="red"
@@ -1003,7 +1084,7 @@ export default function AdminAnalytics() {
             </div>
 
             {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 gap-6 mb-8">
               {/* Gender Distribution Bar Chart */}
               <Card>
                 <CardHeader>
@@ -1043,37 +1124,6 @@ export default function AdminAnalytics() {
                 </CardContent>
               </Card>
 
-              {/* Completion Trend Line Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Completion Trends</CardTitle>
-                  <CardDescription>Monthly completion rate over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingTrends || !Array.isArray(completionTrends) || !completionTrends.length ? (
-                    <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                      {loadingTrends ? "Loading..." : "No trend data available yet"}
-                    </div>
-                  ) : (
-                    <ChartContainer config={completionChartConfig} className="h-[250px] w-full">
-                      <LineChart data={completionTrends}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" tickFormatter={(val) => val ? new Date(val).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : ''} />
-                        <YAxis domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Line
-                          type="monotone"
-                          dataKey="rate"
-                          stroke={CHART_COLORS[0]}
-                          strokeWidth={2}
-                          dot={{ r: 4 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      </LineChart>
-                    </ChartContainer>
-                  )}
-                </CardContent>
-              </Card>
             </div>
 
             {/* Courses Overview (from original) */}
@@ -1116,7 +1166,7 @@ export default function AdminAnalytics() {
                                 <p className="font-bold text-lg">{course.enrolledTeachers ?? 0}</p>
                               </div>
                               <div>
-                                <p className="text-xs text-muted-foreground mb-1">Weeks</p>
+                                <p className="text-xs text-muted-foreground mb-1">Modules</p>
                                 <p className="font-bold">{course.weekCount || 0}</p>
                               </div>
                               <div>
@@ -1307,7 +1357,7 @@ export default function AdminAnalytics() {
                     {/* Batch Header */}
                     <div className="p-4 border-b flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
-                        <h2 className="text-xl font-bold truncate">{currentBatch?.name || "Batch"}</h2>
+                        <h2 className="text-xl font-bold truncate">{currentBatch?.name || "Cohort"}</h2>
                         {currentBatch?.description && (
                           <p className="text-sm text-muted-foreground mt-1">{currentBatch.description}</p>
                         )}
@@ -1502,7 +1552,7 @@ export default function AdminAnalytics() {
                                       ) : (
                                         <>
                                           {completedCourses.map((c: any) => (
-                                            <Badge key={c.courseId} className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                            <Badge key={c.courseId} className="bg-sl-done-soft text-sl-done">
                                               {c.courseName}: Completed
                                             </Badge>
                                           ))}
@@ -1548,7 +1598,7 @@ export default function AdminAnalytics() {
                           </h3>
                           {fileQuizzes.length === 0 ? (
                             <div className="text-center py-6 text-muted-foreground text-sm border rounded-lg bg-muted/20">
-                              No auto-generated quizzes yet — they appear here after files are uploaded to course weeks
+                              No auto-generated quizzes yet — they appear here after files are uploaded to course modules
                             </div>
                           ) : (
                             <div className="space-y-2">
@@ -1779,7 +1829,7 @@ export default function AdminAnalytics() {
                                     Status: <span className="capitalize">{certificateTemplate.status}</span>
                                   </p>
                                   {certificateTemplate.status === "approved" && (
-                                    <p className="text-green-600 flex items-center gap-1 mt-1">
+                                    <p className="text-sl-done flex items-center gap-1 mt-1">
                                       <CheckCircle className="w-4 h-4" /> Approved
                                     </p>
                                   )}
@@ -1789,9 +1839,9 @@ export default function AdminAnalytics() {
                           </div>
 
                           {/* Certificate Preview */}
-                          <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border">
+                          <div className="p-4 bg-sl-surface rounded-lg border">
                             <p className="text-sm font-medium mb-4 text-foreground">Certificate Preview</p>
-                            <div className="border-2 border-primary rounded-lg p-8 space-y-6 text-center bg-white dark:bg-slate-900">
+                            <div className="border-2 border-primary rounded-lg p-8 space-y-6 text-center bg-sl-surface">
                               <div className="space-y-2">
                                 <h1 className="text-3xl font-bold text-primary">Certificate of Completion</h1>
                                 <p className="text-sm text-muted-foreground">Silverleaf Academy</p>
@@ -1968,7 +2018,7 @@ export default function AdminAnalytics() {
                   </CardContent>
                 </Card>
 
-                {/* Week Coverage by Teacher */}
+                {/* Module coverage by Fellow */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -1998,11 +2048,11 @@ export default function AdminAnalytics() {
                   </CardContent>
                 </Card>
 
-                {/* Best Formed Week */}
+                {/* Best formed module */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Star className="w-4 h-4 text-yellow-500" />
+                      <Star className="w-4 h-4 text-sl-muted" />
                       Best Formed Modules
                     </CardTitle>
                     <CardDescription>Top performing modules by composite score (completion 40% + quiz pass 40% + reflections 20%)</CardDescription>
@@ -2105,26 +2155,26 @@ export default function AdminAnalytics() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Ban className="w-4 h-4 text-red-500" />
+                      <Ban className="w-4 h-4 text-sl-risk" />
                       Disqualification Rate by Cohort
                     </CardTitle>
                     <CardDescription>Percentage of fellows disqualified per cohort</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {disqualificationData?.byBatch?.length > 0 ? (
-                      <ChartContainer config={{ disqualification_rate: { label: "Disqualification %", color: CHART_COLORS[4] } }} className="h-[300px] w-full">
+                      <ChartContainer config={{ disqualification_rate: { label: "Disqualification %", color: RISK_COLOR } }} className="h-[300px] w-full">
                         <BarChart data={disqualificationData.byBatch}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="batch_name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 11 }} />
                           <YAxis domain={[0, 100]} tickFormatter={(val: number) => `${val}%`} />
                           <ChartTooltip content={<ChartTooltipContent />} />
-                          <Bar dataKey="disqualification_rate" fill={CHART_COLORS[4]} radius={[4, 4, 0, 0]} name="Disqualification %" />
+                          <Bar dataKey="disqualification_rate" fill={RISK_COLOR} radius={[4, 4, 0, 0]} name="Disqualification %" />
                         </BarChart>
                       </ChartContainer>
                     ) : (
                       <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
                         <div className="text-center">
-                          <CheckCircle className="w-12 h-12 text-green-500/30 mx-auto mb-3" />
+                          <CheckCircle className="w-12 h-12 text-sl-done/30 mx-auto mb-3" />
                           <p className="font-medium">No disqualifications recorded</p>
                         </div>
                       </div>
@@ -2140,13 +2190,13 @@ export default function AdminAnalytics() {
                       <CardDescription>Monthly disqualification counts</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ChartContainer config={{ count: { label: "Disqualifications", color: CHART_COLORS[4] } }} className="h-[250px] w-full">
+                      <ChartContainer config={{ count: { label: "Disqualifications", color: RISK_COLOR } }} className="h-[250px] w-full">
                         <LineChart data={disqualificationData.monthlyTrend}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="month" />
                           <YAxis />
                           <ChartTooltip content={<ChartTooltipContent />} />
-                          <Line type="monotone" dataKey="count" stroke={CHART_COLORS[4]} strokeWidth={2} dot={{ r: 4 }} />
+                          <Line type="monotone" dataKey="count" stroke={RISK_COLOR} strokeWidth={2} dot={{ r: 4 }} />
                         </LineChart>
                       </ChartContainer>
                     </CardContent>
@@ -2196,7 +2246,7 @@ export default function AdminAnalytics() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Star className="w-4 h-4 text-yellow-500" />
+                      <Star className="w-4 h-4 text-sl-muted" />
                       Satisfaction Score Trends
                     </CardTitle>
                     <CardDescription>Average satisfaction ratings over time (1-5 scale)</CardDescription>
@@ -2567,7 +2617,7 @@ export default function AdminAnalytics() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <AlertCircle className="w-4 h-4 text-sl-risk" />
                       At-Risk Fellows
                     </CardTitle>
                     <CardDescription>Candidates with less than 30% completion rate</CardDescription>
@@ -2611,7 +2661,7 @@ export default function AdminAnalytics() {
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <CheckCircle className="w-12 h-12 text-green-500/30 mx-auto mb-3" />
+                        <CheckCircle className="w-12 h-12 text-sl-done/30 mx-auto mb-3" />
                         <p className="text-muted-foreground font-medium">No at-risk fellows</p>
                         <p className="text-sm text-muted-foreground mt-1">All candidates are making good progress</p>
                       </div>
@@ -2798,7 +2848,7 @@ export default function AdminAnalytics() {
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">All Systems</p>
-                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <CheckCircle className="w-4 h-4 text-sl-done" />
                   </div>
                   <Progress value={100} className="h-2" />
                   <p className="text-xs text-muted-foreground">Operational</p>
@@ -2807,6 +2857,7 @@ export default function AdminAnalytics() {
             </div>
           </TabsContent>
         </Tabs>
+      </div>
 
       {/* ===== ALL MODALS (preserved exactly) ===== */}
 
@@ -3166,7 +3217,7 @@ export default function AdminAnalytics() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign module quiz</DialogTitle>
-            <DialogDescription>Create a quiz based on a training week's content</DialogDescription>
+            <DialogDescription>Create a quiz based on a module's content</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -3178,14 +3229,14 @@ export default function AdminAnalytics() {
               <Textarea value={quizDescription} onChange={(e) => setQuizDescription(e.target.value)} placeholder="Quiz description" data-testid="input-quiz-description" />
             </div>
             <div>
-              <Label>Training Week</Label>
+              <Label>Module</Label>
               <Select value={selectedWeek} onValueChange={setSelectedWeek}>
                 <SelectTrigger data-testid="select-training-week">
-                  <SelectValue placeholder="Select a week" />
+                  <SelectValue placeholder="Select a module" />
                 </SelectTrigger>
                 <SelectContent>
                   {trainingWeeks.map((w: any) => (
-                    <SelectItem key={w.id} value={String(w.id)}>{w.title || `Week ${w.weekNumber}`}</SelectItem>
+                    <SelectItem key={w.id} value={String(w.id)}>{w.title || `Module ${w.weekNumber}`}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -3245,14 +3296,14 @@ export default function AdminAnalytics() {
               <Textarea value={quizDescription} onChange={(e) => setQuizDescription(e.target.value)} placeholder="Quiz description" data-testid="input-file-quiz-description" />
             </div>
             <div>
-              <Label>Training Week</Label>
+              <Label>Module</Label>
               <Select value={selectedWeek} onValueChange={(v) => { setSelectedWeek(v); setSelectedFileId(""); }}>
                 <SelectTrigger data-testid="select-file-quiz-week">
-                  <SelectValue placeholder="Select a week" />
+                  <SelectValue placeholder="Select a module" />
                 </SelectTrigger>
                 <SelectContent>
                   {trainingWeeks.map((w: any) => (
-                    <SelectItem key={w.id} value={String(w.id)}>{w.title || `Week ${w.weekNumber}`}</SelectItem>
+                    <SelectItem key={w.id} value={String(w.id)}>{w.title || `Module ${w.weekNumber}`}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -3318,7 +3369,7 @@ export default function AdminAnalytics() {
                     <div key={i} className="border rounded-lg p-3">
                       <p className="text-sm font-medium mb-2">{i + 1}. {q.question}</p>
                       {q.options?.map((opt: string, j: number) => (
-                        <p key={j} className={`text-xs pl-4 py-0.5 ${j === q.correctAnswer ? "text-green-600 font-semibold" : "text-muted-foreground"}`}>
+                        <p key={j} className={`text-xs pl-4 py-0.5 ${j === q.correctAnswer ? "text-sl-done font-semibold" : "text-muted-foreground"}`}>
                           {String.fromCharCode(65 + j)}. {opt}
                         </p>
                       ))}

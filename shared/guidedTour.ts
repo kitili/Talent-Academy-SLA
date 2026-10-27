@@ -15,7 +15,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Academy mark",
-    body: "Silverleaf Academy is the mark. The line under the name says this is the admin desk.",
+    body: "Silverleaf Academy is the mark. The pill beside the name says this is the Admin desk.",
     target: "admin-brand",
   },
   {
@@ -24,13 +24,13 @@ export const ADMIN_TOUR: TourStep[] = [
     target: "admin-account",
   },
   {
-    title: "Tour",
-    body: "Tour starts this walk again from the first step. Use it any time you want the bar and the side menu explained.",
+    title: "Help",
+    body: "Help starts this walk again from the first step. Use it any time you want the bar and the side menu explained.",
     target: "admin-tour",
   },
   {
     title: "Bell",
-    body: "Opens notices sent to you. A red number means unread notes. An academy notice you send also arrives here.",
+    body: "Opens notices sent to you. A blue number counts unread notes. An academy notice you send also arrives here.",
     target: "admin-bell",
   },
   {
@@ -39,7 +39,7 @@ export const ADMIN_TOUR: TourStep[] = [
     target: "admin-theme",
   },
   {
-    title: "Logout",
+    title: "Log out",
     body: "Signs this admin account out and returns you to the sign-in page.",
     target: "admin-logout",
   },
@@ -49,8 +49,8 @@ export const ADMIN_TOUR: TourStep[] = [
     target: "admin-nav",
   },
   {
-    title: "Desk",
-    body: "Desk brings you back to this home: the counts, the pictures, the academy notice, reset password, and start fresh.",
+    title: "Home",
+    body: "Home brings you back here: what needs attention, the academy at a glance, the academy notice, reset password, and start fresh.",
     target: "admin-nav-desk",
   },
   {
@@ -70,7 +70,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Cohorts",
-    body: "A cohort is a group of Fellows. A step is one stage inside that cohort, and each cohort can have a different number. Courses are the lessons on a step, placed here rather than on their own tab. Steps set the order: a course opens when the course before it is complete. A cohort can hold more than one trainer. You add the steps, place the courses, assign the trainers, and open or close the cohort and its quizzes.",
+    body: "A cohort is a group of Fellows. A step is one stage inside that cohort, and each cohort can have a different number. Courses sit on a step, placed here rather than on their own tab. Steps set the order: a course opens when the course before it is complete. A cohort can hold more than one trainer. You add the steps, place the courses, assign the trainers, and open or close the cohort and its quizzes.",
     target: "admin-nav-cohorts",
   },
   {
@@ -80,17 +80,17 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Courses",
-    body: "Courses are the curriculum trainers teach, and only an admin adds, renames or deletes one. Open Cohorts, choose a step, and place the course there. Keep a course on draft while you edit it, and publish it when Fellows should see it.",
+    body: "Courses are the curriculum trainers teach, and only an admin adds, renames or deletes one. Add and edit them on the Courses tab of Cohorts, then place a course on a step from that step. A new course is published at once.",
     target: "admin-nav-cohorts",
   },
   {
-    title: "Counts",
-    body: "Trainers, Fellows, and courses on the academy right now. Needs attention appears here when someone is waiting, and it opens Approvals.",
+    title: "The academy at a glance",
+    body: "Fellows, trainers, open cohorts, courses and attendance on the academy right now.",
     target: "admin-stats",
   },
   {
-    title: "Pictures",
-    body: "Each picture opens the same place as its name in the side menu: Approvals, People, Cohorts, Attendance, Analytics, and Certificates.",
+    title: "Needs attention",
+    body: "What to fix next, with one button each: a cohort with no trainer, a step with no course, or someone waiting on Approvals.",
     target: "admin-pictures",
   },
   {
@@ -121,8 +121,8 @@ export const TRAINER_TOUR: TourStep[] = [
     target: "trainer-batches",
   },
   {
-    title: "The side bar",
-    body: "Desk is the home, with the counts. Then Cohorts, Assessments & quizzes, Progress, Attendance, Messages, and Schedule. Open a cohort to see its Fellows on Progress.",
+    title: "The side menu",
+    body: "Home shows what needs you today. Then Cohorts, Assessments, Progress, Attendance, Messages, and Schedule. Open a cohort to see its Fellows; Progress shows where each one is.",
     target: "trainer-tools",
   },
   {
@@ -137,23 +137,23 @@ export const TEACHER_TOUR: TourStep[] = [
     body: "This is your learning home. The tour walks the places you use after you sign in on the Fellow tab.",
   },
   {
-    title: "Continue learning",
+    title: "Continue",
     body: `Resume opens the next unlocked module. Read the lesson, then take its quiz, which you pass at ${MODULE_QUIZ_PASS_PERCENT}%. A lesson with no approved quiz is done once you mark it read. The following module stays locked until this one is done.`,
     target: "teacher-continue",
   },
   {
-    title: "My learning",
-    body: "Each assigned course shows a percent and a status: Not Started, In Progress, Completed, Passed, Failed, or Locked. Your trainer sees the same percentages.",
+    title: "Learning",
+    body: "Each assigned course, step by step: Completed, In progress with its percent, Not started, or Opens after the course before it. Your trainer sees the same percentages.",
     target: "teacher-learning",
   },
   {
     title: "Your progress",
-    body: "Level, quizzes, average score, modules, and reflections sit on the Progress tab. Calendar and written work are on the Work tab.",
+    body: "Progress shows each cohort's courses, attendance and medals, and how far you are on the academy path. Written work is on Work.",
     target: "teacher-progress",
   },
   {
     title: "Certificates",
-    body: "Open Certificates to see the certificates an admin has issued to you. An admin issues one after you finish every module of a course. Notices and desk mail, when your trainer writes, appear near the top of this page.",
+    body: "Open Certificates to see the certificates an Admin has issued to you. An Admin issues one after you finish every module of a course. Desk mail and notices are under Messages.",
     target: "teacher-certificates",
   },
 ];

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin desk today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#12306B}a:hover{color:#0B1F47}
+</style>
+</helmet>
+<div style="width: 1480px; height: 2760px; box-sizing: border-box; padding: 64px; background: #F2F3F5; font-family: Inter, system-ui, sans-serif; color: #14171C; display: flex; flex-direction: column; gap: 32px">
+<header style="display: flex; flex-direction: column; gap: 8px">
+<p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #12306B">Admin desk · 9 screens at 726 px, 3 at 375 px</p>
+<h1 style="margin: 0; font-size: 36px; font-weight: 700">Navigation twice over, and long explanations before the work</h1>
+</header>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; align-items: start">
+<sc-for list="{{tablet}}" as="shot" hint-placeholder-count="9">
+<article style="background: #FFFFFF; border: 1px solid #D9DCE1; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column">
+<div style="padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #E6E8EC">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">{{shot.title}}</h2>
+<span style="font-size: 13px; color: #4B5563">726 px</span>
+</div>
+<img src="{{shot.src}}" alt="{{shot.alt}}" style="width: 100%; display: block; border-bottom: 1px solid #E6E8EC">
+<ul style="margin: 0; padding: 16px 20px 20px 20px; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{shot.notes}}" as="note" hint-placeholder-count="2">
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33">
+<span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span>
+<span>{{note}}</span>
+</li>
+</sc-for>
+</ul>
+</article>
+</sc-for>
+</div>
+<h2 style="margin: 8px 0 0 0; font-size: 22px; font-weight: 600">At phone width</h2>
+<div style="display: flex; gap: 40px; align-items: flex-start">
+<sc-for list="{{phone}}" as="shot" hint-placeholder-count="3">
+<article style="flex: 0 0 260px; background: #FFFFFF; border: 1px solid #D9DCE1; border-radius: 12px; overflow: hidden">
+<div style="padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #E6E8EC">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">{{shot.title}}</h2>
+<span style="font-size: 13px; color: #4B5563">375 px</span>
+</div>
+<div style="width: 260px; height: 563px; overflow: hidden; border-bottom: 1px solid #E6E8EC">
+<img src="{{shot.src}}" alt="{{shot.alt}}" style="width: 312px; display: block">
+</div>
+<ul style="margin: 0; padding: 16px 20px 20px 20px; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{shot.notes}}" as="note" hint-placeholder-count="1">
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33">
+<span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span>
+<span>{{note}}</span>
+</li>
+</sc-for>
+</ul>
+</article>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1480,"height":2760}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+tablet: [
+{ title: 'Desk', src: '/_blob/41982fbddf28c26707d2021789238c9a', alt: 'Admin desk with photo cards for each section', notes: [
+'Photo cards repeat the tabs above them; Cohorts reuses the Approvals photo.',
+'"2 trainers, 1 teachers": the only figures, and nothing that needs attention.'
+] },
+{ title: 'Approvals', src: '/_blob/f139fa32bfd724818f1371a7f0679d56', alt: 'Pending approvals page with empty trainer and teacher sections', notes: [
+'"Sign them in, then they create their own password" means approve.',
+'Two large empty sections; one empty state would do.'
+] },
+{ title: 'People', src: '/_blob/4fc9f38b640982d2cb47bc09bdf1ec89', alt: 'Trainers list with a squeezed title, search and Add Trainer, and a trainer card with figures', notes: [
+'The back arrow and title are squeezed into a narrow column beside the search.',
+'"Has a cohort 100%" and "Last Active Never" are unclear figures.'
+] },
+{ title: 'Cohorts, top', src: '/_blob/b281251fb31ec566a9bca45fbf3bd9ef', alt: 'Academy path banner and three cards defining Cohort, Batch and Course', notes: [
+'Three definition cards come before any cohort.',
+'"Batch" is defined as a step; D1 renames it "Step".'
+] },
+{ title: 'Cohorts, a cohort', src: '/_blob/60f4432e36ca8fd3ebd675a817e315a2', alt: 'A cohort card with its description, Open room, edit, delete, Close cohort, Stop quizzes and Quiz list buttons, and its steps', notes: [
+'Close cohort, Stop quizzes and delete sit beside Open room with no grouping.',
+'Steps are labelled "WEEK 1"; the data holds the typo "Achievemment".'
+] },
+{ title: 'Cohort room', src: '/_blob/69ce5f3b198b076a7c53c9411997b748', alt: 'Cohort room on a navy page with figures, tabs and a people list', notes: [
+'A different shell: navy page, no admin menu, only "Home".',
+'The cohort description repeats as the page heading.'
+] },
+{ title: 'Attendance', src: '/_blob/808972faaa289224d19d5d18a175368a', alt: 'Attendance page with three figures and a Mark a day form', notes: [
+'The form comes first; the attendance record sits below the fold.',
+'The date field showed 26/10/2026 on 27 October; check the time zone.'
+] },
+{ title: 'Analytics', src: '/_blob/6cd0fe5a51b55faf6b0876ebd3cbbb34', alt: 'Analytics overview with Teachers 1 and Open cohorts 0 tiles', notes: [
+'"Open cohorts 0 · 0 total" while the server reports 8: a cancelled request shows as 0.',
+'Blank white tiles while loading, with no skeleton.'
+] },
+{ title: 'Certificates', src: '/_blob/78f2ed04f8ddf7a9c2c1c048cb73c35d', alt: 'Certificate templates whose previews have white text overlaid across the artwork', notes: [
+'Preview text is laid over the template art and cannot be read.',
+'The wording lists fixed topics whatever the course (D4b fixes this).'
+] }
+],
+phone: [
+{ title: 'Desk', src: '/_blob/e553f12f56a7118cefc2177c636a3a31', alt: 'Admin desk at phone width with a cut-off title and large photo cards', notes: [
+'The title is cut to "Silverle…"; large photos push everything down.'
+] },
+{ title: 'Desk, dark', src: '/_blob/df8f0eca5da56fea95fdb556614a7aa7', alt: 'Admin desk at phone width in dark mode', notes: [
+'Dark mode holds up; the help, theme and logout icon buttons have no accessible names.'
+] },
+{ title: 'Certificates', src: '/_blob/4a637a5cdb6bc6facfb0a0887acd5c56', alt: 'Certificates at phone width with small template previews', notes: [
+'Previews are too small to read, with text over the art.'
+] }
+]
+};
+}
+}
+</script>
+</body>
+</html>

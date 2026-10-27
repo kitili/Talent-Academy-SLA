@@ -1,54 +1,57 @@
-import { BookOpen, CheckCircle, Clock, MessageCircle, Sprout, Star, TrendingUp } from "lucide-react";
+import { Check } from "lucide-react";
 import type { Medal, MedalKind } from "@shared/cohortMedals";
 
-const TONE: Record<MedalKind, { disc: string; ribbon: string }> = {
-  "first-step": { disc: "bg-[#1d4e89] border-[#c9dbf2]", ribbon: "bg-[#1d4e89]" },
-  "keeping-time": { disc: "bg-[#0f7a6c] border-[#b7e4dc]", ribbon: "bg-[#0f7a6c]" },
-  questions: { disc: "bg-[#c47b2b] border-[#f3d7b0]", ribbon: "bg-[#c47b2b]" },
-  "quiz-pass": { disc: "bg-[#3d6b2f] border-[#cfe3c8]", ribbon: "bg-[#3d6b2f]" },
-  "strong-progress": { disc: "bg-[#9b3d55] border-[#f3c3ce]", ribbon: "bg-[#9b3d55]" },
-  "course-done": { disc: "bg-[#102448] border-[#c5d0e4]", ribbon: "bg-[#102448]" },
-  "trainer-star": { disc: "bg-[#b8860b] border-[#ffe7a3]", ribbon: "bg-[#b8860b]" },
+/** What earns each medal, shown on a medal not earned yet (an earned one shows its own `detail`). */
+const HOW: Record<MedalKind, string> = {
+  "first-step": "Start your first course",
+  "keeping-time": "Attendance at 80% or more",
+  questions: "Answer a quiz question",
+  "quiz-pass": "Pass a quiz",
+  "strong-progress": "Reach 60% progress or finish a course",
+  "course-done": "Finish a course",
+  "trainer-star": "Given by a trainer",
 };
 
-const ICON: Record<MedalKind, typeof Star> = {
-  "first-step": Sprout,
-  "keeping-time": Clock,
-  questions: MessageCircle,
-  "quiz-pass": CheckCircle,
-  "strong-progress": TrendingUp,
-  "course-done": BookOpen,
-  "trainer-star": Star,
-};
-
-/** A row of cohort medals. Unearned ones stay visible, faded, the way a locked achievement does. */
-export function CohortMedals({ medals }: { medals: Medal[] }) {
+/**
+ * One even grid of a cohort's medals, earned first. An earned medal has a green check and what earned it; one not yet
+ * earned has a dashed circle and what earns it. Colour here means status only: green is earned.
+ */
+export function CohortMedals({ medals, showCount = true }: { medals: Medal[]; showCount?: boolean }) {
   if (!medals.length) return null;
-  const earned = medals.filter((medal) => medal.earned).length;
+  const earned = medals.filter((medal) => medal.earned);
+  const ordered = [...earned, ...medals.filter((medal) => !medal.earned)];
   return (
     <div data-testid="cohort-medals">
-      <p className="text-xs text-muted-foreground mb-2">{earned} of {medals.length} medals</p>
-      <div className="flex flex-wrap gap-3">
-        {medals.map((medal) => {
-          const Icon = ICON[medal.kind];
-          const tone = TONE[medal.kind];
-          return (
-            <div
-              key={medal.kind}
-              className={`w-16 text-center ${medal.earned ? "" : "opacity-40 grayscale"}`}
-              title={medal.detail}
-              data-testid={`medal-${medal.kind}`}
-              data-earned={medal.earned ? "yes" : "no"}
-            >
-              <div className={`relative mx-auto h-12 w-12 rounded-full border-4 ${tone.disc} text-white shadow-sm flex items-center justify-center`}>
-                <Icon className="h-5 w-5" />
-                <span className={`absolute -bottom-1 left-1/2 h-2 w-5 -translate-x-1/2 rounded-b-sm ${tone.ribbon}`} />
-              </div>
-              <p className="mt-2 text-[11px] font-medium leading-tight text-foreground">{medal.title}</p>
-            </div>
-          );
-        })}
-      </div>
+      {showCount && <p className="mb-2 text-xs text-sl-muted">{earned.length} of {medals.length} medals</p>}
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {ordered.map((medal) => (
+          <li
+            key={medal.kind}
+            className="flex items-start gap-3 rounded-lg border border-sl-line bg-sl-surface px-4 py-3"
+            title={medal.earned ? medal.detail : HOW[medal.kind]}
+            data-testid={`medal-${medal.kind}`}
+            data-earned={medal.earned ? "yes" : "no"}
+          >
+            {medal.earned ? (
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sl-done text-sl-surface" aria-hidden="true">
+                <Check className="h-4 w-4" />
+              </span>
+            ) : (
+              <span className="mt-0.5 h-7 w-7 shrink-0 rounded-full border border-dashed border-sl-muted/60" aria-hidden="true" />
+            )}
+            <span className="min-w-0 text-sm leading-snug">
+              <span className="block font-semibold text-sl-ink">{medal.title}</span>
+              {medal.earned ? (
+                <span className="block text-sl-muted">
+                  <span className="font-semibold text-sl-done">Earned</span> · {medal.detail}
+                </span>
+              ) : (
+                <span className="block text-sl-muted">{HOW[medal.kind]}</span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

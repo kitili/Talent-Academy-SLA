@@ -23,6 +23,7 @@ Work in this order. The steering engineer reorders freely.
 
 | # | Task | Family | Added | Blocked on |
 |---|---|---|---|---|
+| 1 | [Mark attendance per session](prioritised/mark-attendance-per-session.md) | Certificates and records | 2026-10-27 | |
 
 ## Unprioritised
 
@@ -62,6 +63,7 @@ Not ranked.
 
 | Task | Added | Blocked on |
 |---|---|---|
+| [Send the data the redesigned pages show](unprioritised/send-the-data-the-redesigned-pages-show.md) | 2026-10-27 | |
 
 ## Families
 

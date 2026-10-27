@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fellow example states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="width: 1280px; height: 784px; box-sizing: border-box; padding: 48px 56px; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column; gap: 28px">
+<header style="display: flex; flex-direction: column; gap: 8px">
+<p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #0A48A5">Proposed · Fellow, more example states</p>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; font-weight: 700">What a Fellow sees after a quiz, and on marked work</h1>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #3F4652">Each page on the board shows one example state; these are the others, at page size.</p>
+</header>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<p style="margin: 0; font-size: 13px; font-weight: 600; color: #374151">Lesson quiz <span style="font-weight: 400; color: #4B5563">· after a pass</span></p>
+<section aria-labelledby="after" style="background: #FFFFFF; border: 1px dashed #C9D6EA; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+<p style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #4B5563">Example state · after submitting</p>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+<h2 id="after" style="margin: 0; font-size: 18px; font-weight: 600">Your result</h2>
+<span style="font-size: 13px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 4px 12px">4 of 5 · 80% · Passed</span>
+</div>
+<p style="margin: 0; font-size: 14px; color: #4B5563">You passed, so the correct answers are shown. [Lesson file] is done.</p>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{results}}" as="r" hint-placeholder-count="5">
+<li style="border: 1px solid #E3E6EB; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center">
+<span style="font-size: 14px; font-weight: 500">{{r.q}}</span>
+<span style="font-size: 12px; font-weight: 600; color: {{r.ink}}; background: {{r.bg}}; border-radius: 999px; padding: 3px 10px">{{r.mark}}</span>
+</div>
+<span style="font-size: 13px; color: #4B5563">{{r.detail}}</span>
+</li>
+</sc-for>
+</ol>
+<div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px">
+<a href="#module" style="font-size: 15px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; text-decoration: none; border-radius: 8px; padding: 11px 16px">Back to the module</a>
+<a href="#next" style="font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; text-decoration: none; border-radius: 8px; padding: 12px 16px">Next lesson file</a>
+</div>
+</section>
+</div>
+<div style="display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<p style="margin: 0; font-size: 13px; font-weight: 600; color: #374151">Lesson quiz <span style="font-weight: 400; color: #4B5563">· after a try that did not pass</span></p>
+<section aria-labelledby="notpassed" style="background: #FFFFFF; border: 1px dashed #C9D6EA; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; max-width: none">
+<p style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #4B5563">Example state · not passed</p>
+<h2 id="notpassed" style="margin: 0; font-size: 16px; font-weight: 600"><span style="display: inline-block; font-size: 13px; font-weight: 600; color: #B54708; background: #FFFAEB; border-radius: 999px; padding: 4px 12px">Not passed · 3 of 5 · 60% · 2 tries left</span></h2>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #374151">Read the lesson again, then try again. You can see which answers were right; the correct answers show once you pass.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<a href="#file" style="font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; text-decoration: none; border-radius: 8px; padding: 12px 16px">Read the lesson again</a>
+<a href="#retry" style="font-size: 15px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; text-decoration: none; border-radius: 8px; padding: 11px 16px">Try again · try 2 of 3</a>
+</div>
+</section>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<p style="margin: 0; font-size: 13px; font-weight: 600; color: #374151">Work <span style="font-weight: 400; color: #4B5563">· a marked task</span></p>
+<section aria-labelledby="example-marked" style="background: #FFFFFF; border: 1px dashed #C9D6EA; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+<p style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #4B5563">Example state · a marked task</p>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h2 id="example-marked" style="margin: 0; font-size: 18px; font-weight: 600">[Written work title]</h2>
+<span style="font-size: 14px; color: #4B5563">Climate and Culture · submitted [date] · marked [date]</span>
+</div>
+<span style="font-size: 13px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 4px 12px">Marked · 78 / 100</span>
+</div>
+<div style="background: #F6F7F9; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 13px; font-weight: 600; color: #374151">Comment from [Trainer]</span>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #111827">[Trainer's comment on your answer]</p>
+</div>
+<a href="#answer" style="font-size: 14px; align-self: flex-start">Show your answer</a>
+</section>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":784}}'>
+class Component extends DCLogic {
+renderVals() {
+const right = { mark: 'Right', ink: '#067647', bg: '#ECFDF3' };
+return {
+results: [
+{ ...right, q: '1. [Question]', detail: 'Your answer: [Answer]' },
+{ ...right, q: '2. [Question]', detail: 'Your answer: [Answer]' },
+{ q: '3. [Question]', mark: 'Wrong', ink: '#B42318', bg: '#FEF3F2', detail: 'Your answer: [Answer] · correct answer: [Answer]' },
+{ ...right, q: '4. [Question]', detail: 'Your answer: [Answer]' },
+{ ...right, q: '5. [Question]', detail: 'Your answer: [Answer]' }
+]
+};
+}
+}
+</script>
+</body>
+</html>
