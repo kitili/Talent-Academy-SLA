@@ -22,6 +22,19 @@ import { useScreenshotProtection } from "@/hooks/use-screenshot-protection";
 import { ScreenshotWarning } from "@/components/ScreenshotWarning";
 import { TableOfContents } from "@/components/TableOfContents";
 import type { TocEntry } from "@shared/schema";
+import { deskName } from "@shared/deskName";
+import { AcademyShell } from "@/components/AcademyShell";
+import { Loading, SkeletonBar, SkeletonCard } from "@/components/Skeletons";
+
+/** A page of a document that has not arrived: one grey slide, in the place and shape it will take. */
+function DocumentSkeleton({ label = "Loading the document" }: { label?: string }) {
+  return (
+    <Loading label={label} className="w-full max-w-3xl space-y-4 p-4 sm:p-8">
+      <SkeletonBar className="aspect-video w-full" />
+      <SkeletonBar className="h-4 w-2/3" />
+    </Loading>
+  );
+}
 
 // DocumentViewer component for displaying DOCX files converted to HTML
 function DocumentViewer({ url }: { url: string }) {
@@ -60,7 +73,7 @@ function DocumentViewer({ url }: { url: string }) {
   }, [url]);
 
   if (loading) {
-    return <div className="flex items-center justify-center w-full p-12"><p className="text-sl-muted">Loading document...</p></div>;
+    return <DocumentSkeleton />;
   }
 
   if (error) {
@@ -102,7 +115,7 @@ export default function CourseView() {
   const weekId = params.weekId;
   const courseId = params.courseId;
   const [, navigate] = useLocation();
-  const { user, isTrainer } = useAuth();
+  const { user, isAdmin, isTrainer, logoutMutation } = useAuth();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -139,11 +152,11 @@ export default function CourseView() {
   // Fit-to-screen PDF width (constrained by width AND height for landscape slides)
   const [basePdfWidth, setBasePdfWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return 360;
-    return Math.min(window.innerWidth - 8, (window.innerHeight - 120) * (16 / 9));
+    return Math.min(window.innerWidth - 40, (window.innerHeight - 280) * (16 / 9));
   });
   useEffect(() => {
     const update = () => {
-      setBasePdfWidth(Math.min(window.innerWidth - 8, (window.innerHeight - 120) * (16 / 9)));
+      setBasePdfWidth(Math.min(window.innerWidth - 40, (window.innerHeight - 280) * (16 / 9)));
     };
     window.addEventListener('resize', update);
     update();
@@ -182,19 +195,19 @@ export default function CourseView() {
   });
 
   // Fetch quiz status
-  const { data: quizStatus } = useQuery<{ passed: boolean }>({
+  const { data: quizStatus, isLoading: quizStatusLoading } = useQuery<{ passed: boolean }>({
     queryKey: ['/api/training-weeks', weekId, 'quiz-passed'],
     enabled: !!weekId,
   });
 
   // Fetch file quiz progress
-  const { data: fileQuizProgress = [] } = useQuery<{ fileId: string; passed: boolean }[]>({
+  const { data: fileQuizProgress = [], isLoading: fileQuizProgressLoading } = useQuery<{ fileId: string; passed: boolean }[]>({
     queryKey: ['/api/training-weeks', weekId, 'file-quiz-progress'],
     enabled: !!weekId,
   });
 
   // Fetch week details
-  const { data: weeks = [] } = useQuery<any[]>({
+  const { data: weeks = [], isLoading: weeksLoading } = useQuery<any[]>({
     queryKey: ['/api/training-weeks'],
   });
   const currentWeek = weeks.find((w) => w.id === weekId);
@@ -389,9 +402,8 @@ export default function CourseView() {
     }
   };
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
+  // The lesson files are in, but the first one is chosen a moment later: the viewer waits rather than say "select a file".
+  const choosingFile = isLoading || (deckFiles.length > 0 && !selectedFileId);
 
   // Sidebar content - reused in both mobile Sheet and desktop ResizablePanel
   const sidebarInner = (
@@ -401,13 +413,13 @@ export default function CourseView() {
           <ChevronLeft className="h-4 w-4 mr-1" />
           Back to {courseId ? "modules" : "courses"}
         </Button>
-        <h2 className="text-2xl sm:text-3xl font-bold mb-2">Module {currentWeek?.weekNumber}</h2>
+        {weeksLoading ? <SkeletonBar className="mb-2 h-8 w-40" /> : <h2 className="text-2xl sm:text-3xl font-bold mb-2">Module {currentWeek?.weekNumber}</h2>}
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 sm:p-6 pb-32 space-y-6">
           <div>
             <h3 className="text-base font-semibold uppercase tracking-wider text-sl-muted mb-3">Module name</h3>
-            <p className="text-sm text-sl-ink leading-relaxed font-normal">{currentWeek?.competencyFocus || "This module"}</p>
+            {weeksLoading ? <SkeletonBar className="h-4 w-3/4" /> : <p className="text-sm text-sl-ink leading-relaxed font-normal">{currentWeek?.competencyFocus || "This module"}</p>}
           </div>
           {currentWeek?.objective && (
             <div>
@@ -436,7 +448,7 @@ export default function CourseView() {
             <h3 className="text-base font-semibold text-sl-ink mb-3">Lesson files</h3>
             <div className="space-y-2">
               {isLoading ? (
-                <div className="text-center py-8 text-sl-muted text-sm">Loading content...</div>
+                <SkeletonCard label="Loading lesson files" lines={2} />
               ) : deckFiles.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto mb-3 text-sl-muted/40" />
@@ -496,7 +508,8 @@ export default function CourseView() {
                           </div>
                         </div>
                       )}
-                      {!isTrainer && (
+                      {!isTrainer && fileQuizProgressLoading && <SkeletonBar className="h-9 w-full rounded-md" />}
+                      {!isTrainer && !fileQuizProgressLoading && (
                         <Button size="sm" variant={hasPassedQuiz ? "outline" : "secondary"} className="w-full"
                           onClick={() => { setSelectedQuizFileId(file.id); setFileQuizDialogOpen(true); }}
                           data-testid={`button-file-quiz-${file.id}`}
@@ -510,7 +523,12 @@ export default function CourseView() {
               )}
             </div>
           </div>
-          {!isLoading && deckFiles.length > 0 && !isTrainer && (
+          {!isLoading && deckFiles.length > 0 && !isTrainer && quizStatusLoading && (
+            <div className="pt-4">
+              <SkeletonBar className="h-10 w-full rounded-md" />
+            </div>
+          )}
+          {!isLoading && deckFiles.length > 0 && !isTrainer && !quizStatusLoading && (
             <div className="pt-4">
               <Button onClick={() => setQuizDialogOpen(true)} className="w-full" variant={quizStatus?.passed ? "outline" : "default"} data-testid="button-take-quiz">
                 {quizStatus?.passed ? <CheckCircle2 className="mr-2 h-5 w-5 text-sl-done" /> : <Award className="mr-2 h-5 w-5" />}
@@ -529,10 +547,20 @@ export default function CourseView() {
   // Main content panel - reused in both mobile and desktop
   const mainContentInner = (
     <>
-      {selectedFile ? (
+      {choosingFile ? (
         <div className="flex-1 flex flex-col h-full">
           <div className="p-3 sm:p-6 border-b bg-sl-surface flex-shrink-0">
-            <h1 className="text-base sm:text-2xl font-bold mb-1 truncate">{selectedFile.fileName}</h1>
+            <SkeletonBar className="mb-2 h-6 w-64 max-w-full" />
+            <SkeletonBar className="h-4 w-32" />
+          </div>
+          <div className="flex-1 bg-sl-ground flex justify-center overflow-hidden">
+            <DocumentSkeleton label="Loading the lesson" />
+          </div>
+        </div>
+      ) : selectedFile ? (
+        <div className="flex-1 flex flex-col h-full">
+          <div className="p-3 sm:p-6 border-b bg-sl-surface flex-shrink-0">
+            <h2 className="text-base sm:text-2xl font-bold mb-1 truncate">{selectedFile.fileName}</h2>
             <div className="flex items-center gap-2 text-sm text-sl-muted">
               <span>Lesson file</span>
               {selectedFile.progress?.status && (<><span>•</span><span className="capitalize">{selectedFile.progress.status}</span></>)}
@@ -549,13 +577,13 @@ export default function CourseView() {
                   style={{ touchAction: zoomScale > 1 ? 'none' : 'pan-y' }}
                 >
                   {viewUrl ? (
-                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-sl-muted text-sm">Preview not available</div>} loading={<div className="p-8 text-sl-muted text-sm">Loading document...</div>} className="shadow-lg flex-shrink-0">
+                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="p-8 text-sl-muted text-sm">Preview not available</div>} loading={<DocumentSkeleton />} className="shadow-lg flex-shrink-0">
                       <Page pageNumber={pageNumber} width={mobilePdfWidth} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={false} renderAnnotationLayer={false} />
                     </Document>
                   ) : documentLoadError ? (
                     <div className="p-8 text-sl-muted text-sm">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</div>
                   ) : (
-                    <div className="p-8 text-sl-muted text-sm">Loading document...</div>
+                    <DocumentSkeleton />
                   )}
                   {zoomScale > 1.05 && (
                     <button onClick={() => setZoomScale(1.0)} className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full z-10">Reset zoom</button>
@@ -565,7 +593,7 @@ export default function CourseView() {
               <div className="flex flex-col items-center p-2 sm:p-8 pb-24 overflow-x-auto">
                 <div className="w-full max-w-5xl flex flex-col items-center gap-6">
                   {viewUrl ? (
-                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="h-96 bg-sl-neutral-soft rounded-xl flex items-center justify-center"><p className="text-sm text-sl-muted">Preview not available</p></div>} loading={<div className="p-8 text-center text-sl-muted">Loading document...</div>} className="shadow-2xl rounded-xl overflow-hidden">
+                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }} onLoadError={() => setDocumentLoadError(true)} error={<div className="h-96 bg-sl-neutral-soft rounded-xl flex items-center justify-center"><p className="text-sm text-sl-muted">Preview not available</p></div>} loading={<DocumentSkeleton />} className="shadow-2xl rounded-xl overflow-hidden">
                       <Page pageNumber={pageNumber} scale={scale} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={true} renderAnnotationLayer={true} />
                     </Document>
                   ) : documentLoadError ? (
@@ -573,7 +601,7 @@ export default function CourseView() {
                       <p className="text-sm text-sl-muted">This presentation cannot be previewed. The uploaded file is not a valid PowerPoint document.</p>
                     </div>
                   ) : (
-                    <div className="p-8 text-center text-sl-muted">Loading document...</div>
+                    <DocumentSkeleton />
                   )}
                 </div>
               </div>
@@ -598,7 +626,7 @@ export default function CourseView() {
                         <Button onClick={() => setIsFullscreen(true)} variant="default" size="lg" data-testid="button-fullscreen"><Maximize2 className="h-5 w-5 mr-2" />Fullscreen View</Button>
                       </div>
                     </div>
-                  ) : (<div className="flex items-center justify-center"><p className="text-sl-muted">Loading file...</p></div>)}
+                  ) : (<DocumentSkeleton label="Loading the file" />)}
                 </div>
               </div>
             )}
@@ -667,7 +695,16 @@ export default function CourseView() {
   );
 
   return (
-    <div className="bg-sl-ground text-sl-ink h-[100dvh] flex flex-col">
+    <AcademyShell
+      title="Silverleaf Academy"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      desk={isAdmin ? "admin" : user?.role === "teacher" ? "fellow" : "trainer"}
+      current={user?.role === "teacher" ? "learning" : "cohorts"}
+    >
+      <h1 className="sr-only">{weeksLoading ? "Module" : `Module ${currentWeek?.weekNumber ?? ""}${currentWeek?.competencyFocus ? `: ${currentWeek.competencyFocus}` : ""}`}</h1>
+      {/* The viewer fills the page column from under the header to above the phone bar */}
+      <div className="bg-sl-ground text-sl-ink flex h-[calc(100dvh-11.5rem)] min-h-[26rem] flex-col overflow-hidden rounded-xl border border-sl-line sm:h-[calc(100dvh-13rem)] lg:h-[calc(100dvh-9.5rem)]">
       {(isMobile || isTablet) ? (
         <>
           {/* Mobile: top bar */}
@@ -728,6 +765,7 @@ export default function CourseView() {
           </ResizablePanel>
         </ResizablePanelGroup>
       )}
+      </div>
 
       {/* Fullscreen Dialog */}
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
@@ -754,7 +792,7 @@ export default function CourseView() {
                         </div>
                         {documentLoadError && (<div className="h-96 bg-sl-neutral-soft rounded-xl flex items-center justify-center mt-4"><p className="text-xs text-sl-muted">Preview not available</p></div>)}
                       </>
-                    ) : (<div className="p-8 text-center text-sl-muted">Loading document...</div>)}
+                    ) : (<DocumentSkeleton />)}
                   </div>
                 ) : (selectedFile?.fileName.toLowerCase().endsWith('.docx') || selectedFile?.fileName.toLowerCase().endsWith('.doc')) ? (
                   <div className="h-full flex items-start justify-center p-4 sm:p-6 overflow-auto">
@@ -810,6 +848,6 @@ export default function CourseView() {
         <FileQuizDialog weekId={weekId || ''} fileId={selectedQuizFileId} fileName={deckFiles.find(f => f.id === selectedQuizFileId)?.fileName || ''} open={fileQuizDialogOpen} onOpenChange={setFileQuizDialogOpen} canGenerateQuiz={isTrainer} />
       )}
       <ScreenshotWarning visible={showWarning} onDismiss={dismissWarning} />
-    </div>
+    </AcademyShell>
   );
 }
