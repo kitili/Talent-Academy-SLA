@@ -127,7 +127,7 @@ export default function TrainerTeacherContentHistory() {
           ) : displayItem ? (
             <div className="lg:col-span-3 border border-sl-line rounded-lg bg-sl-surface overflow-hidden flex flex-col">
               {/* Header */}
-              <div className="p-4 border-b border-sl-line sticky top-14 sm:top-[68px] z-10 bg-sl-surface">
+              <div className="p-4 border-b border-sl-line sticky top-0 z-10 bg-sl-surface">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-bold flex items-center gap-2">
