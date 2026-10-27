@@ -80,7 +80,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Courses",
-    body: "Courses are the curriculum trainers teach, and only an admin adds, renames or deletes one. Open Cohorts, choose a step, and place the course there. Keep a course on draft while you edit it, and publish it when Fellows should see it.",
+    body: "Courses are the curriculum trainers teach, and only an admin adds, renames or deletes one. Add and edit them on the Courses tab of Cohorts, then place a course on a step from that step. A new course is published at once.",
     target: "admin-nav-cohorts",
   },
   {
@@ -90,7 +90,7 @@ export const ADMIN_TOUR: TourStep[] = [
   },
   {
     title: "Needs attention",
-    body: "What to fix next, with one button each: a cohort with no trainer, a step with no course, a module with no lesson file, or someone waiting on Approvals.",
+    body: "What to fix next, with one button each: a cohort with no trainer, a step with no course, or someone waiting on Approvals.",
     target: "admin-pictures",
   },
   {
@@ -137,13 +137,13 @@ export const TEACHER_TOUR: TourStep[] = [
     body: "This is your learning home. The tour walks the places you use after you sign in on the Fellow tab.",
   },
   {
-    title: "Continue learning",
+    title: "Continue",
     body: `Resume opens the next unlocked module. Read the lesson, then take its quiz, which you pass at ${MODULE_QUIZ_PASS_PERCENT}%. A lesson with no approved quiz is done once you mark it read. The following module stays locked until this one is done.`,
     target: "teacher-continue",
   },
   {
-    title: "My learning",
-    body: "Each assigned course shows a percent and a status: Not Started, In Progress, Completed, Passed, Failed, or Locked. Your trainer sees the same percentages.",
+    title: "Learning",
+    body: "Each assigned course, step by step: Completed, In progress with its percent, Not started, or Opens after the course before it. Your trainer sees the same percentages.",
     target: "teacher-learning",
   },
   {

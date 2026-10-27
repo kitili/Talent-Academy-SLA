@@ -20,7 +20,7 @@ else and shows nothing invented in the gap. The local `.env` is the live product
 | Fellow Work (`FellowWork`, `FellowStates`) | "set by", "submitted", "marked" dates; the Trainer's name on a comment | Those fields on written work |
 | Fellow Quizzes (`FellowQuizzes`) | "finished [date]" on an exam | The finishing date |
 | Lesson quiz, a failed try (`FellowStates`) | "N tries left" and right/wrong per answer | `remainingAttempts`, and a right/wrong `review` without the correct answers, from `/api/training-weeks/:weekId/files/:fileId/submit-quiz` (today a failed try returns `review: []`) |
-| Fellow exam page | A per-question review once the exam is finished (it shows tries and best score now) | The attempts' answers with right/wrong, which `/api/teacher/quiz-attempts` already allows once no retake is left |
+| Fellow exam page | A per-question review once the exam is finished (it shows tries and best score now). The approved rule shows an exam's correct answers after the last try, and Fellow Quizzes and Trainer Assessments already say so, but `QuizRunner` reveals them only after a pass and no screen shows them after the last try | The attempts' answers with right/wrong, which `/api/teacher/quiz-attempts` already allows once no retake is left, drawn on the finished-exam page |
 
 ## Do
 
