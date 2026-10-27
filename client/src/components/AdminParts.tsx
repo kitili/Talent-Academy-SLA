@@ -145,13 +145,13 @@ export function Breadcrumb({ trail, current }: { trail: Array<{ label: string; h
 export type MenuAction = { label: string; onSelect: () => void; testId?: string; danger?: boolean; disabled?: boolean };
 
 /** A closed "More actions" menu. Destructive items end in "…" when they ask for confirmation. */
-export function MoreActions({ actions, testId }: { actions: MenuAction[]; testId?: string }) {
+export function MoreActions({ actions, testId, label = "More actions" }: { actions: MenuAction[]; testId?: string; label?: string }) {
   if (actions.length === 0) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" data-testid={testId} className={secondaryButton}>
-          More actions
+          {label}
           <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
