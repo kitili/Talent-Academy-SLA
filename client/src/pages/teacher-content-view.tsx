@@ -1,29 +1,24 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams, useLocation } from "wouter";
+import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import posthog from "posthog-js";
 import { useAuth } from "@/hooks/use-auth";
-import { useBreakpoint } from "@/hooks/use-breakpoint";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ChevronLeft, ChevronRight, ChevronDown, FileText, CheckCircle2, Circle, Maximize2, Minimize2, ZoomIn, ZoomOut, X, Award, List, PanelLeftClose, PanelLeftOpen, Menu, Lock } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, Circle, Maximize2, Minimize2, ZoomIn, ZoomOut, List, Lock } from "lucide-react";
 import { Document, Page, pdfjs } from 'react-pdf';
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { FileQuizDialog } from "@/components/FileQuizDialog";
 import { useScreenshotProtection } from "@/hooks/use-screenshot-protection";
 import { ScreenshotWarning } from "@/components/ScreenshotWarning";
 import { TableOfContents } from "@/components/TableOfContents";
-import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
-import { ModuleScene } from "@/components/ModuleScene";
+import { AcademyShell } from "@/components/AcademyShell";
 import { sanitizeLessonHtml } from "@shared/htmlSanitize";
+import { MODULE_QUIZ_PASS_PERCENT } from "@shared/constants";
 import { DiscussionThread } from "@/components/DiscussionThread";
 import { saveLastLesson } from "@/lib/lastLessonCache";
 import type { TocEntry } from "@shared/schema";
@@ -102,30 +97,34 @@ function DocumentViewer({ url }: { url: string }) {
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
+const SECTION = "rounded-xl border border-sl-line bg-sl-surface";
+const BUTTON_BASE = "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm disabled:opacity-50";
+const SECONDARY = `${BUTTON_BASE} border border-sl-control bg-sl-surface text-sl-ink`;
+const PRIMARY = `${BUTTON_BASE} bg-sl-accent-strong font-semibold text-white`;
+
 /** For a lesson file with no approved quiz: reading it is what completes it (D6). */
 function MarkReadButton({ done, disabled, onClick }: { done: boolean; disabled: boolean; onClick: () => void }) {
   return (
-    <Button size="sm" variant={done ? "outline" : "secondary"} className="w-full" disabled={done || disabled} onClick={onClick}>
+    <button type="button" className={`${SECONDARY} font-semibold`} disabled={done || disabled} onClick={onClick}>
       {done ? (
-        <><CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />Read</>
+        <><CheckCircle2 aria-hidden="true" className="h-4 w-4 text-sl-done" />Read</>
       ) : (
-        <><CheckCircle2 className="mr-2 h-4 w-4" />Mark read to continue</>
+        "Mark as read"
       )}
-    </Button>
+    </button>
   );
 }
 
-function LessonPage({ title, html, onRead }: { title: string; html: string; onRead: () => void }) {
+function LessonPage({ html, onRead }: { html: string; onRead: () => void }) {
   return (
-    <article className="sl-lesson mx-auto max-w-2xl p-6 sm:p-10">
-      <ModuleScene title={title} />
+    <article className="sl-lesson mx-auto max-w-2xl p-6 sm:p-8">
       <div
-        className="prose mt-4 max-w-none text-foreground"
+        className="prose max-w-none text-sl-ink"
         dangerouslySetInnerHTML={{ __html: sanitizeLessonHtml(html) }}
       />
-      <Button className="mt-6" onClick={onRead}>
+      <button type="button" className={`${PRIMARY} mt-6`} onClick={onRead}>
         I have read this lesson
-      </Button>
+      </button>
     </article>
   );
 }
@@ -137,6 +136,7 @@ interface DeckFile {
   fileSize: number;
   lessonHtml?: string;
   toc?: TocEntry[];
+  youtubeId?: string;
   /** From the server: `locked`, `completed`, or the progress row's status (C2, D6). */
   status?: string;
   /** Whether the file has an approved quiz. With none, the Fellow marks it read to continue (D6). */
@@ -155,16 +155,19 @@ interface WeekProgress {
   percentage: number;
 }
 
+const hasExtension = (name: string | undefined, extensions: string[]) =>
+  extensions.some((extension) => (name || "").toLowerCase().endsWith(extension));
+
 export default function TeacherContentView() {
   const params = useParams<{ courseId?: string; weekId: string }>();
   const weekId = params.weekId;
   // No courseId for teachers
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.0); // Reasonable default scale that fits within content area
+  const [scale, setScale] = useState<number>(1.0); // Fullscreen zoom
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [hasMarkedComplete, setHasMarkedComplete] = useState<boolean>(false);
@@ -172,44 +175,34 @@ export default function TeacherContentView() {
   const [selectedQuizFileId, setSelectedQuizFileId] = useState<string | null>(null);
   const [pageInputValue, setPageInputValue] = useState<string>('');
   const [documentLoadError, setDocumentLoadError] = useState<boolean>(false);
-  
-  // Mobile sidebar drawer state
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
-  
+
   // Track which file's ToC is expanded
   const [expandedTocFileId, setExpandedTocFileId] = useState<string | null>(null);
-  
+
   // Track intended page when switching files via ToC navigation
   const [intendedPage, setIntendedPage] = useState<number | null>(null);
-  
+
   // Track previous file ID to detect actual file changes
   const prevFileIdRef = useRef<string | null>(null);
-  
-  // Responsive breakpoint detection
-  const { isMobile, isTablet } = useBreakpoint();
 
   useEffect(() => {
     if (weekId) sessionStorage.setItem("sl-last-week", weekId);
   }, [weekId]);
 
-  // Pinch-to-zoom state for mobile PDF
+  // Pinch-to-zoom state for the slides on a phone
   const [zoomScale, setZoomScale] = useState<number>(1.0);
   const lastPinchDistance = useRef<number | null>(null);
 
-  // Fit-to-screen PDF width: constrained by both screen width and available height (for landscape slides)
-  const [basePdfWidth, setBasePdfWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 360;
-    return Math.min(window.innerWidth - 8, (window.innerHeight - 120) * (16 / 9));
-  });
+  // The reader's width: a slide page is drawn to fit it.
+  const [readerEl, setReaderEl] = useState<HTMLDivElement | null>(null);
+  const [readerWidth, setReaderWidth] = useState<number>(640);
   useEffect(() => {
-    const update = () => {
-      setBasePdfWidth(Math.min(window.innerWidth - 8, (window.innerHeight - 120) * (16 / 9)));
-    };
-    window.addEventListener('resize', update);
-    update();
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  const pdfWidth = basePdfWidth * zoomScale;
+    if (!readerEl) return;
+    const observer = new ResizeObserver(([entry]) => setReaderWidth(Math.floor(entry.contentRect.width)));
+    observer.observe(readerEl);
+    return () => observer.disconnect();
+  }, [readerEl]);
+  const pdfWidth = Math.max(260, readerWidth - 24) * zoomScale;
 
   const handlePdfTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
@@ -251,6 +244,17 @@ export default function TeacherContentView() {
     : null;
   const nextModuleLocked = !!nextModule?.locked;
 
+  // The cohort and step this module sits in, for the breadcrumb: the Fellow's path lists each cohort's steps and courses.
+  const { data: academyPath } = useQuery<any>({
+    queryKey: ["/api/teacher/academy-path"],
+  });
+  const thisModule = assignedWeeks.find((w: any) => w.id === weekId);
+  const courseName: string = thisModule?.courseName || currentWeek?.courseName || "";
+  const pathCohort = (academyPath?.cohorts || []).find((cohort: any) => cohort.id === thisModule?.batchId);
+  const stepIndex = pathCohort
+    ? (pathCohort.batches || []).findIndex((step: any) => (step.courses || []).some((course: any) => course.id === (thisModule?.courseId || currentWeek?.courseId)))
+    : -1;
+
   // Fetch quiz passage data for all files in the week
   const { data: fileQuizData = {} } = useQuery<Record<string, any>>({
     queryKey: [`/api/teacher/week/${weekId}/file-quizzes`],
@@ -265,7 +269,6 @@ export default function TeacherContentView() {
       ? Math.round((deckFiles.filter((f) => f.done).length / deckFiles.length) * 100)
       : 0,
   };
-
 
   // Mark a file read. The server decides what that means: with no approved quiz it completes the file.
   const saveProgressMutation = useMutation({
@@ -327,7 +330,7 @@ export default function TeacherContentView() {
         const fileName = (selectedFile.fileName || "").toLowerCase();
         const isPptx = fileName.endsWith('.pptx') || fileName.endsWith('.ppt');
         const isDocx = fileName.endsWith('.docx') || fileName.endsWith('.doc');
-        
+
         if (isPptx) {
           const convertUrl = `/api/files/convert-to-pdf?url=${encodeURIComponent(selectedFile.fileUrl)}`;
           const probe = await fetch(convertUrl, { credentials: "include" });
@@ -360,7 +363,7 @@ export default function TeacherContentView() {
     };
 
     fetchViewUrl();
-    
+
     // Only reset page number if the file actually changed
     const currentFileId = selectedFile?.id || null;
     if (currentFileId !== prevFileIdRef.current) {
@@ -379,20 +382,11 @@ export default function TeacherContentView() {
   const handleFileClick = (file: DeckFile) => {
     setSelectedFileId(file.id);
     setHasMarkedComplete(Boolean(file.done));
-    setMobileSidebarOpen(false);
     // Auto-expand ToC for newly selected file if it has one
     if (file.toc && file.toc.length > 0) {
       setExpandedTocFileId(file.id);
     }
     posthog.capture("file_opened", { weekId, fileId: file.id, fileName: file.fileName });
-  };
-
-  // Auto-expand ToC when sidebar opens (show ToC for current file)
-  const handleSidebarOpen = () => {
-    setMobileSidebarOpen(true);
-    if (selectedFile?.toc && selectedFile.toc.length > 0) {
-      setExpandedTocFileId(selectedFile.id);
-    }
   };
 
   // Track completion when user reaches the last page
@@ -412,15 +406,6 @@ export default function TeacherContentView() {
       posthog.capture("content_completed", { weekId, fileId: selectedFile.id, fileName: selectedFile.fileName, totalPages: numPages });
     }
   }, [selectedFile, pageNumber, numPages, hasMarkedComplete, saveProgressMutation]);
-
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-primary" />;
-      default:
-        return <Circle className="h-5 w-5 text-muted-foreground/40" />;
-    }
-  };
 
   // Handle direct page input
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -451,8 +436,26 @@ export default function TeacherContentView() {
     }
   };
 
+  const shell = (children: ReactNode) => (
+    <AcademyShell
+      title="Learning"
+      userLabel={user?.username}
+      onLogout={() => logoutMutation.mutate()}
+      desk="fellow"
+      current="learning"
+    >
+      {children}
+    </AcademyShell>
+  );
+
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return shell(
+      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading the module">
+        <div className="h-7 w-1/2 rounded bg-sl-neutral-soft" />
+        <div className="h-4 w-1/3 rounded bg-sl-neutral-soft" />
+        <div className="h-40 rounded-xl bg-sl-neutral-soft" />
+      </div>
+    );
   }
 
   if (contentError) {
@@ -464,693 +467,144 @@ export default function TeacherContentView() {
       refusal = {};
     }
     const locked = refusal.locked === true || refusal.code === "MODULE_LOCKED";
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center">
-        <Lock className="h-10 w-10 text-muted-foreground" />
-        <h2 className="text-xl font-semibold">{locked ? "Module locked" : "Unable to load this module"}</h2>
-        <p className="text-muted-foreground max-w-md">
+    return shell(
+      <section className={`${SECTION} flex flex-col items-start gap-3 px-5 py-6`}>
+        <Lock aria-hidden="true" className="h-8 w-8 text-sl-muted" />
+        <h1 className="m-0 text-xl font-semibold text-sl-ink">{locked ? "Module locked" : "Unable to load this module"}</h1>
+        <p className="m-0 max-w-md text-sl-muted">
           {locked
             ? "Finish the module before this one, and the course before this course, to unlock it."
             : refusal.error || contentError.message}
         </p>
-        <Button onClick={() => navigate("/teacher/dashboard")}>Back to dashboard</Button>
-      </div>
+        <button type="button" className={PRIMARY} onClick={() => navigate("/teacher/dashboard?tab=learning")}>
+          Back to Learning
+        </button>
+      </section>
     );
   }
 
-  // Shared sidebar inner content (used in both mobile Sheet and desktop panel)
-  const SidebarContent = () => (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-4 pb-8 space-y-6">
-        {/* Competency Focus */}
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Competency Focus
-          </h3>
-          <p className="text-sm text-foreground leading-relaxed">
-            {currentWeek?.competencyFocus || "This module"}
-          </p>
-        </div>
-
-        {/* Learning Objectives */}
-        {currentWeek?.objective && (
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              Learning Objectives
-            </h3>
-            <div className="text-sm text-foreground leading-loose space-y-1">
-              {currentWeek.objective.split(/(?=\d+\.)/).map((line: string, idx: number) => {
-                const trimmed = line.trim();
-                if (!trimmed) return null;
-                return <p key={idx} className="pl-2">{trimmed}</p>;
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Course Progress */}
-        {weekProgress && weekProgress.total > 0 && (
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-semibold text-muted-foreground">Progress</span>
-              <span className="text-sm font-bold text-primary">{weekProgress.percentage}%</span>
-            </div>
-            <Progress value={weekProgress.percentage} className="h-2" />
-            <p className="text-xs text-muted-foreground mt-1">
-              {weekProgress.completed} of {weekProgress.total} completed
-            </p>
-          </div>
-        )}
-
-        {/* Lesson Files */}
-        <div>
-          <h3 className="text-sm font-semibold text-foreground mb-3">Lesson Files</h3>
-          <div className="space-y-2">
-            {deckFiles.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No content available yet</p>
-            ) : (
-              deckFiles.map((file, fileIndex) => {
-                const quizStatus = fileQuizData[file.id];
-                const hasPassedQuiz = file.quizPassed === true || quizStatus?.passed === true || quizStatus?.hasPassed === true;
-                const hasToc = file.toc && file.toc.length > 0;
-                const isTocExpanded = expandedTocFileId === file.id;
-                // The server locks a file until the one before it is done (C2, D6).
-                const isLocked = file.status === "locked";
-
-                return (
-                  <div key={file.id} className="space-y-2">
-                    <div className="relative">
-                      <button
-                        onClick={() => handleFileClick(file)}
-                        disabled={isLocked}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${
-                          isLocked
-                            ? 'opacity-50 cursor-not-allowed bg-muted/30 border-2 border-transparent'
-                            : selectedFileId === file.id
-                            ? 'bg-primary/10 border-2 border-primary hover:bg-primary/15'
-                            : 'hover:bg-muted/50 border-2 border-transparent'
-                        } ${hasToc ? 'pr-12' : ''}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 mt-0.5">
-                            {isLocked ? <Lock className="h-5 w-5 text-muted-foreground" /> : getStatusIcon(file.progress?.status)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <FileText className="h-4 w-4 text-primary flex-shrink-0" />
-                              <span className={`font-semibold text-sm truncate ${isLocked ? 'text-muted-foreground' : ''}`}>{file.fileName}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">{(file.fileSize / 1024 / 1024).toFixed(2)} MB</div>
-                          </div>
-                        </div>
-                      </button>
-                      {hasToc && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setExpandedTocFileId(isTocExpanded ? null : file.id); }}
-                          className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-muted/80 transition-colors"
-                        >
-                          <span className="flex items-center gap-1 text-xs text-primary font-medium">
-                            <List className="h-3.5 w-3.5" />
-                            Contents
-                            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isTocExpanded ? 'rotate-180' : ''}`} />
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                    {hasToc && isTocExpanded && (
-                      <div className="ml-3 pl-3 border-l-2 border-primary/20">
-                        <div className="bg-muted/30 rounded-lg overflow-hidden">
-                          <TableOfContents
-                            toc={file.toc || []}
-                            currentPage={selectedFileId === file.id ? pageNumber : 1}
-                            onPageSelect={(page) => {
-                              if (selectedFileId !== file.id) { setIntendedPage(page); handleFileClick(file); }
-                              else { setPageNumber(page); }
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {file.quizApproved ? (
-                      <Button
-                        size="sm"
-                        variant={hasPassedQuiz ? "outline" : "secondary"}
-                        className="w-full"
-                        disabled={isLocked}
-                        onClick={() => { setSelectedQuizFileId(file.id); setFileQuizDialogOpen(true); }}
-                      >
-                        {hasPassedQuiz ? (
-                          <><CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />Quiz Passed</>
-                        ) : (
-                          <><Award className="mr-2 h-4 w-4" />Take Quiz</>
-                        )}
-                      </Button>
-                    ) : (
-                      <MarkReadButton
-                        done={Boolean(file.done)}
-                        disabled={isLocked || saveProgressMutation.isPending}
-                        onClick={() => saveProgressMutation.mutate({ deckFileId: file.id, status: "completed" })}
-                      />
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Shared PDF/content viewer for mobile
-  const isPdfFile = selectedFile && (
-    selectedFile.fileName.toLowerCase().endsWith('.pdf') ||
-    selectedFile.fileName.toLowerCase().endsWith('.pptx') ||
-    selectedFile.fileName.toLowerCase().endsWith('.ppt')
-  );
+  const isPdfFile = Boolean(selectedFile) && hasExtension(selectedFile?.fileName, ['.pdf', '.pptx', '.ppt']);
   const youtubeId = selectedFile?.youtubeId;
-  const isVideoFile = selectedFile && !youtubeId && (
-    selectedFile.fileName.toLowerCase().endsWith('.mp4') ||
-    selectedFile.fileName.toLowerCase().endsWith('.webm') ||
-    selectedFile.fileName.toLowerCase().endsWith('.mov')
-  );
-  const isDocxFile = selectedFile && (
-    selectedFile.fileName.toLowerCase().endsWith('.docx') ||
-    selectedFile.fileName.toLowerCase().endsWith('.doc')
-  );
+  const isVideoFile = Boolean(selectedFile) && !youtubeId && hasExtension(selectedFile?.fileName, ['.mp4', '.webm', '.mov']);
+  const isDocxFile = Boolean(selectedFile) && hasExtension(selectedFile?.fileName, ['.docx', '.doc']);
 
-  // ── MOBILE LAYOUT ─────────────────────────────────────────────────────────
-  if (isMobile || isTablet) {
-    return (
-      <div className="sl-page sl-bg-board h-[100dvh] flex flex-col">
-        {/* Fixed Top Bar */}
-        <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-card border-b shadow-sm z-10">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/teacher/dashboard')} className="-ml-2">
-            <ChevronLeft className="h-5 w-5" />
-            <span className="text-sm font-medium">Back</span>
-          </Button>
-          <span className="text-base font-semibold truncate max-w-[140px]">
-            {selectedFile?.fileName || `Module ${currentWeek?.weekNumber}`}
+  const crumbs = [
+    { label: "Learning", href: "/teacher/dashboard?tab=learning", test: "button-back-to-weeks" },
+    ...(pathCohort ? [{ label: pathCohort.name as string, href: "/teacher/dashboard?tab=learning" }] : []),
+    ...(stepIndex >= 0 ? [{ label: `Step ${stepIndex + 1}`, href: "/teacher/dashboard?tab=learning" }] : []),
+  ] as Array<{ label: string; href: string; test?: string }>;
+
+  const objectiveLines: string[] = (currentWeek?.objective || "")
+    .split(/(?=\d+\.)/)
+    .map((line: string) => line.trim())
+    .filter(Boolean);
+
+  const openQuiz = (fileId: string) => {
+    setSelectedQuizFileId(fileId);
+    setFileQuizDialogOpen(true);
+  };
+  const quizFileIndex = deckFiles.findIndex((file) => file.id === selectedQuizFileId);
+  const fileAfterQuiz = quizFileIndex >= 0 ? deckFiles[quizFileIndex + 1] : undefined;
+
+  const pagerButton = `${SECONDARY} px-3.5`;
+
+  return shell(
+    <>
+      <nav aria-label="Breadcrumb">
+        <ol className="m-0 flex list-none flex-wrap items-center gap-1.5 p-0 text-sm text-sl-muted">
+          {crumbs.map((crumb, index) => (
+            <li key={`${crumb.label}-${index}`} className="flex items-center gap-1.5">
+              <Link href={crumb.href} className="text-sl-accent underline" data-testid={crumb.test}>{crumb.label}</Link>
+              <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+            </li>
+          ))}
+          <li>
+            <span aria-current="page" className="font-medium text-sl-ink">{courseName || `Module ${currentWeek?.weekNumber ?? ""}`}</span>
+          </li>
+        </ol>
+      </nav>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="m-0 text-[28px] font-semibold text-sl-ink">
+            Module {currentWeek?.weekNumber}{currentWeek?.competencyFocus ? ` · ${currentWeek.competencyFocus}` : ""}
+          </h1>
+          <span className="text-sm text-sl-muted">
+            {[courseName, pathCohort?.name, `pass mark ${MODULE_QUIZ_PASS_PERCENT}%`].filter(Boolean).join(" · ")}
           </span>
-          <Button variant="ghost" size="sm" onClick={handleSidebarOpen} className="-mr-2">
-            <Menu className="h-5 w-5" />
-          </Button>
         </div>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-hidden bg-muted/20 relative">
-          {youtubeId ? (
-            <YouTubeLesson id={youtubeId} title={selectedFile?.fileName || "Lesson"} />
-          ) : selectedFile?.lessonHtml ? (
-            <div className="h-full overflow-auto bg-background">
-              <LessonPage
-                title={selectedFile.fileName}
-                html={selectedFile.lessonHtml}
-                onRead={() => saveProgressMutation.mutate({ deckFileId: selectedFile.id, status: "completed", completedAt: new Date() })}
-              />
-            </div>
-          ) : isPdfFile ? (
-            <div
-              className="flex items-center justify-center w-full h-full overflow-auto"
-              onTouchMove={handlePdfTouchMove}
-              onTouchEnd={handlePdfTouchEnd}
-              style={{ touchAction: zoomScale > 1 ? 'none' : 'pan-y' }}
+        {(previousModule || nextModule) && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={SECONDARY}
+              disabled={!previousModule}
+              onClick={() => previousModule && navigate(`/teacher/week/${previousModule.id}/content`)}
             >
-              {viewUrl ? (
-                <Document
-                  file={viewUrl}
-                  onLoadSuccess={({ numPages }) => { setNumPages(numPages); setDocumentLoadError(false); }}
-                  onLoadError={() => setDocumentLoadError(true)}
-                  className="shadow-lg flex-shrink-0"
-                >
-                  <Page
-                    pageNumber={pageNumber}
-                    width={pdfWidth}
-                    devicePixelRatio={window.devicePixelRatio || 1}
-                    renderTextLayer={false}
-                    renderAnnotationLayer={false}
-                  />
-                </Document>
-              ) : (
-                <div className="p-8 text-muted-foreground text-sm text-center">
-                  {documentLoadError
-                    ? "This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again."
-                    : "Loading document..."}
-                </div>
-              )}
-              {documentLoadError && (
-                <div className="p-8 text-muted-foreground text-sm">Preview not available</div>
-              )}
-              {zoomScale > 1.05 && (
-                <button
-                  onClick={() => setZoomScale(1.0)}
-                  className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full z-10"
-                >
-                  Reset zoom
-                </button>
-              )}
-            </div>
-          ) : isVideoFile ? (
-            <div className="flex flex-col items-center justify-center p-4">
-              {viewUrl && (
-                <video src={viewUrl} controls controlsList="nodownload" className="w-full h-auto rounded-xl shadow-lg bg-black">
-                  Your browser does not support the video tag.
-                </video>
-              )}
-            </div>
-          ) : isDocxFile ? (
-            <div className="bg-white dark:bg-slate-900 min-h-full">
-              {viewUrl && <DocumentViewer url={viewUrl} />}
-            </div>
-          ) : selectedFile ? (
-            <div className="p-4">
-              {viewUrl && (
-                <iframe
-                  src={viewUrl}
-                  className="w-full min-h-[70vh] border-0"
-                  title={selectedFile.fileName}
-                  sandbox="allow-same-origin allow-scripts"
-                />
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full p-8">
-              <div className="text-center">
-                <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                <p className="text-muted-foreground text-sm">Open the menu to select a file</p>
-              </div>
-            </div>
+              <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+              Previous module
+            </button>
+            <button
+              type="button"
+              className={SECONDARY}
+              disabled={!nextModule || nextModuleLocked}
+              onClick={() => nextModule && !nextModuleLocked && navigate(`/teacher/week/${nextModule.id}/content`)}
+            >
+              Next module
+              <ChevronRight aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <section aria-labelledby="objective" className={`${SECTION} flex flex-col gap-2 px-5 py-[18px]`}>
+        <h2 id="objective" className="m-0 text-lg font-semibold text-sl-ink">Objective</h2>
+        {objectiveLines.length > 0 ? (
+          <div className="flex max-w-[680px] flex-col gap-1 text-[15px] leading-relaxed text-sl-neutral">
+            {objectiveLines.map((line, index) => <p key={index} className="m-0">{line}</p>)}
+          </div>
+        ) : (
+          <p className="m-0 text-sm text-sl-muted">No objective has been written for this module yet.</p>
+        )}
+      </section>
+
+      <section aria-labelledby="files" className={`${SECTION} overflow-hidden`}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sl-line px-5 py-4">
+          <h2 id="files" className="m-0 text-lg font-semibold text-sl-ink">Lesson files</h2>
+          {weekProgress.total > 0 && (
+            <span className="text-sm text-sl-muted">
+              {weekProgress.completed} of {weekProgress.total} lesson {weekProgress.total === 1 ? "file" : "files"} done
+            </span>
           )}
         </div>
 
-        {/* Fixed Bottom Nav (PDF only) */}
-        {isPdfFile && viewUrl && (
-          <div className="flex-shrink-0 bg-card/95 backdrop-blur-sm border-t shadow-lg">
-            <div className="flex items-center justify-between px-3 py-2 gap-2">
-              <Button onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1} variant="outline" size="sm" className="h-10 px-3">
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <div className="flex items-center gap-1.5 flex-1 justify-center">
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={pageInputValue}
-                  onChange={handlePageInputChange}
-                  onKeyDown={handlePageInputKeyDown}
-                  onBlur={handlePageInputSubmit}
-                  placeholder={pageNumber.toString()}
-                  className="w-12 h-10 text-center text-sm"
-                />
-                <span className="text-sm text-muted-foreground">/ {numPages}</span>
-              </div>
-              <Button onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages} variant="outline" size="sm" className="h-10 px-3">
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-              <Button onClick={() => setIsFullscreen(true)} variant="outline" size="sm" className="h-10 px-3">
-                <Maximize2 className="h-5 w-5" />
-              </Button>
-            </div>
-            {pageNumber === numPages && numPages > 0 && (
-              <div className="flex items-center justify-center gap-1.5 pb-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span className="text-xs font-semibold text-primary">Last page reached!</span>
-              </div>
-            )}
+        {deckFiles.length === 0 ? (
+          <div className="flex flex-col gap-1 px-5 py-[18px]">
+            <p className="m-0 text-[15px] font-medium text-sl-ink">No lesson file yet</p>
+            <p className="m-0 text-sm text-sl-muted">Your trainer will add one; this module does not hold you up.</p>
           </div>
-        )}
-
-        {/* Mobile Sidebar Sheet */}
-        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-          <SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col">
-            <SheetHeader className="p-4 border-b flex-shrink-0">
-              <SheetTitle className="text-left text-lg">Module {currentWeek?.weekNumber}</SheetTitle>
-            </SheetHeader>
-            <SidebarContent />
-          </SheetContent>
-        </Sheet>
-
-        {/* Fullscreen Dialog */}
-        <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-          <DialogContent className="max-w-[100vw] w-full h-[100dvh] p-0 gap-0">
-            <div className="flex flex-col h-full bg-background">
-              <div className="flex items-center justify-between p-3 border-b bg-card flex-shrink-0">
-                <h2 className="text-sm font-semibold truncate">{selectedFile?.fileName}</h2>
-                <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(false)}><X className="h-4 w-4" /></Button>
-              </div>
-              <div
-                className="flex-1 overflow-auto bg-muted/20 flex items-center justify-center pb-16"
-                onTouchMove={handlePdfTouchMove}
-                onTouchEnd={handlePdfTouchEnd}
-                style={{ touchAction: zoomScale > 1 ? 'none' : 'pan-y' }}
-              >
-                {isPdfFile && viewUrl ? (
-                  <div className="flex items-center justify-center">
-                    <Document file={viewUrl} onLoadSuccess={({ numPages }) => setNumPages(numPages)} className="shadow-lg flex-shrink-0">
-                      <Page pageNumber={pageNumber} width={pdfWidth} devicePixelRatio={window.devicePixelRatio || 1} renderTextLayer={false} renderAnnotationLayer={false} />
-                    </Document>
-                  </div>
-                ) : isVideoFile && viewUrl ? (
-                  <video src={viewUrl} controls controlsList="nodownload" className="w-full h-full object-contain bg-black" />
-                ) : viewUrl ? (
-                  <iframe src={viewUrl} className="w-full h-full border-0" title={selectedFile?.fileName || 'Document'} sandbox="allow-same-origin allow-scripts" />
-                ) : null}
-              </div>
-              {isPdfFile && (
-                <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t shadow-lg z-50">
-                  <div className="flex items-center justify-between px-3 py-2 gap-2">
-                    <Button onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1} variant="outline" size="sm" className="h-10 px-3"><ChevronLeft className="h-5 w-5" /></Button>
-                    <div className="flex items-center gap-1.5 flex-1 justify-center">
-                      <Input type="text" inputMode="numeric" value={pageInputValue} onChange={handlePageInputChange} onKeyDown={handlePageInputKeyDown} onBlur={handlePageInputSubmit} placeholder={pageNumber.toString()} className="w-12 h-10 text-center text-sm" />
-                      <span className="text-sm text-muted-foreground">/ {numPages}</span>
-                    </div>
-                    <Button onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages} variant="outline" size="sm" className="h-10 px-3"><ChevronRight className="h-5 w-5" /></Button>
-                    <Button onClick={() => setIsFullscreen(false)} variant="outline" size="sm" className="h-10 px-3"><Minimize2 className="h-5 w-5" /></Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {selectedQuizFileId && (
-          <FileQuizDialog
-            weekId={weekId || ''}
-            fileId={selectedQuizFileId}
-            fileName={deckFiles.find(f => f.id === selectedQuizFileId)?.fileName || ''}
-            open={fileQuizDialogOpen}
-            onOpenChange={setFileQuizDialogOpen}
-            canGenerateQuiz={false}
-          />
-        )}
-        <ScreenshotWarning visible={showWarning} onDismiss={dismissWarning} />
-        {weekId ? (
-          <div className="p-4 border-t bg-card">
-            <DiscussionThread weekId={weekId} />
-          </div>
-        ) : null}
-        <TeacherLearnerNav />
-      </div>
-    );
-  }
-
-  // ── DESKTOP LAYOUT ────────────────────────────────────────────────────────
-  return (
-    <div className="sl-page sl-bg-board h-screen flex flex-col">
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        {/* Sidebar Panel */}
-        <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-          <div className="h-full border-r bg-card flex flex-col shadow-lg">
-            {/* Fixed Header: Back Button and Week Title */}
-            <div className="p-4 sm:p-6 border-b flex-shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/teacher/dashboard')}
-                className="mb-4 -ml-2"
-                data-testid="button-back-to-weeks"
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Back to Dashboard
-              </Button>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-1">
-                Module {currentWeek?.weekNumber}
-              </h2>
-              <p className="text-xs text-muted-foreground mb-2">
-                Course → Module → Lesson · Learn, then take the quiz to unlock the next module
-              </p>
-              {currentWeek?.competencyFocus && (
-                <p className="text-sm text-muted-foreground">{currentWeek.competencyFocus}</p>
-              )}
-              {(previousModule || nextModule) && (
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!previousModule}
-                    onClick={() => previousModule && navigate(`/teacher/week/${previousModule.id}/content`)}
+        ) : (
+          <div className="flex flex-col gap-3.5 px-5 py-[18px]">
+            {selectedFile && (
+              <>
+                <h3 className="m-0 text-[17px] font-semibold text-sl-ink">{selectedFile.fileName}</h3>
+                <div role="region" aria-label="Lesson file viewer" className="overflow-hidden rounded-[10px] border border-sl-control bg-sl-surface">
+                  <div
+                    ref={setReaderEl}
+                    className="relative flex min-h-[260px] flex-col text-sl-ink"
+                    onTouchMove={isPdfFile ? handlePdfTouchMove : undefined}
+                    onTouchEnd={isPdfFile ? handlePdfTouchEnd : undefined}
+                    style={isPdfFile ? { touchAction: zoomScale > 1 ? 'none' : 'pan-y' } : undefined}
                   >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!nextModule || nextModuleLocked}
-                    onClick={() => nextModule && !nextModuleLocked && navigate(`/teacher/week/${nextModule.id}/content`)}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Scrollable Content: Competency Focus, Objectives, Progress, and File List */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-4 sm:p-6 pb-32 space-y-6">
-                {/* Competency Focus */}
-                <div>
-                  <h3 className="text-base font-semibold uppercase tracking-wider text-[#666] mb-3">
-                    Competency Focus
-                  </h3>
-                  <p className="text-sm text-foreground leading-relaxed font-normal">
-                    {currentWeek?.competencyFocus || "This module"}
-                  </p>
-                </div>
-
-                {/* Learning Objectives */}
-                {currentWeek?.objective && (
-                  <div>
-                    <h3 className="text-base font-semibold uppercase tracking-wider text-[#666] mb-3">
-                      Learning Objectives
-                    </h3>
-                    <div className="text-sm text-foreground leading-loose space-y-2">
-                      {currentWeek.objective.split(/(?=\d+\.)/).map((line: string, idx: number) => {
-                        const trimmed = line.trim();
-                        if (!trimmed) return null;
-                        return (
-                          <p key={idx} className="pl-2 font-normal">
-                            {trimmed}
-                          </p>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Course Progress */}
-                {weekProgress && weekProgress.total > 0 && (
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-semibold text-muted-foreground">
-                        Course Progress
-                      </span>
-                      <span className="text-sm font-bold text-primary">
-                        {weekProgress.percentage}%
-                      </span>
-                    </div>
-                    <Progress value={weekProgress.percentage} className="h-2" />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {weekProgress.completed} of {weekProgress.total} completed
-                    </p>
-                    <p className="text-xs text-muted-foreground/70 mt-2 italic">
-                      Tip: Navigate to the last page of each file to mark it as complete
-                    </p>
-                  </div>
-                )}
-
-                {/* Lesson List */}
-                <div>
-                  <h3 className="text-base font-semibold text-foreground mb-3">
-                    Lesson Files
-                  </h3>
-                  <div className="space-y-2">
-                    {isLoading ? (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        Loading content...
-                      </div>
-                    ) : deckFiles.length === 0 ? (
-                      <div className="text-center py-8">
-                        <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-                        <p className="text-sm font-medium text-muted-foreground mb-1">
-                          No lesson file yet
-                        </p>
-                        <p className="text-xs text-muted-foreground/70">
-                          Plan it as Introduction, Competence development, Design, then Realisation.
-                        </p>
-                      </div>
-                    ) : (
-                      deckFiles.map((file, fileIndex) => {
-                        const quizStatus = fileQuizData[file.id];
-                        const hasPassedQuiz = file.quizPassed === true || quizStatus?.passed === true || quizStatus?.hasPassed === true;
-                        const hasToc = file.toc && file.toc.length > 0;
-                        const isTocExpanded = expandedTocFileId === file.id;
-
-                        // The server locks a file until the one before it is done (C2, D6).
-                        const isLocked = file.status === "locked";
-
-                        return (
-                          <div key={file.id} className="space-y-2">
-                            <div className="relative">
-                              <button
-                                onClick={() => handleFileClick(file)}
-                                disabled={isLocked}
-                                className={`w-full text-left p-3 rounded-lg transition-colors ${
-                                  isLocked 
-                                    ? 'opacity-50 cursor-not-allowed bg-muted/30 border-2 border-transparent'
-                                    : selectedFileId === file.id
-                                    ? 'bg-primary/10 border-2 border-primary hover:bg-primary/15'
-                                    : 'hover:bg-muted/50 border-2 border-transparent'
-                                } ${hasToc ? 'pr-28' : ''}`}
-                                data-testid={`button-file-${file.id}`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0 mt-0.5">
-                                    {isLocked ? (
-                                      <Lock className="h-5 w-5 text-muted-foreground" />
-                                    ) : (
-                                      getStatusIcon(file.progress?.status)
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                                      <span className={`font-semibold text-base truncate ${isLocked ? 'text-muted-foreground' : ''}`}>{file.fileName}</span>
-                                      {isLocked && <span className="text-xs bg-muted/50 text-muted-foreground px-2 py-0.5 rounded">Locked</span>}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {(file.fileSize / 1024 / 1024).toFixed(2)} MB
-                                    </div>
-                                  </div>
-                                </div>
-                              </button>
-                              
-                              {/* ToC Toggle Button - Only show if file has ToC */}
-                              {hasToc && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedTocFileId(isTocExpanded ? null : file.id);
-                                  }}
-                                  className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-muted/80 transition-colors"
-                                  data-testid={`button-toggle-toc-${file.id}`}
-                                  aria-label={isTocExpanded ? "Hide contents" : "View contents"}
-                                >
-                                  <span className="flex items-center gap-1 text-xs text-primary font-medium">
-                                    <List className="h-3.5 w-3.5" />
-                                    Contents
-                                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isTocExpanded ? 'rotate-180' : ''}`} />
-                                  </span>
-                                </button>
-                              )}
-                            </div>
-                            
-                            {/* Expanded ToC - Show beneath the file when expanded */}
-                            {hasToc && isTocExpanded && (
-                              <div className="ml-3 pl-3 border-l-2 border-primary/20">
-                                <div className="bg-muted/30 rounded-lg overflow-hidden">
-                                  <TableOfContents
-                                    toc={file.toc || []}
-                                    currentPage={selectedFileId === file.id ? pageNumber : 1}
-                                    onPageSelect={(page) => {
-                                      // If selecting a ToC entry for a different file, set the intended page first
-                                      if (selectedFileId !== file.id) {
-                                        setIntendedPage(page);
-                                        handleFileClick(file);
-                                      } else {
-                                        // Same file, just navigate to the page
-                                        setPageNumber(page);
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* A file with an approved quiz is done when the quiz is passed; one without, when marked read (D6). */}
-                            {!file.quizApproved ? (
-                              <MarkReadButton
-                                done={Boolean(file.done)}
-                                disabled={isLocked || saveProgressMutation.isPending}
-                                onClick={() => saveProgressMutation.mutate({ deckFileId: file.id, status: "completed" })}
-                              />
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant={hasPassedQuiz ? "outline" : "secondary"}
-                                className="w-full"
-                                disabled={isLocked}
-                                onClick={() => {
-                                  console.log('[COURSE-VIEW] 🎯 Take Quiz button clicked for file:', file.id, file.fileName);
-                                  setSelectedQuizFileId(file.id);
-                                  setFileQuizDialogOpen(true);
-                                  console.log('[COURSE-VIEW] 📝 State updated, dialog should open');
-                                }}
-                                data-testid={`button-file-quiz-${file.id}`}
-                              >
-                                {hasPassedQuiz ? (
-                                  <>
-                                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
-                                    Quiz Passed
-                                  </>
-                                ) : (
-                                  <>
-                                    <Award className="mr-2 h-4 w-4" />
-                                    Take Quiz
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </ResizablePanel>
-
-        {/* Resizable Handle */}
-        <ResizableHandle withHandle />
-
-        {/* Main Content Panel */}
-        <ResizablePanel defaultSize={75} minSize={60}>
-          <div className="h-full flex flex-col">
-            {selectedFile ? (
-              <div className="flex-1 flex flex-col h-full">
-                {/* Content Header */}
-                <div className="p-3 sm:p-6 border-b bg-card flex-shrink-0">
-                  <h1 className="text-base sm:text-2xl font-bold mb-1 truncate">{selectedFile.fileName}</h1>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Presentation File</span>
-                    {selectedFile.progress?.status && (
-                      <>
-                        <span>•</span>
-                        <span className="capitalize">{selectedFile.progress.status}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Content Display - Takes remaining space with internal scroll */}
-                <div className="flex-1 overflow-y-auto bg-muted/20 flex flex-col min-h-0">
-                  {youtubeId ? (
-                    <YouTubeLesson id={youtubeId} title={selectedFile.fileName} />
-                  ) : selectedFile.lessonHtml ? (
-                    <LessonPage
-                      title={selectedFile.fileName}
-                      html={selectedFile.lessonHtml}
-                      onRead={() => saveProgressMutation.mutate({ deckFileId: selectedFile.id, status: "completed", completedAt: new Date() })}
-                    />
-                  ) : (selectedFile.fileName.toLowerCase().endsWith('.pdf') || 
-                    selectedFile.fileName.toLowerCase().endsWith('.pptx') || 
-                    selectedFile.fileName.toLowerCase().endsWith('.ppt')) ? (
-                    <div className="flex flex-col items-center p-2 sm:p-8 pb-24 overflow-x-auto">
-                      {/* Slides Viewer */}
-                      <div className="w-full max-w-5xl flex flex-col items-center gap-6">
+                    {youtubeId ? (
+                      <YouTubeLesson id={youtubeId} title={selectedFile.fileName} />
+                    ) : selectedFile.lessonHtml ? (
+                      <LessonPage
+                        html={selectedFile.lessonHtml}
+                        onRead={() => saveProgressMutation.mutate({ deckFileId: selectedFile.id, status: "completed", completedAt: new Date() })}
+                      />
+                    ) : isPdfFile ? (
+                      <div className="flex min-h-[260px] justify-center overflow-auto bg-white p-3 text-black">
                         {viewUrl ? (
                           <>
                             <Document
@@ -1163,171 +617,255 @@ export default function TeacherContentView() {
                                 console.error('PDF load error:', error);
                                 setDocumentLoadError(true);
                               }}
-                              className="shadow-2xl rounded-xl overflow-hidden"
+                              className="flex-shrink-0"
                             >
                               <Page
                                 pageNumber={pageNumber}
-                                scale={isMobile ? 0.6 : scale}
+                                width={pdfWidth}
                                 devicePixelRatio={window.devicePixelRatio || 1}
                                 renderTextLayer={true}
                                 renderAnnotationLayer={true}
                               />
                             </Document>
-                            {documentLoadError && (
-                              <div className="h-96 bg-muted rounded-xl flex items-center justify-center">
-                                <p className="text-xs text-muted-foreground">Preview not available</p>
-                              </div>
+                            {zoomScale > 1.05 && (
+                              <button
+                                type="button"
+                                onClick={() => setZoomScale(1.0)}
+                                className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-1 text-xs text-white"
+                              >
+                                Reset zoom
+                              </button>
                             )}
                           </>
                         ) : (
-                          <div className="p-8 text-center text-muted-foreground">
+                          <p className="m-0 p-8 text-center text-sm text-sl-muted">
                             {documentLoadError
                               ? "This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again."
                               : "Loading document..."}
-                          </div>
+                          </p>
+                        )}
+                        {documentLoadError && viewUrl && (
+                          <p className="m-0 p-8 text-sm text-sl-muted">Preview not available</p>
                         )}
                       </div>
-                    </div>
-                  ) : (selectedFile.fileName.toLowerCase().endsWith('.mp4') ||
-                    selectedFile.fileName.toLowerCase().endsWith('.webm') ||
-                    selectedFile.fileName.toLowerCase().endsWith('.mov')) ? (
-                    <div className="flex flex-col items-center justify-center p-4 sm:p-8">
-                      {/* Video Player */}
-                      {viewUrl && (
-                        <div className="w-full max-w-5xl">
+                    ) : isVideoFile ? (
+                      <div className="flex flex-col items-center justify-center p-4">
+                        {viewUrl && (
                           <video
                             src={viewUrl}
                             controls
                             controlsList="nodownload"
-                            className="w-full h-auto rounded-xl shadow-2xl bg-black"
+                            className="h-auto w-full max-w-4xl rounded-lg bg-black"
                             data-testid="video-viewer"
                           >
                             Your browser does not support the video tag.
                           </video>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col bg-muted/20">
-                      <div className="flex items-start justify-center py-8 px-6">
-                        {viewUrl ? (
-                          <div className="w-full max-w-4xl flex flex-col gap-6">
-                            {selectedFile.fileName.toLowerCase().endsWith('.txt') ? (
-                              <textarea
-                                readOnly
-                                className="w-full min-h-[600px] rounded-lg shadow-md border-0 p-6 bg-white dark:bg-slate-900 text-black dark:text-white font-mono resize-none"
-                                data-testid="text-viewer"
-                                style={{ lineHeight: '1.5' }}
-                                onContextMenu={(e) => e.preventDefault()}
-                              />
-                            ) : (selectedFile.fileName.toLowerCase().endsWith('.docx') || 
-                                 selectedFile.fileName.toLowerCase().endsWith('.doc')) ? (
-                              <div className="rounded-lg shadow-md overflow-hidden bg-white dark:bg-slate-900">
-                                <DocumentViewer url={viewUrl} />
-                              </div>
-                            ) : (
-                              <div className="rounded-lg shadow-md overflow-hidden">
-                                <iframe
-                                  src={viewUrl}
-                                  className="w-full min-h-[600px] border-0 select-none pointer-events-auto"
-                                  title={selectedFile.fileName}
-                                  data-testid="file-viewer"
-                                  style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-                                  sandbox="allow-same-origin allow-scripts"
-                                  onContextMenu={(e) => e.preventDefault()}
-                                />
-                              </div>
-                            )}
-                            <div className="flex gap-3 justify-center pb-4">
-                              <Button
-                                onClick={() => setIsFullscreen(true)}
-                                variant="default"
-                                size="lg"
-                                data-testid="button-fullscreen"
-                              >
-                                <Maximize2 className="h-5 w-5 mr-2" />
-                                Fullscreen View
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center">
-                            <p className="text-muted-foreground">Loading file...</p>
-                          </div>
                         )}
                       </div>
+                    ) : viewUrl ? (
+                      <div className="flex w-full flex-col gap-4 p-4">
+                        {hasExtension(selectedFile.fileName, ['.txt']) ? (
+                          <textarea
+                            readOnly
+                            aria-label={selectedFile.fileName}
+                            className="min-h-[600px] w-full resize-none rounded-lg border-0 bg-sl-surface p-6 font-mono text-sl-ink"
+                            data-testid="text-viewer"
+                            style={{ lineHeight: '1.5' }}
+                            onContextMenu={(e) => e.preventDefault()}
+                          />
+                        ) : isDocxFile ? (
+                          <div className="overflow-hidden rounded-lg bg-white dark:bg-slate-900">
+                            <DocumentViewer url={viewUrl} />
+                          </div>
+                        ) : (
+                          <iframe
+                            src={viewUrl}
+                            className="pointer-events-auto min-h-[600px] w-full select-none border-0"
+                            title={selectedFile.fileName}
+                            data-testid="file-viewer"
+                            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+                            sandbox="allow-same-origin allow-scripts"
+                            onContextMenu={(e) => e.preventDefault()}
+                          />
+                        )}
+                        <div className="flex justify-center">
+                          <button type="button" className={PRIMARY} onClick={() => setIsFullscreen(true)} data-testid="button-fullscreen">
+                            <Maximize2 aria-hidden="true" className="h-4 w-4" />
+                            Fullscreen view
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="m-0 p-8 text-center text-sl-muted">Loading file...</p>
+                    )}
+                  </div>
+
+                  {isPdfFile && viewUrl && (
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-sl-line bg-sl-ground px-3.5 py-2.5">
+                      <button type="button" className={pagerButton} onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1}>
+                        Previous page
+                      </button>
+                      <span aria-live="polite" className="flex items-center gap-1.5 text-sm text-sl-neutral">
+                        Page
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          aria-label="Go to page"
+                          value={pageInputValue}
+                          onChange={handlePageInputChange}
+                          onKeyDown={handlePageInputKeyDown}
+                          onBlur={handlePageInputSubmit}
+                          placeholder={pageNumber.toString()}
+                          className="h-9 w-14 rounded-md border border-sl-control bg-sl-surface text-center text-sm text-sl-ink"
+                          data-testid="input-page-number"
+                        />
+                        of {numPages}
+                      </span>
+                      <button type="button" className={pagerButton} onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages}>
+                        Next page
+                      </button>
+                      <button type="button" className={pagerButton} onClick={() => setIsFullscreen(true)} data-testid="button-fullscreen-normal">
+                        <Maximize2 aria-hidden="true" className="h-4 w-4" />
+                        Fullscreen
+                      </button>
+                      {pageNumber === numPages && numPages > 0 && (
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-sl-done">
+                          <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                          Last page reached
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
+              </>
+            )}
 
-                {/* Persistent Control Bar - PDF/PPTX Files Only - Always visible */}
-                {(selectedFile.fileName.toLowerCase().endsWith('.pdf') ||
-                  selectedFile.fileName.toLowerCase().endsWith('.pptx') ||
-                  selectedFile.fileName.toLowerCase().endsWith('.ppt')) && viewUrl && (
-                  <div className="flex-shrink-0 bg-card/95 backdrop-blur-sm border-t shadow-2xl">
-                    <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
-                      <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-center">
-                        <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/50 rounded-lg">
-                          <Button onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1} variant="outline" size="sm">
-                            <ChevronLeft className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Previous</span>
-                          </Button>
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap hidden sm:inline">Page</span>
-                            <Input type="text" inputMode="numeric" value={pageInputValue} onChange={handlePageInputChange} onKeyDown={handlePageInputKeyDown} onBlur={handlePageInputSubmit} placeholder={pageNumber.toString()} className="w-12 sm:w-16 h-8 text-center text-sm" data-testid="input-page-number" />
-                            <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">/ {numPages}</span>
-                          </div>
-                          <Button onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages} variant="outline" size="sm">
-                            <span className="hidden sm:inline">Next</span><ChevronRight className="h-4 w-4 sm:ml-1" />
-                          </Button>
-                        </div>
-                        <Button onClick={() => setIsFullscreen(true)} variant="outline" size="sm" data-testid="button-fullscreen-normal">
-                          <Maximize2 className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Fullscreen</span>
-                        </Button>
-                        {pageNumber === numPages && numPages > 0 && (
-                          <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 bg-primary/10 rounded-lg">
-                            <CheckCircle2 className="h-4 w-4 text-primary" />
-                            <span className="text-xs sm:text-sm font-semibold text-primary">Last page!</span>
-                          </div>
+            <ol className="m-0 flex list-none flex-col gap-2 p-0">
+              {deckFiles.map((file) => {
+                const quizStatus = fileQuizData[file.id];
+                const hasPassedQuiz = file.quizPassed === true || quizStatus?.passed === true || quizStatus?.hasPassed === true;
+                const hasToc = file.toc && file.toc.length > 0;
+                const isTocExpanded = expandedTocFileId === file.id;
+                // The server locks a file until the one before it is done (C2, D6).
+                const isLocked = file.status === "locked";
+                const isSelected = selectedFileId === file.id;
+                const subline = isLocked
+                  ? "Locked until the lesson file before it is done"
+                  : file.quizApproved
+                    ? hasPassedQuiz ? "Quiz passed · done" : "Done once you pass its quiz"
+                    : file.done ? "Read · done" : "No quiz on this file · done once you mark it read";
+
+                return (
+                  <li
+                    key={file.id}
+                    className={`flex flex-col gap-2 rounded-[10px] border px-3.5 py-3 ${
+                      isSelected ? "border-sl-accent bg-sl-accent-soft" : "border-sl-line"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleFileClick(file)}
+                        disabled={isLocked}
+                        aria-current={isSelected ? "true" : undefined}
+                        className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 bg-transparent p-0 text-left disabled:cursor-not-allowed disabled:opacity-60"
+                        data-testid={`button-file-${file.id}`}
+                      >
+                        {isLocked ? (
+                          <Lock aria-hidden="true" className="h-5 w-5 flex-none text-sl-muted" />
+                        ) : file.done ? (
+                          <CheckCircle2 aria-hidden="true" className="h-5 w-5 flex-none text-sl-done" />
+                        ) : (
+                          <Circle aria-hidden="true" className="h-5 w-5 flex-none text-sl-muted" />
+                        )}
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                          <span className="truncate text-[15px] text-sl-ink">{file.fileName}</span>
+                          <span className="text-[13px] text-sl-muted">{subline}</span>
+                        </span>
+                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {hasToc && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedTocFileId(isTocExpanded ? null : file.id)}
+                            className={`${SECONDARY} px-3`}
+                            data-testid={`button-toggle-toc-${file.id}`}
+                            aria-expanded={isTocExpanded}
+                            aria-label={isTocExpanded ? "Hide contents" : "View contents"}
+                          >
+                            <List aria-hidden="true" className="h-3.5 w-3.5" />
+                            Contents
+                            <ChevronDown aria-hidden="true" className={`h-3.5 w-3.5 transition-transform ${isTocExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                        )}
+                        {/* A file with an approved quiz is done when the quiz is passed; one without, when marked read (D6). */}
+                        {!file.quizApproved ? (
+                          <MarkReadButton
+                            done={Boolean(file.done)}
+                            disabled={isLocked || saveProgressMutation.isPending}
+                            onClick={() => saveProgressMutation.mutate({ deckFileId: file.id, status: "completed" })}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className={hasPassedQuiz ? `${SECONDARY} font-semibold` : PRIMARY}
+                            disabled={isLocked}
+                            onClick={() => openQuiz(file.id)}
+                            data-testid={`button-file-quiz-${file.id}`}
+                          >
+                            {hasPassedQuiz ? (
+                              <><CheckCircle2 aria-hidden="true" className="h-4 w-4 text-sl-done" />Quiz passed</>
+                            ) : (
+                              `Take the quiz · pass at ${MODULE_QUIZ_PASS_PERCENT}%`
+                            )}
+                          </button>
                         )}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ) : deckFiles.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center max-w-md">
-                  <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground/40" />
-                  <h3 className="text-xl font-semibold mb-2">No Content Available</h3>
-                  <p className="text-muted-foreground">
-                    No lesson file yet. Use the objective beside this page, and plan the lesson as Introduction, Competence development, Design, then Realisation.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-muted-foreground">Select a file from the sidebar to begin</p>
-              </div>
-            )}
+
+                    {/* Expanded ToC - shown beneath the file when expanded */}
+                    {hasToc && isTocExpanded && (
+                      <div className="overflow-hidden rounded-lg border border-sl-line bg-sl-surface">
+                        <TableOfContents
+                          toc={file.toc || []}
+                          currentPage={isSelected ? pageNumber : 1}
+                          onPageSelect={(page) => {
+                            // If selecting a ToC entry for a different file, set the intended page first
+                            if (!isSelected) {
+                              setIntendedPage(page);
+                              handleFileClick(file);
+                            } else {
+                              // Same file, just navigate to the page
+                              setPageNumber(page);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="m-0 text-xs text-sl-muted">Reaching the last page of a slide file counts as reading it.</p>
           </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        )}
+      </section>
+
+      {weekId ? <DiscussionThread weekId={weekId} cohortName={pathCohort?.name} /> : null}
 
       {/* Fullscreen Dialog */}
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-        <DialogContent className="max-w-[100vw] w-full h-[100dvh] p-0 gap-0">
-          <div className="flex flex-col h-full bg-background">
+        <DialogContent className="h-[100dvh] w-full max-w-[100vw] gap-0 p-0">
+          <div className="flex h-full flex-col bg-background">
             {/* Fullscreen header */}
-            <div className="flex items-center justify-between p-4 border-b bg-card flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center justify-between border-b bg-card p-4">
               <h2 className="text-lg font-semibold">{selectedFile?.fileName}</h2>
             </div>
 
             {/* Fullscreen content - scrollable with fixed control bar */}
-            <div className="flex-1 overflow-y-auto bg-muted/20 relative pb-24">
+            <div className="relative flex-1 overflow-y-auto bg-muted/20 pb-24">
               {selectedFile && (
-                (selectedFile.fileName.toLowerCase().endsWith('.pdf') || 
-                 selectedFile.fileName.toLowerCase().endsWith('.pptx') || 
-                 selectedFile.fileName.toLowerCase().endsWith('.ppt')) ? (
+                isPdfFile ? (
                   <div className="flex flex-col items-center p-6">
                     {viewUrl ? (
                       <>
@@ -1346,7 +884,7 @@ export default function TeacherContentView() {
                           >
                             <Page
                               pageNumber={pageNumber}
-                              scale={isMobile ? 0.5 : scale}
+                              scale={scale}
                               devicePixelRatio={window.devicePixelRatio || 1}
                               renderTextLayer={true}
                               renderAnnotationLayer={true}
@@ -1354,7 +892,7 @@ export default function TeacherContentView() {
                           </Document>
                         </div>
                         {documentLoadError && (
-                          <div className="h-96 bg-muted rounded-xl flex items-center justify-center mt-4">
+                          <div className="mt-4 flex h-96 items-center justify-center rounded-xl bg-muted">
                             <p className="text-xs text-muted-foreground">Preview not available</p>
                           </div>
                         )}
@@ -1367,22 +905,19 @@ export default function TeacherContentView() {
                       </div>
                     )}
                   </div>
-                ) : (selectedFile?.fileName.toLowerCase().endsWith('.docx') || 
-                     selectedFile?.fileName.toLowerCase().endsWith('.doc')) ? (
-                  <div className="h-full flex items-start justify-center p-6 overflow-auto">
-                    <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-lg shadow-2xl overflow-y-auto max-h-[calc(100vh-180px)]">
+                ) : isDocxFile ? (
+                  <div className="flex h-full items-start justify-center overflow-auto p-6">
+                    <div className="max-h-[calc(100vh-180px)] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-2xl dark:bg-slate-900">
                       <DocumentViewer url={viewUrl || ''} />
                     </div>
                   </div>
-                ) : (selectedFile?.fileName.toLowerCase().endsWith('.mp4') ||
-                 selectedFile?.fileName.toLowerCase().endsWith('.webm') ||
-                 selectedFile?.fileName.toLowerCase().endsWith('.mov')) ? (
-                  <div className="h-full flex flex-col items-center justify-center">
+                ) : isVideoFile ? (
+                  <div className="flex h-full flex-col items-center justify-center">
                     <video
                       src={viewUrl || ''}
                       controls
                       controlsList="nodownload"
-                      className="w-full h-full object-contain bg-black"
+                      className="h-full w-full bg-black object-contain"
                       data-testid="video-viewer-fullscreen"
                     >
                       Your browser does not support the video tag.
@@ -1391,7 +926,7 @@ export default function TeacherContentView() {
                 ) : (
                   <iframe
                     src={viewUrl || ''}
-                    className="w-full h-full border-0 select-none"
+                    className="h-full w-full select-none border-0"
                     title={selectedFile?.fileName || 'Document'}
                     style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
                     sandbox="allow-same-origin allow-scripts"
@@ -1402,14 +937,12 @@ export default function TeacherContentView() {
             </div>
 
             {/* Fixed Control Bar for Fullscreen - Always visible at bottom */}
-            {(selectedFile?.fileName.toLowerCase().endsWith('.pdf') || 
-              selectedFile?.fileName.toLowerCase().endsWith('.pptx') || 
-              selectedFile?.fileName.toLowerCase().endsWith('.ppt')) && (
-              <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t shadow-2xl z-50">
-                <div className="max-w-7xl mx-auto px-4 py-4">
-                  <div className="flex items-center gap-4 flex-wrap justify-center">
+            {isPdfFile && (
+              <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-card/95 shadow-2xl backdrop-blur-sm">
+                <div className="mx-auto max-w-7xl px-4 py-4">
+                  <div className="flex flex-wrap items-center justify-center gap-4">
                     {/* Page Navigation Controls */}
-                    <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
                       <Button
                         onClick={() => setPageNumber(p => Math.max(1, p - 1))}
                         disabled={pageNumber <= 1}
@@ -1418,9 +951,9 @@ export default function TeacherContentView() {
                       >
                         Previous
                       </Button>
-                      
+
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        <span className="whitespace-nowrap text-sm text-muted-foreground">
                           Page
                         </span>
                         <Input
@@ -1431,14 +964,14 @@ export default function TeacherContentView() {
                           onKeyDown={handlePageInputKeyDown}
                           onBlur={handlePageInputSubmit}
                           placeholder={pageNumber.toString()}
-                          className="w-16 h-8 text-center text-sm"
+                          className="h-8 w-16 text-center text-sm"
                           data-testid="input-page-number-fullscreen"
                         />
-                        <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        <span className="whitespace-nowrap text-sm text-muted-foreground">
                           of {numPages}
                         </span>
                       </div>
-                      
+
                       <Button
                         onClick={() => setPageNumber(p => Math.min(numPages, p + 1))}
                         disabled={pageNumber >= numPages}
@@ -1448,30 +981,32 @@ export default function TeacherContentView() {
                         Next
                       </Button>
                     </div>
-                    
+
                     {/* Zoom Controls */}
-                    <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
                       <Button
                         onClick={() => setScale(s => Math.max(0.5, s - 0.2))}
                         variant="outline"
                         size="sm"
+                        aria-label="Zoom out"
                         data-testid="button-zoom-out-fullscreen"
                       >
                         <ZoomOut className="h-4 w-4" />
                       </Button>
-                      <span className="text-sm text-muted-foreground min-w-16 text-center font-medium">
+                      <span className="min-w-16 text-center text-sm font-medium text-muted-foreground">
                         {Math.round(scale * 100)}%
                       </span>
                       <Button
                         onClick={() => setScale(s => Math.min(2.5, s + 0.2))}
                         variant="outline"
                         size="sm"
+                        aria-label="Zoom in"
                         data-testid="button-zoom-in-fullscreen"
                       >
                         <ZoomIn className="h-4 w-4" />
                       </Button>
                     </div>
-                    
+
                     {/* Exit Fullscreen Button */}
                     <Button
                       onClick={() => setIsFullscreen(false)}
@@ -1479,13 +1014,13 @@ export default function TeacherContentView() {
                       size="sm"
                       data-testid="button-exit-fullscreen-control"
                     >
-                      <Minimize2 className="h-4 w-4 mr-1" />
+                      <Minimize2 className="mr-1 h-4 w-4" />
                       Exit Fullscreen
                     </Button>
-                    
+
                     {/* Completion Indicator */}
                     {pageNumber === numPages && numPages > 0 && (
-                      <div className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 rounded-lg">
+                      <div className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-2">
                         <CheckCircle2 className="h-4 w-4 text-primary" />
                         <span className="text-sm font-semibold text-primary">Last page reached!</span>
                       </div>
@@ -1507,17 +1042,15 @@ export default function TeacherContentView() {
           open={fileQuizDialogOpen}
           onOpenChange={setFileQuizDialogOpen}
           canGenerateQuiz={false}
+          onNextFile={fileAfterQuiz ? () => {
+            setFileQuizDialogOpen(false);
+            handleFileClick(fileAfterQuiz);
+          } : undefined}
         />
       )}
 
       {/* Screenshot Warning Overlay */}
       <ScreenshotWarning visible={showWarning} onDismiss={dismissWarning} />
-      {weekId ? (
-        <div className="border-t bg-card p-4">
-          <DiscussionThread weekId={weekId} />
-        </div>
-      ) : null}
-      <TeacherLearnerNav />
-    </div>
+    </>
   );
 }

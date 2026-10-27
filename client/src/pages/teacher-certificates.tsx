@@ -1,15 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLocation } from "wouter";
-import { TeacherLearnerNav } from "@/components/TeacherLearnerNav";
-import { PlaceCover } from "@/components/PlaceArt";
-import { ArrowLeft, Award, Download } from "lucide-react";
+import { AcademyShell } from "@/components/AcademyShell";
+import { SilverleafCertificate } from "@/components/SilverleafCertificate";
+import { Award } from "lucide-react";
+
+type AcademyPath = {
+  cohortsRequired: number;
+  cohortsCompleted: number;
+  done?: boolean;
+  cohorts?: Array<{ id: string; name: string }>;
+};
+
+/** "A and B", "A, B and C". */
+function listNames(names: string[]) {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+function certificateKindLabel(cert: any) {
+  if (cert.design === "advanced" || cert.kind === "distinction") return "Advanced Level";
+  if (cert.kind === "course") return "Course completion";
+  return "Graduation";
+}
+
+const SECTION = "rounded-xl border border-sl-line bg-sl-surface";
 
 export default function TeacherCertificates() {
   const { user, logoutMutation } = useAuth();
-  const [, navigate] = useLocation();
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/teacher/me"] });
   const teacherId = user?.id || me?.id;
@@ -17,102 +35,128 @@ export default function TeacherCertificates() {
     queryKey: ["/api/teacher", teacherId, "certificates"],
     enabled: Boolean(teacherId),
   });
+  const { data: path } = useQuery<AcademyPath>({
+    queryKey: ["/api/teacher/academy-path"],
+    enabled: Boolean(teacherId) && user?.role === "teacher",
+  });
 
   if (!user || user.role !== "teacher") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-sl-ground">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-          <p className="text-muted-foreground">This page is for Fellows only.</p>
+          <h1 className="mb-2 text-2xl font-semibold text-sl-ink">Access Denied</h1>
+          <p className="text-sl-muted">This page is for Fellows only.</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="sl-page sl-bg-paper min-h-screen pb-20 sm:pb-0">
-      <header className="sticky top-0 z-50 bg-primary shadow-md">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-white">My Certificates</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate("/teacher/dashboard")}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-            >
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+  const required = path?.cohortsRequired ?? 0;
+  const completed = Math.min(path?.cohortsCompleted ?? 0, required);
+  const cohortNames = (path?.cohorts ?? []).map((cohort) => cohort.name);
 
-      <main className="sl-sheet container mx-auto my-4 sm:my-6 px-4 sm:px-6 py-8">
+  return (
+    <AcademyShell
+      title="Certificates"
+      userLabel={user.username}
+      onLogout={() => logoutMutation.mutate()}
+      desk="fellow"
+      current="certificates"
+    >
+      <div className="flex flex-col gap-1">
+        <h1 className="m-0 text-[28px] font-semibold text-sl-ink">Certificates</h1>
+        <span className="text-sm text-sl-muted">Certificates your Admin has issued to you.</span>
+      </div>
+
+      <section aria-labelledby="yours" className={`${SECTION} overflow-hidden`}>
+        <h2 id="yours" className="m-0 border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">
+          Your certificates
+        </h2>
         {isLoading ? (
-          <div className="text-center text-muted-foreground">Loading certificates...</div>
+          <div className="flex flex-col gap-2.5 px-5 py-[18px]" aria-busy="true">
+            <div className="h-3 w-1/3 rounded bg-sl-neutral-soft" />
+            <div className="h-3 w-2/3 rounded bg-sl-neutral-soft" />
+          </div>
         ) : certificates.length === 0 ? (
-          <div className="overflow-hidden rounded-2xl border bg-white text-center">
-            <PlaceCover place="certificate" className="h-52" />
-            <div className="py-8 px-4">
-              <h2 className="text-xl font-semibold mb-2">No certificates yet</h2>
-              <p className="text-muted-foreground">
-                Your administrator issues certificates at graduation or when a course is complete.
-              </p>
-            </div>
+          <div className="flex flex-col gap-1.5 px-5 py-[18px]">
+            <p className="m-0 text-[15px] font-medium text-sl-ink">No certificates yet.</p>
+            <p className="m-0 max-w-[640px] text-sm leading-normal text-sl-muted">
+              A course certificate after every module of a course is complete; the Fellowship certificate after you finish{" "}
+              {required > 0 ? `${required} cohorts` : "the cohorts your academy asks for"}. Your Admin issues them.
+            </p>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <ul className="m-0 flex list-none flex-col gap-4 p-5">
             {certificates.map((cert) => (
-              <Card key={cert.id} className="flex flex-col hover-elevate overflow-hidden">
-                <PlaceCover place="certificate" className="h-32" />
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <Award className="h-8 w-8 text-primary flex-shrink-0" />
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(cert.generatedAt).toLocaleDateString()}
+              <li key={cert.id} className="flex flex-col gap-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sl-line px-[18px] py-4">
+                  <div className="flex min-w-0 items-center gap-3.5">
+                    <span aria-hidden="true" className="flex h-11 w-11 flex-none items-center justify-center rounded-[10px] bg-sl-accent-soft">
+                      <Award className="h-[22px] w-[22px] text-sl-accent" />
                     </span>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <h3 className="m-0 text-base font-semibold text-sl-ink">{cert.courseName}</h3>
+                      <span className="text-sm text-sl-muted">
+                        {certificateKindLabel(cert)} · Issued {new Date(cert.generatedAt).toLocaleDateString()} by Silverleaf Academy
+                      </span>
+                    </div>
                   </div>
-                  <CardTitle className="mt-2">{cert.courseName}</CardTitle>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                    {cert.design === "advanced" || cert.kind === "distinction"
-                      ? "Advanced Level"
-                      : cert.kind === "course"
-                        ? "Course completion"
-                        : "Graduation"}
-                  </p>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <p className="text-sm text-muted-foreground mb-4 flex-1">
-                    {cert.appreciationText}
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() => navigate(`/teacher/certificates/${cert.id}`)}
-                    className="w-full"
-                    data-testid={`button-view-cert-${cert.id}`}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    View Certificate
-                  </Button>
-                </CardContent>
-              </Card>
+                  <div className="flex flex-wrap gap-2.5">
+                    <Link
+                      href={`/teacher/certificates/${cert.id}`}
+                      className="inline-flex min-h-[44px] items-center rounded-lg border border-sl-control bg-sl-surface px-4 text-[15px] text-sl-ink no-underline"
+                      data-testid={`button-view-cert-${cert.id}`}
+                    >
+                      View
+                    </Link>
+                    <Link
+                      href={`/teacher/certificates/${cert.id}?print=1`}
+                      className="inline-flex min-h-[44px] items-center rounded-lg bg-sl-accent-strong px-4 text-[15px] font-semibold text-white no-underline"
+                      data-testid={`button-download-cert-${cert.id}`}
+                    >
+                      Download PDF
+                    </Link>
+                  </div>
+                </div>
+                <div className="max-w-[560px]" role="img" aria-label={`Your ${certificateKindLabel(cert).toLowerCase()} certificate for ${cert.courseName}`}>
+                  <SilverleafCertificate
+                    design={cert.design}
+                    kind={cert.kind}
+                    name={cert.teacherName}
+                    body={cert.appreciationText}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {path && (
+        <section aria-labelledby="path" className={`${SECTION} flex flex-col gap-3 px-5 py-[18px]`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="path" className="m-0 text-lg font-semibold text-sl-ink">Academy path</h2>
+            <span className="text-[15px] font-semibold text-sl-ink">{completed} of {required} cohorts finished</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Academy path"
+            aria-valuemin={0}
+            aria-valuemax={required}
+            aria-valuenow={completed}
+            className="flex gap-1.5"
+          >
+            {Array.from({ length: required }, (_, index) => (
+              <span key={index} className={`h-2 flex-1 rounded ${index < completed ? "bg-sl-done" : "bg-sl-neutral-soft"}`} />
             ))}
           </div>
-        )}
-      </main>
-      <TeacherLearnerNav />
-    </div>
+          <span className="text-sm text-sl-muted">
+            {cohortNames.length > 0 ? `In ${listNames(cohortNames)}. ` : "You are not in a cohort yet. An admin places you in one. "}
+            Your course progress is on{" "}
+            <Link href="/teacher/dashboard?tab=progress" className="text-sl-accent underline">Progress</Link>.
+          </span>
+        </section>
+      )}
+    </AcademyShell>
   );
 }

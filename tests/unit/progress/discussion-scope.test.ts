@@ -62,7 +62,7 @@ test('both discussion routes and the content history call their gates', () => {
 
 test('the discussion copy says who reads it (D11)', () => {
     const thread = source('client/src/components/DiscussionThread.tsx')
-    assert.match(thread, /Other Fellows in your cohort can read this\. Your trainer does not see this thread; use desk mail for a reply\./)
+    assert.match(thread, /Other Fellows in your cohort can read this\. Your trainer does not see this thread; use\{" "\}\r?\n\s*<Link href="\/teacher\/dashboard\?tab=messages"[^>]*>Messages<\/Link> for a reply\./)
     assert.doesNotMatch(thread, /Your trainer can reply here/)
 })
 
