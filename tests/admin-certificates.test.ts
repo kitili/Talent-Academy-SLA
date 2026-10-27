@@ -11,7 +11,8 @@ describe("admin academy certificates", () => {
   it("puts official templates on the admin Certificates tab, keeps signatures, and issues words only at graduation or course completion", () => {
     const app = read("client/src/App.tsx");
     const page = read("client/src/pages/admin-certificates.tsx");
-    const nav = read("client/src/components/AdminNav.tsx");
+    // The Admin menu moved from AdminNav into the shared desk menu (design/board/Shell.dc.html).
+    const nav = read("client/src/components/deskMenu.ts");
     const routes = read("server/routes.ts");
     const storage = read("server/storage.ts");
     const overlay = read("client/src/components/SilverleafCertificate.tsx");

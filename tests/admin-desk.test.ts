@@ -16,7 +16,9 @@ const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 describe("admin desk", () => {
   it("puts admin links in a side menu, joins trainers and teachers, and drops the handover card", () => {
-    const nav = read("client/src/components/AdminNav.tsx");
+    // The Admin menu is the shared desk menu now; the shell draws it as a side column (design/board/Shell.dc.html).
+    const nav = read("client/src/components/deskMenu.ts");
+    const shell = read("client/src/components/AcademyShell.tsx");
     const home = read("client/src/pages/admin-home.tsx");
     for (const label of ["Approvals", "People", "Cohorts", "Attendance", "Analytics", "Certificates"]) {
       assert.match(nav, new RegExp(label));
@@ -24,7 +26,9 @@ describe("admin desk", () => {
     assert.equal(nav.includes('href: "/courses"'), false);
     assert.equal(nav.includes('label: "Trainers"'), false);
     assert.equal(nav.includes('label: "Teachers"'), false);
-    assert.match(nav, /lg:fixed/);
+    assert.match(shell, /DESK_MENUS\[desk\]\.map/);
+    assert.match(shell, /lg:flex-col/);
+    assert.match(shell, /aria-current=\{on \? "page" : undefined\}/);
     assert.equal(nav.toLowerCase().includes("handover"), false);
     assert.equal(nav.includes("rounded-full"), false);
     assert.equal(home.includes("/admin/handover"), false);
