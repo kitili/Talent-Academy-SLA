@@ -26,6 +26,12 @@ describe("admin academy certificates", () => {
     assert.match(copy, /Aloyce Shirima/);
     assert.match(copy, /Nelly Zablon/);
     assert.match(overlay, /text-certificate-name/);
+    // The panel over the template's printed sample name is the template's own navy, clears its heading
+    // (top 41.5%) and signatures (bottom 27%), and survives printing to PDF without background graphics.
+    assert.match(overlay, /TEMPLATE_NAVY = "#002367"/);
+    assert.equal(overlay.includes("#0d2454"), false);
+    assert.match(overlay, /top-\[41\.5%\] bottom-\[27%\]/);
+    assert.match(overlay, /\[print-color-adjust:exact\]/);
     assert.match(copy, /cert-fellowship\.jpg/);
     assert.match(copy, /cert-advanced\.jpg/);
     assert.match(routes, /\/api\/admin\/certificates\/issue/);
