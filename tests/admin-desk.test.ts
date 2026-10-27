@@ -36,9 +36,9 @@ describe("admin desk", () => {
     assert.match(home, /PlaceCover/);
     assert.match(home, /place: "certificate"/);
     const auth = read("client/src/pages/unified-auth.tsx");
-    assert.match(auth, /\/bg-library.jpg/);
-    assert.match(auth, /PLACES\[place\]/);
-    assert.match(auth, /sl-sign-role/);
+    assert.equal(auth.includes("bg-library.jpg"), false);
+    assert.equal(auth.includes("PlaceArt"), false);
+    assert.match(auth, /bg-sl-ground/);
     assert.equal(auth.toLowerCase().includes("adult teacher"), false);
     assert.equal(home.includes("LearningPath"), false);
     assert.equal(home.includes("Total Trainers"), false);
