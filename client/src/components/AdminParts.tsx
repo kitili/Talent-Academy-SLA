@@ -1,6 +1,13 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
+import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -248,4 +255,59 @@ export function cohortHasTrainer(cohort: PathCohort) {
 
 export function plural(count: number, one: string, many = `${one}s`) {
   return `${count} ${count === 1 ? one : many}`;
+}
+
+/**
+ * "Reset password…" on a person's page. It calls the route the Home tool calls (`/api/admin/reset-user-password`),
+ * with the person's own login so the Admin types only the new password.
+ */
+export function ResetPasswordDialog({
+  open,
+  onOpenChange,
+  personName,
+  identifier,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  personName: string;
+  identifier: string;
+}) {
+  const { toast } = useToast();
+  const [password, setPassword] = useState("");
+  const reset = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/admin/reset-user-password", { userIdentifier: identifier, newPassword: password }),
+    onSuccess: () => {
+      toast({ title: "Password reset successfully" });
+      setPassword("");
+      onOpenChange(false);
+    },
+    onError: (error: Error) => toast({ title: "Could not reset the password", description: error.message, variant: "destructive" }),
+  });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset password for {personName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2 py-4">
+          <Label htmlFor="person-new-password">New Password</Label>
+          <div className="relative">
+            <PasswordInput
+              id="person-new-password"
+              placeholder="Enter new password (min 6 characters)"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              data-testid="input-person-new-password"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => reset.mutate()} disabled={reset.isPending || password.length < 6} data-testid="button-confirm-person-reset">
+            Reset
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
