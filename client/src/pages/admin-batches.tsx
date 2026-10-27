@@ -31,7 +31,6 @@ import {
   Chip,
   MoreActions,
   PageHeader,
-  SkeletonRows,
   TabBar,
   cardClass,
   cohortFellows,
@@ -48,6 +47,7 @@ import {
   type PathPayload,
   type PathStep,
 } from "@/components/AdminParts";
+import { SkeletonCard, SkeletonRows } from "@/components/Skeletons";
 import { ACADEMY_TERMS, batchHoldingCourse, nextBatchName } from "@shared/academyPath";
 import { deskName } from "@shared/deskName";
 
@@ -90,7 +90,7 @@ export default function AdminBatches() {
     enabled: user?.role === "admin",
   });
 
-  const { data: quizzes = [] } = useQuery<AssignedQuiz[]>({
+  const { data: quizzes = [], isLoading: quizzesLoading } = useQuery<AssignedQuiz[]>({
     queryKey: ["/api/batches", quizListFor || "none", "quizzes"],
     enabled: !!quizListFor,
   });
@@ -594,7 +594,9 @@ export default function AdminBatches() {
           </div>
           {quizListFor === cohort.id && (
             <div className="space-y-2 rounded-lg border border-sl-line p-3" data-testid={`quiz-list-${cohort.id}`}>
-              {quizzes.length === 0 ? (
+              {quizzesLoading ? (
+                <SkeletonRows label="Loading the quiz list" rows={2} className="[&>div]:px-1" />
+              ) : quizzes.length === 0 ? (
                 <p className="text-sm text-sl-muted">No assigned quizzes in this cohort yet. Open the room to assign one.</p>
               ) : quizzes.map((quiz) => {
                 const stopped = (quiz.status || "open") === "stopped";
@@ -662,7 +664,18 @@ export default function AdminBatches() {
         </div>
 
         {isLoading ? (
-          <div className={cardClass}><SkeletonRows rows={5} /></div>
+          tab === "cohorts" ? (
+            <div className="flex flex-wrap items-start gap-4">
+              <section className={`${cardClass} min-w-0 flex-[1_1_300px] overflow-hidden`}>
+                <SkeletonRows label="Loading cohorts" rows={5} />
+              </section>
+              <div className="min-w-0 flex-[2_1_520px]">
+                <SkeletonCard label="Loading the cohort" lines={6} />
+              </div>
+            </div>
+          ) : (
+            <div className={cardClass}><SkeletonRows label="Loading courses" rows={5} /></div>
+          )
         ) : isError ? (
           <div className={`${cardClass} p-6`}>
             <p className="font-semibold text-sl-ink">The cohorts did not load.</p>

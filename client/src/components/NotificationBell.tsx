@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { SkeletonRows } from "@/components/Skeletons";
 
 interface Notification {
   id: string;
@@ -29,7 +30,7 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
     refetchInterval: 30000,
   });
 
-  const { data: notifications = [] } = useQuery<Notification[]>({
+  const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     queryFn: async () => {
       const res = await fetch("/api/notifications?limit=30");
@@ -105,7 +106,9 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto">
-            {notifications.length === 0 ? (
+            {notificationsLoading ? (
+              <SkeletonRows label="Loading notifications" rows={5} />
+            ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
                 <Bell className="h-8 w-8 mb-2 opacity-30" />
                 <p className="text-sm">No notifications yet</p>

@@ -10,7 +10,6 @@ import {
   AccessDenied,
   Chip,
   PageHeader,
-  SkeletonRows,
   cardClass,
   cohortFellows,
   cohortHasTrainer,
@@ -25,6 +24,7 @@ import {
   type PathPayload,
   type Tone,
 } from "@/components/AdminParts";
+import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
 import { deskName } from "@shared/deskName";
 import { ADMIN_TOUR } from "@shared/guidedTour";
 import {
@@ -124,14 +124,17 @@ export default function AdminHome() {
     onError: (error: Error) => toast({ title: "Could not send notice", description: error.message, variant: "destructive" }),
   });
 
-  const { data: freshTrainerList = [] } = useQuery<{ id: string; username: string; email?: string }[]>({
+  const { data: freshTrainerData, isLoading: freshTrainersLoading } = useQuery<{ id: string; username: string; email?: string }[]>({
     queryKey: ["/api/admin/trainers"],
     enabled: freshOpen,
   });
-  const { data: freshTeacherList = [] } = useQuery<{ id: string; name: string; email?: string }[]>({
+  const { data: freshTeacherData, isLoading: freshTeachersLoading } = useQuery<{ id: string; name: string; email?: string }[]>({
     queryKey: ["/api/admin/teachers"],
     enabled: freshOpen,
   });
+  const freshTrainerList = freshTrainerData ?? [];
+  const freshTeacherList = freshTeacherData ?? [];
+  const freshPeopleLoading = freshTrainersLoading || freshTeachersLoading;
 
   useEffect(() => {
     if (tour.open) setFreshOpen(false);
@@ -283,7 +286,7 @@ export default function AdminHome() {
             {pathReady && !isLoading && <span className="font-medium text-sl-muted"> · {attention.length}</span>}
           </h2>
           {pathLoading || isLoading ? (
-            <SkeletonRows />
+            <SkeletonRows label="Loading what needs attention" rows={3} />
           ) : (
             <>
               {pathError && (
@@ -336,7 +339,11 @@ export default function AdminHome() {
                     <p className="mt-1 text-sm text-sl-muted">{figure.note}</p>
                   </>
                 ) : (
-                  <div className="mt-2 h-14 animate-pulse rounded bg-sl-neutral-soft" aria-busy="true" />
+                  <div className="mt-2 space-y-2" role="status" aria-busy="true">
+                    <span className="sr-only">Loading {figure.label}</span>
+                    <SkeletonBar className="h-7 w-14" />
+                    <SkeletonBar className="h-3.5 w-24" />
+                  </div>
                 )}
               </div>
             ))}
@@ -485,6 +492,11 @@ export default function AdminHome() {
                       placeholder="Find a trainer or Fellow"
                       data-testid="input-fresh-person"
                     />
+                    {freshPeopleLoading ? (
+                      <div className="rounded-md border p-2">
+                        <SkeletonRows label="Loading people" rows={3} className="[&>div]:px-1 [&>div]:py-2" />
+                      </div>
+                    ) : (
                     <div className="max-h-40 overflow-y-auto rounded-md border p-2 space-y-2">
                       {visibleTrainers.map((trainer) => (
                         <label key={trainer.id} className="flex items-center gap-2 text-sm">
@@ -510,6 +522,7 @@ export default function AdminHome() {
                         <p className="text-sm text-muted-foreground">No matching people.</p>
                       )}
                     </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="fresh-phrase">Confirmation</Label>

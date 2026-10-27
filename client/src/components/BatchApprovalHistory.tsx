@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   Select,
   SelectContent,
@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageStrip } from "@/components/PageStrip";
+import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { Chip, linkClass } from "@/components/AdminParts";
@@ -38,6 +39,8 @@ export function BatchApprovalHistory({ batchId }: { batchId: string }) {
   const { data, isLoading } = useQuery<HistoryPage>({
     queryKey: ["/api/batches", batchId, "approval-history", page],
     enabled: open,
+    // Turning the page keeps the last page on screen until the next one arrives.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/batches/${batchId}/approval-history?page=${page}`);
       return res.json();
@@ -65,9 +68,9 @@ export function BatchApprovalHistory({ batchId }: { batchId: string }) {
       {open && (
         <div className="mt-3 space-y-3" data-testid={`approval-history-${batchId}`}>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-sl-muted">
-              {data ? `${data.total} saved in this cohort` : "Loading the saved history"}
-            </p>
+            <div className="text-sm text-sl-muted">
+              {data ? `${data.total} saved in this cohort` : <SkeletonBar className="h-4 w-40" />}
+            </div>
             <a
               href={`/api/batches/${batchId}/approval-history?format=csv`}
               className={`${linkClass} inline-flex min-h-[44px] items-center text-sm`}
@@ -77,7 +80,7 @@ export function BatchApprovalHistory({ batchId }: { batchId: string }) {
             </a>
           </div>
           {isLoading ? (
-            <p className="text-sm text-sl-muted">Loading history...</p>
+            <SkeletonRows label="Loading the saved history" rows={3} className="rounded-lg border border-sl-line bg-sl-surface" />
           ) : !data || data.items.length === 0 ? (
             <p className="text-sm text-sl-muted">No approval history for this cohort yet.</p>
           ) : (
