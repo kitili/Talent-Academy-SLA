@@ -6,11 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useLocation, useRoute } from "wouter";
-import { Download, ArrowLeft, LogOut, Edit2, Save, X } from "lucide-react";
+import { Link, useLocation, useRoute, useSearch } from "wouter";
+import { Download, ChevronLeft, Edit2, Save, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SilverleafCertificate } from "@/components/SilverleafCertificate";
+import { AcademyShell } from "@/components/AcademyShell";
+import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+
+/** Print only the certificate, whatever the page around it is (the shell's header and menu stay out of the PDF). */
+const PRINT_CSS = `
+@media print {
+  @page { size: landscape; margin: 0; }
+  body * { visibility: hidden !important; }
+  #certificate-print, #certificate-print * { visibility: visible !important; }
+  #certificate-print { position: fixed; inset: 0; width: 100vw; max-width: none; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}`;
 
 interface Certificate {
   id: string;
@@ -33,6 +45,7 @@ export default function TeacherCertificateView() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/teacher/certificates/:certId");
   const { toast } = useToast();
+  const search = useSearch();
 
   const certId = params?.certId;
   
@@ -59,6 +72,14 @@ export default function TeacherCertificateView() {
     }
   }, [certificate, certId]);
 
+  // "Download PDF" on the Certificates page opens this page with ?print=1: the print dialog saves the PDF.
+  const wantsPrint = new URLSearchParams(search).get("print") === "1";
+  useEffect(() => {
+    if (!wantsPrint || !certificate) return;
+    const timer = window.setTimeout(() => window.print(), 800);
+    return () => window.clearTimeout(timer);
+  }, [wantsPrint, certificate]);
+
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<Certificate>) => {
       const response = await apiRequest("PATCH", `/api/certificates/${certId}`, updates);
@@ -76,10 +97,10 @@ export default function TeacherCertificateView() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-sl-ground flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Please Log In</h1>
-          <p className="text-muted-foreground">You need to be logged in to view certificates.</p>
+          <h1 className="text-2xl font-semibold text-sl-ink mb-2">Please Log In</h1>
+          <p className="text-sl-muted">You need to be logged in to view certificates.</p>
         </div>
       </div>
     );
@@ -87,19 +108,19 @@ export default function TeacherCertificateView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading certificate...</p>
+      <div className="min-h-screen bg-sl-ground flex items-center justify-center">
+        <p className="text-sl-muted">Loading certificate...</p>
       </div>
     );
   }
 
   if (!certificate) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-sl-ground flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Certificate Not Found</h1>
+          <h1 className="text-2xl font-semibold text-sl-ink mb-2">Certificate Not Found</h1>
           <Button onClick={() => window.history.back()} className="mt-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ChevronLeft className="mr-2 h-4 w-4" />
             Go Back
           </Button>
         </div>
@@ -136,87 +157,61 @@ export default function TeacherCertificateView() {
     return "/";
   };
 
-  return (
-    <div className="sl-page sl-bg-paper min-h-screen">
-      <header className="sticky top-0 z-50 bg-primary shadow-md no-print">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Certificate</h1>
-          <div className="flex items-center gap-3">
-            {canEdit && !isEditing && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={startEditing}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                data-testid="button-edit-certificate"
-              >
-                <Edit2 className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-            )}
-            {isEditing && (
-              <>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={saveChanges}
-                  disabled={updateMutation.isPending}
-                  className="bg-green-500/80 hover:bg-green-500 text-white border-green-600"
-                  data-testid="button-save-certificate"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  Save
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={cancelEditing}
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                  data-testid="button-cancel-edit"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Cancel
-                </Button>
-              </>
-            )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handlePrint}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-              data-testid="button-download-certificate"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(getBackPath())}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-              data-testid="button-logout"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+  const isFellow = user.role === "teacher";
+  const buttonBase = "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 text-[15px]";
+  const secondary = `${buttonBase} border border-sl-control bg-sl-surface text-sl-ink`;
+  const primary = `${buttonBase} bg-sl-accent-strong font-semibold text-white`;
 
-      <main className="container mx-auto px-4 py-8 flex justify-center">
+  return (
+    <AcademyShell
+      title="Certificate"
+      userLabel={user.username}
+      onLogout={() => logoutMutation.mutate()}
+      desk={isFellow ? "fellow" : user.role === "trainer" ? "trainer" : undefined}
+      current={isFellow ? "certificates" : undefined}
+    >
+      <style>{PRINT_CSS}</style>
+      <div className="flex flex-wrap items-center justify-between gap-3 no-print">
+        <div className="flex flex-col gap-1">
+          <Link
+            href={getBackPath()}
+            className="inline-flex items-center gap-1 self-start text-sm text-sl-accent underline"
+            data-testid="button-back"
+          >
+            <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" />
+            {isFellow ? "Back to Certificates" : "Back"}
+          </Link>
+          <h1 className="m-0 text-[28px] font-semibold text-sl-ink">Certificate</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {canEdit && !isEditing && (
+            <button type="button" className={secondary} onClick={startEditing} data-testid="button-edit-certificate">
+              <Edit2 aria-hidden="true" className="h-4 w-4" />
+              Edit
+            </button>
+          )}
+          {isEditing && (
+            <>
+              <button type="button" className={primary} onClick={saveChanges} disabled={updateMutation.isPending} data-testid="button-save-certificate">
+                <Save aria-hidden="true" className="h-4 w-4" />
+                Save
+              </button>
+              <button type="button" className={secondary} onClick={cancelEditing} data-testid="button-cancel-edit">
+                <X aria-hidden="true" className="h-4 w-4" />
+                Cancel
+              </button>
+            </>
+          )}
+          <button type="button" className={primary} onClick={handlePrint} data-testid="button-download-certificate">
+            <Download aria-hidden="true" className="h-4 w-4" />
+            Download PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="flex justify-center">
         {!isEditing ? (
-          <div className="w-full max-w-5xl print:shadow-none">
+          <div id="certificate-print" className="w-full max-w-5xl print:shadow-none">
             <SilverleafCertificate
               design={certificate.design}
               kind={certificate.kind}
@@ -403,23 +398,7 @@ export default function TeacherCertificateView() {
           </div>
         </Card>
         )}
-      </main>
-
-      <style>{`
-        @media print {
-          body {
-            margin: 0;
-            padding: 0;
-            background: white;
-          }
-          .no-print {
-            display: none;
-          }
-          main {
-            padding: 0;
-          }
-        }
-      `}</style>
-    </div>
+      </div>
+    </AcademyShell>
   );
 }

@@ -155,7 +155,7 @@ export default function TeacherExam() {
 
 function PaperPane({ name, url }: { name?: string; url: string }) {
   const kind = paperPreviewKind(name);
-  if (!url) return <p className="text-sm text-[#3a4a60]">Loading the paper…</p>;
+  if (!url) return <p className="text-sm text-sl-muted">Loading the paper…</p>;
   if (kind === "image") return <img src={url} alt={name || "Exam paper"} className="max-h-[36rem] w-full object-contain" />;
   if (kind === "pdf") return <iframe title={name || "Exam paper"} src={url} className="min-h-[32rem] w-full flex-1 rounded-lg border" />;
   return (
