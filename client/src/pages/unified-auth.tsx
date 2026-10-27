@@ -1,18 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { PasswordInput } from "@/components/ui/password-input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { homeForRole, persistSessionUser, signInRedirect } from "@/lib/sessionUser";
-import { Shield, GraduationCap, Users, Mail } from "lucide-react";
+import { Shield, GraduationCap, Users, Eye, EyeOff } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
-import { PLACES, type PlaceName } from "@/components/PlaceArt";
 
 type Role = "admin" | "trainer" | "teacher";
 
@@ -24,9 +18,20 @@ interface MultiRoleOption {
   name: string;
 }
 
-const SilverleafLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
-  <img src={logoImage} alt="Silverleaf Academy" className={className} />
+const SilverleafLogo = ({ className = "h-9 w-auto" }: { className?: string }) => (
+  <img src={logoImage} alt="" className={className} />
 );
+
+const fieldClass =
+  "min-h-11 w-full rounded-lg border border-sl-control bg-sl-surface px-3 py-2.5 text-[15px] text-sl-ink placeholder:text-sl-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent";
+const labelClass = "text-sm font-semibold text-sl-ink";
+const hintClass = "text-[13px] text-sl-muted";
+const primaryClass =
+  "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-sl-accent-strong px-4 py-3 text-[15px] font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent focus-visible:ring-offset-2 focus-visible:ring-offset-sl-surface disabled:opacity-60";
+const secondaryClass =
+  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-4 py-2.5 text-[15px] font-semibold text-sl-ink hover:bg-sl-neutral-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent";
+const linkClass =
+  "inline-flex min-h-11 items-center font-semibold text-sl-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent rounded";
 
 export default function UnifiedAuth() {
   const { toast } = useToast();
@@ -40,6 +45,7 @@ export default function UnifiedAuth() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [mode, setMode] = useState<"sign-in" | "request" | "password">("sign-in");
   const [passwordReady, setPasswordReady] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [requestName, setRequestName] = useState("");
   const [requestUsername, setRequestUsername] = useState("");
   const [requestEmail, setRequestEmail] = useState("");
@@ -303,24 +309,9 @@ export default function UnifiedAuth() {
   };
 
   const roleCards = [
-    {
-      value: "admin",
-      icon: Shield,
-      title: "Admin",
-      description: "Academy",
-    },
-    {
-      value: "trainer",
-      icon: Users,
-      title: "Trainer",
-      description: "Cohorts",
-    },
-    {
-      value: "teacher",
-      icon: GraduationCap,
-      title: "Fellow",
-      description: "Lessons",
-    }
+    { value: "admin", title: "Admin", note: "Runs the academy" },
+    { value: "trainer", title: "Trainer", note: "I coach cohorts" },
+    { value: "teacher", title: "Fellow", note: "I learn in a cohort" },
   ];
 
   const getRoleIcon = (role: Role) => {
@@ -339,17 +330,95 @@ export default function UnifiedAuth() {
     }
   };
 
-  const scenes: Record<Role, { src: string; line: string; place: PlaceName }> = {
-    admin: { src: "/bg-library.jpg", line: "The library is open", place: "library" },
-    trainer: { src: "/bg-hall.jpg", line: "The hall is open", place: "hall" },
-    teacher: { src: "/bg-garden.jpg", line: "The garden is open", place: "garden" },
-  };
-  const scene = scenes[loginRole];
+  const deskName = loginRole === "teacher" ? "Fellow" : "Trainer";
+
+  const heading =
+    mode === "request"
+      ? { title: "Request a desk", line: "An Admin reads every request. No password yet: you set it after approval." }
+      : mode === "password"
+        ? { title: "Create your password", line: "An Admin approved your desk. Create your password, then sign in." }
+        : { title: "Sign in", line: "Admins, Trainers and Fellows all sign in here." };
+
+  const passwordField = (id: string, label: string) => (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={labelClass}>{label}</label>
+      <div className="flex items-stretch overflow-hidden rounded-lg border border-sl-control bg-sl-surface focus-within:ring-2 focus-within:ring-sl-accent">
+        <input
+          id={id}
+          data-testid="input-login-password"
+          type={showPassword ? "text" : "password"}
+          autoComplete={mode === "password" ? "new-password" : "current-password"}
+          value={loginPassword}
+          onChange={(e) => setLoginPassword(e.target.value)}
+          required
+          className="min-h-11 min-w-0 flex-1 bg-transparent px-3 py-2.5 text-[15px] text-sl-ink focus-visible:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword((shown) => !shown)}
+          aria-label={showPassword ? "Hide password" : "Show password"}
+          aria-pressed={showPassword}
+          aria-controls={id}
+          data-testid="button-toggle-password"
+          className="flex w-11 shrink-0 items-center justify-center border-l border-sl-line text-sl-neutral hover:bg-sl-neutral-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sl-accent"
+        >
+          {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
+        </button>
+      </div>
+    </div>
+  );
+
+  const deskChoice = (
+    <fieldset className="flex flex-col gap-2 border-0 p-0">
+      <legend className={`${labelClass} mb-2 p-0`}>I am a…</legend>
+      <div className="flex flex-wrap gap-2.5">
+        {roleCards.filter((role) => role.value !== "admin").map((role) => {
+          const isSelected = loginRole === role.value;
+          return (
+            <label
+              key={role.value}
+              htmlFor={`role-${role.value}`}
+              className={`flex min-h-11 flex-1 basis-40 cursor-pointer flex-col gap-1 rounded-lg border px-3.5 py-3 focus-within:ring-2 focus-within:ring-sl-accent ${isSelected ? "border-sl-accent bg-sl-accent-soft" : "border-sl-control bg-sl-surface"}`}
+            >
+              <span className="flex items-center gap-2.5 text-[15px] font-semibold text-sl-ink">
+                <input
+                  id={`role-${role.value}`}
+                  type="radio"
+                  name="role"
+                  value={role.value}
+                  checked={isSelected}
+                  onChange={() => setLoginRole(role.value as Role)}
+                  data-testid={`radio-${role.value}`}
+                  className="m-0 h-[18px] w-[18px] accent-[rgb(var(--sl-accent-strong))]"
+                />
+                {role.title}
+              </span>
+              <span className="pl-7 text-[13px] text-sl-muted">{role.note}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+
+  const approvedNotice = passwordReady && mode !== "password" && (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sl-line bg-sl-accent-soft px-3.5 py-2 text-sm text-sl-ink">
+      <span>An Admin approved your desk.</span>
+      <button type="button" className={linkClass} onClick={() => openMode("password")} data-testid="button-mode-password">
+        Create your password
+      </button>
+    </div>
+  );
+
+  const submitLabel = loginLoading ? (
+    <>
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+      Please wait...
+    </>
+  ) : mode === "request" ? "Send request" : mode === "password" ? "Save password" : "Sign in";
 
   return (
-    <div className="relative min-h-screen">
-      <img key={scene.src} src={scene.src} alt="" className="pointer-events-none fixed inset-0 h-full w-full object-cover object-center" decoding="async" />
-      <div className="fixed inset-0 bg-[#102448]/20" />
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-sl-ground px-4 py-12 text-sl-ink sm:py-16">
       {/* Multi-role picker dialog */}
       <Dialog open={showRolePicker} onOpenChange={setShowRolePicker}>
         <DialogContent className="sm:max-w-md">
@@ -368,20 +437,20 @@ export default function UnifiedAuth() {
                   onClick={() => handleRoleSelection(roleOption)}
                   disabled={selectingRole}
                   data-testid={`select-role-${roleOption.role}`}
-                  className="flex items-center gap-4 p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200 text-left disabled:opacity-50"
+                  className="flex min-h-11 items-center gap-4 rounded-lg border border-sl-control p-4 text-left hover:border-sl-accent hover:bg-sl-accent-soft disabled:opacity-50"
                 >
-                  <div className="p-3 rounded-lg bg-primary text-primary-foreground">
-                    <Icon className="w-6 h-6" />
+                  <div className="rounded-lg bg-sl-accent-soft p-3 text-sl-accent">
+                    <Icon className="h-6 w-6" />
                   </div>
                   <div className="flex-1">
-                    <div className="font-semibold capitalize">{roleOption.role}</div>
-                    <div className="text-sm text-muted-foreground">{roleOption.name}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="font-semibold capitalize text-sl-ink">{roleOption.role}</div>
+                    <div className="text-sm text-sl-muted">{roleOption.name}</div>
+                    <div className="mt-1 text-xs text-sl-muted">
                       {getRoleDescription(roleOption.role)}
                     </div>
                   </div>
                   {selectingRole && (
-                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-sl-accent/30 border-t-sl-accent" />
                   )}
                 </button>
               );
@@ -390,146 +459,148 @@ export default function UnifiedAuth() {
         </DialogContent>
       </Dialog>
 
-      <div className="relative z-10 flex min-h-screen items-end justify-center px-4 py-6 sm:items-center">
-        <div className="w-full max-w-lg">
-          <Card className="w-full rounded-[1.75rem] border-0 bg-white/95 text-center shadow-2xl backdrop-blur">
-              <CardHeader className="pb-2 pt-6 text-center">
-                <div className="mb-3 flex items-center justify-center gap-3">
-                  <SilverleafLogo className="h-12 w-12" />
-                  <div className="text-left">
-                    <p className="text-lg font-bold text-[#102448]">Silverleaf Academy</p>
-                    <p className="text-sm text-muted-foreground">{scene.line}</p>
+      <div className="flex items-center gap-3">
+        <SilverleafLogo />
+        <span className="text-lg font-semibold">Silverleaf Academy</span>
+      </div>
+
+      <main className={`flex w-full flex-col gap-6 rounded-xl border border-sl-line bg-sl-surface p-6 sm:px-8 sm:pb-7 sm:pt-8 ${mode === "sign-in" ? "max-w-[420px]" : "max-w-[480px]"}`}>
+        {mode === "request" && requestSent ? (
+          <section aria-labelledby="request-sent-title" className="flex flex-col gap-3.5" data-testid="text-request-sent">
+            <span className="self-start rounded-full bg-sl-neutral-soft px-2.5 py-[3px] text-xs font-semibold text-sl-neutral">Waiting for an Admin</span>
+            <h1 id="request-sent-title" className="m-0 text-[28px] font-semibold leading-tight">Request sent</h1>
+            <p className="m-0 text-[15px] leading-relaxed">
+              Thank you, {requestName.trim()}. We sent your request for a {deskName} desk to the Admin.
+            </p>
+            <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+              {[
+                "An Admin approves or declines your request.",
+                "If it is approved, you set your own password.",
+                "Then you sign in and go straight to your desk.",
+              ].map((text, index) => (
+                <li key={text} className="flex items-start gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sl-neutral-soft text-[13px] font-semibold text-sl-neutral">{index + 1}</span>
+                  <span className="text-sm leading-relaxed text-sl-neutral">{text}</span>
+                </li>
+              ))}
+            </ol>
+            <p className={`m-0 ${hintClass}`}>When you are approved, open this page again. It asks you to create your password.</p>
+            <button type="button" className={`${secondaryClass} self-start sm:w-auto`} onClick={() => openMode("sign-in")} data-testid="button-mode-signin">
+              Back to sign in
+            </button>
+          </section>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <h1 className="m-0 text-[28px] font-semibold leading-tight">{heading.title}</h1>
+              <p className="m-0 text-[15px] leading-relaxed text-sl-muted">{heading.line}</p>
+            </div>
+
+            {approvedNotice}
+
+            <form
+              aria-label={heading.title}
+              onSubmit={mode === "request" ? handleRequest : mode === "password" ? handleCreatePassword : handleLogin}
+              className="flex flex-col gap-[18px]"
+            >
+              {mode === "sign-in" ? (
+                <div role="radiogroup" aria-labelledby="signin-as" className="flex flex-col gap-1.5">
+                  <span id="signin-as" className={labelClass}>Sign in as</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {roleCards.map((role) => {
+                      const isSelected = loginRole === role.value;
+                      return (
+                        <button
+                          key={role.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => setLoginRole(role.value as Role)}
+                          data-testid={`radio-${role.value}`}
+                          className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent ${isSelected ? "border-sl-accent bg-sl-accent-soft text-sl-accent" : "border-sl-control bg-sl-surface text-sl-ink hover:bg-sl-neutral-soft"}`}
+                        >
+                          {role.title}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-                <CardTitle className="text-2xl font-bold">Come in</CardTitle>
-                <CardDescription>
-                  {passwordReady
-                    ? "An admin approved you. Create your password, then sign in."
-                    : "Sign in, or ask for a trainer or Fellow desk."}
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="px-4 sm:px-6">
-                    <div className={`mb-4 grid gap-2 text-[11px] font-semibold leading-tight ${passwordReady ? "grid-cols-3" : "grid-cols-2"}`}>
-                      <button type="button" className={`rounded-full px-2 py-2 ${mode === "sign-in" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("sign-in")} data-testid="button-mode-signin">Sign in</button>
-                      <button type="button" className={`rounded-full px-2 py-2 ${mode === "request" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("request")} data-testid="button-mode-request">Request a desk</button>
-                      {passwordReady && (
-                        <button type="button" className={`rounded-full px-2 py-2 ${mode === "password" ? "bg-[#102448] text-white" : "bg-[#f4eadc] text-[#102448]"}`} onClick={() => openMode("password")} data-testid="button-mode-password">Create your password</button>
-                      )}
-                    </div>
-                    <form onSubmit={mode === "request" ? handleRequest : mode === "password" ? handleCreatePassword : handleLogin} className="space-y-4 sm:space-y-6">
-                      {/* Role Selection Cards */}
-                      <div className={`grid items-stretch gap-3 ${mode === "sign-in" ? "grid-cols-3" : "grid-cols-2"}`}>
-                        {roleCards.filter((role) => mode === "sign-in" || role.value !== "admin").map((role) => {
-                          const isSelected = loginRole === role.value;
-                          const place = scenes[role.value as Role].place;
-                          return (
-                            <button
-                              key={role.value}
-                              type="button"
-                              onClick={() => setLoginRole(role.value as Role)}
-                              data-testid={`radio-${role.value}`}
-                              className={`sl-sign-role ${isSelected ? "sl-sign-role-live" : ""}`}
-                            >
-                              <span className="sl-sign-role-frame">
-                                <img src={PLACES[place]} alt="" />
-                              </span>
-                              <span className="sl-sign-role-copy">
-                                <span className="block text-sm font-semibold leading-none">{role.title}</span>
-                                <span className="mt-1 block text-[11px] leading-none opacity-80">{role.description}</span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+              ) : (
+                deskChoice
+              )}
 
-                      {mode === "request" && (
-                        <div className="space-y-2 text-left">
-                          <Label htmlFor="request-name">Name</Label>
-                          <Input id="request-name" data-testid="input-request-name" value={requestName} onChange={(e) => setRequestName(e.target.value)} required placeholder="Your name" className="h-12 bg-card border-2" />
-                        </div>
-                      )}
+              {mode === "request" && (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="request-name" className={labelClass}>Full name</label>
+                    <input id="request-name" data-testid="input-request-name" type="text" autoComplete="name" value={requestName} onChange={(e) => setRequestName(e.target.value)} required className={fieldClass} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="request-email" className={labelClass}>Email</label>
+                    <input id="request-email" data-testid="input-request-email" type="email" autoComplete="email" aria-describedby="request-email-hint" value={requestEmail} onChange={(e) => setRequestEmail(e.target.value)} required className={fieldClass} />
+                    <span id="request-email-hint" className={hintClass}>Use the email you will sign in with.</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="request-username" className={labelClass}>Username</label>
+                    <input id="request-username" data-testid="input-request-username" type="text" autoComplete="username" aria-describedby="request-username-hint" value={requestUsername} onChange={(e) => setRequestUsername(e.target.value)} required className={fieldClass} />
+                    <span id="request-username-hint" className={hintClass}>3 to 40 letters or numbers. You can also sign in with it.</span>
+                  </div>
+                </>
+              )}
 
-                      <div className="space-y-2">
-                        <Label htmlFor="login-email">
-                          {mode === "request" ? "Username" : loginRole === "teacher" ? "Username, Fellow ID, or email" : "Username or email"}
-                        </Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
-                          <Input
-                            id="login-email"
-                            data-testid={mode === "request" ? "input-request-username" : "input-login-email"}
-                            type="text"
-                            autoComplete="username"
-                            placeholder="Username or email"
-                            value={mode === "request" ? requestUsername : loginEmail}
-                            onChange={(e) => mode === "request" ? setRequestUsername(e.target.value) : setLoginEmail(e.target.value)}
-                            required
-                            className="pl-10 h-12 text-sm sm:text-base bg-card border-2 text-[#17233c]"
-                          />
-                        </div>
-                      </div>
+              {mode !== "request" && (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="login-email" className={labelClass}>Email or username</label>
+                  <input
+                    id="login-email"
+                    data-testid="input-login-email"
+                    type="text"
+                    autoComplete="username"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                    className={fieldClass}
+                  />
+                </div>
+              )}
 
-                      {mode === "request" && (
-                        <div className="space-y-2 text-left">
-                          <Label htmlFor="request-email">Email</Label>
-                          <Input id="request-email" data-testid="input-request-email" type="email" value={requestEmail} onChange={(e) => setRequestEmail(e.target.value)} required placeholder="name@school.com" className="h-12 bg-card border-2 text-[#17233c]" />
-                        </div>
-                      )}
+              {mode !== "request" && passwordField("login-password", mode === "password" ? "New password" : "Password")}
 
-                      {mode !== "request" && <div className="space-y-2">
-                        <Label htmlFor="login-password">{mode === "password" ? "New password" : "Password"}</Label>
-                        <div className="relative">
-                          <PasswordInput
-                            id="login-password"
-                            data-testid="input-login-password"
-                            autoComplete="current-password"
-                            placeholder="Password"
-                            value={loginPassword}
-                            onChange={(e) => setLoginPassword(e.target.value)}
-                            required
-                            className="h-12 text-sm sm:text-base bg-card border-2"
-                          />
-                        </div>
-                      </div>}
+              <button
+                type="submit"
+                className={primaryClass}
+                disabled={loginLoading}
+                data-testid={mode === "request" ? "button-submit-request" : mode === "password" ? "button-save-password" : "button-login"}
+              >
+                {submitLabel}
+              </button>
 
-                      <Button 
-                        type="submit" 
-                        size="lg"
-                        className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-xl hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98]" 
-                        disabled={loginLoading}
-                        data-testid={mode === "request" ? "button-submit-request" : mode === "password" ? "button-save-password" : "button-login"}
-                      >
-                        {loginLoading ? (
-                          <span className="flex items-center gap-2">
-                            <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span className="text-sm sm:text-base">Please wait...</span>
-                          </span>
-                        ) : mode === "request" ? (
-                          "Ask to be signed in"
-                        ) : mode === "password" ? (
-                          "Save password"
-                        ) : (
-                          "Sign In"
-                        )}
-                      </Button>
+              {mode === "sign-in" && (
+                <p className="m-0 text-sm text-sl-muted">Forgot your password? Ask your Admin to reset it.</p>
+              )}
+            </form>
 
-                      {mode === "request" && (
-                        <p className="text-left text-xs text-[#3a4a60]">Trainer and Fellow desks. An admin approves you from Approvals.</p>
-                      )}
-                      {requestSent && mode === "request" && (
-                        <p className="text-left text-sm text-[#17233c]" data-testid="text-request-sent">
-                          Request sent. Refresh this page after an admin approves you. Create your password will appear then.
-                        </p>
-                      )}
-                      {mode === "password" && (
-                        <p className="text-left text-xs text-[#3a4a60]">Use the username or email from your request. This stays closed until an admin approves you.</p>
-                      )}
-                    </form>
-              </CardContent>
-            </Card>
-        </div>
-      </div>
+            {mode === "sign-in" ? (
+              <>
+                <div className="h-px bg-sl-line" />
+                <div className="flex flex-col gap-2.5">
+                  <p className="m-0 text-sm text-sl-muted">New to the academy? Ask for a Trainer or Fellow desk. An Admin approves it.</p>
+                  <button type="button" className={secondaryClass} onClick={() => openMode("request")} data-testid="button-mode-request">
+                    Request a desk
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="m-0 text-sm text-sl-muted">
+                {mode === "request" ? "Already have a desk? " : ""}
+                <button type="button" className={linkClass} onClick={() => openMode("sign-in")} data-testid="button-mode-signin">
+                  {mode === "request" ? "Sign in" : "Back to sign in"}
+                </button>
+              </p>
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }
