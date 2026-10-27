@@ -5,27 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Silverleaf Academy</title>
     <meta name="description" content="Silverleaf Talent Academy — sign in for cohorts, modules, and quizzes." />
-    <meta name="theme-color" content="#0f2a5c" />
+    <meta name="theme-color" content="#FFFFFF" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      html, body, #root { min-height: 100%; margin: 0; background: #eef2f8; }
-      #boot {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: Inter, system-ui, sans-serif;
-        color: #0f2a5c;
-      }
+      html, body, #root { min-height: 100%; margin: 0; background: #F6F7F9; }
+      /* The first paint, before the app loads: the shell in grey bars (client/src/components/Skeletons.tsx, PageSkeleton). */
+      #boot { min-height: 100vh; font-family: Inter, system-ui, sans-serif; }
+      #boot .bar { background: #EEF0F3; border-radius: 6px; }
+      #boot .top { height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: #FFFFFF; border-bottom: 1px solid #E3E6EB; }
+      #boot .row { display: flex; }
+      #boot .menu { width: 256px; padding: 16px; background: #FFFFFF; border-right: 1px solid #E3E6EB; min-height: calc(100vh - 69px); box-sizing: border-box; }
+      #boot .menu .bar { height: 32px; margin-bottom: 12px; }
+      #boot .main { flex: 1; padding: 32px 40px; }
+      #boot .card { background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 20px; margin-top: 24px; }
+      #boot .card .bar { height: 14px; margin-top: 12px; }
+      @media (max-width: 1023px) { #boot .menu { display: none; } #boot .main { padding: 24px 20px; } }
+      @media (prefers-reduced-motion: no-preference) { #boot .bar { animation: boot-pulse 2s ease-in-out infinite; } }
+      @keyframes boot-pulse { 50% { opacity: .5; } }
     </style>
   </head>
   <body>
     <div id="root">
-      <div id="boot">Silverleaf Academy — opening sign in…</div>
+      <div id="boot" role="status" aria-busy="true">
+        <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Opening Silverleaf Academy</span>
+        <div class="top" aria-hidden="true"><div class="row" style="align-items:center;gap:12px"><div class="bar" style="width:30px;height:36px"></div><div class="bar" style="width:144px;height:16px"></div></div><div class="bar" style="width:96px;height:36px"></div></div>
+        <div class="row" aria-hidden="true">
+          <div class="menu"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+          <div class="main">
+            <div class="bar" style="width:224px;height:32px"></div><div class="bar" style="width:320px;max-width:100%;height:16px;margin-top:8px"></div>
+            <div class="card"><div class="bar" style="width:192px;height:20px;margin-top:0"></div><div class="bar"></div><div class="bar"></div><div class="bar" style="width:66%"></div></div>
+            <div class="card"><div class="bar" style="width:192px;height:20px;margin-top:0"></div><div class="bar"></div><div class="bar" style="width:66%"></div></div>
+          </div>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

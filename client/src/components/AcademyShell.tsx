@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
   BookOpen,
@@ -139,9 +139,9 @@ export function DeskNav({ desk, current, onNavigate }: { desk: Desk; current?: s
       aria-label={`${DESK_LABELS[desk]} desk`}
       data-tour={DESK_NAV_TOUR[desk]}
       data-testid={desk === "admin" ? "admin-nav" : `nav-${desk}`}
-      className="hidden border-b border-sl-line bg-sl-surface sm:block lg:max-w-[280px] lg:flex-[1_1_232px] lg:border-b-0 lg:border-r"
+      className="hidden shrink-0 border-b border-sl-line bg-sl-surface print:hidden sm:block lg:max-w-[280px] lg:flex-[1_1_232px] lg:overflow-y-auto lg:border-b-0 lg:border-r"
     >
-      <div className="flex flex-wrap gap-1 px-4 py-2 sm:px-6 lg:sticky lg:top-[72px] lg:flex-col lg:flex-nowrap lg:px-3 lg:py-5">
+      <div className="flex flex-wrap gap-1 px-4 py-2 sm:px-6 lg:flex-col lg:flex-nowrap lg:px-3 lg:py-5">
         {DESK_MENUS[desk].map((item) => (
           <DeskLink key={item.key} desk={desk} item={item} on={on === item.key} onNavigate={onNavigate} hooks className={itemClass(on === item.key)}>
             {item.label}
@@ -168,7 +168,7 @@ export function DeskPhoneBar({ desk, current, onNavigate }: { desk: Desk; curren
     <nav
       aria-label={`${DESK_LABELS[desk]} desk`}
       data-testid={`phone-nav-${desk}`}
-      className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-sl-line bg-sl-surface pb-[env(safe-area-inset-bottom)] sm:hidden"
+      className="z-40 grid min-h-16 shrink-0 grid-cols-5 border-t border-sl-line bg-sl-surface pb-[env(safe-area-inset-bottom)] print:hidden sm:hidden"
     >
       {bar.map((item) => {
         const Icon = PHONE_ICONS[item.key] ?? House;
@@ -230,6 +230,14 @@ export function AcademyShell({
   const name = userLabel ?? (user ? deskName(user) : undefined);
   const logout = onLogout ?? (user ? () => logoutMutation.mutate() : undefined);
 
+  // Only the main area scrolls (the header and the menu stay put), so a new page or section starts at its top here.
+  const mainRef = useRef<HTMLElement>(null);
+  const [location] = useLocation();
+  const search = useSearch();
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [location, search, current]);
+
   useEffect(() => {
     const before = document.title;
     document.title = title && title !== "Silverleaf Academy" ? `${title} · Silverleaf Academy` : "Silverleaf Academy";
@@ -241,9 +249,11 @@ export function AcademyShell({
   return (
     <InsideShell.Provider value>
       <SceneBackdrop scene="library">
-        <div className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-40 border-b border-sl-line bg-sl-surface text-sl-ink" data-tour={admin ? "admin-header" : undefined}>
-            <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 pl-4 pr-2 sm:px-6 sm:py-3">
+        {/* The frame fills the window and does not scroll; the header, the menu and the phone bar stay in place, and
+            only <main> scrolls. When printing, everything flows on paper and the frame is hidden. */}
+        <div className="flex h-dvh flex-col overflow-hidden print:h-auto print:overflow-visible">
+          <header className="z-40 h-14 shrink-0 border-b border-sl-line bg-sl-surface text-sl-ink print:hidden sm:h-[68px]" data-tour={admin ? "admin-header" : undefined}>
+            <div className="flex h-full flex-nowrap items-center justify-between gap-x-3 pl-4 pr-2 sm:px-6">
               <div className="flex min-w-0 items-center gap-3" data-tour={admin ? "admin-brand" : undefined}>
                 <img src={logoImage} alt="" width={30} height={36} className="block h-[30px] w-[25px] object-contain sm:h-9 sm:w-[30px]" />
                 <span className="truncate text-base font-semibold">
@@ -303,14 +313,12 @@ export function AcademyShell({
               </div>
             </div>
           </header>
-          <div className="flex flex-1 flex-col lg:flex-row">
+          <div className="flex min-h-0 flex-1 flex-col lg:flex-row print:block">
             {desk && <DeskNav desk={desk} current={current} onNavigate={onNavigate} />}
-            <main
-              className={`min-w-0 max-w-[1120px] flex-1 space-y-7 px-4 pt-5 sm:px-6 sm:pb-12 sm:pt-6 lg:flex-[999_1_560px] lg:px-10 lg:pt-8 ${
-                desk ? "pb-24" : "pb-12"
-              } ${desk ? "" : "mx-auto w-full"}`}
-            >
-              {children}
+            <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:flex-[999_1_560px] print:overflow-visible">
+              <div className={`max-w-[1120px] space-y-7 px-4 pb-12 pt-5 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 ${desk ? "" : "mx-auto w-full"}`}>
+                {children}
+              </div>
             </main>
           </div>
           {desk && <DeskPhoneBar desk={desk} current={current} onNavigate={onNavigate} />}
