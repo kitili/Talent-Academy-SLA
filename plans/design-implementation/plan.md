@@ -7,7 +7,22 @@ Working branch `feat/improvements-designs`, cut from `feat/improvements` at `599
 branch's `HEAD` and merges back into it. `feat/improvements` takes it with the engineer's go-ahead; `main` is untouched.
 
 Contract commit (this plan, `design/`, `client/src/components/deskMenu.ts`, the `AcademyShell` props, the `sl-*`
-colour tokens): see `git log --oneline -- plans/design-implementation/plan.md`. Tracks: not started.
+colour tokens): `09d9d07`.
+
+**Built and merged, 2026-10-27.** All eight tracks merged into `feat/improvements-designs`: S `825d71a`, P `2e52135`,
+A1 `0c66bab`, A2 `487513d`, T1 `1762a13`, T2 `4215160`, F1 `01f4727`, F2 `6954f52`.
+- **Verify passes:** three read-only Sonnet passes covered the seven Sonnet tracks. Their findings were fixed by the
+  orchestrator in `b0d4ecc`, `98d3b49` and `3406ffe`.
+- **Screen check:** done with the test logins (Admin, Trainer, Fellow), in light and dark mode and at phone width. It
+  found one false empty state on the Fellow desk, fixed in `d226d15`.
+- **Verification:**
+  - `npm test`: 107 and 167 pass, 0 fail;
+  - `npm run build`: passes;
+  - `npm run typecheck`: 29 errors, down from 32; none in a file the tracks changed.
+- **Not built:** what the server does not send yet is listed in
+  `tasks/unprioritised/send-the-data-the-redesigned-pages-show.md`.
+- **Words outside the tracks:** the guided tour's words (`shared/guidedTour.ts`) and the guides were updated after
+  the merge.
 
 ## Objective
 
