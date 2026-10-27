@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trainer desk today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#12306B}a:hover{color:#0B1F47}
+</style>
+</helmet>
+<div style="width: 1480px; height: 2200px; box-sizing: border-box; padding: 64px; background: #F2F3F5; font-family: Inter, system-ui, sans-serif; color: #14171C; display: flex; flex-direction: column; gap: 32px">
+<header style="display: flex; flex-direction: column; gap: 8px">
+<p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #12306B">Trainer desk · 4 screens at 726 px, 2 at 375 px</p>
+<h1 style="margin: 0; font-size: 36px; font-weight: 700">Decoration first, and a colour for everything</h1>
+</header>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; align-items: start">
+<sc-for list="{{tablet}}" as="shot" hint-placeholder-count="4">
+<article style="background: #FFFFFF; border: 1px solid #D9DCE1; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column">
+<div style="padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #E6E8EC">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">{{shot.title}}</h2>
+<span style="font-size: 13px; color: #4B5563">726 px</span>
+</div>
+<img src="{{shot.src}}" alt="{{shot.alt}}" style="width: 100%; display: block; border-bottom: 1px solid #E6E8EC">
+<ul style="margin: 0; padding: 16px 20px 20px 20px; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{shot.notes}}" as="note" hint-placeholder-count="2">
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33">
+<span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span>
+<span>{{note}}</span>
+</li>
+</sc-for>
+</ul>
+</article>
+</sc-for>
+</div>
+<h2 style="margin: 8px 0 0 0; font-size: 22px; font-weight: 600">At phone width</h2>
+<div style="display: flex; gap: 40px; align-items: flex-start">
+<sc-for list="{{phone}}" as="shot" hint-placeholder-count="2">
+<article style="flex: 0 0 260px; background: #FFFFFF; border: 1px solid #D9DCE1; border-radius: 12px; overflow: hidden">
+<div style="padding: 14px 20px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #E6E8EC">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">{{shot.title}}</h2>
+<span style="font-size: 13px; color: #4B5563">375 px</span>
+</div>
+<div style="width: 260px; height: 563px; overflow: hidden; border-bottom: 1px solid #E6E8EC">
+<img src="{{shot.src}}" alt="{{shot.alt}}" style="width: 312px; display: block">
+</div>
+<ul style="margin: 0; padding: 16px 20px 20px 20px; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{shot.notes}}" as="note" hint-placeholder-count="1">
+<li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #252A33">
+<span aria-hidden="true" style="flex: 0 0 8px; height: 8px; margin-top: 6px; border-radius: 4px; background: #B4430E"></span>
+<span>{{note}}</span>
+</li>
+</sc-for>
+</ul>
+</article>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1480,"height":2200}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+tablet: [
+{ title: 'Desk', src: '/_blob/3de052302fd602772acf6ede76691ce3', alt: 'Trainer desk with gradient header, coloured pill tabs, photo banner, gradient greeting and seven pastel tiles', notes: [
+'Photo banner, gradient greeting and seven pastel tiles before any task.',
+'"For you today" holds a slogan; the subtitle reads "Trainer hall".'
+] },
+{ title: 'Cohorts', src: '/_blob/170c398142995251cb112c57c03815fe', alt: 'Trainer cohort list with a coloured teacher-count badge on each cohort', notes: [
+'Cohorts are named "Batch 5 — Literacy": the cohort/batch overlap D1 fixes.',
+'Each badge has its own colour for the same kind of figure.'
+] },
+{ title: 'A cohort', src: '/_blob/1e0ec556b652a09069df1c85908658ee', alt: 'A cohort with Open cohort room, a red Delete button, course links and a scrolling cohort switcher', notes: [
+'A red Delete that always fails for trainers.',
+'The tab highlight jumps to Progress; two sideways scrollers stack up.'
+] },
+{ title: 'Assessments and quizzes', src: '/_blob/876090189e480dd82415b8b4d2502c9b', alt: 'Assessments section with Upload assessment, Write exam and Upload paper buttons, and Lesson quizzes with Checkpoint and File Quiz', notes: [
+'The cohort header repeats on every tab, pushing the tab below the fold.',
+'"Upload assessment" and "Upload paper" read as the same action.'
+] }
+],
+phone: [
+{ title: 'Desk, first visit', src: '/_blob/68cb32d28618dd88c733ce5646449dee', alt: 'Trainer desk at phone width with the tour card covering the lower half', notes: [
+'The tour covers half the screen; counts show 0 until they load.'
+] },
+{ title: 'Desk', src: '/_blob/06a7ba0b98b5789bda3cb23e320f8442', alt: 'Trainer desk at phone width with two pill tabs, banner, greeting and stat tiles', notes: [
+'Only two tabs fit; the rest scroll sideways.'
+] }
+]
+};
+}
+}
+</script>
+</body>
+</html>

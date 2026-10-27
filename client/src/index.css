@@ -22,6 +22,26 @@ a, button, [role="button"] {
 
 /* LIGHT MODE */
 :root {
+  /* Silverleaf redesign tokens (design/DESIGN-BRIEF.md), as RGB channels for Tailwind's sl-* colours.
+     Colour means status only: risk, attention, done, neutral. One accent: Silverleaf blue. */
+  --sl-ground: 246 247 249;        /* #F6F7F9 page ground */
+  --sl-surface: 255 255 255;       /* cards, header, menu */
+  --sl-line: 227 230 235;          /* #E3E6EB card and divider lines */
+  --sl-control: 213 217 224;       /* #D5D9E0 input and secondary button borders */
+  --sl-ink: 17 24 39;              /* #111827 */
+  --sl-muted: 75 85 99;            /* #4B5563 secondary text */
+  --sl-accent: 10 72 165;          /* #0A48A5 links, current item, primary button */
+  --sl-accent-strong: 10 72 165;   /* primary button background */
+  --sl-accent-soft: 232 240 251;   /* #E8F0FB current menu item, selected option */
+  --sl-risk: 180 35 24;            /* #B42318 */
+  --sl-risk-soft: 254 243 242;     /* #FEF3F2 */
+  --sl-attention: 181 71 8;        /* #B54708 */
+  --sl-attention-soft: 255 250 235;/* #FFFAEB */
+  --sl-done: 6 118 71;             /* #067647 */
+  --sl-done-soft: 236 253 243;     /* #ECFDF3 */
+  --sl-neutral: 55 65 81;          /* #374151 */
+  --sl-neutral-soft: 238 240 243;  /* #EEF0F3 */
+
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
 
@@ -159,6 +179,24 @@ a, button, [role="button"] {
 }
 
 .dark {
+  --sl-ground: 15 23 36;
+  --sl-surface: 22 32 51;
+  --sl-line: 42 53 71;
+  --sl-control: 63 76 98;
+  --sl-ink: 243 244 246;
+  --sl-muted: 167 176 190;
+  --sl-accent: 125 168 240;
+  --sl-accent-strong: 47 107 211;
+  --sl-accent-soft: 28 44 74;
+  --sl-risk: 253 162 155;
+  --sl-risk-soft: 59 21 20;
+  --sl-attention: 254 200 75;
+  --sl-attention-soft: 58 42 10;
+  --sl-done: 117 224 167;
+  --sl-done-soft: 14 51 36;
+  --sl-neutral: 208 213 221;
+  --sl-neutral-soft: 39 49 66;
+
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
 

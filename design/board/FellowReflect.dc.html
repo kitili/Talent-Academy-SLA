@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Fellow Reflect tab</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 16px; font-weight: 600">Silverleaf Academy</span>
+<span style="font-size: 12px; font-weight: 600; color: #0A48A5; background: #E8F0FB; border-radius: 999px; padding: 3px 10px">Fellow</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #374151; background: none; border: 0; padding: 10px 12px; border-radius: 8px">Help</button>
+<button type="button" aria-label="Notifications, 1 unread" style="position: relative; width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span style="position: absolute; top: 7px; right: 7px; min-width: 16px; height: 16px; border-radius: 8px; background: #0A48A5; color: #FFFFFF; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">1</span></button>
+<button type="button" aria-label="Switch to dark mode" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+<span style="font-size: 14px; font-weight: 600; padding: 0 8px">Amina Teacher</span>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 9px 14px">Log out</button>
+</div>
+</header>
+<div style="display: flex; flex-wrap: wrap; flex: 1 1 auto">
+<nav aria-label="Fellow desk" style="flex: 1 1 232px; max-width: 280px; background: #FFFFFF; border-right: 1px solid #E3E6EB; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<a href="#home" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Home</a>
+<a href="#learning" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Learning</a>
+<a href="#work" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Work</a>
+<a href="#quizzes" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Quizzes</a>
+<a href="#progress" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Progress</a>
+<a href="#reflect" aria-current="page" style="text-decoration: none; background: #E8F0FB; color: #0A48A5; font-weight: 600; border-radius: 8px; padding: 10px 12px">Reflect</a>
+<a href="#messages" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Messages</a>
+<a href="#certificates" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Certificates</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 32px 40px 48px 40px; display: flex; flex-direction: column; gap: 22px; max-width: 1040px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Reflect</h1>
+<span style="font-size: 14px; color: #4B5563">Set your own goals and say how each course went.</span>
+</div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #374151; background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 12px 16px">Your trainer does not see reflections; the academy reads them to improve courses.</p>
+<section aria-labelledby="goals" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<h2 id="goals" style="margin: 0; font-size: 18px; font-weight: 600; padding: 16px 20px; border-bottom: 1px solid #E3E6EB">Your goals</h2>
+<div style="padding: 16px 20px; border-bottom: 1px solid #EEF0F3; display: flex; flex-direction: column; gap: 4px">
+<p style="margin: 0; font-size: 15px; font-weight: 500">No goals yet.</p>
+<p style="margin: 0; font-size: 14px; color: #4B5563">Goals you add appear here with their target dates.</p>
+</div>
+<form aria-labelledby="add-goal" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+<h3 id="add-goal" style="margin: 0; font-size: 16px; font-weight: 600">Add a goal</h3>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="goal" style="font-size: 14px; font-weight: 500">Goal</label>
+<textarea id="goal" rows="3" style="font: inherit; font-size: 15px; line-height: 1.5; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 12px; resize: vertical"></textarea>
+</div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="goal-date" style="font-size: 14px; font-weight: 500">Target date</label>
+<input id="goal-date" type="date" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 12px; min-height: 44px; box-sizing: border-box">
+</div>
+<button type="button" style="font: inherit; font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; border: 0; border-radius: 8px; padding: 12px 18px">Save goal</button>
+</div>
+</form>
+</section>
+<section aria-labelledby="reflection" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<h2 id="reflection" style="margin: 0; font-size: 18px; font-weight: 600; padding: 16px 20px; border-bottom: 1px solid #E3E6EB">Course reflection</h2>
+<form aria-labelledby="reflection" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px; max-width: 460px">
+<label for="course" style="font-size: 14px; font-weight: 500">Course</label>
+<select id="course" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 12px; min-height: 44px; background: #FFFFFF; color: #111827">
+<sc-for list="{{courses}}" as="c" hint-placeholder-count="4">
+<option>{{c}}</option>
+</sc-for>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="worked" style="font-size: 14px; font-weight: 500">What worked, what you will change</label>
+<textarea id="worked" rows="5" style="font: inherit; font-size: 15px; line-height: 1.5; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 12px; resize: vertical"></textarea>
+</div>
+<fieldset style="margin: 0; border: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+<legend style="padding: 0 0 10px 0; font-size: 14px; font-weight: 500">How useful was this course? <span style="font-weight: 400; color: #4B5563">(optional)</span></legend>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ratings}}" as="r" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 8px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 0 14px; min-height: 44px">
+<input type="radio" id="{{r.id}}" name="rating" value="{{r.value}}" style="width: 18px; height: 18px; margin: 0; accent-color: #0A48A5">
+<label for="{{r.id}}" style="font-size: 15px; padding: 11px 0">{{r.label}}</label>
+</div>
+</sc-for>
+</div>
+</fieldset>
+<div style="display: flex; justify-content: flex-end">
+<button type="button" style="font: inherit; font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; border: 0; border-radius: 8px; padding: 12px 18px">Save reflection</button>
+</div>
+</form>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1192}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+courses: ['Designs behavior plan', 'Projects strong, calm presence', 'Responds to level of students Engagement', 'Setting clear Expectations'],
+ratings: [
+{ id: 'r1', value: '1', label: '1 · Not useful' },
+{ id: 'r2', value: '2', label: '2' },
+{ id: 'r3', value: '3', label: '3' },
+{ id: 'r4', value: '4', label: '4' },
+{ id: 'r5', value: '5', label: '5 · Very useful' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

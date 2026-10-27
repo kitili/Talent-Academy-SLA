@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed glossary</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1144px; box-sizing: border-box; padding: 56px 64px; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column; gap: 32px">
+<header style="display: flex; flex-direction: column; gap: 10px; max-width: 1100px">
+<p style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #0A48A5">Proposed · the words we use</p>
+<h1 style="margin: 0; font-size: 44px; line-height: 1.1; font-weight: 700">One name for each thing</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #3F4652">These are the words on every screen. The code sometimes still uses older names, shown in the last column.</p>
+</header>
+<section aria-labelledby="words" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<h2 id="words" style="margin: 0; font-size: 18px; font-weight: 600; padding: 16px 24px; border-bottom: 1px solid #E3E6EB">The words</h2>
+<table style="width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5">
+<thead>
+<tr style="text-align: left; color: #4B5563; font-size: 14px">
+<th scope="col" style="font-weight: 500; padding: 10px 24px; width: 170px">Word</th>
+<th scope="col" style="font-weight: 500; padding: 10px 16px">What it is</th>
+<th scope="col" style="font-weight: 500; padding: 10px 24px; width: 380px">In the code today</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{words}}" as="w" hint-placeholder-count="10">
+<tr style="border-top: 1px solid #EEF0F3; vertical-align: top">
+<th scope="row" style="text-align: left; font-weight: 600; padding: 12px 24px">{{w.word}}</th>
+<td style="padding: 12px 16px; color: #252A33">{{w.what}}</td>
+<td style="padding: 12px 24px; color: #374151">
+<sc-for list="{{w.parts}}" as="pt" hint-placeholder-count="2"><sc-if value="{{pt.isCode}}" hint-placeholder-val="{{ true }}"><code style="font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: #EEF0F3; border-radius: 6px; padding: 2px 6px">{{pt.text}}</code></sc-if><sc-if value="{{pt.isText}}" hint-placeholder-val="{{ false }}"><span style="font-size: 14px; color: #4B5563">{{pt.text}}</span></sc-if></sc-for>
+</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</section>
+<section aria-labelledby="avoid" style="background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-width: 1100px">
+<h2 id="avoid" style="margin: 0; font-size: 18px; font-weight: 600">Words we avoid on screen</h2>
+<ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 32px">
+<sc-for list="{{avoid}}" as="a" hint-placeholder-count="6">
+<li style="font-size: 15px; line-height: 1.5; color: #252A33"><strong style="font-weight: 600; color: #111827">{{a.word}}</strong> <span style="color: #4B5563">→</span> {{a.say}}</li>
+</sc-for>
+</ul>
+</section>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #252A33; max-width: 1100px">Note: marking attendance per session is planned as a separate task. Until then, attendance is marked for a date, not for a session.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1144}}'>
+class Component extends DCLogic {
+renderVals() {
+const c = (text) => ({ text, isCode: true, isText: false });
+const t = (text) => ({ text, isCode: false, isText: true });
+const row = (word, what, parts) => ({ word, what, parts });
+const rows = [
+row('Cohort', 'A group of Fellows and their Trainers, going through Steps in order; open or closed', [c('batches')]),
+row('Step', 'One stage of a cohort; holds courses; runs after the step before it', [c('cohort_batches')]),
+row('Course', 'A set of modules an Admin creates and places on a step', [c('courses')]),
+row('Module', 'One part of a course, with an objective; holds lesson files', [c('training_weeks'), t(" (shown as \"Week\" in parts of today's app)")]),
+row('Lesson file', 'One PDF or PowerPoint in a module; done when its approved quiz is passed, or when marked read if it has none', [c('deck_files')]),
+row('Session', 'One meeting of a cohort on the calendar: title, date, time, place', [c('scheduled_events'), t(' (type '), c('session'), t(')')]),
+row('Attendance mark', 'Present, late, absent or excused for one person, one cohort, one day; not tied to a session (yet)', [c('attendance_records'), t(', '), c('trainer_attendance')]),
+row('Fellow', 'A learner', [c('teachers')]),
+row('Trainer', 'Coaches the cohorts they are placed on', [c('users'), t(' (role '), c('trainer'), t(')')]),
+row('Admin', 'Runs the academy', [c('users'), t(' (role '), c('admin'), t(')')])
+];
+return {
+words: rows,
+avoid: [
+{ word: 'Batch', say: 'say cohort, or step' },
+{ word: 'Week (for a module)', say: 'say module' },
+{ word: 'Teacher', say: 'say Fellow' },
+{ word: 'Class or class roster', say: 'say cohort, roster' },
+{ word: 'Lesson on its own', say: 'say module or lesson file' },
+{ word: 'Session for attendance', say: 'say the date' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

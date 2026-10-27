@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed Trainer Cohorts page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; border-bottom: 1px solid #E3E6EB; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 16px; font-weight: 600">Silverleaf Academy</span>
+<span style="font-size: 12px; font-weight: 600; color: #0A48A5; background: #E8F0FB; border-radius: 999px; padding: 3px 10px">Trainer</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #374151; background: none; border: 0; padding: 10px 12px; border-radius: 8px">Help</button>
+<button type="button" aria-label="Notifications, none unread" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg></button>
+<button type="button" aria-label="Switch to dark mode" style="width: 44px; height: 44px; background: none; border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></button>
+<span style="font-size: 14px; font-weight: 600; padding: 0 8px">Test Trainer</span>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 9px 14px">Log out</button>
+</div>
+</header>
+<div style="display: flex; flex-wrap: wrap; flex: 1 1 auto">
+<nav aria-label="Trainer desk" style="flex: 1 1 232px; max-width: 280px; background: #FFFFFF; border-right: 1px solid #E3E6EB; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+<a href="#home" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Home</a>
+<a href="#cohorts" aria-current="page" style="text-decoration: none; background: #E8F0FB; color: #0A48A5; font-weight: 600; border-radius: 8px; padding: 10px 12px">Cohorts</a>
+<a href="#assessments" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Assessments</a>
+<a href="#progress" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Progress</a>
+<a href="#attendance" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Attendance</a>
+<a href="#messages" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Messages</a>
+<a href="#schedule" style="text-decoration: none; color: #374151; border-radius: 8px; padding: 10px 12px">Schedule</a>
+</nav>
+<main style="flex: 999 1 560px; min-width: 0; padding: 32px 40px 48px 40px; display: flex; flex-direction: column; gap: 20px; max-width: 1120px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Cohorts</h1>
+<span style="font-size: 14px; color: #4B5563">The 7 cohorts you run. Admins create, close and delete cohorts and place courses on them.</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+<section aria-label="Your cohorts" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; overflow: hidden">
+<div style="padding: 14px 16px; border-bottom: 1px solid #E3E6EB; display: flex; flex-direction: column; gap: 6px">
+<label for="cohort-search" style="font-size: 13px; color: #4B5563">Find a cohort</label>
+<input id="cohort-search" type="search" placeholder="Cohort name" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 12px">
+</div>
+<ul style="margin: 0; padding: 0; list-style: none">
+<sc-for list="{{cohorts}}" as="c" hint-placeholder-count="7">
+<li style="border-bottom: 1px solid #EEF0F3">
+<a href="#cohort" aria-current="{{c.current}}" style="text-decoration: none; color: #111827; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 16px; background: {{c.bg}}">
+<span style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+<span style="font-size: 15px; font-weight: 600">{{c.name}}</span>
+<span style="font-size: 13px; color: #4B5563">{{c.meta}}</span>
+</span>
+<sc-if value="{{c.closed}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; font-weight: 600; color: #374151; background: #EEF0F3; border-radius: 999px; padding: 3px 10px">Closed</span></sc-if>
+</a>
+</li>
+</sc-for>
+</ul>
+</section>
+<section aria-labelledby="cohort-title" style="flex: 2 1 520px; min-width: 0; background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<h2 id="cohort-title" style="margin: 0; font-size: 22px; font-weight: 600">Climate and Culture</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 3px 10px">Open</span>
+<span style="font-size: 12px; font-weight: 600; color: #067647; background: #ECFDF3; border-radius: 999px; padding: 3px 10px">Quizzes on</span>
+</div>
+</div>
+<a href="#room" style="font-size: 14px; font-weight: 600; color: #FFFFFF; background: #0A48A5; text-decoration: none; border-radius: 8px; padding: 12px 16px">Open cohort room</a>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px">
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 15px; font-weight: 600">Trainers</h3>
+<span style="font-size: 14px">Anthonia Peter</span>
+<span style="font-size: 14px">Test Trainer (you)</span>
+</div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 15px; font-weight: 600">Finishing</h3>
+<span style="font-size: 14px; color: #4B5563">A Fellow finishes the academy after 2 cohorts. Set by your Admin.</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h3 style="margin: 0; font-size: 17px; font-weight: 600">Steps <span style="font-weight: 500; color: #4B5563">· run in order</span></h3>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+<li style="border: 1px solid #E3E6EB; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline">
+<span style="font-size: 15px; font-weight: 600">Step {{s.n}} · {{s.name}}</span>
+<span style="font-size: 13px; color: #4B5563">{{s.meta}}</span>
+</div>
+<sc-if value="{{s.hasCourses}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{s.courses}}" as="course" hint-placeholder-count="4">
+<a href="#course" style="font-size: 13px; color: #0A48A5; text-decoration: none; background: #F6F7F9; border: 1px solid #E3E6EB; border-radius: 8px; padding: 6px 10px">{{course}}</a>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{s.empty}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+<span style="font-size: 12px; font-weight: 600; color: #374151; background: #EEF0F3; border-radius: 999px; padding: 3px 10px">No course yet</span>
+<span style="font-size: 14px; color: #4B5563">Ask your Admin to place one.</span>
+</div>
+</sc-if>
+</li>
+</sc-for>
+</ol>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+<h3 style="margin: 0; font-size: 17px; font-weight: 600">Fellows <span style="font-weight: 500; color: #4B5563">· 1</span></h3>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 14px; min-height: 44px">Add a Fellow</button>
+</div>
+<div style="overflow-x: auto; border: 1px solid #E3E6EB; border-radius: 10px">
+<ul style="margin: 0; padding: 0; list-style: none">
+<sc-for list="{{fellows}}" as="f" hint-placeholder-count="1">
+<li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px">
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<span style="font-size: 15px; font-weight: 600">{{f.name}}</span>
+<span style="font-size: 12px; font-weight: 600; color: #374151; background: #EEF0F3; border-radius: 999px; padding: 3px 10px; white-space: nowrap">{{f.progress}}</span>
+</div>
+<span style="font-size: 13px; color: #4B5563">{{f.step}} · last seen {{f.seen}}</span>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 14px; min-height: 44px">Message</button>
+<button type="button" style="font: inherit; font-size: 14px; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 10px 14px; min-height: 44px">Feedback</button>
+</div>
+</li>
+</sc-for>
+</ul>
+</div>
+<p style="margin: 0; font-size: 13px; color: #4B5563">Message opens desk mail with the Fellow. Feedback adds a comment they can read but not reply to.</p>
+</div>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":972}}'>
+class Component extends DCLogic {
+renderVals() {
+const open = { closed: false, current: 'false', bg: '#FFFFFF' };
+const row = (name) => ({ ...open, name, meta: '0 Fellows · no steps yet' });
+return {
+cohorts: [
+{ ...open, name: 'Climate and Culture', meta: '1 Fellow · 3 steps', current: 'page', bg: '#E8F0FB' },
+row('Batch 2 — Early years'),
+row('Batch 3 — Lower primary'),
+row('Batch 4 — Upper primary'),
+row('Batch 5 — Literacy'),
+row('Batch 6 — Numeracy'),
+row('Batch 7 — Staff practice')
+],
+steps: [
+{ n: 1, name: 'Culture of Achievemment', meta: '4 courses', hasCourses: true, empty: false, courses: ['Designs behavior plan', 'Projects strong, calm presence', 'Responds to level of students Engagement', 'Setting clear Expectations'] },
+{ n: 2, name: 'Systems and Procedures', meta: 'No course', hasCourses: false, empty: true, courses: [] },
+{ n: 3, name: 'Rules and Consequences', meta: 'No course', hasCourses: false, empty: true, courses: [] }
+],
+fellows: [
+{ name: 'Amina Teacher', step: 'Step 1', progress: 'Not started', seen: '[last seen]' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposed request a desk page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0A48A5}a:hover{color:#083A86}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F6F7F9; font-family: Inter, system-ui, sans-serif; color: #111827; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 56px 16px; box-sizing: border-box">
+<div style="display: flex; align-items: center; gap: 12px">
+<img src="/_blob/67291cc5cf75113d16832678d92ee54a" alt="" width="30" height="36" style="display: block">
+<span style="font-size: 18px; font-weight: 600">Silverleaf Academy</span>
+</div>
+<div style="width: 100%; max-width: 940px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; justify-content: center">
+<main style="flex: 1 1 400px; max-width: 480px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3E6EB; border-radius: 12px; padding: 32px 32px 28px 32px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h1 style="margin: 0; font-size: 28px; font-weight: 600">Request a desk</h1>
+<p style="margin: 0; font-size: 15px; line-height: 1.5; color: #4B5563">An Admin reads every request. No password yet: you set it after approval.</p>
+</div>
+<form aria-label="Request a desk" style="display: flex; flex-direction: column; gap: 18px">
+<fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="padding: 0; margin-bottom: 8px; font-size: 14px; font-weight: 600">I am a…</legend>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="2">
+<label for="{{r.id}}" style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 4px; border: 1px solid {{r.border}}; background: {{r.bg}}; border-radius: 8px; padding: 12px 14px; min-height: 44px; box-sizing: border-box">
+<span style="display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600"><input id="{{r.id}}" type="radio" name="role" value="{{r.value}}" style="width: 18px; height: 18px; margin: 0; accent-color: #0A48A5">{{r.label}}</span>
+<span style="font-size: 13px; color: #4B5563; padding-left: 28px">{{r.note}}</span>
+</label>
+</sc-for>
+</div>
+</fieldset>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="req-name" style="font-size: 14px; font-weight: 600">Full name</label>
+<input id="req-name" name="name" type="text" autocomplete="name" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 11px 12px; min-height: 44px; box-sizing: border-box">
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="req-email" style="font-size: 14px; font-weight: 600">Email</label>
+<input id="req-email" name="email" type="email" autocomplete="email" aria-describedby="req-email-hint" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 11px 12px; min-height: 44px; box-sizing: border-box">
+<span id="req-email-hint" style="font-size: 13px; color: #4B5563">Use the email you will sign in with.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="req-note" style="font-size: 14px; font-weight: 600">Anything the Admin should know <span style="font-weight: 400; color: #4B5563">(optional)</span></label>
+<textarea id="req-note" name="note" rows="3" aria-describedby="req-note-hint" style="font: inherit; font-size: 15px; border: 1px solid #D5D9E0; border-radius: 8px; padding: 11px 12px; resize: vertical"></textarea>
+<span id="req-note-hint" style="font-size: 13px; color: #4B5563">Your school, or the cohort you were told to join.</span>
+</div>
+<button type="submit" style="font: inherit; font-size: 15px; font-weight: 600; color: #FFFFFF; background: #0A48A5; border: 0; border-radius: 8px; padding: 12px 18px; min-height: 44px">Send request</button>
+</form>
+<p style="margin: 0; font-size: 14px; color: #4B5563">Already have a desk? <a href="#signin">Sign in</a></p>
+</main>
+<section aria-labelledby="after-sending" style="flex: 1 1 320px; max-width: 400px; box-sizing: border-box; background: #FFFFFF; border: 1px dashed #C9D6EA; border-radius: 12px; padding: 24px 24px; display: flex; flex-direction: column; gap: 14px">
+<p style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #4B5563">After sending · second state</p>
+<span style="align-self: flex-start; font-size: 12px; font-weight: 600; color: #374151; background: #EEF0F3; border-radius: 999px; padding: 3px 10px">Waiting for an Admin</span>
+<h2 id="after-sending" style="margin: 0; font-size: 18px; font-weight: 600">Request sent</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.5">Thank you, [full name]. We sent your request for a [Fellow] desk to the Admin.</p>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{next}}" as="n" hint-placeholder-count="3">
+<li style="display: flex; gap: 12px; align-items: flex-start">
+<span style="flex: 0 0 24px; height: 24px; border-radius: 12px; background: #EEF0F3; color: #374151; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center">{{n.n}}</span>
+<span style="font-size: 14px; line-height: 1.5; color: #374151">{{n.text}}</span>
+</li>
+</sc-for>
+</ol>
+<a href="#signin" style="align-self: flex-start; font-size: 14px; font-weight: 600; text-decoration: none; color: #111827; background: #FFFFFF; border: 1px solid #D5D9E0; border-radius: 8px; padding: 11px 16px; min-height: 44px; box-sizing: border-box; display: flex; align-items: center">Back to sign in</a>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":872}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+roles: [
+{ id: 'role-trainer', value: 'trainer', label: 'Trainer', note: 'I coach cohorts', border: '#D5D9E0', bg: '#FFFFFF' },
+{ id: 'role-fellow', value: 'fellow', label: 'Fellow', note: 'I learn in a cohort', border: '#D5D9E0', bg: '#FFFFFF' }
+],
+next: [
+{ n: 1, text: 'An Admin approves or declines your request.' },
+{ n: 2, text: 'If it is approved, you set your own password.' },
+{ n: 3, text: 'Then you sign in and go straight to your desk.' }
+]
+};
+}
+}
+</script>
+</body>
+</html>

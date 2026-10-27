@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 import { SceneBackdrop, type SceneName } from "@/components/SceneBackdrop";
 import { AdminNav, adminFrame } from "@/components/AdminNav";
+import type { Desk } from "@/components/deskMenu";
 
 type AcademyShellProps = {
   title: string;
@@ -15,6 +16,11 @@ type AcademyShellProps = {
   actions?: ReactNode;
   scene?: SceneName;
   showAdminNav?: boolean;
+  /** Which desk's menu (DESK_MENUS) the shell draws, and its current item's key. */
+  desk?: Desk;
+  current?: string;
+  /** Switch sections in place instead of following the item's href (Trainer and Fellow desks). */
+  onNavigate?: (key: string) => void;
   children: ReactNode;
 };
 

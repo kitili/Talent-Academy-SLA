@@ -11,6 +11,26 @@ export default {
         sm: ".1875rem", /* 3px */
       },
       colors: {
+        // Silverleaf redesign tokens (client/src/index.css --sl-*): bg-sl-ground, text-sl-muted, border-sl-line, ...
+        sl: {
+          "ground": "rgb(var(--sl-ground) / <alpha-value>)",
+          "surface": "rgb(var(--sl-surface) / <alpha-value>)",
+          "line": "rgb(var(--sl-line) / <alpha-value>)",
+          "control": "rgb(var(--sl-control) / <alpha-value>)",
+          "ink": "rgb(var(--sl-ink) / <alpha-value>)",
+          "muted": "rgb(var(--sl-muted) / <alpha-value>)",
+          "accent": "rgb(var(--sl-accent) / <alpha-value>)",
+          "accent-strong": "rgb(var(--sl-accent-strong) / <alpha-value>)",
+          "accent-soft": "rgb(var(--sl-accent-soft) / <alpha-value>)",
+          "risk": "rgb(var(--sl-risk) / <alpha-value>)",
+          "risk-soft": "rgb(var(--sl-risk-soft) / <alpha-value>)",
+          "attention": "rgb(var(--sl-attention) / <alpha-value>)",
+          "attention-soft": "rgb(var(--sl-attention-soft) / <alpha-value>)",
+          "done": "rgb(var(--sl-done) / <alpha-value>)",
+          "done-soft": "rgb(var(--sl-done-soft) / <alpha-value>)",
+          "neutral": "rgb(var(--sl-neutral) / <alpha-value>)",
+          "neutral-soft": "rgb(var(--sl-neutral-soft) / <alpha-value>)",
+        },
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
