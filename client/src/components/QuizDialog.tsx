@@ -157,7 +157,7 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
                   value={answers[question.id] || ""}
                   onValueChange={(value) => setAnswers({ ...answers, [question.id]: value })}
                 >
-                  {question.options.map((option, optIdx) => (
+                  {(question.options ?? []).map((option, optIdx) => (
                     <div key={optIdx} className="mb-2 flex min-h-[44px] items-center space-x-2">
                       <RadioGroupItem value={option} id={`${question.id}-${optIdx}`} />
                       <Label htmlFor={`${question.id}-${optIdx}`} className="cursor-pointer text-sl-ink">
