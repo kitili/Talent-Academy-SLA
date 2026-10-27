@@ -2,17 +2,29 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PageStrip, usePager } from "@/components/PageStrip";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 import { Send } from "lucide-react";
 
 type Peer = { id: string; name: string; role: string };
 
+/** Two message bubbles in outline: one from them, one from you. */
+function MailSkeleton({ label }: { label: string }) {
+  return (
+    <Loading label={label} className="space-y-2">
+      <SkeletonBar className="h-10 w-3/5 rounded-2xl" />
+      <SkeletonBar className="ml-auto h-10 w-1/2 rounded-2xl" />
+    </Loading>
+  );
+}
+
 /**
  * A short 1:1 thread. Newest notes are on the first page so the desk stays small.
  * `bare` draws it without its own card, for a page that already frames it (the Fellow's Messages).
+ * `loading` is set by a page that is still finding out who the peer is, so "No one to write to yet" waits for the answer.
  */
-export function DeskMail({ peer, selfLabel, bare = false }: { peer: Peer | null; selfLabel: string; bare?: boolean }) {
+export function DeskMail({ peer, selfLabel, bare = false, loading = false }: { peer: Peer | null; selfLabel: string; bare?: boolean; loading?: boolean }) {
   const [body, setBody] = useState("");
-  const { data: thread = [] } = useQuery<any[]>({
+  const { data: thread = [], isLoading: threadLoading } = useQuery<any[]>({
     queryKey: ["/api/desk-messages", peer?.id],
     enabled: Boolean(peer?.id),
     queryFn: async () => {
@@ -42,6 +54,14 @@ export function DeskMail({ peer, selfLabel, bare = false }: { peer: Peer | null;
 
   const frame = bare ? "" : "max-w-md rounded-xl border border-sl-line bg-sl-surface";
 
+  if (!peer && loading) {
+    return (
+      <div className={bare ? "" : `${frame} p-4`} data-testid="desk-mail">
+        <MailSkeleton label="Loading your messages" />
+      </div>
+    );
+  }
+
   if (!peer) {
     return (
       <div className={frame} data-testid="desk-mail">
@@ -65,7 +85,9 @@ export function DeskMail({ peer, selfLabel, bare = false }: { peer: Peer | null;
         </div>
       </div>
       <div className="space-y-2 rounded-lg bg-sl-ground p-2">
-        {pager.total === 0 ? (
+        {threadLoading ? (
+          <MailSkeleton label="Loading your messages" />
+        ) : pager.total === 0 ? (
           <p className="px-1 py-2 text-sm text-sl-muted">No messages yet. Write a short note.</p>
         ) : (
           pager.slice.map((item: any) => {

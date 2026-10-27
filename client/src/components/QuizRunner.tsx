@@ -2,11 +2,31 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Clock } from "lucide-react";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 
 const SECONDARY_BUTTON =
   "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-[18px] text-[15px] text-sl-ink disabled:opacity-50";
 const PRIMARY_BUTTON =
   "inline-flex min-h-[44px] items-center justify-center rounded-lg bg-sl-accent-strong px-[18px] text-[15px] font-semibold text-white disabled:opacity-50";
+
+/**
+ * A quiz question in outline: the question bar and four answer cards. Shown while questions load, while an AI draft is
+ * made, and while answers are sent. `note` is the one honest line under it ("Preparing the quiz").
+ */
+export function QuizSkeleton({ label, note }: { label: string; note?: string }) {
+  return (
+    <Loading label={label} className="flex flex-col gap-4">
+      <SkeletonBar className="h-1.5 w-full" />
+      <SkeletonBar className="h-5 w-4/5" />
+      <div className="flex flex-col gap-2.5">
+        {Array.from({ length: 4 }, (_, index) => (
+          <SkeletonBar key={index} className="h-12 w-full rounded-lg" />
+        ))}
+      </div>
+      {note && <p className="m-0 text-center text-sm text-sl-muted">{note}</p>}
+    </Loading>
+  );
+}
 
 export interface QuizQuestion {
   id: string;
@@ -135,10 +155,7 @@ export function QuizRunner({ questions, quizId, attemptNumber, onComplete, onClo
   // ── SUBMITTING ──
   if (phase === "submitting") {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-sl-accent border-t-transparent" />
-        <p className="m-0 text-sl-muted">Submitting your answers…</p>
-      </div>
+      <QuizSkeleton label="Sending your answers" note="Submitting your answers…" />
     );
   }
 

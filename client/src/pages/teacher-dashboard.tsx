@@ -17,6 +17,7 @@ import { PageStrip, usePager } from "@/components/PageStrip";
 import { batchIsComplete } from "@shared/academyPath";
 import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import type { Medal } from "@shared/cohortMedals";
+import { Loading, SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 
 /** The Fellow desk's sections. Keys are DESK_MENUS.fellow's (the shell draws the menu); `quiz` is the old key of `quizzes`. */
 const FELLOW_TABS = ["home", "learning", "work", "quizzes", "progress", "reflect", "messages"] as const;
@@ -57,10 +58,12 @@ function Chip({ tone = "neutral", children, testId }: { tone?: Tone; children: R
   );
 }
 
-function PageHeading({ title, sub, testId }: { title: string; sub?: ReactNode; testId?: string }) {
+function PageHeading({ title, sub, testId, titleLoading = false }: { title: string; sub?: ReactNode; testId?: string; titleLoading?: boolean }) {
   return (
     <div>
-      <h1 className="text-[28px] font-semibold leading-tight text-sl-ink" data-testid={testId}>{title}</h1>
+      <h1 className="text-[28px] font-semibold leading-tight text-sl-ink" data-testid={testId}>
+        {titleLoading ? <SkeletonBar className="h-8 w-56" /> : title}
+      </h1>
       {sub && <p className="mt-1 text-sm text-sl-muted">{sub}</p>}
     </div>
   );
@@ -104,6 +107,16 @@ function Empty({ title, body }: { title: string; body: ReactNode }) {
       <p className="text-[15px] font-medium text-sl-ink">{title}</p>
       <p className="text-sm text-sl-muted">{body}</p>
     </div>
+  );
+}
+
+/** Two grey lines inside a side card whose data has not arrived. */
+function SideLines({ label }: { label: string }) {
+  return (
+    <Loading label={label} className="space-y-2 py-1">
+      <SkeletonBar className="h-3.5 w-full" />
+      <SkeletonBar className="h-3.5 w-2/3" />
+    </Loading>
   );
 }
 
@@ -272,21 +285,21 @@ export default function TeacherDashboard() {
     posthog.capture("teacher_dashboard_viewed");
   }, []);
 
-  const { data: teacher } = useQuery<any>({
+  const { data: teacher, isLoading: teacherLoading } = useQuery<any>({
     queryKey: ["/api/teacher/me"],
   });
 
-  const { data: reportCard } = useQuery<any>({
+  const { data: reportCard, isLoading: reportLoading } = useQuery<any>({
     queryKey: ["/api/teacher/report-card"],
   });
 
   const { data: assignedWeeks = [], isLoading: weeksLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/assigned-weeks"],
   });
-  const { data: medalRows = [] } = useQuery<Array<{ batchId: string; batchName: string; medals: Medal[] }>>({
+  const { data: medalRows = [], isLoading: medalsLoading } = useQuery<Array<{ batchId: string; batchName: string; medals: Medal[] }>>({
     queryKey: ["/api/teacher/medals"],
   });
-  const { data: deskPeers = [] } = useQuery<any[]>({
+  const { data: deskPeers = [], isLoading: peersLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/desk-peers"],
   });
   const { data: path, isLoading: pathLoading } = useQuery<any>({
@@ -294,12 +307,14 @@ export default function TeacherDashboard() {
   });
   // Until the cohorts and modules arrive, the desk shows grey bars, never "not in a cohort" or "no modules" (D-brief: no false empty state).
   const deskLoading = pathLoading || weeksLoading;
-  const { data: certificates = [] } = useQuery<any[]>({
+  const { data: certificates = [], isLoading: certificatesQueryLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher", teacher?.id, "certificates"],
     enabled: Boolean(teacher?.id),
   });
+  // This query waits for the Fellow's id, so it is not "loading" yet while the id is still on its way.
+  const certificatesLoading = teacherLoading || certificatesQueryLoading;
 
-  const { data: deskNotices = [] } = useQuery<any[]>({
+  const { data: deskNotices = [], isLoading: noticesLoading } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
     queryFn: async () => {
       const res = await fetch("/api/notifications?limit=8");
@@ -384,7 +399,7 @@ export default function TeacherDashboard() {
   }, [tour.open, tour.index, tab]);
 
   // Fetch own reflections
-  const { data: reflections = [] } = useQuery<any[]>({
+  const { data: reflections = [], isLoading: reflectionsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/reflections"],
     queryFn: async () => {
       const response = await fetch("/api/teacher/reflections");
@@ -394,7 +409,7 @@ export default function TeacherDashboard() {
   });
 
   // Fetch trainer comments
-  const { data: trainerComments = [] } = useQuery<any[]>({
+  const { data: trainerComments = [], isLoading: commentsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/trainer-comments"],
     queryFn: async () => {
       const response = await fetch("/api/teacher/trainer-comments");
@@ -404,7 +419,7 @@ export default function TeacherDashboard() {
   });
 
   // Fetch goals
-  const { data: goals = [] } = useQuery<any[]>({
+  const { data: goals = [], isLoading: goalsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/goals"],
     queryFn: async () => {
       const response = await fetch("/api/teacher/goals");
@@ -414,7 +429,7 @@ export default function TeacherDashboard() {
   });
 
   // Fetch improvement tips
-  const { data: tips = [] } = useQuery<any[]>({
+  const { data: tips = [], isLoading: tipsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/improvement-tips"],
     queryFn: async () => {
       const response = await fetch("/api/teacher/improvement-tips");
@@ -424,7 +439,7 @@ export default function TeacherDashboard() {
   });
 
   // Fetch progress summary
-  const { data: progressSummary } = useQuery<any>({
+  const { data: progressSummary, isLoading: summaryLoading } = useQuery<any>({
     queryKey: ["/api/teacher/progress-summary"],
     queryFn: async () => {
       const response = await fetch("/api/teacher/progress-summary");
@@ -572,7 +587,7 @@ export default function TeacherDashboard() {
   const resumeWeek =
     assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson || (shelfIsEmpty ? firstModule : undefined);
 
-  const { data: upcomingEvents = [] } = useQuery<any[]>({
+  const { data: upcomingEvents = [], isLoading: eventsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/events"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/events");
@@ -582,7 +597,7 @@ export default function TeacherDashboard() {
     },
   });
 
-  const { data: skills = [] } = useQuery<any[]>({
+  const { data: skills = [], isLoading: skillsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/skills-map"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/skills-map");
@@ -592,7 +607,7 @@ export default function TeacherDashboard() {
     },
   });
 
-  const { data: myExams = [] } = useQuery<any[]>({
+  const { data: myExams = [], isLoading: examsQueryLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/quizzes"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/quizzes", { credentials: "include" });
@@ -604,7 +619,7 @@ export default function TeacherDashboard() {
 
   // Each try's score, so an exam row can say Not started, Passed or how many tries are left (the server grades; this
   // page only reads the scores back).
-  const { data: examAttempts = [] } = useQuery<any[]>({
+  const { data: examAttempts = [], isLoading: attemptsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/quiz-attempts"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/quiz-attempts", { credentials: "include" });
@@ -614,7 +629,7 @@ export default function TeacherDashboard() {
     },
   });
 
-  const { data: myWork = [] } = useQuery<any[]>({
+  const { data: myWork = [], isLoading: workLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/assignments"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/assignments");
@@ -652,6 +667,9 @@ export default function TeacherDashboard() {
       },
     })),
   });
+
+  // An exam row's standing (Not started, Passed, tries left) needs the tries too.
+  const examsLoading = examsQueryLoading || attemptsLoading;
 
   const assessments = myWork.filter((item: any) => item.kind === "assessment");
   const eventPager = usePager(upcomingEvents, 5);
@@ -697,17 +715,17 @@ export default function TeacherDashboard() {
 
   const home = (
     <>
-      <PageHeading title={`Hello, ${firstName}`} sub={headerLine} testId="text-welcome" />
+      <PageHeading title={`Hello, ${firstName}`} sub={headerLine} testId="text-welcome" titleLoading={teacherLoading} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-6">
           <section className="rounded-xl border border-sl-line bg-sl-surface px-5 py-5" data-tour="teacher-continue" aria-labelledby="continue-heading">
             {deskLoading ? (
-              <div className="space-y-3" aria-busy="true" aria-label="Loading your courses">
+              <Loading label="Loading your courses" className="space-y-3">
                 <h2 id="continue-heading" className="sr-only">Loading your courses</h2>
-                <div className="h-3 w-24 rounded bg-sl-neutral-soft" />
-                <div className="h-5 w-2/3 rounded bg-sl-neutral-soft" />
-                <div className="h-3 w-5/6 rounded bg-sl-neutral-soft" />
-              </div>
+                <SkeletonBar className="h-3 w-24" />
+                <SkeletonBar className="h-5 w-2/3" />
+                <SkeletonBar className="h-3 w-5/6" />
+              </Loading>
             ) : resumeWeek && !shelfIsEmpty ? (
               <>
                 <p className="text-xs font-semibold uppercase tracking-wide text-sl-accent">Continue</p>
@@ -771,7 +789,9 @@ export default function TeacherDashboard() {
             </Panel>
           )}
 
-          {homeStep && (
+          {deskLoading && <SkeletonCard label="Loading your courses in this step" lines={3} />}
+
+          {!deskLoading && homeStep && (
             <Panel title={`Your courses in Step ${focus.current + 1}`} id="home-courses">
               {homeStep.courses.length === 0 ? (
                 <Empty title="No course in this step yet." body="Courses appear here once your Admin places one on this step." />
@@ -809,7 +829,9 @@ export default function TeacherDashboard() {
 
         <div className="min-w-0 space-y-4">
           <SideCard title="Coming up">
-            {upcomingEvents.length === 0 ? (
+            {eventsLoading ? (
+              <SideLines label="Loading what is coming up" />
+            ) : upcomingEvents.length === 0 ? (
               <p>Nothing scheduled. Sessions and deadlines from your trainer appear here.</p>
             ) : (
               <ul className="space-y-2">
@@ -824,7 +846,9 @@ export default function TeacherDashboard() {
             <p><a href="?tab=work#my-calendar" className={LINK} onClick={(event) => { event.preventDefault(); setTab("work"); window.setTimeout(() => document.getElementById("my-calendar")?.scrollIntoView(), 0); }}>Open my calendar</a></p>
           </SideCard>
           <SideCard title="From your trainer">
-            {trainerComments.length === 0 ? (
+            {commentsLoading ? (
+              <SideLines label="Loading feedback from your trainer" />
+            ) : trainerComments.length === 0 ? (
               <p>No new messages or feedback.</p>
             ) : (
               <p>
@@ -835,7 +859,9 @@ export default function TeacherDashboard() {
             <p><a href="?tab=messages" className={LINK} onClick={goTab("messages")}>Open messages</a></p>
           </SideCard>
           <SideCard title="Certificates" tour="teacher-certificates">
-            {certificates.length === 0 ? (
+            {certificatesLoading ? (
+              <SideLines label="Loading your certificates" />
+            ) : certificates.length === 0 ? (
               <p>None yet. A course certificate is issued once every module is complete.</p>
             ) : (
               <p>{certificates.length} issued to you.</p>
@@ -972,7 +998,9 @@ export default function TeacherDashboard() {
       )}
 
       <Panel title={learningStepData ? `Courses in Step ${learningStepIndex + 1}, in order` : "Courses"} id="my-learning" tour="teacher-learning">
-        {!learningStepData ? (
+        {deskLoading ? (
+          <SkeletonRows label="Loading your courses" rows={3} />
+        ) : !learningStepData ? (
           <Empty title="No courses yet." body="An Admin places a course on your cohort, and it appears here." />
         ) : learningStepData.courses.length === 0 ? (
           <Empty title="No course in this step yet." body="Courses appear here once your Admin places one on this step." />
@@ -1006,7 +1034,9 @@ export default function TeacherDashboard() {
         sub={`Written work your trainer sets${cohortNames ? ` in ${cohortNames}` : ""} · marked out of 100`}
       />
       <Panel title="Your written work" id="my-work" testId="card-teacher-work">
-        {assessments.length === 0 ? (
+        {workLoading ? (
+          <SkeletonRows label="Loading your written work" rows={2} />
+        ) : assessments.length === 0 ? (
           <Empty title="No written work yet." body="When your trainer sets some, it appears here with its due date." />
         ) : (
           <div className="divide-y divide-sl-line">
@@ -1101,7 +1131,9 @@ export default function TeacherDashboard() {
       </Panel>
 
       <Panel title="My calendar" id="my-calendar" sub="Sessions and deadlines for your cohorts">
-        {upcomingEvents.length === 0 ? (
+        {eventsLoading ? (
+          <SkeletonRows label="Loading your calendar" rows={3} />
+        ) : upcomingEvents.length === 0 ? (
           <Empty title="Nothing scheduled yet." body="A session or deadline your trainer adds appears here." />
         ) : (
           <>
@@ -1145,7 +1177,9 @@ export default function TeacherDashboard() {
         sub={<>Exams your trainer assigned. Lesson file quizzes are on each module page in <a href="?tab=learning" className={LINK} onClick={goTab("learning")}>Learning</a>.</>}
       />
       <Panel title="Your exams" id="your-exams" testId="card-teacher-exams">
-        {myExams.length === 0 ? (
+        {examsLoading ? (
+          <SkeletonRows label="Loading your exams" rows={3} />
+        ) : myExams.length === 0 ? (
           <Empty title="No exams yet." body="When your trainer assigns one, it appears here with its due date, pass mark and tries." />
         ) : (
           <div className="space-y-5 px-5 py-4">
@@ -1224,6 +1258,12 @@ export default function TeacherDashboard() {
         sub={`Your courses, attendance and medals in each cohort${path ? ` · academy path ${path.cohortsCompleted} of ${path.cohortsRequired} cohorts finished` : ""}`}
       />
       <div className="space-y-6" data-tour="teacher-progress">
+        {pathLoading && (
+          <>
+            <SkeletonCard label="Loading your cohorts" lines={5} />
+            <SkeletonCard label="Loading your academy path" lines={2} />
+          </>
+        )}
         {!pathLoading && cohorts.length === 0 && (
           <Panel title="Cohorts" id="progress-none">
             <Empty title="You are not in a cohort yet." body="An Admin places you in one. Your courses, attendance and medals appear here." />
@@ -1248,7 +1288,9 @@ export default function TeacherDashboard() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-base font-semibold text-sl-ink">Courses</h3>
-                {!step ? (
+                {weeksLoading ? (
+                  <SkeletonRows label="Loading your courses" rows={2} className="rounded-lg border border-sl-line" />
+                ) : !step ? (
                   <p className="text-[15px] text-sl-muted">No steps in this cohort yet.</p>
                 ) : step.courses.length === 0 ? (
                   <>
@@ -1273,7 +1315,9 @@ export default function TeacherDashboard() {
               </div>
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-sl-ink">Attendance</h3>
-                {line ? (
+                {attendanceByCohort[cohortIndex]?.isLoading ? (
+                  <Loading label="Loading your attendance"><SkeletonBar className="h-4 w-64 max-w-full" /></Loading>
+                ) : line ? (
                   <p className="flex flex-wrap items-center gap-2 text-[15px] text-sl-ink">
                     {line}
                     {rate !== null && <Chip tone={rate >= 80 ? "done" : "attention"}>{rate}%</Chip>}
@@ -1283,8 +1327,10 @@ export default function TeacherDashboard() {
                 )}
               </div>
               <div className="space-y-2">
-                <h3 className="text-base font-semibold text-sl-ink">Medals <span className="font-normal text-sl-muted">· {earned} of {medals.length || 7}</span></h3>
-                {medals.length === 0 || (earned === 0 && cohortIndex > 0) ? (
+                <h3 className="text-base font-semibold text-sl-ink">Medals {!medalsLoading && <span className="font-normal text-sl-muted">· {earned} of {medals.length || 7}</span>}</h3>
+                {medalsLoading ? (
+                  <CohortMedals medals={[]} loading />
+                ) : medals.length === 0 || (earned === 0 && cohortIndex > 0) ? (
                   <p className="text-[15px] text-sl-muted">None earned here yet. The same seven medals, earned the same way as above.</p>
                 ) : (
                   <CohortMedals medals={medals} showCount={false} />
@@ -1315,6 +1361,9 @@ export default function TeacherDashboard() {
         )}
 
         <Panel title="Your figures" id="progress-figures" sub="From your quizzes, modules and reflections">
+          {reportLoading || weeksLoading || reflectionsLoading ? (
+            <div className="px-5 py-4"><SkeletonFigures line count={5} label="Loading your figures" /></div>
+          ) : (
           <dl className="grid grid-cols-2 gap-px bg-sl-line sm:grid-cols-5">
             {[
               { label: "Level", value: reportCard?.level || "Beginner", testId: "text-level" },
@@ -1329,7 +1378,10 @@ export default function TeacherDashboard() {
               </div>
             ))}
           </dl>
+          )}
         </Panel>
+
+        {summaryLoading && <SkeletonCard label="Loading your progress toward graduation" lines={3} />}
 
         {progressSummary && (
           <Panel title="Progress toward graduation" id="progress-graduation" sub="Your overall training completion and graduation probability">
@@ -1349,6 +1401,8 @@ export default function TeacherDashboard() {
             </div>
           </Panel>
         )}
+
+        {skillsLoading && <SkeletonCard label="Loading your skills map" lines={3} />}
 
         {skills.length > 0 && (
           <Panel title="Skills map" id="progress-skills" sub="Coverage from each module's competency focus">
@@ -1381,7 +1435,9 @@ export default function TeacherDashboard() {
       </p>
 
       <Panel title="Your goals" id="reflect-goals" testId="card-reflect-goals">
-        {goals.length === 0 ? (
+        {goalsLoading ? (
+          <SkeletonRows label="Loading your goals" rows={2} />
+        ) : goals.length === 0 ? (
           <Empty title="No goals yet." body="Goals you add appear here with their target dates." />
         ) : (
           <div className="px-5 py-4">
@@ -1440,6 +1496,12 @@ export default function TeacherDashboard() {
             });
           }}
         >
+          {weeksLoading && (
+            <Loading label="Loading your modules" className="max-w-md space-y-1.5">
+              <SkeletonBar className="h-3.5 w-32" />
+              <SkeletonBar className="h-11 w-full" />
+            </Loading>
+          )}
           {assignedWeeks.length > 0 && (
             <div className="max-w-md space-y-1.5">
               <label htmlFor="reflect-module" className="text-sm font-medium text-sl-ink">Course and module</label>
@@ -1474,6 +1536,7 @@ export default function TeacherDashboard() {
             </button>
           </div>
         </form>
+        {reflectionsLoading && <SkeletonRows label="Loading your previous reflections" rows={2} className="border-t border-sl-line" />}
         {reflections.length > 0 && (
           <div className="border-t border-sl-line px-5 py-4">
             <h3 className="mb-2 text-base font-semibold text-sl-ink">Previous reflections</h3>
@@ -1492,6 +1555,8 @@ export default function TeacherDashboard() {
           </div>
         )}
       </Panel>
+
+      {weeksLoading && <SkeletonCard label="Loading the courses you can rate" lines={3} />}
 
       {uniqueCourses.length > 0 && (
         <Panel title="Rate a course" id="reflect-rate" sub="Help the academy improve by rating a course you have taken">
@@ -1559,6 +1624,8 @@ export default function TeacherDashboard() {
         </div>
       </Panel>
 
+      {tipsLoading && <SkeletonCard label="Loading tips for you" lines={2} />}
+
       {tips.length > 0 && (
         <Panel title="Tips for you" id="reflect-tips" sub="Suggestions based on your attendance, quizzes and reflections">
           <ul className="divide-y divide-sl-line">
@@ -1586,7 +1653,12 @@ export default function TeacherDashboard() {
         <div className="flex flex-wrap">
           <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1 border-sl-line px-5 py-4 md:border-r">
             <h3 className="mb-1 text-[15px] font-semibold text-sl-ink">Threads</h3>
-            {peers.length === 0 ? (
+            {peersLoading ? (
+              <Loading label="Loading your threads" className="space-y-2">
+                <SkeletonBar className="h-11 w-full" />
+                <SkeletonBar className="h-11 w-full" />
+              </Loading>
+            ) : peers.length === 0 ? (
               <>
                 <p className="text-[15px] font-medium text-sl-ink">No threads yet.</p>
                 <p className="text-sm text-sl-muted">Each trainer you write to gets one thread here.</p>
@@ -1620,13 +1692,15 @@ export default function TeacherDashboard() {
                 </select>
               </div>
             )}
-            <DeskMail peer={activePeer} selfLabel={teacher?.name || "Fellow"} bare />
+            <DeskMail peer={activePeer} selfLabel={teacher?.name || "Fellow"} bare loading={peersLoading} />
           </div>
         </div>
       </Panel>
 
       <Panel title="Trainer feedback" id="trainer-feedback" sub="Comments your trainers leave on your progress. Read only.">
-        {trainerComments.length === 0 ? (
+        {commentsLoading ? (
+          <SkeletonRows label="Loading your trainer's feedback" rows={2} />
+        ) : trainerComments.length === 0 ? (
           <Empty title="No feedback yet." body="Feedback appears here marked Progress, Improvement or General." />
         ) : (
           <div className="px-5 py-4">
@@ -1647,7 +1721,9 @@ export default function TeacherDashboard() {
       </Panel>
 
       <Panel title="From the academy" id="academy-notices" sub="Academy notices from your Admin and cohort notes from your trainers. Read only.">
-        {deskNotices.length === 0 ? (
+        {noticesLoading ? (
+          <SkeletonRows label="Loading notices from the academy" rows={2} />
+        ) : deskNotices.length === 0 ? (
           <Empty title="Nothing yet." body={`Notices for every Fellow and notes to ${cohortNames || "your cohorts"} appear here, newest first.`} />
         ) : (
           <div className="px-5 py-4">
