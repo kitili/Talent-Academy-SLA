@@ -1,3 +1,4 @@
+/** Place photos. Only the sign-in page still reads these (track P); the desks draw none. */
 export const PLACES = {
   library: "/places/place-library.jpg",
   hall: "/places/place-hall.jpg",
@@ -22,8 +23,11 @@ export function placeForLabel(label: string, index = 0): PlaceName {
   return ROTATION[Math.abs(index) % ROTATION.length];
 }
 
+/**
+ * Was a photo with the title over it. Photos never sit behind text now (design/board/Shell.dc.html), so only the title
+ * and its line are left, as plain text, until each page draws its own page header.
+ */
 export function PlaceBanner({
-  place,
   title,
   subtitle,
   titleTestId,
@@ -34,24 +38,16 @@ export function PlaceBanner({
   titleTestId?: string;
 }) {
   return (
-    <section className="sl-place-banner">
-      <img src={PLACES[place]} alt="" />
-      <div className="sl-place-banner-copy">
-        <h2 data-testid={titleTestId} className="text-2xl sm:text-3xl font-bold text-white">
-          {title}
-        </h2>
-        {subtitle && <p className="mt-1 text-sm sm:text-base text-white/90 max-w-xl">{subtitle}</p>}
-      </div>
+    <section className="flex flex-col gap-1">
+      <h2 data-testid={titleTestId} className="text-lg font-semibold text-sl-ink">
+        {title}
+      </h2>
+      {subtitle && <p className="text-sm text-sl-muted">{subtitle}</p>}
     </section>
   );
 }
 
-export function PlaceCover({
-  place,
-  className = "h-28 sm:h-36",
-}: {
-  place: PlaceName;
-  className?: string;
-}) {
-  return <img src={PLACES[place]} alt="" className={`w-full object-cover ${className}`} />;
+/** Was a decorative photo. Draws nothing now; kept so callers still compile. */
+export function PlaceCover(_props: { place: PlaceName; className?: string }) {
+  return null;
 }

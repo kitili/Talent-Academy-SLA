@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CircleHelp } from "lucide-react";
 import type { TourStep } from "@shared/guidedTour";
 
 const TARGET_CLASS = "sla-tour-target";
 
 type Spot = { top: number; left: number; width: number; height: number };
 
+/** The first element with this target that is on screen: the shell hides its side menu and some header controls on a phone. */
 function findTarget(target?: string) {
   if (!target) return null;
-  const element = document.querySelector(`[data-tour="${target}"]`);
-  if (!(element instanceof HTMLElement)) return null;
-  return element;
+  const elements = Array.from(document.querySelectorAll(`[data-tour="${target}"]`));
+  const shown = elements.find((element) => {
+    if (!(element instanceof HTMLElement)) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width >= 2 && rect.height >= 2;
+  });
+  return shown instanceof HTMLElement ? shown : null;
 }
 
 function spotFor(element: HTMLElement): Spot | null {
@@ -58,21 +62,18 @@ export function useGuidedTour(storageKey: string) {
   return { open, index, setIndex, close, replay };
 }
 
+/** The header's Help: it starts the page's guided tour from the first step (design/board/Shell.dc.html). */
 export function TourButton({ onClick, testId, tone = "dark", tourId }: { onClick: () => void; testId: string; tone?: "dark" | "light"; tourId?: string }) {
   return (
     <Button
       type="button"
-      variant="secondary"
-      size="sm"
+      variant="ghost"
       onClick={onClick}
       data-testid={testId}
       data-tour={tourId}
-      className={tone === "light"
-        ? "bg-transparent text-[#17233c] border-[#102448]/15 hover:bg-[#102448]/5 dark:text-[#f6f1e8] dark:border-white/20 dark:hover:bg-white/10"
-        : "bg-white/10 text-white border-white/20 hover:bg-white/20"}
+      className={`min-h-11 px-3 text-sm font-normal ${tone === "light" ? "text-sl-neutral" : "text-white hover:bg-white/10"}`}
     >
-      <CircleHelp className="h-4 w-4 sm:mr-2" />
-      <span className="hidden sm:inline">Tour</span>
+      Help
     </Button>
   );
 }
@@ -133,29 +134,29 @@ export function GuidedTour({
       {spot && (
         <div
           aria-hidden
-          className="fixed rounded-2xl border-2 border-white"
+          className="fixed rounded-xl border-2 border-sl-surface"
           style={{
             top: spot.top,
             left: spot.left,
             width: spot.width,
             height: spot.height,
-            boxShadow: "0 0 0 3px #c4842a, 0 0 0 9999px rgba(16, 36, 72, 0.14)",
+            boxShadow: "0 0 0 3px rgb(var(--sl-accent)), 0 0 0 9999px rgba(16, 36, 72, 0.14)",
           }}
         />
       )}
       <div className={`absolute inset-x-0 ${cardOnTop ? "top-0" : "bottom-0"} p-4 sm:p-6 flex justify-center`}>
-        <div className="pointer-events-auto w-full max-w-lg rounded-2xl bg-white text-slate-900 shadow-2xl border p-5 space-y-4">
+        <div className="pointer-events-auto w-full max-w-lg rounded-xl border border-sl-line bg-sl-surface p-5 text-sl-ink shadow-lg space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-primary">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sl-accent">
               Step {index + 1} of {steps.length}
             </p>
-            <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={onClose}>
+            <button type="button" className="min-h-11 px-2 text-sm text-sl-muted hover:text-sl-ink" onClick={onClose}>
               Skip
             </button>
           </div>
           <div>
             <h2 id="guided-tour-title" className="text-xl font-semibold">{step.title}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-sl-muted">{step.body}</p>
           </div>
           <div className="flex items-center justify-between gap-3">
             <Button
