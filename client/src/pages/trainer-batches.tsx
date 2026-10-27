@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { useLocation, useSearch, Link } from "wouter";
 import posthog from "posthog-js";
 import { Button } from "@/components/ui/button";
@@ -533,6 +533,7 @@ export default function TrainerBatches() {
       return res.json();
     },
     enabled: addTeacherOpen,
+    placeholderData: keepPreviousData,
   });
 
   const addTeacherMutation = useMutation({

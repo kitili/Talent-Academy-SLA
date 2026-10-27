@@ -379,10 +379,17 @@ export default function ApprovalsPage() {
     );
   }
 
+  // A Trainer approves Fellows here too; the page keeps the shell, so the top bar and menu stay in view.
   return (
-    <div className="min-h-screen bg-sl-ground">
-      <div className="mx-auto my-6 w-[calc(100%-2rem)] max-w-5xl">{body}</div>
-    </div>
+    <AcademyShell
+      title="Approvals"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      desk="trainer"
+      current="home"
+    >
+      {body}
+    </AcademyShell>
   );
 }
 

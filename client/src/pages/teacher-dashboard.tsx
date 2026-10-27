@@ -62,7 +62,7 @@ function PageHeading({ title, sub, testId, titleLoading = false }: { title: stri
   return (
     <div>
       <h1 className="text-[28px] font-semibold leading-tight text-sl-ink" data-testid={testId}>
-        {titleLoading ? <SkeletonBar className="h-8 w-56" /> : title}
+        {titleLoading ? <><span className="sr-only">Loading your desk</span><SkeletonBar className="inline-block h-8 w-56 align-middle" /></> : title}
       </h1>
       {sub && <p className="mt-1 text-sm text-sl-muted">{sub}</p>}
     </div>

@@ -143,7 +143,9 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
         {quizState === 'loading' && (
           <div className="space-y-6 py-4">
             <SkeletonCard label="Preparing your quiz" lines={3} />
-            <SkeletonCard label="Preparing your quiz" lines={3} />
+            <div aria-hidden="true">
+              <SkeletonCard label="" lines={3} />
+            </div>
           </div>
         )}
 

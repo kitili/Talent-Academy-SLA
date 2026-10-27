@@ -102,7 +102,7 @@ export default function TeacherExam() {
       </Link>
       <div className="flex flex-col gap-1">
         <h1 className="m-0 text-[28px] font-semibold text-sl-ink" data-testid="exam-title">
-          {isLoading ? <SkeletonBar className="h-8 w-64 max-w-full" /> : quiz?.title || "Exam"}
+          {isLoading ? <><span className="sr-only">Exam</span><SkeletonBar className="inline-block h-8 w-64 max-w-full align-middle" /></> : quiz?.title || "Exam"}
         </h1>
         {ready && !writing && (
           <span className="text-sm text-sl-muted">{mine.length >= QUIZ_ATTEMPTS ? `All ${QUIZ_ATTEMPTS} tries used` : `Try ${mine.length + 1} of ${QUIZ_ATTEMPTS}`}</span>

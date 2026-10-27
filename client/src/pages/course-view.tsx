@@ -704,7 +704,7 @@ export default function CourseView() {
     >
       <h1 className="sr-only">{weeksLoading ? "Module" : `Module ${currentWeek?.weekNumber ?? ""}${currentWeek?.competencyFocus ? `: ${currentWeek.competencyFocus}` : ""}`}</h1>
       {/* The viewer fills the page column from under the header to above the phone bar */}
-      <div className="bg-sl-ground text-sl-ink flex h-[calc(100dvh-11.5rem)] min-h-[26rem] flex-col overflow-hidden rounded-xl border border-sl-line sm:h-[calc(100dvh-13rem)] lg:h-[calc(100dvh-9.5rem)]">
+      <div className="bg-sl-ground text-sl-ink !mt-0 flex h-[calc(100dvh-11.75rem-env(safe-area-inset-bottom))] min-h-[26rem] flex-col overflow-hidden rounded-xl border border-sl-line sm:h-[calc(100dvh-12.75rem)] lg:h-[calc(100dvh-9.25rem)]">
       {(isMobile || isTablet) ? (
         <>
           {/* Mobile: top bar */}

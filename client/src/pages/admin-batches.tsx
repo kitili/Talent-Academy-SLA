@@ -620,7 +620,7 @@ export default function AdminBatches() {
               })}
             </div>
           )}
-          <BatchApprovalHistory batchId={cohort.id} />
+          <BatchApprovalHistory key={cohort.id} batchId={cohort.id} />
         </div>
       </section>
     );
