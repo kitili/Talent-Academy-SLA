@@ -139,9 +139,9 @@ export function DeskNav({ desk, current, onNavigate }: { desk: Desk; current?: s
       aria-label={`${DESK_LABELS[desk]} desk`}
       data-tour={DESK_NAV_TOUR[desk]}
       data-testid={desk === "admin" ? "admin-nav" : `nav-${desk}`}
-      className="hidden border-b border-sl-line bg-sl-surface sm:block lg:max-w-[280px] lg:flex-[1_1_232px] lg:border-b-0 lg:border-r"
+      className="hidden border-b border-sl-line bg-sl-surface sm:sticky sm:top-[68px] sm:z-30 sm:block lg:static lg:z-auto lg:max-w-[280px] lg:flex-[1_1_232px] lg:border-b-0 lg:border-r"
     >
-      <div className="flex flex-wrap gap-1 px-4 py-2 sm:px-6 lg:sticky lg:top-[72px] lg:flex-col lg:flex-nowrap lg:px-3 lg:py-5">
+      <div className="flex flex-wrap gap-1 px-4 py-2 sm:px-6 lg:sticky lg:top-[68px] lg:max-h-[calc(100vh-68px)] lg:flex-col lg:flex-nowrap lg:overflow-y-auto lg:px-3 lg:py-5">
         {DESK_MENUS[desk].map((item) => (
           <DeskLink key={item.key} desk={desk} item={item} on={on === item.key} onNavigate={onNavigate} hooks className={itemClass(on === item.key)}>
             {item.label}
@@ -242,8 +242,8 @@ export function AcademyShell({
     <InsideShell.Provider value>
       <SceneBackdrop scene="library">
         <div className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-40 border-b border-sl-line bg-sl-surface text-sl-ink" data-tour={admin ? "admin-header" : undefined}>
-            <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 pl-4 pr-2 sm:px-6 sm:py-3">
+          <header className="sticky top-0 z-40 h-14 border-b border-sl-line bg-sl-surface text-sl-ink sm:h-[68px]" data-tour={admin ? "admin-header" : undefined}>
+            <div className="flex h-full flex-nowrap items-center justify-between gap-x-3 pl-4 pr-2 sm:px-6">
               <div className="flex min-w-0 items-center gap-3" data-tour={admin ? "admin-brand" : undefined}>
                 <img src={logoImage} alt="" width={30} height={36} className="block h-[30px] w-[25px] object-contain sm:h-9 sm:w-[30px]" />
                 <span className="truncate text-base font-semibold">

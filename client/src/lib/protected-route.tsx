@@ -1,14 +1,11 @@
 import { useAuth } from "@/hooks/use-auth";
 import { protectedRedirect } from "@/lib/sessionUser";
 import { Redirect, Route } from "wouter";
+import { PageSkeleton } from "@/components/Skeletons";
 
+/** Before the sign-in check answers: the page in grey outline, never a coloured splash or "Opening…" text. */
 export function OpeningClassroom() {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-primary text-white gap-3 px-6 text-center">
-      <p className="text-xl font-semibold">Silverleaf Academy</p>
-      <p className="text-white/90">Opening your classroom…</p>
-    </div>
-  );
+  return <PageSkeleton />;
 }
 
 export function ProtectedRoute({
