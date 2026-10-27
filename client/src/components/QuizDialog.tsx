@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
@@ -21,6 +20,11 @@ interface QuizDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Buttons follow the sl-* tokens (design/DESIGN-BRIEF.md "Look").
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sl-accent";
+const BTN_PRIMARY = `inline-flex items-center justify-center rounded-lg bg-sl-accent-strong px-4 py-2.5 min-h-[44px] text-[15px] font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const BTN_SECONDARY = `inline-flex items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-3.5 py-2.5 min-h-[44px] text-sm text-sl-ink hover:bg-sl-neutral-soft disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
 
 export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
   const { toast } = useToast();
@@ -36,17 +40,11 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
 
   const generateQuizMutation = useMutation({
     mutationFn: async () => {
-      console.log('[QUIZ-DIALOG] Starting quiz generation for weekId:', weekId);
-      const url = `/api/training-weeks/${weekId}/generate-quiz`;
-      console.log('[QUIZ-DIALOG] Making request to:', url);
-      const response = await apiRequest('POST', url, {});
-      console.log('[QUIZ-DIALOG] Got response, status:', response.status);
+      const response = await apiRequest('POST', `/api/training-weeks/${weekId}/generate-quiz`, {});
       const data = await response.json();
-      console.log('[QUIZ-DIALOG] Parsed response:', data);
       return data.questions;
     },
     onSuccess: (generatedQuestions: QuizQuestion[]) => {
-      console.log('[QUIZ-DIALOG] Success! Got', generatedQuestions.length, 'questions');
       setQuestions(generatedQuestions);
       setAnswers({});
       setQuizState('quiz');
@@ -88,30 +86,25 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
   });
 
   const handleOpenChange = (newOpen: boolean) => {
-    console.log('[QUIZ-DIALOG] handleOpenChange called, newOpen:', newOpen, 'weekId:', weekId);
-    
     // Only trigger generation when opening
     if (newOpen) {
-      console.log('[QUIZ-DIALOG] Dialog opening, setting up quiz generation');
       setQuizState('loading');
       setAnswers({});
       setResults(null);
-      
+
       // Delay the mutation slightly to ensure dialog is open
       setTimeout(() => {
-        console.log('[QUIZ-DIALOG] Calling mutation...');
         generateQuizMutation.mutate();
       }, 100);
     }
-    
+
     if (!newOpen) {
-      console.log('[QUIZ-DIALOG] Dialog closing, resetting state');
       setQuizState('loading');
       setQuestions([]);
       setAnswers({});
       setResults(null);
     }
-    
+
     onOpenChange(newOpen);
   };
 
@@ -136,28 +129,28 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto border-sl-line bg-sl-surface text-sl-ink">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Module quiz</DialogTitle>
-          <DialogDescription>
-            {quizState === 'quiz' && "Answer all questions to complete this week's checkpoint."}
+          <DialogTitle className="text-2xl font-semibold text-sl-ink">Module quiz</DialogTitle>
+          <DialogDescription className="text-sl-muted">
+            {quizState === 'quiz' && "Answer all questions to complete this module's checkpoint."}
             {quizState === 'results' && "Review your quiz results below."}
             {quizState === 'loading' && "Generating quiz questions from your training materials..."}
           </DialogDescription>
         </DialogHeader>
 
         {quizState === 'loading' && (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Analyzing training content...</p>
+          <div className="flex flex-col items-center justify-center py-12" role="status">
+            <Loader2 className="mb-4 h-12 w-12 animate-spin text-sl-accent" aria-hidden="true" />
+            <p className="text-sl-muted">Analyzing training content...</p>
           </div>
         )}
 
         {quizState === 'quiz' && (
           <div className="space-y-6 py-4">
             {questions.map((question, index) => (
-              <div key={question.id} className="border rounded-lg p-4 bg-card">
-                <p className="font-semibold mb-3">
+              <div key={question.id} className="rounded-xl border border-sl-line bg-sl-surface p-4">
+                <p className="mb-3 font-semibold text-sl-ink">
                   {index + 1}. {question.question}
                 </p>
                 <RadioGroup
@@ -165,9 +158,9 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
                   onValueChange={(value) => setAnswers({ ...answers, [question.id]: value })}
                 >
                   {question.options.map((option, optIdx) => (
-                    <div key={optIdx} className="flex items-center space-x-2 mb-2">
+                    <div key={optIdx} className="mb-2 flex min-h-[44px] items-center space-x-2">
                       <RadioGroupItem value={option} id={`${question.id}-${optIdx}`} />
-                      <Label htmlFor={`${question.id}-${optIdx}`} className="cursor-pointer">
+                      <Label htmlFor={`${question.id}-${optIdx}`} className="cursor-pointer text-sl-ink">
                         {option}
                       </Label>
                     </div>
@@ -176,58 +169,60 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
               </div>
             ))}
             <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <button type="button" className={BTN_SECONDARY} onClick={() => onOpenChange(false)}>
                 Cancel
-              </Button>
-              <Button 
+              </button>
+              <button
+                type="button"
+                className={BTN_PRIMARY}
                 onClick={handleSubmit}
                 disabled={submitQuizMutation.isPending}
                 data-testid="button-submit-quiz"
               >
                 {submitQuizMutation.isPending ? "Submitting..." : "Submit Quiz"}
-              </Button>
+              </button>
             </div>
           </div>
         )}
 
         {quizState === 'results' && results && (
           <div className="space-y-6 py-4">
-            <div className={`text-center p-6 rounded-lg ${results.passed ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+            <div className={`rounded-xl p-6 text-center ${results.passed ? 'bg-sl-done-soft' : 'bg-sl-risk-soft'}`}>
               {results.passed ? (
-                <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400 mx-auto mb-4" />
+                <CheckCircle2 className="mx-auto mb-4 h-16 w-16 text-sl-done" aria-hidden="true" />
               ) : (
-                <XCircle className="h-16 w-16 text-red-600 dark:text-red-400 mx-auto mb-4" />
+                <XCircle className="mx-auto mb-4 h-16 w-16 text-sl-risk" aria-hidden="true" />
               )}
-              <h3 className="text-2xl font-bold mb-2">
+              <h3 className="mb-2 text-2xl font-semibold text-sl-ink">
                 {results.passed ? "Congratulations!" : "Keep Learning"}
               </h3>
-              <p className="text-lg mb-4">
+              <p className="mb-4 text-lg text-sl-ink">
                 You scored {results.score} out of {results.totalQuestions} ({results.percentage}%)
               </p>
-              <p className="text-sm text-muted-foreground">
-                {results.passed 
-                  ? "You've successfully completed this module quiz!" 
+              <p className="text-sm text-sl-muted">
+                {results.passed
+                  ? "You've successfully completed this module quiz!"
                   : "You need 70% or higher to pass. Review the materials and try again."}
               </p>
             </div>
 
             {results.passed ? (
               <div className="space-y-4">
-                <h4 className="font-semibold">Review Your Answers:</h4>
+                <h4 className="font-semibold text-sl-ink">Review Your Answers:</h4>
                 {questions.map((question, index) => {
                   const userAnswer = answers[question.id];
                   const isCorrect = userAnswer === question.correctAnswer;
                   return (
-                    <div key={question.id} className={`border rounded-lg p-4 ${isCorrect ? 'border-green-200 bg-green-50/50 dark:bg-green-900/10' : 'border-red-200 bg-red-50/50 dark:bg-red-900/10'}`}>
-                      <p className="font-semibold mb-2">
+                    <div key={question.id} className={`rounded-xl border border-sl-line p-4 ${isCorrect ? 'bg-sl-done-soft' : 'bg-sl-risk-soft'}`}>
+                      <p className="mb-2 font-semibold text-sl-ink">
                         {index + 1}. {question.question}
                       </p>
                       <div className="space-y-1 text-sm">
-                        <p className={isCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
+                        <p className={isCorrect ? 'text-sl-done' : 'text-sl-risk'}>
                           Your answer: {userAnswer}
                         </p>
                         {!isCorrect && (
-                          <p className="text-green-700 dark:text-green-400">
+                          <p className="text-sl-done">
                             Correct answer: {question.correctAnswer}
                           </p>
                         )}
@@ -237,19 +232,19 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
                 })}
               </div>
             ) : (
-              <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground text-center">
+              <div className="rounded-lg bg-sl-neutral-soft p-4 text-center text-sm text-sl-neutral">
                 Correct answers are shown after passing the quiz. Review the material and try again.
               </div>
             )}
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <button type="button" className={BTN_SECONDARY} onClick={() => onOpenChange(false)}>
                 Close
-              </Button>
+              </button>
               {!results.passed && (
-                <Button onClick={handleRetake} data-testid="button-retake-quiz">
+                <button type="button" className={BTN_PRIMARY} onClick={handleRetake} data-testid="button-retake-quiz">
                   Retake Quiz
-                </Button>
+                </button>
               )}
             </div>
           </div>
