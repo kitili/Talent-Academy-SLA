@@ -604,7 +604,7 @@ export default function TeacherContentView() {
                         onRead={() => saveProgressMutation.mutate({ deckFileId: selectedFile.id, status: "completed", completedAt: new Date() })}
                       />
                     ) : isPdfFile ? (
-                      <div className="flex justify-center overflow-auto bg-white p-3 text-black">
+                      <div className="flex min-h-[260px] justify-center overflow-auto bg-white p-3 text-black">
                         {viewUrl ? (
                           <>
                             <Document
