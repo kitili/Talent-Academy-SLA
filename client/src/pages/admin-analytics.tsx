@@ -22,6 +22,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, LineCh
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import { AcademyShell } from "@/components/AcademyShell";
 import { AttendanceBoard } from "@/components/AttendanceBoard";
+import { Loading, SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 import { deskName } from "@shared/deskName";
 
 interface BatchAnalytics {
@@ -190,17 +191,17 @@ export default function AdminAnalytics() {
     enabled: isAdmin && expandedBatchId !== null,
   });
 
-  const { data: batchWithTeachers = null as any } = useQuery({
+  const { data: batchWithTeachers = null as any, isLoading: loadingBatchTeachers } = useQuery({
     queryKey: ["/api/batches", expandedBatchId],
     enabled: isAdmin && expandedBatchId !== null,
   });
 
-  const { data: assignedQuizzes = [] } = useQuery<any[]>({
+  const { data: assignedQuizzes = [], isLoading: loadingAssignedQuizzes } = useQuery<any[]>({
     queryKey: ["/api/batches", expandedBatchId, "quizzes"],
     enabled: isAdmin && !!expandedBatchId,
   });
 
-  const { data: fileQuizzes = [] } = useQuery<any[]>({
+  const { data: fileQuizzes = [], isLoading: loadingFileQuizzes } = useQuery<any[]>({
     queryKey: ["/api/batches", expandedBatchId, "file-quizzes"],
     enabled: isAdmin && !!expandedBatchId,
     queryFn: async () => {
@@ -241,7 +242,7 @@ export default function AdminAnalytics() {
     enabled: !!selectedQuizId && viewQuizDetailsOpen,
   });
 
-  const { data: teacherAttempts = [] } = useQuery<any[]>({
+  const { data: teacherAttempts = [], isLoading: loadingTeacherAttempts } = useQuery<any[]>({
     queryKey: ["/api/batches", expandedBatchId, "teachers", selectedTeacherForAttempts?.teacher?.id, "quiz-attempts"],
     enabled: !!expandedBatchId && !!selectedTeacherForAttempts?.teacher?.id && viewTeacherAttemptsOpen,
   });
@@ -275,7 +276,7 @@ export default function AdminAnalytics() {
     },
   });
 
-  const { data: userActivityStats = {} } = useQuery({
+  const { data: userActivityStats = {}, isLoading: loadingUserActivity } = useQuery({
     queryKey: ["/api/admin/users", selectedUser?.id, "activity"],
     enabled: isAdmin && selectedUser !== null,
     queryFn: async () => {
@@ -797,7 +798,7 @@ export default function AdminAnalytics() {
           </CardHeader>
           <CardContent>
             {loadingTrainers ? (
-              <p>Loading...</p>
+              <SkeletonFigures label="Loading your figures" count={2} />
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -895,11 +896,7 @@ export default function AdminAnalytics() {
                 </Button>
               </div>
               {loadingSnapshot ? (
-                <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-                  {[...Array(8)].map((_, i) => (
-                    <div key={i} className="h-24 animate-pulse rounded-xl bg-sl-neutral-soft" />
-                  ))}
-                </div>
+                <SkeletonFigures label="Loading the figures" count={9} />
               ) : (
                 <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
                   <KPICard label="Fellows" value={academySnapshot?.teachers ?? totalTeachers} subtitle="approved" onClick={() => navigate("/admin/teachers")} />
@@ -917,10 +914,11 @@ export default function AdminAnalytics() {
 
             <section aria-labelledby="an-cohorts" className="mb-6 overflow-hidden rounded-xl border border-sl-line bg-sl-surface" data-testid="overview-cohorts">
               <h2 id="an-cohorts" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">
-                Cohorts <span className="font-medium text-sl-muted">· {overviewCohorts.filter((row) => row.open).length} open</span>
+                Cohorts
+                {!loadingCohorts && <span className="font-medium text-sl-muted"> · {overviewCohorts.filter((row) => row.open).length} open</span>}
               </h2>
               {loadingCohorts ? (
-                <div className="m-5 h-24 animate-pulse rounded-lg bg-sl-neutral-soft" />
+                <SkeletonRows label="Loading cohorts" rows={4} />
               ) : overviewCohorts.length === 0 ? (
                 <p className="px-5 py-4 text-sm text-sl-muted">No cohorts yet. They appear here once one is created.</p>
               ) : (
@@ -956,12 +954,12 @@ export default function AdminAnalytics() {
 
             <section aria-labelledby="an-trend" className="mb-6 flex flex-col gap-3 rounded-xl border border-sl-line bg-sl-surface px-5 py-4">
               <h2 id="an-trend" className="text-lg font-semibold text-sl-ink">Course completion over time</h2>
-              {loadingTrends || !Array.isArray(completionTrends) || !completionTrends.length ? (
+              {loadingTrends ? (
+                <Loading label="Loading the completion trend"><SkeletonBar className="h-40 w-full" /></Loading>
+              ) : !Array.isArray(completionTrends) || !completionTrends.length ? (
                 <div className="flex h-40 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-sl-control bg-sl-ground px-4 text-center">
-                  <span className="text-[15px] font-semibold text-sl-neutral">{loadingTrends ? "Loading…" : "Not enough data yet"}</span>
-                  {!loadingTrends && (
-                    <span className="text-sm text-sl-muted">No Fellow has completed a course. The line appears after the first completion.</span>
-                  )}
+                  <span className="text-[15px] font-semibold text-sl-neutral">Not enough data yet</span>
+                  <span className="text-sm text-sl-muted">No Fellow has completed a course. The line appears after the first completion.</span>
                 </div>
               ) : (
                 <ChartContainer config={completionChartConfig} className="h-[250px] w-full">
@@ -995,13 +993,7 @@ export default function AdminAnalytics() {
               </div>
 
               {loadingPipeline ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Card key={i} className="animate-pulse">
-                      <CardContent className="pt-6 h-28" />
-                    </Card>
-                  ))}
-                </div>
+                <SkeletonFigures label="Loading the pipeline figures" count={5} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <KPICard
@@ -1092,9 +1084,11 @@ export default function AdminAnalytics() {
                   <CardDescription>Breakdown of candidates by gender</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loadingPipeline || !pipelineData?.genderDistribution ? (
+                  {loadingPipeline ? (
+                    <Loading label="Loading the gender chart"><SkeletonBar className="h-48 w-full" /></Loading>
+                  ) : !pipelineData?.genderDistribution ? (
                     <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                      {loadingPipeline ? "Loading..." : "No demographic data available yet"}
+                      No demographic data available yet
                     </div>
                   ) : (() => {
                     const labelMap: Record<string, string> = { male: "Male", female: "Female", other: "Other", notSpecified: "Not Specified" };
@@ -1141,7 +1135,9 @@ export default function AdminAnalytics() {
               </CardHeader>
               <CardContent>
                 {loadingCourses ? (
-                  <p className="text-muted-foreground">Loading courses...</p>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {[0, 1, 2].map((index) => <SkeletonCard key={index} label="Loading courses" lines={3} />)}
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {Array.isArray(coursesAnalytics) && coursesAnalytics.length > 0 ? (
@@ -1299,12 +1295,16 @@ export default function AdminAnalytics() {
               <div className="lg:col-span-1 border rounded-lg bg-card flex flex-col" style={{ maxHeight: "calc(100vh - 300px)" }}>
                 <div className="p-3 border-b">
                   <h3 className="font-semibold text-sm">Cohorts</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{Array.isArray(batchesAnalytics) ? batchesAnalytics.length : 0} total</p>
+                  {loadingBatches ? (
+                    <SkeletonBar className="mt-1 h-3.5 w-16" />
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">{Array.isArray(batchesAnalytics) ? batchesAnalytics.length : 0} total</p>
+                  )}
                 </div>
                 <ScrollArea className="flex-1">
                   <div className="p-2 space-y-2">
                     {loadingBatches ? (
-                      <p className="text-sm text-muted-foreground p-3">Loading...</p>
+                      <SkeletonRows label="Loading cohorts" rows={4} />
                     ) : Array.isArray(batchesAnalytics) && batchesAnalytics.length > 0 ? (
                       batchesAnalytics.map((batch: any) => (
                         <button
@@ -1528,7 +1528,9 @@ export default function AdminAnalytics() {
                             </DialogContent>
                           </Dialog>
                         </div>
-                        {batchWithTeachers?.teachers?.length === 0 ? (
+                        {loadingBatchTeachers ? (
+                          <SkeletonRows label="Loading Fellows" rows={4} />
+                        ) : batchWithTeachers?.teachers?.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
                             No Fellows enrolled in this cohort yet
                           </div>
@@ -1596,7 +1598,9 @@ export default function AdminAnalytics() {
                             <Award className="h-4 w-4 text-primary" />
                             Auto-Generated File Quizzes
                           </h3>
-                          {fileQuizzes.length === 0 ? (
+                          {loadingFileQuizzes ? (
+                            <SkeletonRows label="Loading file quizzes" rows={2} />
+                          ) : fileQuizzes.length === 0 ? (
                             <div className="text-center py-6 text-muted-foreground text-sm border rounded-lg bg-muted/20">
                               No auto-generated quizzes yet — they appear here after files are uploaded to course modules
                             </div>
@@ -1659,7 +1663,9 @@ export default function AdminAnalytics() {
                               </Button>
                             </div>
                           </div>
-                          {assignedQuizzes.length === 0 ? (
+                          {loadingAssignedQuizzes ? (
+                            <SkeletonRows label="Loading assigned quizzes" rows={2} />
+                          ) : assignedQuizzes.length === 0 ? (
                             <div className="text-center py-6 text-muted-foreground text-sm border rounded-lg bg-muted/20">
                               No quizzes assigned yet
                             </div>
@@ -1712,7 +1718,9 @@ export default function AdminAnalytics() {
                       <TabsContent value="progress" className="space-y-4 flex-1 overflow-y-auto p-4">
                         <h3 className="text-base font-semibold">Fellow Progress</h3>
                         {isLoadingProgress ? (
-                          <div className="text-center py-8 text-muted-foreground">Loading progress...</div>
+                          <div className="space-y-4">
+                            {[0, 1].map((index) => <SkeletonCard key={index} label="Loading progress" lines={3} />)}
+                          </div>
                         ) : batchProgress.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">No progress data available</div>
                         ) : (
@@ -1907,11 +1915,9 @@ export default function AdminAnalytics() {
 
             {loadingEngagement || loadingReflections || loadingWeekCoverage || loadingBestWeek || loadingCourseCompletion ? (
               <div className="space-y-6">
-                {[...Array(4)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardContent className="pt-6 h-48" />
-                  </Card>
-                ))}
+                <SkeletonFigures label="Loading the figures" count={4} />
+                <SkeletonCard label="Loading the charts" lines={6} />
+                <SkeletonCard label="Loading the charts" lines={6} />
               </div>
             ) : (
               <div className="space-y-6">
@@ -2110,11 +2116,9 @@ export default function AdminAnalytics() {
 
             {loadingDisqualification || loadingRepetition || loadingSatisfaction || loadingQuizPerformance || loadingCourseAssignment ? (
               <div className="space-y-6">
-                {[...Array(4)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardContent className="pt-6 h-48" />
-                  </Card>
-                ))}
+                <SkeletonFigures label="Loading the figures" count={4} />
+                <SkeletonCard label="Loading the charts" lines={6} />
+                <SkeletonCard label="Loading the charts" lines={6} />
               </div>
             ) : (
               <div className="space-y-6">
@@ -2412,11 +2416,7 @@ export default function AdminAnalytics() {
 
             {loadingDemographics ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[...Array(4)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardContent className="pt-6 h-72" />
-                  </Card>
-                ))}
+                {[0, 1, 2, 3].map((index) => <SkeletonCard key={index} label="Loading demographics" lines={8} />)}
               </div>
             ) : !demographicsData ? (
               <Card>
@@ -2575,11 +2575,7 @@ export default function AdminAnalytics() {
 
             {loadingPerformance ? (
               <div className="space-y-6">
-                {[...Array(3)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardContent className="pt-6 h-48" />
-                  </Card>
-                ))}
+                {[0, 1, 2].map((index) => <SkeletonCard key={index} label="Loading performance" lines={6} />)}
               </div>
             ) : (
               <div className="space-y-6">
@@ -2722,7 +2718,7 @@ export default function AdminAnalytics() {
               </CardHeader>
               <CardContent>
                 {loadingUsers ? (
-                  <p className="text-muted-foreground">Loading people...</p>
+                  <SkeletonRows label="Loading people" rows={5} />
                 ) : (
                   <Tabs defaultValue="trainers" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
@@ -2920,7 +2916,16 @@ export default function AdminAnalytics() {
           </DialogHeader>
           <DialogDescription>Track user progress and performance</DialogDescription>
 
-          {selectedUser && viewingActivityUserId && (
+          {selectedUser && viewingActivityUserId && loadingUserActivity && (
+            <Loading label="Loading activity" className="space-y-4">
+              <SkeletonBar className="h-16 w-full" />
+              <div className="grid grid-cols-2 gap-3">
+                <SkeletonBar className="h-16 w-full" />
+                <SkeletonBar className="h-16 w-full" />
+              </div>
+            </Loading>
+          )}
+          {selectedUser && viewingActivityUserId && !loadingUserActivity && (
             <div className="space-y-4">
               <div className="p-3 bg-muted/30 rounded-lg">
                 <p className="text-xs text-muted-foreground mb-2">Progress</p>
@@ -3354,7 +3359,9 @@ export default function AdminAnalytics() {
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Quiz Details</DialogTitle>
-            <DialogDescription>{quizDetails?.title || "Loading..."}</DialogDescription>
+            <DialogDescription asChild>
+              <div>{quizDetails ? quizDetails.title : <SkeletonBar className="h-4 w-40" />}</div>
+            </DialogDescription>
           </DialogHeader>
           {quizDetails ? (
             <div className="space-y-4">
@@ -3379,7 +3386,12 @@ export default function AdminAnalytics() {
               )}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">Loading quiz details...</p>
+            <Loading label="Loading quiz details" className="space-y-3">
+              <SkeletonBar className="h-4 w-24" />
+              <SkeletonBar className="h-4 w-full" />
+              <SkeletonBar className="h-20 w-full" />
+              <SkeletonBar className="h-20 w-full" />
+            </Loading>
           )}
         </DialogContent>
       </Dialog>
@@ -3391,7 +3403,9 @@ export default function AdminAnalytics() {
             <DialogTitle>Quiz Attempts</DialogTitle>
             <DialogDescription>{selectedTeacherForAttempts?.teacher?.name || selectedTeacherForAttempts?.teacherName || "Fellow"}</DialogDescription>
           </DialogHeader>
-          {teacherAttempts.length === 0 ? (
+          {loadingTeacherAttempts ? (
+            <SkeletonRows label="Loading quiz attempts" rows={3} />
+          ) : teacherAttempts.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-4">No quiz attempts found</p>
           ) : (
             <div className="space-y-3">
@@ -3652,14 +3666,14 @@ export default function AdminAnalytics() {
               Submitted Reflections
             </DialogTitle>
             <DialogDescription>
-              {allReflections.length} reflection{allReflections.length !== 1 ? "s" : ""} submitted across all cohorts
+              {loadingAllReflections
+                ? "Reflections submitted across all cohorts"
+                : `${allReflections.length} reflection${allReflections.length !== 1 ? "s" : ""} submitted across all cohorts`}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 pr-2">
             {loadingAllReflections ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground">
-                Loading reflections...
-              </div>
+              <SkeletonRows label="Loading reflections" rows={4} />
             ) : allReflections.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 No reflections submitted yet.

@@ -21,7 +21,6 @@ import { filterByQuery, PageStrip, usePager } from "@/components/PageStrip";
 import {
   AccessDenied,
   PageHeader,
-  SkeletonRows,
   StatusChip,
   cardClass,
   inputClass,
@@ -29,6 +28,7 @@ import {
   primaryButton,
   type PathPayload,
 } from "@/components/AdminParts";
+import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
 
 interface Teacher {
   id: string;
@@ -76,7 +76,7 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
   const allActive = (teachers ?? []).filter((teacher) => teacher.approvalStatus !== "inactive");
 
   const cohortsOf = (teacherId: string) => {
-    if (!path) return "…";
+    if (!path) return <SkeletonBar className="h-4 w-6" />;
     return String(path.cohorts.filter((cohort) => cohort.batches.some((step) => (step.teachers || []).some((person) => person.id === teacherId))).length);
   };
 
@@ -230,7 +230,7 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
         </div>
 
         {isLoading ? (
-          <SkeletonRows />
+          <SkeletonRows label="Loading Fellows" rows={5} />
         ) : isError ? (
           <div className="px-5 py-6">
             <p className="font-semibold text-sl-ink">Could not load Fellows</p>
@@ -298,22 +298,24 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
           </>
         )}
 
-        <details className="border-t border-sl-line" data-testid="inactive-teachers">
-          <summary className="min-h-[44px] cursor-pointer px-5 py-3 text-[15px] font-semibold text-sl-neutral">
-            Inactive desks · {inactiveTeachers.length}
-          </summary>
-          {inactiveTeachers.length === 0 ? (
-            <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
-              No inactive Fellow desks. A deactivated desk folds in here; it is not deleted.
-            </p>
-          ) : (
-            <ul className="space-y-2 px-5 pb-4 text-sm text-sl-muted">
-              {inactiveTeachers.map((teacher) => (
-                <li key={teacher.id}>{teacher.name} · {teacher.email}</li>
-              ))}
-            </ul>
-          )}
-        </details>
+        {!isLoading && !isError && (
+          <details className="border-t border-sl-line" data-testid="inactive-teachers">
+            <summary className="min-h-[44px] cursor-pointer px-5 py-3 text-[15px] font-semibold text-sl-neutral">
+              Inactive desks · {inactiveTeachers.length}
+            </summary>
+            {inactiveTeachers.length === 0 ? (
+              <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
+                No inactive Fellow desks. A deactivated desk folds in here; it is not deleted.
+              </p>
+            ) : (
+              <ul className="space-y-2 px-5 pb-4 text-sm text-sl-muted">
+                {inactiveTeachers.map((teacher) => (
+                  <li key={teacher.id}>{teacher.name} · {teacher.email}</li>
+                ))}
+              </ul>
+            )}
+          </details>
+        )}
       </section>
     </div>
   );

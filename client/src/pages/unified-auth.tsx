@@ -5,12 +5,27 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { homeForRole, persistSessionUser, signInRedirect } from "@/lib/sessionUser";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 import { Shield, GraduationCap, Users, Eye, EyeOff } from "lucide-react";
 import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
 
 type Role = "admin" | "trainer" | "teacher";
 
 const DESK_REQUEST_KEY = "sl-desk-request";
+
+/** The desk request this browser saved, if it is one whose status can be asked (a Fellow or trainer with a username). */
+function savedDeskRequest(): { username: string; role: "teacher" | "trainer" } | null {
+  try {
+    const raw = localStorage.getItem(DESK_REQUEST_KEY);
+    if (!raw) return null;
+    const saved: { username?: string; role?: string } = JSON.parse(raw);
+    const role = saved.role === "teacher" || saved.role === "trainer" ? saved.role : null;
+    const username = (saved.username || "").trim();
+    return role && username.length >= 3 ? { username, role } : null;
+  } catch {
+    return null;
+  }
+}
 
 interface MultiRoleOption {
   id: string;
@@ -53,6 +68,8 @@ export default function UnifiedAuth() {
   const [requestUsername, setRequestUsername] = useState("");
   const [requestEmail, setRequestEmail] = useState("");
   const [requestSent, setRequestSent] = useState(false);
+  // True while the status of a saved desk request is being asked, so the form does not flash before it turns into "create your password".
+  const [checkingRequest, setCheckingRequest] = useState(() => savedDeskRequest() !== null);
 
   // Multi-role selection state
   const [showRolePicker, setShowRolePicker] = useState(false);
@@ -67,22 +84,15 @@ export default function UnifiedAuth() {
   }, [user, isLoading, showRolePicker, setLocation]);
 
   useEffect(() => {
-    const raw = localStorage.getItem(DESK_REQUEST_KEY);
-    if (!raw) return;
-    let saved: { username?: string; role?: string } = {};
-    try {
-      saved = JSON.parse(raw);
-    } catch {
-      return;
-    }
-    const role = saved.role === "teacher" || saved.role === "trainer" ? saved.role : null;
-    const username = (saved.username || "").trim();
-    if (!role || username.length < 3) return;
+    const saved = savedDeskRequest();
+    if (!saved) return;
+    const { role, username } = saved;
     let cancelled = false;
     (async () => {
       try {
         const response = await fetch(
           `/api/access-requests/status?identifier=${encodeURIComponent(username)}&role=${role}`,
+          { signal: AbortSignal.timeout(8000) }, // a slow answer must not keep the sign-in form hidden
         );
         const data = await response.json().catch(() => ({}));
         if (cancelled) return;
@@ -96,6 +106,8 @@ export default function UnifiedAuth() {
         if (data.code === "approved") localStorage.removeItem(DESK_REQUEST_KEY);
       } catch {
         // Stay on sign-in until the next refresh can reach the academy.
+      } finally {
+        if (!cancelled) setCheckingRequest(false);
       }
     })();
     return () => {
@@ -468,7 +480,17 @@ export default function UnifiedAuth() {
       </div>
 
       <main className={`flex w-full flex-col gap-6 rounded-xl border border-sl-line bg-sl-surface p-6 sm:px-8 sm:pb-7 sm:pt-8 ${mode === "sign-in" ? "max-w-[420px]" : "max-w-[480px]"}`}>
-        {mode === "request" && requestSent ? (
+        {checkingRequest ? (
+          <Loading label="Checking your request" className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <SkeletonBar className="h-8 w-48" />
+              <SkeletonBar className="h-4 w-64 max-w-full" />
+            </div>
+            <SkeletonBar className="h-11 w-full" />
+            <SkeletonBar className="h-11 w-full" />
+            <SkeletonBar className="h-11 w-full" />
+          </Loading>
+        ) : mode === "request" && requestSent ? (
           <section aria-labelledby="request-sent-title" className="flex flex-col gap-3.5" data-testid="text-request-sent">
             <span className="self-start rounded-full bg-sl-neutral-soft px-2.5 py-[3px] text-xs font-semibold text-sl-neutral">Waiting for an Admin</span>
             <h1 id="request-sent-title" className="m-0 text-[28px] font-semibold leading-tight">Request sent</h1>

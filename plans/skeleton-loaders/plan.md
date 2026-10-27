@@ -9,6 +9,12 @@ branch `feat/improvements-designs`.
 The orchestrator commits the shared kit and the sticky shell first (see *Done before the tracks*). Then three tracks
 (A, T, F) run in parallel, by the same file ownership as `plans/design-implementation/plan.md`.
 
+**Built and merged, 2026-10-27.** Tracks A `df0d845`, T `dbf4c2d`, F `ea156b7`. Verify-pass fixes, the Trainer
+Approvals shell, and `tests/unit/contract/loading-skeletons.test.ts` are in `7a42c7a`.
+- **Verification:** `npm test` 107 + 170 pass; `npm run build` passes; typecheck 29, unchanged.
+- **On screen, with every API answer slowed by 2 s:** sections show skeletons and then their content. The window never
+  scrolls; only main does.
+
 ## Objective
 
 While data loads, every page shows grey bars in the shape of what is coming. A page never shows:

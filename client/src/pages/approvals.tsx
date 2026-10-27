@@ -6,7 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { AcademyShell } from "@/components/AcademyShell";
-import { Chip, PageHeader, SkeletonRows, TabBar, cardClass, linkClass, primaryButton, secondaryButton } from "@/components/AdminParts";
+import { Chip, PageHeader, TabBar, cardClass, linkClass, primaryButton, secondaryButton } from "@/components/AdminParts";
+import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
 import { useAuth } from "@/hooks/use-auth";
 import { deskName } from "@shared/deskName";
 
@@ -55,7 +56,7 @@ export default function ApprovalsPage() {
   const { user, logoutMutation } = useAuth();
   const [tab, setTab] = useState<"trainers" | "fellows">("trainers");
 
-  const { data: currentUser } = useQuery<CurrentUser>({
+  const { data: currentUser, isLoading: currentUserLoading } = useQuery<CurrentUser>({
     queryKey: ["/api/user"],
   });
 
@@ -71,7 +72,7 @@ export default function ApprovalsPage() {
   const isAdmin = currentUser?.role === "admin";
 
   // The decisions already saved (the same rows the CSV export holds), newest first.
-  const { data: history } = useQuery<{ items: HistoryItem[] }>({
+  const { data: history, isLoading: historyLoading } = useQuery<{ items: HistoryItem[] }>({
     queryKey: ["/api/admin/approval-history"],
     enabled: isAdmin,
   });
@@ -171,11 +172,12 @@ export default function ApprovalsPage() {
   });
 
   const activeTab = isAdmin ? tab : "fellows";
-  const loading = activeTab === "trainers" ? adminsLoading : teachersLoading;
+  // Until the signed-in role is known, which list to ask for is not known either, so nothing is "empty" yet.
+  const loading = currentUserLoading || (activeTab === "trainers" ? adminsLoading : teachersLoading);
   const nobodyAtAll = (!isAdmin || (!adminsLoading && pendingAdmins.length === 0)) && !teachersLoading && pendingTeachers.length === 0;
   const tabs = [
-    ...(isAdmin ? [{ id: "trainers", label: "Trainers waiting", count: pendingAdmins.length, testId: "approvals-tab-trainers" }] : []),
-    { id: "fellows", label: "Fellows waiting", count: pendingTeachers.length, testId: "approvals-tab-fellows" },
+    ...(isAdmin ? [{ id: "trainers", label: "Trainers waiting", count: adminsLoading || currentUserLoading ? undefined : pendingAdmins.length, testId: "approvals-tab-trainers" }] : []),
+    { id: "fellows", label: "Fellows waiting", count: teachersLoading || currentUserLoading ? undefined : pendingTeachers.length, testId: "approvals-tab-fellows" },
   ];
 
   const body = (
@@ -203,8 +205,8 @@ export default function ApprovalsPage() {
       </div>
 
       {loading ? (
-        <section className={cardClass} aria-label="Loading requests">
-          <SkeletonRows />
+        <section className={cardClass}>
+          <SkeletonRows label="Loading requests" rows={3} />
         </section>
       ) : activeTab === "trainers" ? (
         pendingAdmins.length === 0 ? (
@@ -319,6 +321,15 @@ export default function ApprovalsPage() {
         </section>
       )}
 
+      {isAdmin && historyLoading && (
+        <section className="flex flex-col gap-2.5">
+          <SkeletonBar className="h-5 w-40" />
+          <div className={cardClass}>
+            <SkeletonRows label="Loading recent decisions" rows={3} />
+          </div>
+        </section>
+      )}
+
       {isAdmin && history && history.items.length > 0 && (
         <section aria-labelledby="recent-decisions" className="flex flex-col gap-2.5">
           <h2 id="recent-decisions" className="text-[17px] font-semibold text-sl-ink">Recent decisions</h2>
@@ -368,10 +379,17 @@ export default function ApprovalsPage() {
     );
   }
 
+  // A Trainer approves Fellows here too; the page keeps the shell, so the top bar and menu stay in view.
   return (
-    <div className="min-h-screen bg-sl-ground">
-      <div className="mx-auto my-6 w-[calc(100%-2rem)] max-w-5xl">{body}</div>
-    </div>
+    <AcademyShell
+      title="Approvals"
+      userLabel={user ? deskName(user) : undefined}
+      onLogout={() => logoutMutation.mutate()}
+      desk="trainer"
+      current="home"
+    >
+      {body}
+    </AcademyShell>
   );
 }
 

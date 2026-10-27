@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 import { Settings } from "lucide-react";
 
 interface ProfileSettingsDialogProps {
@@ -60,7 +61,7 @@ export function ProfileSettingsDialog({
   const emailEndpoint = userType === "admin" ? "/api/profile/change-email" : "/api/teacher/profile/change-email";
 
   // Fetch existing profile when dialog opens
-  const { data: profileData } = useQuery<any>({
+  const { data: profileData, isLoading: profileLoading } = useQuery<any>({
     queryKey: [profileEndpoint],
     queryFn: async () => {
       const res = await fetch(profileEndpoint, { credentials: "include" });
@@ -212,6 +213,17 @@ export function ProfileSettingsDialog({
 
           {/* ── Profile Tab ─────────────────────────────────── */}
           <TabsContent value="profile" className="space-y-4 py-4">
+            {profileLoading && (
+              <Loading label="Loading your profile" className="space-y-4">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <div key={index} className="space-y-1">
+                    <SkeletonBar className="h-3.5 w-24" />
+                    <SkeletonBar className="h-10 w-full" />
+                  </div>
+                ))}
+              </Loading>
+            )}
+            <div className="space-y-4" hidden={profileLoading}>
             {userType === "admin" ? (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -285,9 +297,11 @@ export function ProfileSettingsDialog({
               </div>
             )}
 
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={() => saveProfileMutation.mutate()} disabled={saveProfileMutation.isPending}>
+              <Button onClick={() => saveProfileMutation.mutate()} disabled={saveProfileMutation.isPending || profileLoading}>
                 {saveProfileMutation.isPending ? "Saving..." : "Save Profile"}
               </Button>
             </DialogFooter>

@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ACADEMY_TERMS } from "@shared/academyPath";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 
 /** A post's role as a Fellow reads it: learners are Fellows (D13). */
 function roleLabel(role?: string) {
@@ -13,7 +14,7 @@ export function DiscussionThread({ weekId, cohortName }: { weekId: string; cohor
   const [body, setBody] = useState("");
   const headingId = useId();
   const fieldId = useId();
-  const { data: posts = [] } = useQuery<any[]>({
+  const { data: posts = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/weeks", weekId, "discussions"],
     queryFn: async () => {
       const res = await fetch(`/api/weeks/${weekId}/discussions`);
@@ -65,7 +66,16 @@ export function DiscussionThread({ weekId, cohortName }: { weekId: string; cohor
           </button>
         </div>
       </div>
-      {posts.length === 0 ? (
+      {isLoading ? (
+        <Loading label="Loading the discussion" className="flex flex-col gap-2.5 border-t border-sl-neutral-soft pt-3.5">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="flex flex-col gap-2 rounded-lg border border-sl-line px-3 py-2.5">
+              <SkeletonBar className="h-3.5 w-1/3" />
+              <SkeletonBar className="h-3.5 w-3/4" />
+            </div>
+          ))}
+        </Loading>
+      ) : posts.length === 0 ? (
         <div className="flex flex-col gap-1 border-t border-sl-neutral-soft pt-3.5">
           <p className="m-0 text-[15px] font-medium text-sl-ink">No posts yet</p>
           <p className="m-0 text-sm text-sl-muted">

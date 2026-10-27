@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { AcademyShell } from "@/components/AcademyShell";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { QuizRunner } from "@/components/QuizRunner";
+import { QuizRunner, QuizSkeleton } from "@/components/QuizRunner";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import { isWritingExam, mimeFromPaperName, paperPreviewKind } from "@shared/trainerDesk";
 import { ChevronLeft } from "lucide-react";
@@ -24,10 +25,13 @@ export default function TeacherExam() {
     enabled: !!quizId,
   });
 
-  const { data: attempts = [] } = useQuery<any[]>({
+  const { data: attempts = [], isLoading: attemptsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/quiz-attempts"],
     enabled: !!quizId,
   });
+  // The tries decide what the page shows (writing box, runner or "finished"), so nothing shows before they answer.
+  const opening = isLoading || (!!quiz && attemptsLoading);
+  const ready = !!quiz && !attemptsLoading;
 
   const mine = attempts.filter((attempt) => attempt.assignedQuizId === quizId);
   const latest = mine[0];
@@ -97,14 +101,20 @@ export default function TeacherExam() {
         Back to Quizzes
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="m-0 text-[28px] font-semibold text-sl-ink" data-testid="exam-title">{quiz?.title || "Exam"}</h1>
-        {quiz && !writing && (
+        <h1 className="m-0 text-[28px] font-semibold text-sl-ink" data-testid="exam-title">
+          {isLoading ? <><span className="sr-only">Exam</span><SkeletonBar className="inline-block h-8 w-64 max-w-full align-middle" /></> : quiz?.title || "Exam"}
+        </h1>
+        {ready && !writing && (
           <span className="text-sm text-sl-muted">{mine.length >= QUIZ_ATTEMPTS ? `All ${QUIZ_ATTEMPTS} tries used` : `Try ${mine.length + 1} of ${QUIZ_ATTEMPTS}`}</span>
         )}
       </div>
-      {isLoading && <p className="m-0 text-sl-muted">Opening the exam…</p>}
+      {opening && (
+        <section className="rounded-xl border border-sl-line bg-sl-surface p-5">
+          <QuizSkeleton label="Opening the exam" />
+        </section>
+      )}
       {error && <p className="m-0 text-sm text-sl-risk">This exam is not on your desk.</p>}
-      {quiz && writing && (
+      {ready && writing && (
         <div className="grid gap-4 lg:grid-cols-2" data-testid="exam-split">
           <section className="flex min-h-[24rem] flex-col rounded-xl border border-sl-line bg-sl-surface p-4 text-sl-ink" data-testid="exam-paper">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-sl-muted">Exam paper</h2>
@@ -143,7 +153,7 @@ export default function TeacherExam() {
           </section>
         </div>
       )}
-      {quiz && !writing && finished && !triedHere && (
+      {ready && !writing && finished && !triedHere && (
         <section className="flex flex-col gap-3 rounded-xl border border-sl-line bg-sl-surface p-5" data-testid="exam-finished">
           <span className={`self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${passed ? "bg-sl-done-soft text-sl-done" : "bg-sl-neutral-soft text-sl-neutral"}`}>
             {passed ? `Passed · best ${Math.max(...mine.map(percentOf))}%` : `All ${QUIZ_ATTEMPTS} tries used · best ${Math.max(0, ...mine.map(percentOf))}%`}
@@ -160,7 +170,7 @@ export default function TeacherExam() {
           <p className="m-0 text-sm text-sl-muted">This exam is finished; there is no try left to take.</p>
         </section>
       )}
-      {quiz && !writing && (!finished || triedHere) && (
+      {ready && !writing && (!finished || triedHere) && (
         <section className="rounded-xl border border-sl-line bg-sl-surface p-5">
           <QuizRunner
             questions={quiz.questions || []}
@@ -180,7 +190,17 @@ export default function TeacherExam() {
 
 function PaperPane({ name, url }: { name?: string; url: string }) {
   const kind = paperPreviewKind(name);
-  if (!url) return <p className="text-sm text-sl-muted">Loading the paper…</p>;
+  if (!url) {
+    return (
+      <Loading label="Opening the paper" className="flex flex-1 flex-col gap-3">
+        <SkeletonBar className="h-4 w-full" />
+        <SkeletonBar className="h-4 w-11/12" />
+        <SkeletonBar className="h-4 w-full" />
+        <SkeletonBar className="h-4 w-4/5" />
+        <SkeletonBar className="h-4 w-2/3" />
+      </Loading>
+    );
+  }
   if (kind === "image") return <img src={url} alt={name || "Exam paper"} className="max-h-[36rem] w-full object-contain" />;
   if (kind === "pdf") return <iframe title={name || "Exam paper"} src={url} className="min-h-[32rem] w-full flex-1 rounded-lg border" />;
   return (

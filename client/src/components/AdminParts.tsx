@@ -172,17 +172,6 @@ export function MoreActions({ actions, testId, label = "More actions" }: { actio
   );
 }
 
-/** Grey bars while a list loads (never a false 0). */
-export function SkeletonRows({ rows = 3 }: { rows?: number }) {
-  return (
-    <div className="space-y-3 p-5" aria-busy="true" aria-label="Loading">
-      {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="h-6 animate-pulse rounded bg-sl-neutral-soft" />
-      ))}
-    </div>
-  );
-}
-
 /** Whole-page denied card, in tokens. */
 export function AccessDenied({ children }: { children?: ReactNode }) {
   return (

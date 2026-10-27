@@ -10,7 +10,6 @@ import {
   Breadcrumb,
   Chip,
   ResetPasswordDialog,
-  SkeletonRows,
   StatusChip,
   cardClass,
   cohortFellows,
@@ -22,6 +21,7 @@ import {
   stepWords,
   type PathPayload,
 } from "@/components/AdminParts";
+import { SkeletonCard, SkeletonHeading, SkeletonRows } from "@/components/Skeletons";
 
 interface TrainerDetail {
   id: string;
@@ -96,7 +96,8 @@ export default function AdminTrainerDetail() {
     return shell(
       <>
         <Breadcrumb trail={trail} current="Trainer" />
-        <div className={cardClass}><SkeletonRows rows={4} /></div>
+        <SkeletonHeading />
+        <SkeletonCard label="Loading the trainer" lines={4} />
       </>,
     );
   }
@@ -140,7 +141,7 @@ export default function AdminTrainerDetail() {
           {path && <span className="font-medium text-sl-muted"> · {running.length}</span>}
         </h2>
         {!path ? (
-          <SkeletonRows rows={2} />
+          <SkeletonRows label="Loading cohorts and steps" rows={2} />
         ) : running.length === 0 ? (
           <p className="px-5 py-4 text-[15px] text-sl-muted">
             This trainer runs no cohort yet. Assign them under{" "}

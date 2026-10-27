@@ -8,7 +8,8 @@ import type { ReactNode } from "react";
 
 /** One grey bar. Size it with Tailwind (`h-4 w-40`). The pulse stops when the person asks for reduced motion. */
 export function SkeletonBar({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`rounded-md bg-sl-neutral-soft motion-safe:animate-pulse ${className}`} />;
+  // A span, so a bar can stand in for text inside a heading; it displays as a block unless the caller says otherwise.
+  return <span aria-hidden="true" className={`block rounded-md bg-sl-neutral-soft motion-safe:animate-pulse ${className}`} />;
 }
 
 /** A loading region: announces `label` to screen readers and marks itself busy. */

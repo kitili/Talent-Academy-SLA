@@ -17,12 +17,28 @@ import { useScreenshotProtection } from "@/hooks/use-screenshot-protection";
 import { ScreenshotWarning } from "@/components/ScreenshotWarning";
 import { TableOfContents } from "@/components/TableOfContents";
 import { AcademyShell } from "@/components/AcademyShell";
+import { Loading, SkeletonBar, SkeletonHeading, SkeletonCard } from "@/components/Skeletons";
 import { sanitizeLessonHtml } from "@shared/htmlSanitize";
 import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import { DiscussionThread } from "@/components/DiscussionThread";
 import { saveLastLesson } from "@/lib/lastLessonCache";
 import type { TocEntry } from "@shared/schema";
 import { youtubeEmbedSrc } from "@shared/youtube";
+
+/** The reader's page area in outline, while a lesson file is being opened. */
+function ReaderSkeleton({ label = "Opening the lesson file" }: { label?: string }) {
+  return (
+    <Loading label={label} className="flex min-h-[260px] w-full flex-col gap-3 p-6">
+      <SkeletonBar className="h-6 w-1/3" />
+      <SkeletonBar className="h-4 w-full" />
+      <SkeletonBar className="h-4 w-11/12" />
+      <SkeletonBar className="h-4 w-full" />
+      <SkeletonBar className="h-4 w-4/5" />
+      <SkeletonBar className="mt-2 h-24 w-full" />
+      <SkeletonBar className="h-4 w-2/3" />
+    </Loading>
+  );
+}
 
 function YouTubeLesson({ id, title }: { id: string; title: string }) {
   return (
@@ -77,7 +93,7 @@ function DocumentViewer({ url }: { url: string }) {
   }, [url]);
 
   if (loading) {
-    return <div className="flex items-center justify-center w-full p-12"><p className="text-muted-foreground">Loading document...</p></div>;
+    return <ReaderSkeleton label="Opening the document" />;
   }
 
   if (error) {
@@ -450,11 +466,27 @@ export default function TeacherContentView() {
 
   if (isLoading) {
     return shell(
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading the module">
-        <div className="h-7 w-1/2 rounded bg-sl-neutral-soft" />
-        <div className="h-4 w-1/3 rounded bg-sl-neutral-soft" />
-        <div className="h-40 rounded-xl bg-sl-neutral-soft" />
-      </div>
+      <>
+        <SkeletonBar className="h-4 w-56" />
+        <SkeletonHeading />
+        <SkeletonCard label="Loading the objective" lines={2} />
+        <section className={`${SECTION} overflow-hidden`}>
+          <div className="border-b border-sl-line px-5 py-4"><SkeletonBar className="h-5 w-32" /></div>
+          <div className="flex flex-col gap-3.5 px-5 py-[18px]">
+            <div className="overflow-hidden rounded-[10px] border border-sl-control"><ReaderSkeleton label="Loading the lesson files" /></div>
+            {Array.from({ length: 3 }, (_, index) => (
+              <div key={index} className="flex items-center gap-3 rounded-[10px] border border-sl-line px-3.5 py-3">
+                <SkeletonBar className="h-5 w-5 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <SkeletonBar className="h-4 w-1/3" />
+                  <SkeletonBar className="h-3 w-1/2" />
+                </div>
+                <SkeletonBar className="h-9 w-32" />
+              </div>
+            ))}
+          </div>
+        </section>
+      </>
     );
   }
 
@@ -618,8 +650,10 @@ export default function TeacherContentView() {
                                 setDocumentLoadError(true);
                               }}
                               className="flex-shrink-0"
+                              loading={<ReaderSkeleton label="Opening the presentation" />}
                             >
                               <Page
+                                loading={<ReaderSkeleton label="Opening the page" />}
                                 pageNumber={pageNumber}
                                 width={pdfWidth}
                                 devicePixelRatio={window.devicePixelRatio || 1}
@@ -638,11 +672,13 @@ export default function TeacherContentView() {
                             )}
                           </>
                         ) : (
-                          <p className="m-0 p-8 text-center text-sm text-sl-muted">
-                            {documentLoadError
-                              ? "This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again."
-                              : "Loading document..."}
-                          </p>
+                          documentLoadError ? (
+                            <p className="m-0 p-8 text-center text-sm text-sl-muted">
+                              This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again.
+                            </p>
+                          ) : (
+                            <ReaderSkeleton label="Opening the presentation" />
+                          )
                         )}
                         {documentLoadError && viewUrl && (
                           <p className="m-0 p-8 text-sm text-sl-muted">Preview not available</p>
@@ -696,7 +732,7 @@ export default function TeacherContentView() {
                         </div>
                       </div>
                     ) : (
-                      <p className="m-0 p-8 text-center text-sl-muted">Loading file...</p>
+                      <ReaderSkeleton label="Opening the file" />
                     )}
                   </div>
 
@@ -881,8 +917,10 @@ export default function TeacherContentView() {
                               setDocumentLoadError(true);
                             }}
                             className="shadow-2xl"
+                            loading={<ReaderSkeleton label="Opening the presentation" />}
                           >
                             <Page
+                              loading={<ReaderSkeleton label="Opening the page" />}
                               pageNumber={pageNumber}
                               scale={scale}
                               devicePixelRatio={window.devicePixelRatio || 1}
@@ -898,11 +936,13 @@ export default function TeacherContentView() {
                         )}
                       </>
                     ) : (
-                      <div className="p-8 text-center text-muted-foreground">
-                        {documentLoadError
-                          ? "This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again."
-                          : "Loading document..."}
-                      </div>
+                      documentLoadError ? (
+                        <div className="p-8 text-center text-muted-foreground">
+                          This presentation could not be opened. You can still take the quiz, or ask your trainer to upload the slides again.
+                        </div>
+                      ) : (
+                        <ReaderSkeleton label="Opening the presentation" />
+                      )
                     )}
                   </div>
                 ) : isDocxFile ? (

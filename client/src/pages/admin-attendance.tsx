@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { SkeletonRows } from "@/components/Skeletons";
 import { AcademyShell } from "@/components/AcademyShell";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -201,14 +202,16 @@ export default function AdminAttendance() {
           {mark.error && <p className="text-sm text-sl-risk" role="alert">{mark.error.message}</p>}
         </section>
 
-        {isLoading && <p className="text-sm text-sl-muted">Opening the lists…</p>}
         {error && <p className="text-sm text-sl-risk" role="alert">The attendance list needs the academy database.</p>}
 
         <section aria-labelledby="attendance-recent" className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface">
           <h2 id="attendance-recent" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">
-            Recent marks <span className="font-medium text-sl-muted">· {recent.length}</span>
+            Recent marks
+            {!isLoading && <span className="font-medium text-sl-muted"> · {recent.length}</span>}
           </h2>
-          {recent.length === 0 ? (
+          {isLoading ? (
+            <SkeletonRows label="Loading recent marks" rows={4} />
+          ) : recent.length === 0 ? (
             <p className="px-5 py-4 text-sm text-sl-muted">No one has been marked yet. Each mark you save appears here with its date, cohort and status.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -243,7 +246,7 @@ export default function AdminAttendance() {
               </table>
             </div>
           )}
-          {notes.map((note) => (
+          {!isLoading && notes.map((note) => (
             <p key={note} className="border-t border-sl-neutral-soft px-5 py-3 text-[13px] text-sl-muted">{note}</p>
           ))}
         </section>

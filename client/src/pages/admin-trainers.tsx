@@ -21,7 +21,6 @@ import { filterByQuery, PageStrip, usePager } from "@/components/PageStrip";
 import {
   AccessDenied,
   PageHeader,
-  SkeletonRows,
   StatusChip,
   cardClass,
   cohortFellows,
@@ -30,6 +29,7 @@ import {
   primaryButton,
   type PathPayload,
 } from "@/components/AdminParts";
+import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
 
 interface Trainer {
   id: string;
@@ -75,7 +75,7 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
   const allActive = (trainers ?? []).filter((trainer) => trainer.approvalStatus !== "inactive");
 
   const fellowsOf = (trainerId: string) => {
-    if (!path) return "…";
+    if (!path) return <SkeletonBar className="h-4 w-6" />;
     const seen = new Set<string>();
     for (const cohort of path.cohorts) {
       if ((cohort.trainerIds || []).includes(trainerId)) for (const fellow of cohortFellows(cohort)) seen.add(fellow.id);
@@ -233,7 +233,7 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
         </div>
 
         {isLoading ? (
-          <SkeletonRows />
+          <SkeletonRows label="Loading trainers" rows={5} />
         ) : (trainers ?? []).length === 0 ? (
           <p className="px-5 py-6 text-[15px] text-sl-muted">No trainers yet. Add one, or approve a request from the sign-in page.</p>
         ) : (
@@ -293,22 +293,24 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
           </>
         )}
 
-        <details className="border-t border-sl-line" data-testid="inactive-trainers">
-          <summary className="min-h-[44px] cursor-pointer px-5 py-3 text-[15px] font-semibold text-sl-neutral">
-            Inactive desks · {inactiveTrainers.length}
-          </summary>
-          {inactiveTrainers.length === 0 ? (
-            <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
-              No inactive trainer desks. A deactivated desk folds in here; it is not deleted.
-            </p>
-          ) : (
-            <ul className="space-y-2 px-5 pb-4 text-sm text-sl-muted">
-              {inactiveTrainers.map((trainer) => (
-                <li key={trainer.id}>{trainer.username}{trainer.email ? ` · ${trainer.email}` : ""}</li>
-              ))}
-            </ul>
-          )}
-        </details>
+        {!isLoading && (
+          <details className="border-t border-sl-line" data-testid="inactive-trainers">
+            <summary className="min-h-[44px] cursor-pointer px-5 py-3 text-[15px] font-semibold text-sl-neutral">
+              Inactive desks · {inactiveTrainers.length}
+            </summary>
+            {inactiveTrainers.length === 0 ? (
+              <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
+                No inactive trainer desks. A deactivated desk folds in here; it is not deleted.
+              </p>
+            ) : (
+              <ul className="space-y-2 px-5 pb-4 text-sm text-sl-muted">
+                {inactiveTrainers.map((trainer) => (
+                  <li key={trainer.id}>{trainer.username}{trainer.email ? ` · ${trainer.email}` : ""}</li>
+                ))}
+              </ul>
+            )}
+          </details>
+        )}
       </section>
 
       {!isLoading && (trainers ?? []).length > 0 && (

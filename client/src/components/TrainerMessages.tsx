@@ -7,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DeskMail } from "@/components/DeskMail";
 import { PageStrip, usePager } from "@/components/PageStrip";
+import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
 
 type Notice = { id: string; title: string; message: string; isRead: string | boolean; createdAt: string };
 type Teacher = { id: string; name: string };
@@ -36,6 +37,7 @@ export function TrainerMessages({
   expandedId,
   onPick,
   selfLabel,
+  loading = false,
 }: {
   batches: Cohort[];
   selectedBatchId: string;
@@ -44,13 +46,15 @@ export function TrainerMessages({
   expandedId: string | null;
   onPick: (id: string) => void;
   selfLabel: string;
+  /** The cohorts or the chosen cohort's Fellows have not arrived: grey bars stand where they will be. */
+  loading?: boolean;
 }) {
   const { toast } = useToast();
   const [note, setNote] = useState("");
   const [feedbackFellowId, setFeedbackFellowId] = useState("");
   const [feedbackCategory, setFeedbackCategory] = useState("progress");
   const [feedback, setFeedback] = useState("");
-  const { data: notices = [] } = useQuery<Notice[]>({
+  const { data: notices = [], isLoading: noticesLoading } = useQuery<Notice[]>({
     queryKey: ["/api/notifications", "inbox"],
     queryFn: async () => {
       const res = await fetch("/api/notifications?limit=100", { credentials: "include" });
@@ -111,7 +115,7 @@ export function TrainerMessages({
   const unread = notices.filter(isUnread).length;
   const cohort = batches.find((batch) => batch.id === selectedBatchId);
 
-  const cohortSelect = (id: string) => (
+  const cohortSelect = (id: string) => loading ? <SkeletonBar className="h-11 w-full rounded-lg" /> : (
     <select id={id} className={FIELD} value={selectedBatchId} onChange={(event) => onSelectBatch(event.target.value)} data-testid={`select-${id}`}>
       {batches.map((batch) => (
         <option key={batch.id} value={batch.id}>
@@ -133,7 +137,9 @@ export function TrainerMessages({
             <Label htmlFor="mail-cohort" className="text-sm font-normal text-sl-muted">Cohort</Label>
             {cohortSelect("mail-cohort")}
           </div>
-          {teachers.length === 0 ? (
+          {loading ? (
+            <SkeletonRows label="Loading Fellows" rows={3} className="-mx-5" />
+          ) : teachers.length === 0 ? (
             <p className="text-sm text-sl-muted">No Fellows in {cohort?.name || "this cohort"} yet. Add one on Cohorts, then write to them here.</p>
           ) : (
             <ul className="space-y-2" data-testid="select-message-teacher">
@@ -195,17 +201,21 @@ export function TrainerMessages({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="feedback-fellow">Fellow</Label>
-              <select
-                id="feedback-fellow"
-                className={FIELD}
-                value={feedbackFellow?.id || ""}
-                onChange={(event) => setFeedbackFellowId(event.target.value)}
-                disabled={teachers.length === 0}
-                data-testid="select-feedback-fellow"
-              >
-                {teachers.length === 0 && <option value="">No Fellows in this cohort</option>}
-                {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
-              </select>
+              {loading ? (
+                <SkeletonBar className="h-11 w-full rounded-lg" />
+              ) : (
+                <select
+                  id="feedback-fellow"
+                  className={FIELD}
+                  value={feedbackFellow?.id || ""}
+                  onChange={(event) => setFeedbackFellowId(event.target.value)}
+                  disabled={teachers.length === 0}
+                  data-testid="select-feedback-fellow"
+                >
+                  {teachers.length === 0 && <option value="">No Fellows in this cohort</option>}
+                  {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
+                </select>
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="feedback-category">Category</Label>
@@ -236,7 +246,9 @@ export function TrainerMessages({
             Mark all read
           </Button>
         </div>
-        {notices.length === 0 ? (
+        {noticesLoading ? (
+          <SkeletonRows label="Loading messages" rows={3} className="-mx-5" />
+        ) : notices.length === 0 ? (
           <p className="text-sm text-sl-muted">No messages yet.</p>
         ) : pager.slice.map((notice) => (
           <button

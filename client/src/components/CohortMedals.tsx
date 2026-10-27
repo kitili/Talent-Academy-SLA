@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import type { Medal, MedalKind } from "@shared/cohortMedals";
+import { Loading, SkeletonBar } from "@/components/Skeletons";
 
 /** What earns each medal, shown on a medal not earned yet (an earned one shows its own `detail`). */
 const HOW: Record<MedalKind, string> = {
@@ -16,7 +17,23 @@ const HOW: Record<MedalKind, string> = {
  * One even grid of a cohort's medals, earned first. An earned medal has a green check and what earned it; one not yet
  * earned has a dashed circle and what earns it. Colour here means status only: green is earned.
  */
-export function CohortMedals({ medals, showCount = true }: { medals: Medal[]; showCount?: boolean }) {
+export function CohortMedals({ medals, showCount = true, loading = false }: { medals: Medal[]; showCount?: boolean; loading?: boolean }) {
+  // `loading` is set by a page whose medals have not arrived: the grid in outline, not an empty one.
+  if (loading) {
+    return (
+      <Loading label="Loading your medals" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="flex items-start gap-3 rounded-lg border border-sl-line bg-sl-surface px-4 py-3">
+            <SkeletonBar className="h-7 w-7 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <SkeletonBar className="h-4 w-2/3" />
+              <SkeletonBar className="h-3 w-full" />
+            </div>
+          </div>
+        ))}
+      </Loading>
+    );
+  }
   if (!medals.length) return null;
   const earned = medals.filter((medal) => medal.earned);
   const ordered = [...earned, ...medals.filter((medal) => !medal.earned)];

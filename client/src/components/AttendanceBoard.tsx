@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { SkeletonBar, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 
 type TeacherRow = {
   id: string;
@@ -82,7 +83,7 @@ function SummaryLine({ totals, marked, rate }: { totals: Record<StatusKey, numbe
 }
 
 /** Cohorts with marks, each with its rate; the cohorts with none are named together on the last line. */
-function CohortRates({ trainers, allCohorts }: { trainers: TrainerRow[]; allCohorts: Array<{ id: string; name: string }> }) {
+function CohortRates({ trainers, allCohorts, loading }: { trainers: TrainerRow[]; allCohorts: Array<{ id: string; name: string }>; loading: boolean }) {
   const seen = new Map<string, { id: string; name: string; rate: number; marked: number }>();
   for (const trainer of trainers) {
     for (const cohort of trainer.cohorts) {
@@ -96,6 +97,9 @@ function CohortRates({ trainers, allCohorts }: { trainers: TrainerRow[]; allCoho
   return (
     <section className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" aria-labelledby="attendance-by-cohort" data-testid="attendance-cohort-chart">
       <h2 id="attendance-by-cohort" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">By cohort</h2>
+      {loading ? (
+        <SkeletonRows label="Loading cohorts" rows={3} />
+      ) : (
       <ul>
         {marked.map((cohort) => (
           <li key={cohort.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-sl-neutral-soft px-5 py-3.5">
@@ -118,6 +122,7 @@ function CohortRates({ trainers, allCohorts }: { trainers: TrainerRow[]; allCoho
           <li className="px-5 py-4 text-sm text-sl-muted">No cohort has attendance marks yet.</li>
         )}
       </ul>
+      )}
     </section>
   );
 }
@@ -159,13 +164,33 @@ export function AttendanceBoard({ variant = "full", heading = "All marks so far"
     queryKey: ["/api/admin/attendance-summary"],
   });
   // Every cohort by name, so the ones with no marks can be listed. The attendance page loads the same list.
-  const { data: lists } = useQuery<{ cohorts: Array<{ id: string; name: string }> }>({
+  const { data: lists, isLoading: listsLoading } = useQuery<{ cohorts: Array<{ id: string; name: string }> }>({
     queryKey: ["/api/admin/attendance"],
     enabled: variant === "full",
   });
 
   if (isLoading) {
-    return <div className="h-32 animate-pulse rounded-xl bg-sl-neutral-soft" data-testid="admin-attendance" />;
+    return (
+      <div className="space-y-4" data-testid="admin-attendance">
+        <div className="space-y-2">
+          <SkeletonBar className="h-5 w-44" />
+          <SkeletonBar className="h-4 w-64 max-w-full" />
+        </div>
+        <SkeletonFigures label="Loading attendance" line count={5} />
+        {variant === "full" && (
+          <>
+            <section className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface">
+              <h2 className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">By cohort</h2>
+              <SkeletonRows label="Loading cohorts" rows={3} />
+            </section>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <SkeletonRows label="Loading Fellows" rows={4} className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" />
+              <SkeletonRows label="Loading Trainers" rows={4} className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" />
+            </div>
+          </>
+        )}
+      </div>
+    );
   }
 
   const teachers = data?.teachers || [];
@@ -191,7 +216,7 @@ export function AttendanceBoard({ variant = "full", heading = "All marks so far"
       <SummaryLine totals={totals} marked={marked} rate={rate} />
       {variant === "full" && (
         <>
-          <CohortRates trainers={trainers} allCohorts={lists?.cohorts ?? []} />
+          <CohortRates trainers={trainers} allCohorts={lists?.cohorts ?? []} loading={listsLoading} />
           <div className="grid gap-4 lg:grid-cols-2">
             <PeopleTable
               title="Fellows"

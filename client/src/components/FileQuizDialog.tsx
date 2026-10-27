@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle2, XCircle, Loader2, ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { QuizSkeleton } from "@/components/QuizRunner";
 
 /** The sentence the server sent with a refusal (`{ error }`), not the raw "403: {...}" of `apiRequest`. */
 export function serverSentence(error: Error | null | undefined, fallback: string) {
@@ -300,7 +301,7 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
               {quizState === 'results' ? "Your result" : `${fileName} quiz`}
             </DialogTitle>
             <DialogDescription className="text-sm text-sl-muted">
-              {quizState === 'loading' && "Loading quiz..."}
+              {quizState === 'loading' && "Preparing the quiz"}
               {quizState === 'quiz' && `Question ${currentIndex + 1} of ${total} · pass at ${MODULE_QUIZ_PASS_PERCENT}%`}
               {quizState === 'results' && `${fileName} quiz · pass at ${MODULE_QUIZ_PASS_PERCENT}%`}
               {quizState === 'unavailable' && "No quiz available for this file yet."}
@@ -308,9 +309,8 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
           </DialogHeader>
 
           {quizState === 'loading' && (
-            <div className="flex flex-col items-center justify-center py-12" data-testid="loading-state">
-              <Loader2 className="mb-4 h-12 w-12 animate-spin text-sl-accent" />
-              <p className="text-sm text-sl-muted">Loading quiz...</p>
+            <div className="py-4" data-testid="loading-state">
+              <QuizSkeleton label="Loading the quiz" note="Preparing the quiz" />
             </div>
           )}
 
@@ -576,10 +576,8 @@ export function FileQuizDialog({ weekId, fileId, fileName, open, onOpenChange, c
         )}
 
         {quizState === 'loading' && (
-          <div className="flex flex-col items-center justify-center py-12" data-testid="loading-state">
-            <Loader2 className="mb-4 h-12 w-12 animate-spin text-sl-accent" />
-            <p className="text-sm text-sl-muted">Analyzing presentation content...</p>
-            <p className="mt-1 text-xs text-sl-muted">Generating {numQuestions} questions - this may take 10-15 seconds</p>
+          <div className="py-4" data-testid="loading-state">
+            <QuizSkeleton label="Preparing the quiz" note="Analyzing presentation content. Generating questions can take 10-15 seconds." />
           </div>
         )}
 
