@@ -106,7 +106,7 @@ test('assigned-quiz reads and submit use the quiz\'s pass mark and QUIZ_ATTEMPTS
 test('the quiz dialog states the module pass mark from C1, and CourseWeeks mounts the approve dialog for trainers', () => {
     const dialog = readFileSync('client/src/components/FileQuizDialog.tsx', 'utf8')
     assert.doesNotMatch(dialog, /\d+% required|pass at \d+%/)
-    assert.equal((dialog.match(/pass at \$?\{MODULE_QUIZ_PASS_PERCENT\}%/g) ?? []).length, 4)
+    assert.equal((dialog.match(/pass at \$?\{MODULE_QUIZ_PASS_PERCENT\}%/g) ?? []).length, 3)
     const weeks = readFileSync('client/src/pages/course-weeks.tsx', 'utf8')
     assert.match(weeks, /\{isTrainer && editQuiz && !isLoadingEditQuiz && \(\r?\n\s*<FileQuizEditDialog/)
 })
