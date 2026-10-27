@@ -17,7 +17,6 @@ import {
   Chip,
   MoreActions,
   ResetPasswordDialog,
-  SkeletonRows,
   StatusChip,
   cardClass,
   linkClass,
@@ -27,6 +26,7 @@ import {
   type PathPayload,
   type Tone,
 } from "@/components/AdminParts";
+import { Loading, SkeletonBar, SkeletonCard, SkeletonHeading, SkeletonRows } from "@/components/Skeletons";
 
 interface TeacherDetail {
   id: string;
@@ -197,7 +197,9 @@ export default function AdminTeacherDetail() {
     return shell(
       <>
         <Breadcrumb trail={trail} current="Fellow" />
-        <div className={cardClass}><SkeletonRows rows={4} /></div>
+        <SkeletonHeading />
+        <SkeletonCard label="Loading the Fellow" lines={4} />
+        <SkeletonCard label="Loading cohorts and steps" lines={3} />
       </>,
     );
   }
@@ -218,8 +220,9 @@ export default function AdminTeacherDetail() {
     const modules = ((read?.data as Module[] | undefined) ?? []).slice().sort((a, b) => a.weekNumber - b.weekNumber);
     const files = modules.reduce((sum, module) => sum + (module.deckFiles?.length ?? 0), 0);
     const ready = !!read && !read.isLoading && !read.isError;
+    const failed = !!read && read.isError;
     let tone: Tone = "neutral";
-    let label = "Loading";
+    let label = failed ? "Could not load" : "";
     if (ready) {
       if (modules.length === 0) label = "No modules yet";
       else if (files === 0) {
@@ -227,8 +230,8 @@ export default function AdminTeacherDetail() {
         label = "No lesson files yet";
       } else label = "Has lesson files";
     }
-    const moduleText = !ready ? "…" : modules.length === 0 ? "0" : modules.length === 1 ? `1 · ${modules[0].competencyFocus || "Module 1"}` : String(modules.length);
-    return { ...course, ready, modules, files, tone, label, moduleText };
+    const moduleText = !ready ? "" : modules.length === 0 ? "0" : modules.length === 1 ? `1 · ${modules[0].competencyFocus || "Module 1"}` : String(modules.length);
+    return { ...course, ready, failed, modules, files, tone, label, moduleText };
   });
   const noModules = courseStatus.filter((course) => course.ready && course.modules.length === 0);
   const noFiles = courseStatus.filter((course) => course.ready && course.modules.length > 0 && course.files === 0);
@@ -278,7 +281,7 @@ export default function AdminTeacherDetail() {
           {path && <span className="font-medium text-sl-muted"> · {mine.length}</span>}
         </h2>
         {!path ? (
-          <SkeletonRows rows={2} />
+          <SkeletonRows label="Loading cohorts and steps" rows={2} />
         ) : mine.length === 0 ? (
           <p className="px-5 py-4 text-[15px] text-sl-muted">
             This Fellow is not on any step yet. Tick them on a step under{" "}
@@ -321,9 +324,12 @@ export default function AdminTeacherDetail() {
 
       <section aria-labelledby="course-progress" className={`${cardClass} overflow-hidden`}>
         <h2 id="course-progress" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">
-          Course progress <span className="font-medium text-sl-muted">· {plural(courseList.length, "course")}</span>
+          Course progress
+          {path && <span className="font-medium text-sl-muted"> · {plural(courseList.length, "course")}</span>}
         </h2>
-        {courseStatus.length === 0 ? (
+        {!path ? (
+          <SkeletonRows label="Loading course progress" rows={3} />
+        ) : courseStatus.length === 0 ? (
           <p className="px-5 py-4 text-[15px] text-sl-muted">No course is placed on this Fellow's steps yet.</p>
         ) : (
           <>
@@ -345,8 +351,12 @@ export default function AdminTeacherDetail() {
                           <span className="text-[13px] font-normal text-sl-muted">{course.where}</span>
                         </span>
                       </th>
-                      <td className="px-3 py-3 text-sl-muted">{course.moduleText}</td>
-                      <td className="px-5 py-3"><Chip tone={course.tone}>{course.label}</Chip></td>
+                      <td className="px-3 py-3 text-sl-muted">
+                        {course.ready || course.failed ? course.moduleText : <SkeletonBar className="h-4 w-24" />}
+                      </td>
+                      <td className="px-5 py-3">
+                        {course.ready || course.failed ? <Chip tone={course.tone}>{course.label}</Chip> : <SkeletonBar className="h-6 w-28 rounded-full" />}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -379,7 +389,7 @@ export default function AdminTeacherDetail() {
         <section aria-labelledby="person-attendance" className={`${cardClass} flex flex-col gap-2.5 px-5 py-4`}>
           <h2 id="person-attendance" className="text-lg font-semibold text-sl-ink">Attendance</h2>
           {!attendance ? (
-            <div className="h-10 animate-pulse rounded bg-sl-neutral-soft" aria-busy="true" />
+            <Loading label="Loading attendance"><SkeletonBar className="h-10 w-full" /></Loading>
           ) : !row || row.marked === 0 ? (
             <p className="text-[15px] text-sl-ink">No marks yet.</p>
           ) : (
@@ -401,7 +411,7 @@ export default function AdminTeacherDetail() {
         <section aria-labelledby="person-certificates" className={`${cardClass} flex flex-col gap-2.5 px-5 py-4`}>
           <h2 id="person-certificates" className="text-lg font-semibold text-sl-ink">Certificates</h2>
           {certificates === undefined ? (
-            <div className="h-10 animate-pulse rounded bg-sl-neutral-soft" aria-busy="true" />
+            <Loading label="Loading certificates"><SkeletonBar className="h-10 w-full" /></Loading>
           ) : myCertificates.length === 0 ? (
             <p className="text-[15px] text-sl-ink">None issued yet.</p>
           ) : (
@@ -421,6 +431,7 @@ export default function AdminTeacherDetail() {
           <p className="text-sm leading-relaxed text-sl-muted">
             Tries and scores are in each cohort room's Gradebook.
           </p>
+          {!path && <Loading label="Loading cohorts"><SkeletonBar className="h-4 w-40" /></Loading>}
           <ul className="flex flex-col gap-1 text-sm">
             {mine.map(({ cohort }) => (
               <li key={cohort.id}>
