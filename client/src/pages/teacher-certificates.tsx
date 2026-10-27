@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { AcademyShell } from "@/components/AcademyShell";
 import { SilverleafCertificate } from "@/components/SilverleafCertificate";
+import { SkeletonBar, SkeletonRows, Loading } from "@/components/Skeletons";
 import { Award } from "lucide-react";
 
 type AcademyPath = {
@@ -35,7 +36,7 @@ export default function TeacherCertificates() {
     queryKey: ["/api/teacher", teacherId, "certificates"],
     enabled: Boolean(teacherId),
   });
-  const { data: path } = useQuery<AcademyPath>({
+  const { data: path, isLoading: pathLoading } = useQuery<AcademyPath>({
     queryKey: ["/api/teacher/academy-path"],
     enabled: Boolean(teacherId) && user?.role === "teacher",
   });
@@ -73,9 +74,9 @@ export default function TeacherCertificates() {
           Your certificates
         </h2>
         {isLoading ? (
-          <div className="flex flex-col gap-2.5 px-5 py-[18px]" aria-busy="true">
-            <div className="h-3 w-1/3 rounded bg-sl-neutral-soft" />
-            <div className="h-3 w-2/3 rounded bg-sl-neutral-soft" />
+          <div className="flex flex-col gap-4 p-5">
+            <SkeletonRows label="Loading your certificates" rows={1} className="rounded-xl border border-sl-line" />
+            <SkeletonBar className="aspect-[1024/723] w-full max-w-[560px]" />
           </div>
         ) : certificates.length === 0 ? (
           <div className="flex flex-col gap-1.5 px-5 py-[18px]">
@@ -131,6 +132,14 @@ export default function TeacherCertificates() {
           </ul>
         )}
       </section>
+
+      {pathLoading && !path && (
+        <Loading label="Loading your academy path" className={`${SECTION} flex flex-col gap-3 px-5 py-[18px]`}>
+          <SkeletonBar className="h-5 w-40" />
+          <SkeletonBar className="h-2 w-full" />
+          <SkeletonBar className="h-3.5 w-2/3" />
+        </Loading>
+      )}
 
       {path && (
         <section aria-labelledby="path" className={`${SECTION} flex flex-col gap-3 px-5 py-[18px]`}>
