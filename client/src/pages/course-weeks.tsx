@@ -14,6 +14,8 @@ import { deskName } from "@shared/deskName";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import type { UploadResult } from "@uppy/core";
 import { FilePreview } from "@/components/FilePreview";
+import { SkeletonBar, SkeletonCard, SkeletonHeading } from "@/components/Skeletons";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DndContext,
   closestCenter,
@@ -84,13 +86,15 @@ interface SortableFileItemProps {
   position: number;
   count: number;
   quiz?: { generated: boolean; questionCount: number; approved: boolean };
+  /** The quiz status has not answered: the chip and the quiz button are grey bars, not "Create quiz". */
+  quizLoading?: boolean;
   onView: () => void;
   onDelete: () => void;
   onEditQuiz: () => void;
   onMove: (delta: number) => void;
 }
 
-function SortableFileItem({ file, position, count, quiz, onView, onDelete, onEditQuiz, onMove }: SortableFileItemProps) {
+function SortableFileItem({ file, position, count, quiz, quizLoading = false, onView, onDelete, onEditQuiz, onMove }: SortableFileItemProps) {
   const {
     attributes,
     listeners,
@@ -142,16 +146,25 @@ function SortableFileItem({ file, position, count, quiz, onView, onDelete, onEdi
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        {chip && <Chip tone={chip.tone}>{chip.label}</Chip>}
-        <button
-          type="button"
-          className={isDraft ? BTN_PRIMARY : BTN_SECONDARY}
-          onClick={onEditQuiz}
-          title="Review, edit and approve the quiz Fellows take on this file"
-          data-testid={`button-edit-quiz-${file.id}`}
-        >
-          {isDraft ? "Review and approve" : quiz?.generated ? "Edit quiz" : "Create quiz"}
-        </button>
+        {quizLoading ? (
+          <>
+            <SkeletonBar className="h-6 w-32 rounded-full" />
+            <SkeletonBar className="h-11 w-28 rounded-lg" />
+          </>
+        ) : (
+          <>
+            {chip && <Chip tone={chip.tone}>{chip.label}</Chip>}
+            <button
+              type="button"
+              className={isDraft ? BTN_PRIMARY : BTN_SECONDARY}
+              onClick={onEditQuiz}
+              title="Review, edit and approve the quiz Fellows take on this file"
+              data-testid={`button-edit-quiz-${file.id}`}
+            >
+              {isDraft ? "Review and approve" : quiz?.generated ? "Edit quiz" : "Create quiz"}
+            </button>
+          </>
+        )}
         <button type="button" className={BTN_ICON} onClick={onView} aria-label={`Preview ${file.fileName}`} data-testid={`button-view-${file.id}`}>
           <ExternalLink className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -211,7 +224,7 @@ function SortableWeekItem({
   onEditQuiz,
 }: SortableWeekItemProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
-  const { data: quizStatus } = useQuery<QuizStatus>({
+  const { data: quizStatus, isLoading: quizStatusLoading } = useQuery<QuizStatus>({
     queryKey: [`/api/training-weeks/${week.id}/quiz-status`],
     enabled: isAdmin && (week.deckFiles?.length ?? 0) > 0,
   });
@@ -455,6 +468,7 @@ function SortableWeekItem({
                     position={index + 1}
                     count={files.length}
                     quiz={quizStatus?.[file.id]}
+                    quizLoading={quizStatusLoading}
                     onEditQuiz={() => onEditQuiz(week.id, { id: file.id, fileName: file.fileName })}
                     onMove={(delta) => onMoveFile(week.id, file.id, delta)}
                     onView={() => {
@@ -822,7 +836,13 @@ export default function CourseWeeks() {
       }
     >
       {isLoadingCourse ? (
-        <p className="py-12 text-center text-sl-muted">Loading...</p>
+        <>
+          <h1 className="sr-only">Course</h1>
+          <SkeletonBar className="h-4 w-56" />
+          <SkeletonHeading />
+          <SkeletonCard label="Loading the course" lines={1} />
+          <SkeletonCard label="Loading the modules" lines={3} />
+        </>
       ) : (
         <>
           <nav aria-label="Breadcrumb">
@@ -877,7 +897,7 @@ export default function CourseWeeks() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 id="modules-heading" className="text-lg font-semibold text-sl-ink">
                 Modules{" "}
-                <span className="font-medium text-sl-muted">· {isLoadingWeeks ? "…" : sortedWeeks.length} · Fellows take them in this order</span>
+                {!isLoadingWeeks && <span className="font-medium text-sl-muted">· {sortedWeeks.length} · Fellows take them in this order</span>}
               </h2>
               {isTrainer && (
                 <button
@@ -893,8 +913,9 @@ export default function CourseWeeks() {
             </div>
 
             {isLoadingWeeks ? (
-              <div className="space-y-3" aria-busy="true">
-                <div className="h-24 rounded-xl bg-sl-neutral-soft" />
+              <div className="space-y-3">
+                <SkeletonCard label="Loading the modules" lines={2} />
+                <SkeletonCard label="Loading the modules" lines={2} />
               </div>
             ) : sortedWeeks.length === 0 ? (
               <p className="py-8 text-sm text-sl-muted">
@@ -937,6 +958,20 @@ export default function CourseWeeks() {
         </>
       )}
 
+      {isTrainer && editQuiz && isLoadingEditQuiz && (
+        <Dialog open onOpenChange={(open) => { if (!open) setEditQuiz(null); }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>{editQuiz.fileName}</DialogTitle>
+              <DialogDescription>Review the questions, then approve the quiz.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <SkeletonCard label="Loading the quiz" lines={3} />
+              <SkeletonCard label="Loading the quiz" lines={3} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       {isTrainer && editQuiz && !isLoadingEditQuiz && (
         <FileQuizEditDialog
           open={!!editQuiz}
