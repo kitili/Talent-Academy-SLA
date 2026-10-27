@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, ChevronRight, AlertCircle } from "lucide-react";
+import { Clock } from "lucide-react";
+
+const SECONDARY_BUTTON =
+  "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-[18px] text-[15px] text-sl-ink disabled:opacity-50";
+const PRIMARY_BUTTON =
+  "inline-flex min-h-[44px] items-center justify-center rounded-lg bg-sl-accent-strong px-[18px] text-[15px] font-semibold text-white disabled:opacity-50";
 
 export interface QuizQuestion {
   id: string;
@@ -125,10 +124,10 @@ export function QuizRunner({ questions, quizId, attemptNumber, onComplete, onClo
   // ── COUNTDOWN ──
   if (phase === "countdown") {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <p className="text-lg text-muted-foreground">Quiz starting in</p>
-        <span className="text-7xl font-bold text-primary">{countdown}</span>
-        <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+      <div className="flex h-64 flex-col items-center justify-center gap-4">
+        <p className="m-0 text-lg text-sl-muted">Quiz starting in</p>
+        <span className="text-7xl font-bold text-sl-accent">{countdown}</span>
+        <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>Cancel</button>
       </div>
     );
   }
@@ -136,51 +135,40 @@ export function QuizRunner({ questions, quizId, attemptNumber, onComplete, onClo
   // ── SUBMITTING ──
   if (phase === "submitting") {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-muted-foreground">Submitting your answers…</p>
+      <div className="flex h-64 flex-col items-center justify-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-sl-accent border-t-transparent" />
+        <p className="m-0 text-sl-muted">Submitting your answers…</p>
       </div>
     );
   }
 
   // ── RESULTS ──
   if (phase === "results" && result) {
+    const chip = result.openEndedPending
+      ? { tone: "bg-sl-attention-soft text-sl-attention", text: `Awaiting review · ${result.score} of ${result.mcqTotal} · ${result.percentage}%` }
+      : result.passed
+        ? { tone: "bg-sl-done-soft text-sl-done", text: `${result.score} of ${result.mcqTotal} · ${result.percentage}% · Passed` }
+        : {
+            tone: "bg-sl-attention-soft text-sl-attention",
+            text: `Not passed · ${result.score} of ${result.mcqTotal} · ${result.percentage}% · ${
+              result.remainingAttempts > 0
+                ? `${result.remainingAttempts} ${result.remainingAttempts === 1 ? "try" : "tries"} left`
+                : "no tries left"
+            }`,
+          };
     return (
-      <div className="flex flex-col gap-5 p-2">
-        <div className="text-center">
-          {result.openEndedPending ? (
-            <div className="flex flex-col items-center gap-2">
-              <AlertCircle className="h-12 w-12 text-yellow-500" />
-              <h2 className="text-xl font-semibold">MCQ Complete — Awaiting Review</h2>
-              <p className="text-sm text-muted-foreground">
-                Your MCQ score: {result.score}/{result.mcqTotal} ({result.percentage}%). <br />
-                Your written answers are being reviewed by your trainer.
-              </p>
-              <Badge variant="secondary" className="mt-1">Pending trainer review</Badge>
-            </div>
-          ) : result.passed ? (
-            <div className="flex flex-col items-center gap-2">
-              <CheckCircle className="h-12 w-12 text-green-500" />
-              <h2 className="text-xl font-semibold text-green-600">Passed!</h2>
-              <p className="text-sm text-muted-foreground">
-                Score: {result.score}/{result.mcqTotal} ({result.percentage}%)
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <XCircle className="h-12 w-12 text-red-500" />
-              <h2 className="text-xl font-semibold text-red-600">Not passed</h2>
-              <p className="text-sm text-muted-foreground">
-                Score: {result.score}/{result.mcqTotal} ({result.percentage}%){" "}
-                {result.remainingAttempts > 0 && `— ${result.remainingAttempts} attempt(s) remaining`}
-              </p>
-            </div>
-          )}
-        </div>
+      <div className="flex flex-col gap-4">
+        <h2 className="m-0 text-lg font-semibold text-sl-ink">Your result</h2>
+        <p className="m-0">
+          <span className={`inline-block rounded-full px-3 py-1 text-[13px] font-semibold ${chip.tone}`}>{chip.text}</span>
+        </p>
+        {result.openEndedPending && (
+          <p className="m-0 text-sm text-sl-muted">Your written answers are being reviewed by your trainer.</p>
+        )}
 
-        {/* Answer review — only show correct answers if passed; hide if failed */}
+        {/* Right or wrong shows after every try; the correct answer only when the server sends it (after a pass). */}
         {!result.openEndedPending && (
-          <div className="space-y-3 max-h-72 overflow-y-auto">
+          <ol className="m-0 flex max-h-80 list-none flex-col gap-2 overflow-y-auto p-0">
             {questions.map((q, idx) => {
               const given = result.answers[q.id] ?? "";
               const reviewed = result.review?.find((item) => item.id === q.id);
@@ -188,105 +176,130 @@ export function QuizRunner({ questions, quizId, attemptNumber, onComplete, onClo
               const isCorrect = q.type === "open_ended" ? null : reviewed?.correct === true;
 
               return (
-                <div key={q.id} className="border rounded p-3 text-sm space-y-1">
-                  <div className="flex items-start gap-2">
+                <li key={q.id} className="flex flex-col gap-1 rounded-[10px] border border-sl-line px-3 py-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-sl-ink">{idx + 1}. {q.question}</span>
                     {q.type !== "open_ended" && (
-                      isCorrect
-                        ? <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
-                        : <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          isCorrect ? "bg-sl-done-soft text-sl-done" : "bg-sl-risk-soft text-sl-risk"
+                        }`}
+                      >
+                        {isCorrect ? "Right" : "Wrong"}
+                      </span>
                     )}
-                    <span className="font-medium">{idx + 1}. {q.question}</span>
                   </div>
                   {q.type === "open_ended" ? (
-                    <p className="text-muted-foreground pl-6 italic">{given || "(no answer)"}</p>
+                    <span className="text-[13px] italic text-sl-muted">{given || "(no answer)"}</span>
                   ) : (
-                    <>
-                      <p className="pl-6">Your answer: <span className={isCorrect ? "text-green-600" : "text-red-600"}>{given || "(none)"}</span></p>
-                      {result.passed && !isCorrect && (
-                        <p className="pl-6 text-green-600">Correct: {correct}</p>
-                      )}
-                    </>
+                    <span className="text-[13px] text-sl-muted">
+                      Your answer: {given || "(none)"}
+                      {result.passed && !isCorrect ? ` · correct answer: ${correct}` : ""}
+                    </span>
                   )}
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ol>
         )}
 
-        <Button onClick={onClose} className="w-full">Close</Button>
+        <div className="flex justify-end">
+          <button type="button" className={PRIMARY_BUTTON} onClick={onClose}>Close</button>
+        </div>
       </div>
     );
   }
 
   // ── QUESTION ──
   return (
-    <div className="flex flex-col gap-5">
-      {/* Header: progress + timer */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>Question {currentIndex + 1} of {totalQuestions}</span>
-        <div className={`flex items-center gap-1 font-mono ${timerWarning ? "text-red-500" : ""}`}>
-          <Clock className="h-4 w-4" />
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between text-sm text-sl-muted">
+        <span>Question {currentIndex + 1} of {totalQuestions} · try {attemptNumber}</span>
+        <div className={`flex items-center gap-1 font-mono ${timerWarning ? "text-sl-risk" : ""}`}>
+          <Clock aria-hidden="true" className="h-4 w-4" />
           <span>{timeLeft}s</span>
         </div>
       </div>
 
+      {/* Progress dots, one per question */}
+      <div
+        role="progressbar"
+        aria-label={`Question ${currentIndex + 1} of ${totalQuestions}`}
+        aria-valuemin={1}
+        aria-valuemax={totalQuestions}
+        aria-valuenow={currentIndex + 1}
+        className="flex gap-1.5"
+      >
+        {questions.map((question, index) => (
+          <span
+            key={question.id}
+            className={`h-1.5 flex-1 rounded-sm ${index <= currentIndex ? "bg-sl-accent-strong" : "bg-sl-line"}`}
+          />
+        ))}
+      </div>
+
       {/* Timer bar */}
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+      <div className="h-1 overflow-hidden rounded-full bg-sl-line">
         <div
-          className={`h-full rounded-full transition-all ${timerWarning ? "bg-red-500" : "bg-primary"}`}
+          className={`h-full rounded-full transition-all ${timerWarning ? "bg-sl-risk" : "bg-sl-accent-strong"}`}
           style={{ width: `${timerPercent}%` }}
         />
       </div>
 
-      {/* Overall progress */}
-      <Progress value={((currentIndex) / totalQuestions) * 100} className="h-1" />
-
-      {/* Question */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs capitalize">
-            {currentQuestion.type.replace("_", " ")}
-          </Badge>
-        </div>
-        <p className="text-base font-medium leading-relaxed">{currentQuestion.question}</p>
-      </div>
-
-      {/* Answer area */}
       {currentQuestion.type === "open_ended" ? (
-        <Textarea
-          placeholder="Type your answer here…"
-          value={currentAnswer}
-          onChange={e => setCurrentAnswer(e.target.value)}
-          rows={5}
-          className="resize-none"
-        />
+        <div className="flex flex-col gap-2.5">
+          <label htmlFor={`answer-${currentIndex}`} className="pb-1 text-[17px] font-semibold leading-snug text-sl-ink">
+            {currentIndex + 1}. {currentQuestion.question}
+          </label>
+          <textarea
+            id={`answer-${currentIndex}`}
+            placeholder="Type your answer here…"
+            value={currentAnswer}
+            onChange={e => setCurrentAnswer(e.target.value)}
+            rows={5}
+            className="resize-none rounded-lg border border-sl-control bg-sl-surface px-3 py-2.5 text-[15px] text-sl-ink"
+          />
+        </div>
       ) : (
-        <RadioGroup
-          value={currentAnswer}
-          onValueChange={setCurrentAnswer}
-          className="space-y-2"
-        >
-          {(currentQuestion.options ?? []).map(option => (
-            <div key={option} className="flex items-center space-x-2 border rounded px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
-              <RadioGroupItem value={option} id={`opt-${option}`} />
-              <Label htmlFor={`opt-${option}`} className="cursor-pointer flex-1">{option}</Label>
-            </div>
-          ))}
-        </RadioGroup>
+        <fieldset className="m-0 flex flex-col gap-2.5 border-0 p-0">
+          <legend className="pb-3 text-[17px] font-semibold leading-snug text-sl-ink">
+            {currentIndex + 1}. {currentQuestion.question}
+          </legend>
+          {(currentQuestion.options ?? []).map((option, optionIndex) => {
+            const checked = currentAnswer === option;
+            const id = `opt-${currentIndex}-${optionIndex}`;
+            return (
+              <div
+                key={option}
+                className={`flex min-h-[48px] items-center gap-3 rounded-lg border px-3.5 ${
+                  checked ? "border-sl-accent bg-sl-accent-soft" : "border-sl-control bg-sl-surface"
+                }`}
+              >
+                <input
+                  type="radio"
+                  id={id}
+                  name={`question-${currentQuestion.id}`}
+                  checked={checked}
+                  onChange={() => setCurrentAnswer(option)}
+                  className="m-0 h-[18px] w-[18px] accent-[rgb(var(--sl-accent-strong))]"
+                />
+                <label htmlFor={id} className="flex-1 cursor-pointer py-[13px] text-[15px] text-sl-ink">{option}</label>
+              </div>
+            );
+          })}
+        </fieldset>
       )}
 
-      {/* Submit button */}
-      <Button
-        onClick={handleSubmitAnswer}
-        disabled={currentQuestion.type !== "open_ended" && !currentAnswer}
-        className="w-full"
-      >
-        {currentIndex + 1 < totalQuestions ? (
-          <><ChevronRight className="h-4 w-4 mr-1" /> Next</>
-        ) : (
-          "Submit Quiz"
-        )}
-      </Button>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSubmitAnswer}
+          disabled={currentQuestion.type !== "open_ended" && !currentAnswer}
+          className={PRIMARY_BUTTON}
+        >
+          {currentIndex + 1 < totalQuestions ? "Next" : "Submit answers"}
+        </button>
+      </div>
     </div>
   );
 }
