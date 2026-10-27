@@ -3,9 +3,19 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { FileText, Presentation, FileSpreadsheet } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { Loading, SkeletonBar } from '@/components/Skeletons';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+/** The thumbnail's place, in grey, until the first page has drawn. */
+function ThumbnailSkeleton() {
+  return (
+    <Loading label="Loading the preview" className="flex items-center justify-center">
+      <SkeletonBar className="h-[60px] w-20" />
+    </Loading>
+  );
+}
 
 interface FilePreviewProps {
   fileName: string;
@@ -29,10 +39,12 @@ export function FilePreview({ fileName, fileUrl, className = "" }: FilePreviewPr
         <Document
           file={fileUrl}
           onLoadError={() => setThumbnailError(true)}
+          loading={<ThumbnailSkeleton />}
           className="flex items-center justify-center"
         >
           <Page
             pageNumber={1}
+            loading={<ThumbnailSkeleton />}
             width={80}
             renderTextLayer={false}
             renderAnnotationLayer={false}

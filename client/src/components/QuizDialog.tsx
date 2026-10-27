@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
+import { SkeletonCard } from "@/components/Skeletons";
 import { useToast } from "@/hooks/use-toast";
 
 interface QuizDialogProps {
@@ -140,9 +141,9 @@ export function QuizDialog({ weekId, open, onOpenChange }: QuizDialogProps) {
         </DialogHeader>
 
         {quizState === 'loading' && (
-          <div className="flex flex-col items-center justify-center py-12" role="status">
-            <Loader2 className="mb-4 h-12 w-12 animate-spin text-sl-accent" aria-hidden="true" />
-            <p className="text-sl-muted">Analyzing training content...</p>
+          <div className="space-y-6 py-4">
+            <SkeletonCard label="Preparing your quiz" lines={3} />
+            <SkeletonCard label="Preparing your quiz" lines={3} />
           </div>
         )}
 
