@@ -10,6 +10,7 @@ import {
   summarizeTrainerDesk,
 } from "../shared/trainerDesk.ts";
 import { encouragementCandidate, hallDay } from "../shared/encouragement.ts";
+import { DESK_MENUS } from "../client/src/components/deskMenu.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
@@ -131,15 +132,19 @@ describe("trainer desk wiring", () => {
     assert.equal(trainer.includes('href="/courses"'), false);
     assert.equal(trainer.includes("button-trainer-courses"), false);
     assert.match(trainer, /link-batch-course-\$\{course\.id\}/);
-    assert.match(trainer, /data-testid="trainer-sidebar"/);
-    assert.match(trainer, /trainer-nav-\$\{item\.id\}/);
-    assert.match(trainer, /id: "assessments"/);
+    // The shell draws the side menu from DESK_MENUS.trainer; the page names the current section and switches it in place.
+    assert.match(trainer, /desk="trainer"/);
+    assert.match(trainer, /onNavigate=/);
+    assert.match(trainer, /DESK_MENUS\.trainer\.map/);
+    assert.equal(trainer.includes('data-testid="trainer-sidebar"'), false);
+    assert.equal(trainer.includes("button-back-to-desk"), false);
+    for (const item of DESK_MENUS.trainer) assert.match(trainer, new RegExp(`\\b${item.key}: render`));
     assert.equal(trainer.includes('id: "assignments"'), false);
     assert.equal(trainer.includes('id: "certificates"'), false);
     assert.equal(trainer.includes('id: "assessments", label: "Assessments", icon'), false);
     assert.equal(trainer.includes('id: "quizzes", label: "Quizzes", icon'), false);
     assert.equal(trainer.includes('id: "teachers", label: "Teachers", icon'), false);
-    assert.match(trainer, /id: "messages"/);
+    assert.match(trainer, /new URLSearchParams\(search\)\.get\("tab"\)/);
     assert.match(trainer, /data-testid="trainer-quizzes"/);
     assert.match(trainer, /data-testid="trainer-assessments"/);
     assert.match(trainer, /dueDate: deadlineIso/);

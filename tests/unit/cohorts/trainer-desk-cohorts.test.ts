@@ -25,7 +25,7 @@ test('the Progress tab links a Fellow\'s lesson file history for a module they a
 
 test('the trainer desk says cohort for a cohort and Fellow for the learner', () => {
     assert.doesNotMatch(page, /(to|from|in) (this )?batch\b|Batch Schedule|Batch deleted|Select Week|Teacher progress/)
-    assert.match(page, />Cohort schedule</)
+    assert.match(page, /Sessions and deadlines on your/)
     assert.match(page, /"Fellow added to the cohort"/)
-    assert.match(page, />Fellow progress</)
+    assert.match(page, /Where each Fellow is in each course of a cohort/)
 })
