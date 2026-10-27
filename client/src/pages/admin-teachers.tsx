@@ -1,26 +1,34 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ChevronRight, Plus, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { filterByQuery, ListSearch, PageStrip, usePager } from "@/components/PageStrip";
-import { AdminPage } from "@/components/AdminPage";
+import { filterByQuery, PageStrip, usePager } from "@/components/PageStrip";
+import {
+  AccessDenied,
+  PageHeader,
+  SkeletonRows,
+  StatusChip,
+  cardClass,
+  inputClass,
+  linkClass,
+  primaryButton,
+  type PathPayload,
+} from "@/components/AdminParts";
 
 interface Teacher {
   id: string;
@@ -36,7 +44,8 @@ interface Teacher {
   courseCompletion?: number;
 }
 
-export default function AdminTeachers({ embedded = false }: { embedded?: boolean }) {
+/** The Fellows tab of People. Fellows are stored as teachers. Edit and Remove now sit on the Fellow's own page. */
+export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -50,6 +59,11 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
   const { data: teachers, isLoading, isError } = useQuery<Teacher[]>({
     queryKey: ["/api/admin/teachers"],
   });
+  // The cohorts a Fellow is in come from the steps they are ticked on (the Cohorts page read).
+  const { data: path } = useQuery<PathPayload>({
+    queryKey: ["/api/admin/academy-path"],
+    enabled: user?.role === "admin",
+  });
   const [listQuery, setListQuery] = useState("");
   const filteredTeachers = filterByQuery(
     teachers ?? [],
@@ -59,32 +73,12 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
   const activeTeachers = filteredTeachers.filter((teacher) => teacher.approvalStatus !== "inactive");
   const inactiveTeachers = filteredTeachers.filter((teacher) => teacher.approvalStatus === "inactive");
   const teacherPager = usePager(activeTeachers);
+  const allActive = (teachers ?? []).filter((teacher) => teacher.approvalStatus !== "inactive");
 
-  const [editTeacher, setEditTeacher] = useState<Teacher | null>(null);
-
-  const updateTeacherMutation = useMutation({
-    mutationFn: async (data: { id: string; name: string; email: string }) => {
-      const res = await apiRequest("PATCH", `/api/admin/teachers/${data.id}`, { name: data.name, email: data.email });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Fellow updated" });
-      setEditTeacher(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
-    },
-    onError: (error: Error) => toast({ title: "Update failed", description: error.message, variant: "destructive" }),
-  });
-
-  const deleteTeacherMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/admin/dismiss-teacher/${id}`);
-    },
-    onSuccess: () => {
-      toast({ title: "Fellow removed" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers"] });
-    },
-    onError: (error: Error) => toast({ title: "Remove failed", description: error.message, variant: "destructive" }),
-  });
+  const cohortsOf = (teacherId: string) => {
+    if (!path) return "…";
+    return String(path.cohorts.filter((cohort) => cohort.batches.some((step) => (step.teachers || []).some((person) => person.id === teacherId))).length);
+  };
 
   const createTeacherMutation = useMutation({
     mutationFn: async (data: { name: string; email: string; password: string }) => {
@@ -131,43 +125,21 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
   };
 
   if (user?.role !== "admin") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="p-8 text-center max-w-md">
-          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-          <p className="text-muted-foreground">
-            Only administrators can access this page.
-          </p>
-        </Card>
-      </div>
-    );
+    return <AccessDenied />;
   }
 
   return (
-    <AdminPage embedded={embedded} scene="garden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 md:mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate("/admin")}
-              data-testid="button-back-dashboard"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Fellows</h1>
-              <p className="text-muted-foreground">
-                Active Fellows are listed here. Inactive desks stay folded below.
-              </p>
-            </div>
-          </div>
-          <ListSearch value={listQuery} onChange={setListQuery} placeholder="Search Fellows" />
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="People"
+        tabs={tabs}
+        actions={
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <Button type="button" data-testid="button-add-teacher" onClick={() => setIsDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Fellow
-            </Button>
+            <DialogTrigger asChild>
+              <button type="button" className={primaryButton} data-testid="button-add-teacher">
+                Add a Fellow
+              </button>
+            </DialogTrigger>
             <DialogContent onCloseAutoFocus={(event) => event.preventDefault()}>
               <DialogHeader>
                 <DialogTitle>Add a Fellow</DialogTitle>
@@ -235,175 +207,114 @@ export default function AdminTeachers({ embedded = false }: { embedded?: boolean
               </form>
             </DialogContent>
           </Dialog>
+        }
+      />
+
+      <section aria-labelledby="fellows-list" className={`${cardClass} overflow-hidden`}>
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-sl-line px-5 py-4">
+          <h2 id="fellows-list" className="text-lg font-semibold text-sl-ink">
+            Active Fellows
+            {!isLoading && !isError && <span className="font-medium text-sl-muted"> · {allActive.length}</span>}
+          </h2>
+          <div className="flex min-w-[220px] flex-col gap-1.5 sm:w-80">
+            <label htmlFor="people-search" className="text-[13px] text-sl-muted">Find a Fellow</label>
+            <input
+              id="people-search"
+              type="search"
+              className={inputClass}
+              placeholder="Name, Fellow ID or email"
+              value={listQuery}
+              onChange={(e) => setListQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="p-6 animate-pulse bg-muted h-24" />
-            ))}
-          </div>
+          <SkeletonRows />
         ) : isError ? (
-          <Card className="p-8 text-center">
-            <p className="font-semibold">Could not load Fellows</p>
-            <p className="text-muted-foreground mt-1">Open Cohorts, or refresh this page.</p>
-          </Card>
-        ) : teachers && teachers.length > 0 ? (
-          <div className="space-y-4">
-            {teacherPager.slice.map((teacher) => (
-              <Card
-                key={teacher.id}
-                className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => navigate(`/admin/teachers/${teacher.id}`)}
-                data-testid={`card-teacher-${teacher.id}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold">{teacher.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          ID: {teacher.teacherId} | {teacher.email}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={
-                          teacher.approvalStatus === "approved"
-                            ? "default"
-                            : teacher.approvalStatus === "pending"
-                            ? "secondary"
-                            : "destructive"
-                        }
-                      >
-                        {teacher.approvalStatus}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Progress
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {teacher.progress || 0}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Course Completion
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {teacher.courseCompletion || 0}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Files Viewed
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {teacher.filesViewed || 0}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Last Active
-                        </p>
-                        <p className="text-sm font-semibold">
-                          {teacher.lastLogin
-                            ? format(new Date(teacher.lastLogin), "MMM d")
-                            : "Never"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Progress value={teacher.progress || 0} className="h-2" />
-                  </div>
-
-                  <div className="flex items-start gap-2 ml-4 flex-shrink-0 mt-1">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditTeacher(teacher);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Remove ${teacher.name}?`)) deleteTeacherMutation.mutate(teacher.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground mt-2" />
-                  </div>
-                </div>
-              </Card>
-            ))}
-            <PageStrip page={teacherPager.page} pages={teacherPager.pages} setPage={teacherPager.setPage} />
-            {inactiveTeachers.length > 0 && (
-              <details className="rounded-xl border p-4" data-testid="inactive-teachers">
-                <summary className="cursor-pointer font-medium">Inactive ({inactiveTeachers.length})</summary>
-                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                  {inactiveTeachers.map((teacher) => (
-                    <li key={teacher.id}>{teacher.name} · {teacher.email}</li>
-                  ))}
-                </ul>
-              </details>
-            )}
+          <div className="px-5 py-6">
+            <p className="font-semibold text-sl-ink">Could not load Fellows</p>
+            <p className="mt-1 text-sm text-sl-muted">Open Cohorts, or refresh this page.</p>
           </div>
+        ) : (teachers ?? []).length === 0 ? (
+          <p className="px-5 py-6 text-[15px] text-sl-muted">No Fellows yet. Add one, or approve a request from the sign-in page.</p>
         ) : (
-          <Card className="p-8 text-center">
-            <p className="text-muted-foreground">No Fellows found</p>
-          </Card>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse text-sm">
+                <thead>
+                  <tr className="text-left text-sl-muted">
+                    <th scope="col" className="px-5 py-2.5 font-medium">Fellow</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Email</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Cohorts</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Progress</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Last active</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Status</th>
+                    <th scope="col" className="px-5 py-2.5"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teacherPager.slice.map((teacher) => (
+                    <tr key={teacher.id} className="border-t border-sl-line" data-testid={`card-teacher-${teacher.id}`}>
+                      <th scope="row" className="px-5 py-3.5 text-left font-semibold text-sl-ink">
+                        <span className="flex flex-col gap-0.5">
+                          <span>{teacher.name}</span>
+                          <span className="text-[13px] font-normal text-sl-muted">Fellow ID {teacher.teacherId}</span>
+                        </span>
+                      </th>
+                      <td className="px-3 py-3.5 text-sl-ink">{teacher.email}</td>
+                      <td className="px-3 py-3.5 text-sl-ink">{cohortsOf(teacher.id)}</td>
+                      <td className="px-3 py-3.5 text-sl-ink">{teacher.progress || 0}%</td>
+                      <td className="px-3 py-3.5 text-sl-muted">
+                        {teacher.lastLogin ? format(new Date(teacher.lastLogin), "d MMM") : "Not recorded"}
+                      </td>
+                      <td className="px-3 py-3.5"><StatusChip status={teacher.approvalStatus} /></td>
+                      <td className="px-5 py-1.5 text-right">
+                        <a
+                          href={`/admin/teachers/${teacher.id}`}
+                          aria-label={`Open ${teacher.name}`}
+                          className={`${linkClass} inline-flex min-h-[44px] items-center font-semibold no-underline hover:underline`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            navigate(`/admin/teachers/${teacher.id}`);
+                          }}
+                        >
+                          Open
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                  {activeTeachers.length === 0 && (
+                    <tr className="border-t border-sl-line">
+                      <td colSpan={7} className="px-5 py-5 text-sl-muted">No Fellow matches “{listQuery.trim()}”.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-5">
+              <PageStrip page={teacherPager.page} pages={teacherPager.pages} setPage={teacherPager.setPage} />
+            </div>
+          </>
         )}
-        <Dialog open={Boolean(editTeacher)} onOpenChange={(open) => { if (!open) setEditTeacher(null); }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Fellow</DialogTitle>
-              <DialogDescription>Update name and email. This is Moodle-style participant CRUD.</DialogDescription>
-            </DialogHeader>
-            {editTeacher && (
-              <form
-                className="space-y-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  updateTeacherMutation.mutate({
-                    id: editTeacher.id,
-                    name: editTeacher.name,
-                    email: editTeacher.email,
-                  });
-                }}
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="edit-teacher-name">Name</Label>
-                  <Input
-                    id="edit-teacher-name"
-                    value={editTeacher.name}
-                    onChange={(e) => setEditTeacher({ ...editTeacher, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-teacher-email">Email</Label>
-                  <Input
-                    id="edit-teacher-email"
-                    type="email"
-                    value={editTeacher.email}
-                    onChange={(e) => setEditTeacher({ ...editTeacher, email: e.target.value })}
-                  />
-                </div>
-                <Button type="submit" disabled={updateTeacherMutation.isPending}>Save</Button>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>
-    </AdminPage>
+
+        <details className="border-t border-sl-line" data-testid="inactive-teachers">
+          <summary className="min-h-[44px] cursor-pointer px-5 py-3 text-[15px] font-semibold text-sl-neutral">
+            Inactive desks · {inactiveTeachers.length}
+          </summary>
+          {inactiveTeachers.length === 0 ? (
+            <p className="px-5 pb-4 text-sm leading-relaxed text-sl-muted">
+              No inactive Fellow desks. A deactivated desk folds in here; it is not deleted.
+            </p>
+          ) : (
+            <ul className="space-y-2 px-5 pb-4 text-sm text-sl-muted">
+              {inactiveTeachers.map((teacher) => (
+                <li key={teacher.id}>{teacher.name} · {teacher.email}</li>
+              ))}
+            </ul>
+          )}
+        </details>
+      </section>
+    </div>
   );
 }
