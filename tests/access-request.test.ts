@@ -48,7 +48,7 @@ describe("sign-in portal", () => {
     assert.match(page, /Request a desk/);
     assert.match(page, /\/api\/access-requests/);
     assert.match(page, /Create your password/);
-    assert.match(approvals, /create their own password/i);
+    assert.match(approvals, /set their own password/i);
     assert.match(read("server/auth.ts"), /signInBlock/);
   });
 });
