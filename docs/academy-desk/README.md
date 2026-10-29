@@ -23,6 +23,16 @@ Everything here is shipped unless a section says **Not built**.
 
 | Admin cohort page | Shows Trainers, Fellows and **Courses in order**. The Fellows listed are the cohort's own roster (`batch_teachers`), so Fellows a Trainer registered or enrolled appear; **Manage the roster** ticks Fellows in and out of the cohort (progress is kept). A cohort's first course starts its first part automatically; parts (steps) are under **Split into parts (advanced)**. |
 
+## Demo academy
+
+`scripts/demo-academy.ts seed` builds a Demo academy over HTTP through the app's own routes. It creates accounts
+(Admin, an instructional and an in-house Trainer, two in-house and two pre-service Fellows), a Demo cohort, two
+courses with video lessons, sessions, the academy year (published with Done), assessments, a quiz and a written exam.
+Then it does the work as each Fellow and marks it as the Trainer. Every name starts with "Demo"; every email is
+`demo.…@example.com`. The password is written to `demo-accounts.local.md`, which git ignores. `remove` deletes the
+Demo cohort, courses and academy-year rows and makes the demo people inactive, so their emails stay taken; a rerun
+sets `DEMO_EMAIL_TAG`. Seeded on the live site on 2026-10-29 (60 of 60 steps).
+
 ## Rules worth knowing
 
 - A kind is chosen on the request form and changed afterwards by an Admin (Trainer or Fellow page) or, for a Fellow,
@@ -33,6 +43,12 @@ Everything here is shipped unless a section says **Not built**.
 - Session times travel as an instant (the browser's zone is applied before sending). Academy-year entries are whole days
   (UTC midnight, printed in UTC).
 - Roster and Fellow lists never send a password hash.
+- A Trainer acts only on their own cohorts and Fellows (since 2026-10-29). This covers: resetting a Fellow's password,
+  comments, attendance (only Fellows enrolled in that cohort), announcements, disqualifying, and marking open quiz
+  answers (the attempt names the Fellow and quiz, not the request). Desk mail goes from a Fellow to staff, or from a
+  Trainer to staff or their own Fellows.
+- Removing a Fellow or a Trainer makes the desk inactive; it never deletes the row (a delete cascaded through cohorts,
+  exams, marks and certificates).
 
 ## Files
 
