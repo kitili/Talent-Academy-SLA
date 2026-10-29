@@ -108,6 +108,7 @@ import {
   teacherProfiles,
   openEndedReviews,
   writtenAssignments,
+  writtenAssignmentTeachers,
   assignmentSubmissions,
   discussionPosts,
   deskMessages,
@@ -121,6 +122,7 @@ import {
 import { db } from "./db";
 import { eq, and, or, sql as sqlOp, desc, max, inArray } from "drizzle-orm";
 import { quizVisibleToTeacher, summarizeTrainerDesk, type TrainerCohortSummary } from "@shared/trainerDesk";
+import { assignmentRoster, audienceWithNames } from "@shared/academyPeople";
 import { courseHealth, quizStoppedReason } from "./cohortAccess";
 import { batchRiskStatus, moduleCoveragePercentage } from "./progressLogic";
 import { computeCourseCompletion } from "./completion";
@@ -129,6 +131,25 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 
 import { resolveDatabaseUrl } from "./databaseUrl";
+
+/**
+ * Raw SQL (`db.execute`) returns a `timestamp` column as text with no zone, such as `2026-10-29 13:46:08.395`. The app
+ * stores UTC there, but a browser reads zone-less text in its own zone, three hours off in Dar es Salaam. Rows that go
+ * to a page through raw SQL pass their timestamp columns through this, which marks them as the UTC they are.
+ */
+export function utcTimestamps<T extends Record<string, unknown>>(rows: T[], keys: string[]): T[] {
+  return rows.map((row) => {
+    const copy: Record<string, unknown> = { ...row };
+    for (const key of keys) {
+      const value = copy[key];
+      if (typeof value === "string" && value && !/(Z|[+-]\d\d(:?\d\d)?)$/.test(value)) {
+        const date = new Date(`${value.replace(" ", "T")}Z`);
+        if (!Number.isNaN(date.getTime())) copy[key] = date.toISOString();
+      }
+    }
+    return copy as T;
+  });
+}
 import { TALENT_SIGNATORY_1, TALENT_SIGNATORY_2 } from "@shared/talentCertificate";
 import { kindForIssue, wordingForIssue } from "@shared/certificateDesigns";
 
@@ -416,6 +437,7 @@ export interface IStorage {
   createScheduledEvent(event: InsertScheduledEvent): Promise<ScheduledEvent>;
   getScheduledEvents(batchId: string): Promise<ScheduledEvent[]>;
   getScheduledEventsForTeacher(teacherId: string): Promise<ScheduledEvent[]>;
+  updateScheduledEvent(id: string, updates: Partial<InsertScheduledEvent>): Promise<ScheduledEvent | undefined>;
   deleteScheduledEvent(id: string): Promise<void>;
 
   // User profile operations (admin/trainer)
@@ -2164,6 +2186,10 @@ export class DatabaseStorage implements IStorage {
             SELECT 1 FROM assignment_submissions s
             WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id
           )
+          AND (
+            NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+            OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = bt.teacher_id)
+          )
       `);
       const enrolledTeachers = Number(enrolled[0]?.count || 0);
       const completionPercentage = Math.round(Number(completion[0]?.avg || 0) * 10) / 10;
@@ -2224,6 +2250,17 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
+    const [uploaded, waiting] = await Promise.all([
+      db.select({ count: sqlOp`COUNT(*)::int` }).from(writtenAssignments).where(and(
+        inArray(writtenAssignments.batchId, ids),
+        eq(writtenAssignments.kind, "assessment"),
+      )),
+      db.select({ count: sqlOp`COUNT(*)::int` })
+        .from(assignmentSubmissions)
+        .innerJoin(writtenAssignments, eq(writtenAssignments.id, assignmentSubmissions.assignmentId))
+        .where(and(inArray(writtenAssignments.batchId, ids), sqlOp`${assignmentSubmissions.trainerScore} IS NULL`)),
+    ]);
+
     const [quizRows, stepRows, attendance, certs, events, people, progress] = await Promise.all([
       db.select({
         status: assignedQuizzes.status,
@@ -2240,6 +2277,7 @@ export class DatabaseStorage implements IStorage {
       db.select({ count: sqlOp`COUNT(*)::int` }).from(teacherCertificates).where(inArray(teacherCertificates.batchId, ids)),
       db.select({ count: sqlOp`COUNT(*)::int` }).from(scheduledEvents).where(and(
         inArray(scheduledEvents.batchId, ids),
+        eq(scheduledEvents.eventType, "session"),
         sqlOp`${scheduledEvents.startDate} >= now()`,
       )),
       db.select({ count: sqlOp`COUNT(DISTINCT ${batchTeachers.teacherId})::int` }).from(batchTeachers).where(inArray(batchTeachers.batchId, ids)),
@@ -2268,6 +2306,8 @@ export class DatabaseStorage implements IStorage {
       certificateCount: Number(certs[0]?.count || 0),
       upcomingEvents: Number(events[0]?.count || 0),
       progressPercent: progressAvg === null || progressAvg === undefined ? null : Number(progressAvg),
+      uploadedAssessments: Number(uploaded[0]?.count || 0),
+      toMark: Number(waiting[0]?.count || 0),
     });
   }
 
@@ -2326,12 +2366,28 @@ export class DatabaseStorage implements IStorage {
       else genderDistribution.notSpecified += cnt;
     }
 
-    // Participation rate: teachers in at least one batch / total approved
-    const participatingResult = await db
-      .select({ count: sqlOp`COUNT(DISTINCT ${batchTeachers.teacherId})::int` })
-      .from(batchTeachers);
-    const participating = Number(participatingResult[0]?.count) || 0;
-    const participationRate = totalCandidates > 0 ? Math.round((participating / totalCandidates) * 1000) / 10 : 0;
+    // Enrolled: approved Fellows on at least one cohort.
+    const enrolledResult = await db.execute(sqlOp`
+      SELECT COUNT(DISTINCT bt.teacher_id)::int AS count
+      FROM batch_teachers bt
+      JOIN teachers t ON t.id = bt.teacher_id AND t.approval_status = 'approved'
+    `);
+    const enrolled = Number((enrolledResult.rows?.[0] as { count?: number } | undefined)?.count) || 0;
+
+    // Participation rate: approved Fellows who opened a lesson, tried a quiz or handed in work in the last 30 days.
+    const activeResult = await db.execute(sqlOp`
+      SELECT COUNT(*)::int AS count
+      FROM teachers t
+      WHERE t.approval_status = 'approved'
+        AND (
+          EXISTS (SELECT 1 FROM teacher_content_progress p WHERE p.teacher_id = t.id
+                  AND GREATEST(p.viewed_at, p.completed_at) >= now() - interval '30 days')
+          OR EXISTS (SELECT 1 FROM teacher_quiz_attempts a WHERE a.teacher_id = t.id AND a.completed_at >= now() - interval '30 days')
+          OR EXISTS (SELECT 1 FROM assignment_submissions s WHERE s.teacher_id = t.id AND s.submitted_at >= now() - interval '30 days')
+        )
+    `);
+    const activeLast30Days = Number((activeResult.rows?.[0] as { count?: number } | undefined)?.count) || 0;
+    const participationRate = totalCandidates > 0 ? Math.round((activeLast30Days / totalCandidates) * 1000) / 10 : 0;
 
     // Graduation rate: distinct teachers with certificates / total approved
     const graduatedResult = await db
@@ -2359,6 +2415,8 @@ export class DatabaseStorage implements IStorage {
 
     return {
       totalCandidates,
+      enrolled,
+      activeLast30Days,
       genderDistribution,
       participationRate,
       graduationRate,
@@ -2465,10 +2523,13 @@ export class DatabaseStorage implements IStorage {
       const completionResult = await db
         .select({
           avgCompletion: sqlOp`COALESCE(AVG(CASE WHEN ${teacherCourseCompletion.totalWeeks} > 0 THEN (${teacherCourseCompletion.completedWeeks}::float / ${teacherCourseCompletion.totalWeeks}) * 100 ELSE 0 END), 0)::float`,
+          rows: sqlOp`COUNT(*)::int`,
         })
         .from(teacherCourseCompletion)
         .where(eq(teacherCourseCompletion.batchId, batch.id));
       const completionPercentage = Math.round(Number(completionResult[0]?.avgCompletion || 0) * 10) / 10;
+      // A cohort nobody has started has no completion yet: it is neither 0% nor at risk.
+      const hasProgress = Number(completionResult[0]?.rows || 0) > 0;
 
       // Graduation rate (certificates / enrollment)
       const certResult = await db
@@ -2488,8 +2549,8 @@ export class DatabaseStorage implements IStorage {
 
       // Traffic light status
       let status: 'green' | 'yellow' | 'red' = 'green';
-      if (completionPercentage < 50) status = 'red';
-      else if (completionPercentage < 80) status = 'yellow';
+      if (hasProgress && completionPercentage < 50) status = 'red';
+      else if (hasProgress && completionPercentage < 80) status = 'yellow';
 
       cohorts.push({
         batchId: batch.id,
@@ -2497,6 +2558,7 @@ export class DatabaseStorage implements IStorage {
         enrollment: enrollmentCount,
         enrollmentCount,
         completionPercentage,
+        hasProgress,
         graduationRate,
         avgQuizScore,
         status,
@@ -2546,11 +2608,16 @@ export class DatabaseStorage implements IStorage {
           SELECT 1 FROM assignment_submissions s
           WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id
         )
+        AND (
+          NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+          OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = bt.teacher_id)
+        )
     `);
     const cohorts = await this.getCohortAnalytics();
-    const averageCompletion = cohorts.length
-      ? Math.round((cohorts.reduce((sum: number, cohort: any) => sum + Number(cohort.completionPercentage || 0), 0) / cohorts.length) * 10) / 10
-      : 0;
+    const started = cohorts.filter((cohort: any) => cohort.hasProgress);
+    const averageCompletion = started.length
+      ? Math.round((started.reduce((sum: number, cohort: any) => sum + Number(cohort.completionPercentage || 0), 0) / started.length) * 10) / 10
+      : null;
     return {
       teachers: Number(teacherCount?.count || 0),
       trainers: Number(trainerCount?.count || 0),
@@ -3338,7 +3405,12 @@ export class DatabaseStorage implements IStorage {
       WHERE bt.teacher_id = ${teacherId}
       ORDER BY se.start_date ASC
     `);
-    return result.rows as ScheduledEvent[];
+    return utcTimestamps(result.rows as Record<string, unknown>[], ["start_date", "end_date", "created_at"]) as unknown as ScheduledEvent[];
+  }
+
+  async updateScheduledEvent(id: string, updates: Partial<InsertScheduledEvent>): Promise<ScheduledEvent | undefined> {
+    const [row] = await db.update(scheduledEvents).set(updates).where(eq(scheduledEvents.id, id)).returning();
+    return row;
   }
 
   async deleteScheduledEvent(id: string): Promise<void> {
@@ -3399,7 +3471,58 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getWrittenAssignments(batchId: string) {
-    return db.select().from(writtenAssignments).where(eq(writtenAssignments.batchId, batchId)).orderBy(desc(writtenAssignments.createdAt));
+    const rows = await db.select().from(writtenAssignments).where(eq(writtenAssignments.batchId, batchId)).orderBy(desc(writtenAssignments.createdAt));
+    const audience = await this.getWrittenAssignmentAudienceMap(rows.map((row) => row.id));
+    const names = await this.getTeacherNameMap(Object.values(audience).flat());
+    return rows.map((row) => ({
+      ...row,
+      teacherIds: audience[row.id] || [],
+      audience: audienceWithNames(audience[row.id] || [], names),
+    }));
+  }
+
+  /** Display name for each Fellow id (name, else email). Ids with no Fellow are left out. */
+  async getTeacherNameMap(teacherIds: string[]): Promise<Record<string, string>> {
+    const unique = Array.from(new Set(teacherIds.filter(Boolean)));
+    if (unique.length === 0) return {};
+    const rows = await db
+      .select({ id: teachers.id, name: teachers.name, email: teachers.email })
+      .from(teachers)
+      .where(inArray(teachers.id, unique));
+    const map: Record<string, string> = {};
+    for (const row of rows) map[row.id] = row.name || row.email || "Fellow";
+    return map;
+  }
+
+  async replaceWrittenAssignmentAudience(assignmentId: string, teacherIds: string[]): Promise<void> {
+    await db.delete(writtenAssignmentTeachers).where(eq(writtenAssignmentTeachers.assignmentId, assignmentId));
+    const unique = Array.from(new Set(teacherIds.filter(Boolean)));
+    if (unique.length === 0) return;
+    await db.insert(writtenAssignmentTeachers).values(unique.map((teacherId) => ({ assignmentId, teacherId })));
+  }
+
+  async getWrittenAssignmentAudienceMap(assignmentIds: string[]): Promise<Record<string, string[]>> {
+    if (assignmentIds.length === 0) return {};
+    const rows = await db.select().from(writtenAssignmentTeachers).where(inArray(writtenAssignmentTeachers.assignmentId, assignmentIds));
+    const map: Record<string, string[]> = {};
+    for (const row of rows) (map[row.assignmentId] ||= []).push(row.teacherId);
+    return map;
+  }
+
+  /** True when this Fellow may see and answer the assignment: enrolled in its cohort and inside its audience. */
+  async teacherCanSeeAssignment(assignmentId: string, teacherId: string): Promise<boolean> {
+    const result = await db.execute(sqlOp`
+      SELECT 1
+      FROM written_assignments wa
+      JOIN batch_teachers bt ON bt.batch_id = wa.batch_id AND bt.teacher_id = ${teacherId}
+      WHERE wa.id = ${assignmentId}
+        AND (
+          NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+          OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = ${teacherId})
+        )
+      LIMIT 1
+    `);
+    return result.rows.length > 0;
   }
 
   async getWrittenAssignment(id: string) {
@@ -3425,9 +3548,13 @@ export class DatabaseStorage implements IStorage {
       FROM written_assignments wa
       JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
       WHERE bt.teacher_id = ${teacherId}
+        AND (
+          NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+          OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = ${teacherId})
+        )
       ORDER BY wa.created_at DESC
     `);
-    return result.rows;
+    return utcTimestamps(result.rows as Record<string, unknown>[], ["due_date", "created_at"]);
   }
 
   async upsertAssignmentSubmission(assignmentId: string, teacherId: string, response: string) {
@@ -3448,7 +3575,20 @@ export class DatabaseStorage implements IStorage {
       WHERE s.assignment_id = ${assignmentId}
       ORDER BY s.submitted_at DESC
     `);
-    return result.rows;
+    return utcTimestamps(result.rows as Record<string, unknown>[], ["submitted_at", "reviewed_at"]);
+  }
+
+  /**
+   * Everyone who sits the assignment (its named Fellows, or the whole cohort when none are named), each with their
+   * submission or none, followed by anyone who submitted but has since left the audience.
+   */
+  async getAssignmentRoster(assignment: { id: string; batchId: string }) {
+    const submissions = (await this.getAssignmentSubmissions(assignment.id)) as any[];
+    const named = (await this.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
+    const sitters = named.length > 0
+      ? Object.entries(await this.getTeacherNameMap(named)).map(([id, name]) => ({ id, name }))
+      : (await this.getTeachersInBatch(assignment.batchId)).map((t) => ({ id: t.id, name: t.name || t.email || "Fellow" }));
+    return assignmentRoster(sitters, submissions);
   }
 
   async listDiscussionPosts(weekId: string) {

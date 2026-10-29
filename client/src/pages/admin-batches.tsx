@@ -1,3 +1,4 @@
+import { audienceLabel, type AudienceMember } from "@shared/academyPeople";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -35,7 +36,6 @@ import {
   cardClass,
   cohortFellows,
   cohortHasTrainer,
-  emptyStepNumbers,
   inputClass,
   linkClass,
   orderedSteps,
@@ -177,15 +177,34 @@ export default function AdminBatches() {
     onError: (error: Error) => fail(error, "Could not save the trainers"),
   });
 
-  const saveBatchTeachers = useMutation({
-    mutationFn: async ({ batchId, teacherIds }: { batchId: string; teacherIds: string[] }) => {
-      await apiRequest("PUT", `/api/admin/academy-path/batches/${batchId}/teachers`, { teacherIds });
+  // The roster is the cohort's: ticking enrols a Fellow, unticking takes them out of the cohort.
+  const saveRoster = useMutation({
+    mutationFn: async ({ cohortId, teacherIds }: { cohortId: string; teacherIds: string[] }) => {
+      await apiRequest("PUT", `/api/admin/academy-path/cohorts/${cohortId}/teachers`, { teacherIds });
     },
     onSuccess: () => {
-      toast({ title: "Fellows updated" });
+      toast({ title: "Roster updated" });
       refresh();
     },
-    onError: (error: Error) => fail(error, "Could not save the Fellows"),
+    onError: (error: Error) => fail(error, "Could not save the roster"),
+  });
+
+  // A course joins the cohort at the end of its list. The cohort's first course starts the first part by itself.
+  const addCourseToCohort = useMutation({
+    mutationFn: async ({ cohort, courseId }: { cohort: CohortRow; courseId: string }) => {
+      const steps = orderedSteps(cohort);
+      let stepId = steps[steps.length - 1]?.id;
+      if (!stepId) {
+        const res = await apiRequest("POST", `/api/admin/academy-path/cohorts/${cohort.id}/batches`, { name: nextBatchName(0) });
+        stepId = (await res.json()).id as string;
+      }
+      await apiRequest("POST", `/api/admin/academy-path/batches/${stepId}/courses`, { courseId });
+    },
+    onSuccess: () => {
+      toast({ title: "Course added to the cohort" });
+      refresh();
+    },
+    onError: (error: Error) => fail(error, "Could not add the course"),
   });
 
   // How many cohorts a Fellow finishes (the academy setting the server already keeps).
@@ -359,9 +378,7 @@ export default function AdminBatches() {
   // The one chip a cohort in the list wears: the worst thing the Admin can fix.
   const listChip = (cohort: CohortRow) => {
     if (!cohortHasTrainer(cohort)) return <Chip tone="risk">No trainer</Chip>;
-    const empty = emptyStepNumbers(cohort).length;
-    if (empty > 0) return <Chip tone="attention">{empty === 1 ? "1 step without a course" : `${empty} steps without a course`}</Chip>;
-    if (cohort.batches.length === 0) return <Chip>No steps yet</Chip>;
+    if (cohort.batches.every((batch) => batch.courses.length === 0)) return <Chip tone="attention">No course yet</Chip>;
     return null;
   };
 
@@ -370,6 +387,8 @@ export default function AdminBatches() {
     const quizzesStopped = (cohort.quizzesStatus || "open") === "stopped";
     const batches = orderedSteps(cohort);
     const fellows = cohortFellows(cohort);
+    const placedCourses = batches.flatMap((batch) => batch.courses.map((course) => ({ ...course, batchId: batch.id })));
+    const addableCourses = courses.filter((course) => !placedCourses.some((placed) => placed.id === course.id));
     const names = trainerNames(cohort);
     const description = cohort.description || "";
     const long = description.length > DESCRIPTION_CUT;
@@ -457,7 +476,7 @@ export default function AdminBatches() {
                 ? "No Fellows enrolled yet"
                 : `${fellows.length} enrolled · ${fellows.slice(0, 3).map((fellow) => fellow.name).join(", ")}${fellows.length > 3 ? ` and ${fellows.length - 3} more` : ""}`}
             </span>
-            <button type="button" className={`${linkClass} w-fit min-h-[44px] text-left text-sm`} onClick={() => setRosterFor(cohort.id)} disabled={batches.length === 0}>
+            <button type="button" className={`${linkClass} w-fit min-h-[44px] text-left text-sm`} onClick={() => setRosterFor(cohort.id)} data-testid={`button-roster-${cohort.id}`}>
               Manage the roster
             </button>
           </div>
@@ -477,6 +496,59 @@ export default function AdminBatches() {
           </div>
         </div>
 
+        <div className="flex flex-col gap-3" data-testid={`cohort-courses-${cohort.id}`}>
+          <h3 className="text-[17px] font-semibold text-sl-ink">
+            Courses <span className="font-medium text-sl-muted">· Fellows work through them in this order</span>
+          </h3>
+          {placedCourses.length === 0 ? (
+            <p className="text-sm text-sl-muted">No course in this cohort yet.{courses.length > 0 ? " Add the first one below." : ""}</p>
+          ) : (
+            <ol className="flex flex-col gap-2">
+              {placedCourses.map((course, index) => (
+                <li key={course.id} className="flex items-center justify-between gap-3 rounded-[10px] border border-sl-line px-4 py-3" data-testid={`cohort-course-${course.id}`}>
+                  <span className="min-w-0 text-[15px] text-sl-ink"><span className="text-sl-muted">{index + 1}.</span> {course.name}</span>
+                  <button
+                    type="button"
+                    className={`${linkClass} min-h-[44px] text-sm`}
+                    disabled={removeCourseFromBatch.isPending}
+                    onClick={() => removeCourseFromBatch.mutate({ batchId: course.batchId, courseId: course.id })}
+                    aria-label={`Remove ${course.name} from this cohort`}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+          {addableCourses.length > 0 ? (
+            <Select
+              key={`${cohort.id}-${placedCourses.map((course) => course.id).join(",")}`}
+              onValueChange={(courseId) => addCourseToCohort.mutate({ cohort, courseId })}
+            >
+              <SelectTrigger
+                className="h-auto min-h-[44px] w-fit gap-2 rounded-lg border border-sl-control bg-sl-surface px-3.5 text-sm font-semibold text-sl-accent shadow-none focus:ring-sl-accent [&>span]:text-sl-accent"
+                data-testid={`select-add-course-${cohort.id}`}
+                aria-label="Add a course to this cohort"
+              >
+                <SelectValue placeholder="Add a course" />
+              </SelectTrigger>
+              <SelectContent>
+                {addableCourses.map((course) => (
+                  <SelectItem key={course.id} value={course.id}>{course.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="text-sm text-sl-muted">
+              {courses.length === 0 ? "There are no courses yet. Make one on the Courses tab." : "Every course is already in this cohort. Make a new course on the Courses tab."}
+            </span>
+          )}
+        </div>
+
+        <details className="rounded-[10px] border border-sl-line px-4 py-3" data-testid={`cohort-parts-${cohort.id}`}>
+          <summary className="min-h-[44px] cursor-pointer text-sm font-semibold text-sl-ink">Split into parts (advanced)</summary>
+          <p className="mt-2 text-sm text-sl-muted">Most cohorts do not need this. A part is a group of courses that runs after the one before it.</p>
+          <div className="mt-3">
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-[17px] font-semibold text-sl-ink">
@@ -580,6 +652,9 @@ export default function AdminBatches() {
           </ol>
         </div>
 
+          </div>
+        </details>
+
         <div className="flex flex-col gap-2.5 border-t border-sl-line pt-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-[15px] font-semibold text-sl-ink">Quizzes</h3>
@@ -604,7 +679,7 @@ export default function AdminBatches() {
                   <div key={quiz.id} className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-sl-ink">{quiz.title}</p>
-                      <p className="text-xs text-sl-muted">{stopped ? "Stopped" : "Open"}</p>
+                      <p className="text-xs text-sl-muted">{stopped ? "Stopped" : "Open"} · Given to {audienceLabel((quiz as { audience?: AudienceMember[] }).audience)}</p>
                     </div>
                     <button
                       type="button"
@@ -655,7 +730,7 @@ export default function AdminBatches() {
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <button type="button" className={`${linkClass} min-h-[44px] text-sm`} onClick={() => setTermsOpen(true)} data-testid="button-how-it-fits">
-              How cohorts, steps and courses fit
+              How cohorts and courses fit
             </button>
             <button type="button" className={primaryButton} onClick={() => setCohortOpen(true)} data-testid="button-add-cohort">
               Add a cohort
@@ -685,7 +760,7 @@ export default function AdminBatches() {
           cohorts.length === 0 ? (
             <div className={`${cardClass} flex flex-col items-start gap-3 p-6`}>
               <h2 className="text-lg font-semibold text-sl-ink">No cohorts yet</h2>
-              <p className="text-sm text-sl-muted">Add the first group of Fellows. Then add the steps they will go through.</p>
+              <p className="text-sm text-sl-muted">Add the first group of Fellows. Then add the courses they will work through.</p>
               <button type="button" className={primaryButton} onClick={() => setCohortOpen(true)}>Add a cohort</button>
             </div>
           ) : (
@@ -719,7 +794,7 @@ export default function AdminBatches() {
                           <span className="text-[15px] font-semibold text-sl-ink">{cohort.name}</span>
                           <span className="text-[13px] text-sl-muted">
                             {trainerCount === 0 ? "No trainer" : plural(trainerCount, "trainer")} · {plural(cohortFellows(cohort).length, "Fellow")} ·{" "}
-                            <span data-testid={`badge-batch-count-${cohort.id}`}>{plural(cohort.batches.length, "step")}</span>
+                            <span data-testid={`badge-batch-count-${cohort.id}`}>{plural(cohort.batches.reduce((total, batch) => total + batch.courses.length, 0), "course")}</span>
                           </span>
                           {listChip(cohort)}
                         </button>
@@ -736,7 +811,7 @@ export default function AdminBatches() {
           <section aria-labelledby="courses-title" className="flex flex-col gap-4">
             <div className={`${cardClass} flex flex-col gap-3 p-5`}>
               <h2 id="courses-title" className="text-lg font-semibold text-sl-ink">New course</h2>
-              <p className="text-sm text-sl-muted">Add a course here, then place it on a step. A step can hold more than one Fellow.</p>
+              <p className="text-sm text-sl-muted">Make a course here, then add it to a cohort from the cohort page.</p>
               <Label htmlFor="new-course-name" className="sr-only">New course</Label>
               <input
                 id="new-course-name"
@@ -778,7 +853,7 @@ export default function AdminBatches() {
                             {course.name}
                             {course.publishStatus === "draft" && <Chip>Draft</Chip>}
                           </p>
-                          <p className="text-sm text-sl-muted">{placed.length > 0 ? placed.join(", ") : "Not placed on a step yet"}</p>
+                          <p className="text-sm text-sl-muted">{placed.length > 0 ? placed.join(", ") : "Not in a cohort yet"}</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <button type="button" className={secondaryButton} onClick={() => navigate(`/courses/${course.id}`)} data-testid={`button-open-course-${course.id}`}>
@@ -811,11 +886,11 @@ export default function AdminBatches() {
       <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>How cohorts, steps and courses fit</DialogTitle>
-            <DialogDescription>A cohort holds steps that run in order. A step holds courses.</DialogDescription>
+            <DialogTitle>How cohorts and courses fit</DialogTitle>
+            <DialogDescription>A cohort is a group of Fellows with a Trainer. It works through its courses in order. A course has modules and lesson files.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            {(["cohort", "step", "course"] as const).map((key) => (
+            {(["cohort", "course"] as const).map((key) => (
               <div key={key} className={`${cardClass} p-4`} data-testid={`card-term-${key}`}>
                 <p className="mb-1 font-semibold text-sl-ink">{ACADEMY_TERMS[key].title}</p>
                 <p className="text-sm text-sl-muted">{ACADEMY_TERMS[key].body}</p>
@@ -829,7 +904,7 @@ export default function AdminBatches() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add a cohort</DialogTitle>
-            <DialogDescription>This is the group. You will add its steps next. They do not have to match any other cohort.</DialogDescription>
+            <DialogDescription>This is the group. You will add its Fellows and courses next. They do not have to match any other cohort.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -943,40 +1018,32 @@ export default function AdminBatches() {
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Fellows in {rosterCohort?.name}</DialogTitle>
-            <DialogDescription>Tick the Fellows on each step. Each tick is saved at once.</DialogDescription>
+            <DialogDescription>Tick a Fellow to put them in this cohort; untick to take them out. Each tick is saved at once. Their progress is kept.</DialogDescription>
           </DialogHeader>
-          {rosterCohort && orderedSteps(rosterCohort).map((batch, index) => (
-            <div key={batch.id} className="space-y-1" data-testid={`teachers-${batch.id}`}>
-              <p className="text-sm font-semibold text-sl-ink">{ACADEMY_TERMS.step.title} {index + 1} · {batch.name}</p>
-              <p className="mb-2 text-xs text-sl-muted" data-testid={`step-roster-note-${batch.id}`}>
-                Ticking a Fellow also adds them to the cohort. Unticking takes them off this step only; they stay in the cohort. To take a Fellow out of the cohort, use Remove on the cohort roster in Analytics.
-              </p>
-              <div className="flex max-h-36 flex-wrap gap-x-4 gap-y-1 overflow-y-auto">
-                {(data?.teachers || []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No active Fellows yet.</p>
-                ) : (data?.teachers || []).map((teacher) => {
-                  const ticked = (batch.teachers || []).some((row) => row.id === teacher.id);
-                  return (
-                    <label key={teacher.id} className="flex min-h-[44px] items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={ticked}
-                        disabled={saveBatchTeachers.isPending}
-                        onCheckedChange={(checked) => {
-                          const current = (batch.teachers || []).map((row) => row.id);
-                          const teacherIds = checked
-                            ? [...current, teacher.id]
-                            : current.filter((id) => id !== teacher.id);
-                          saveBatchTeachers.mutate({ batchId: batch.id, teacherIds });
-                        }}
-                        data-testid={`check-teacher-${batch.id}-${teacher.id}`}
-                      />
-                      {teacher.name}
-                    </label>
-                  );
-                })}
-              </div>
+          {rosterCohort && (
+            <div className="flex max-h-72 flex-wrap gap-x-4 gap-y-1 overflow-y-auto" data-testid={`roster-${rosterCohort.id}`}>
+              {(data?.teachers || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active Fellows yet.</p>
+              ) : (data?.teachers || []).map((teacher) => {
+                const current = cohortFellows(rosterCohort).map((row) => row.id);
+                const ticked = current.includes(teacher.id);
+                return (
+                  <label key={teacher.id} className="flex min-h-[44px] items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={ticked}
+                      disabled={saveRoster.isPending}
+                      onCheckedChange={(checked) => {
+                        const teacherIds = checked ? [...current, teacher.id] : current.filter((id) => id !== teacher.id);
+                        saveRoster.mutate({ cohortId: rosterCohort.id, teacherIds });
+                      }}
+                      data-testid={`check-roster-${rosterCohort.id}-${teacher.id}`}
+                    />
+                    {teacher.name}
+                  </label>
+                );
+              })}
             </div>
-          ))}
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRosterFor(null)}>Done</Button>
           </DialogFooter>

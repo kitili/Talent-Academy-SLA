@@ -832,7 +832,7 @@ export default function AdminAnalytics() {
       open: cohort.cohortStatus !== "closed",
       trainers: trainerNames.join(", "),
       fellows: cohort.enrollmentCount ?? cohort.enrollment ?? 0,
-      completion: `${cohort.completionPercentage ?? 0}%`,
+      completion: cohort.hasProgress === false ? "No data yet" : `${cohort.completionPercentage ?? 0}%`,
       marks,
       attendance: cohort.attendanceRate == null ? "No marks yet" : `${cohort.attendanceRate}%${marks ? ` · ${marks} mark${marks === 1 ? "" : "s"}` : ""}`,
     };
@@ -903,7 +903,7 @@ export default function AdminAnalytics() {
                   <KPICard label="Trainers" value={academySnapshot?.trainers ?? totalTrainers} subtitle="approved" onClick={() => navigate("/admin/trainers")} />
                   <KPICard label="Open cohorts" value={academySnapshot?.openCohorts ?? 0} subtitle={`${academySnapshot?.closedCohorts ?? 0} closed · ${academySnapshot?.batches ?? 0} total`} onClick={() => navigate("/admin/batches")} />
                   <KPICard label="Courses" value={academySnapshot?.courses ?? 0} subtitle={`${academySnapshot?.overdueAssignments ?? 0} overdue written tasks`} onClick={() => navigate("/admin/batches")} />
-                  <KPICard label="Average completion" value={`${academySnapshot?.averageCompletion ?? 0}%`} subtitle={`${academySnapshot?.atRiskBatches ?? 0} cohorts at risk`} />
+                  <KPICard label="Average completion" value={academySnapshot?.averageCompletion == null ? "No data yet" : `${academySnapshot.averageCompletion}%`} subtitle={`Cohorts Fellows have started · ${academySnapshot?.atRiskBatches ?? 0} at risk`} />
                   <KPICard label="Quizzes" value={academySnapshot?.openQuizzes ?? 0} subtitle={`${academySnapshot?.stoppedQuizzes ?? 0} stopped`} />
                   <KPICard label="Attendance" value={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceRate ?? 0}%` : "—"} subtitle={academySnapshot?.attendanceMarked ? `${academySnapshot.attendanceMarked} marks` : "No attendance marked yet"} />
                   <KPICard label="Reflections" value={academySnapshot?.reflections ?? 0} subtitle={academySnapshot?.reflections ? "View all" : "none written yet"} onClick={() => setShowReflectionsDialog(true)} />
@@ -998,10 +998,10 @@ export default function AdminAnalytics() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <KPICard
                     label="Fellows enrolled"
-                    value={pipelineData?.totalCandidates ?? 0}
+                    value={pipelineData?.enrolled ?? 0}
                     icon={Users}
                     color="blue"
-                    subtitle="Enrolled Fellows"
+                    subtitle={`On a cohort · ${pipelineData?.totalCandidates ?? 0} approved`}
                   />
                   <KPICard
                     label="Gender Split"
@@ -1018,7 +1018,7 @@ export default function AdminAnalytics() {
                     value={`${pipelineData?.participationRate ?? 0}%`}
                     icon={TrendingUp}
                     color="green"
-                    subtitle="Active in last 30 days"
+                    subtitle={`${pipelineData?.activeLast30Days ?? 0} active in the last 30 days`}
                   />
                   <KPICard
                     label="Graduation Rate"
@@ -2582,8 +2582,8 @@ export default function AdminAnalytics() {
                 {/* Completion Rate Trends */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Completion Rate Trends</CardTitle>
-                    <CardDescription>Monthly completion rates across all cohorts</CardDescription>
+                    <CardTitle className="text-base">Completions per month</CardTitle>
+                    <CardDescription>Courses Fellows finished each month, across all cohorts</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {performanceData?.completionRateTrends?.length > 0 ? (

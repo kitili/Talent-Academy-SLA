@@ -43,6 +43,7 @@ Not ranked.
 
 | Task | Added | Blocked on |
 |---|---|---|
+| [Simplify cohorts, batches and courses into one chain](unprioritised/simplify-cohorts-batches-and-courses-into-one-chain.md) | 2026-10-29 | Whether to start stage 2 (stage 1 done on the Admin page) |
 
 ### Certificates and records
 

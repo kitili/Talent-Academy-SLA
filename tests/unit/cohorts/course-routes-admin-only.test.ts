@@ -3,9 +3,11 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 /**
- * D2: only admins create, edit, delete and place courses; a trainer reorders the modules of a course placed
- * on a cohort they run. Text contracts over `server/routes.ts`: they prove which guard each route names, not
- * that the guard behaves (`trainerMayEditCourse` is driven with rows in tests/unit/contract/trainer-scope.test.ts).
+ * D2, widened on 2026-10-29 (plans/academy-desk/academy-desk-round-2-plan.md, decision "Admin and every Trainer"):
+ * only admins delete courses; a trainer edits a course they made or one placed on a cohort they run, and makes
+ * courses through /api/trainer/courses. Text contracts over `server/routes.ts`: they prove which guard each route
+ * names, not that the guard behaves (`trainerMayEditCourse` is driven with rows in
+ * tests/unit/contract/trainer-scope.test.ts and tests/unit/academy-desk/trainer-courses-and-uploads.test.ts).
  */
 
 const routes = readFileSync('server/routes.ts', 'utf8')
@@ -15,13 +17,20 @@ function route(method: string, path: string) {
     return routes.match(new RegExp(`app\\.${method}\\("${escaped}",[\\s\\S]*?\\r?\\n  }\\);\\r?\\n`))?.[0] ?? ''
 }
 
-test('course PATCH and DELETE are admin-only', () => {
-    for (const method of ['patch', 'delete']) {
-        const handler = route(method, '/api/courses/:id')
-        assert.ok(handler, `${method} /api/courses/:id not found`)
-        assert.match(handler, /^app\.\w+\("[^"]+", isAuthenticated, isAdmin, async/)
-        assert.doesNotMatch(handler.split('\n')[0], /isTrainer/)
-    }
+test('course DELETE is admin-only', () => {
+    const handler = route('delete', '/api/courses/:id')
+    assert.ok(handler, 'delete /api/courses/:id not found')
+    assert.match(handler, /^app\.\w+\("[^"]+", isAuthenticated, isAdmin, async/)
+    assert.doesNotMatch(handler.split('\n')[0], /isTrainer/)
+})
+
+test('course PATCH checks trainerMayEditCourse before it writes', () => {
+    const handler = route('patch', '/api/courses/:id')
+    assert.ok(handler, 'patch /api/courses/:id not found')
+    const guard = handler.indexOf('trainerMayEditCourse(req.user, req.params.id)')
+    const write = handler.indexOf('storage.updateCourse(')
+    assert.ok(guard > 0, 'course PATCH does not call trainerMayEditCourse')
+    assert.ok(write > guard, 'course PATCH writes before its guard')
 })
 
 test('the course assign route is gone', () => {

@@ -2,12 +2,14 @@ import { createContext, useContext, useEffect, useRef, useState, type ComponentT
 import { Link, useLocation, useSearch } from "wouter";
 import {
   BookOpen,
+  CalendarDays,
   ClipboardCheck,
   ClipboardList,
   Ellipsis,
   House,
   MessageSquare,
   UserCheck,
+  UserPlus,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -69,6 +71,8 @@ const PHONE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   people: Users,
   cohorts: UsersRound,
   assessments: ClipboardCheck,
+  fellows: UserPlus,
+  calendar: CalendarDays,
 };
 
 function useCurrentItem(desk: Desk, current?: string) {

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,7 @@ import { ChevronLeft } from "lucide-react";
 import { learningStatus, staffWatchLabel } from "@shared/learningStatus";
 import { deadlineLocalValue, parseDeadline } from "@shared/academyPath";
 import { deskName } from "@shared/deskName";
+import { audienceLabel } from "@shared/academyPeople";
 import { AcademyShell } from "@/components/AcademyShell";
 import { SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 
@@ -50,7 +51,9 @@ export default function CohortWorkspace() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user, isAdmin, logoutMutation } = useAuth();
-  const [tab, setTab] = useState("people");
+  // `?tab=work&work=<id>` opens one assessment's marking straight from the Trainer's Assessments page.
+  const linked = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
+  const [tab, setTab] = useState(linked.get("tab") || "people");
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
   const [addEmail, setAddEmail] = useState("");
@@ -60,7 +63,8 @@ export default function CohortWorkspace() {
   const [workTitle, setWorkTitle] = useState("");
   const [workInstructions, setWorkInstructions] = useState("");
   const [workDue, setWorkDue] = useState("");
-  const [openWorkId, setOpenWorkId] = useState<string | null>(null);
+  const [openWorkId, setOpenWorkId] = useState<string | null>(linked.get("work"));
+  const [workAudience, setWorkAudience] = useState<string[]>([]);
   const [dueDrafts, setDueDrafts] = useState<Record<string, string>>({});
   const [markDrafts, setMarkDrafts] = useState<Record<string, { score: string; comment: string }>>({});
   const [eventTitle, setEventTitle] = useState("");
@@ -205,7 +209,8 @@ export default function CohortWorkspace() {
         title: workTitle,
         instructions: workInstructions,
         kind: "assessment",
-        dueDate: workDue || null,
+        dueDate: parseDeadline(workDue)?.toISOString() ?? null,
+        teacherIds: workAudience,
       });
       return res.json();
     },
@@ -214,6 +219,7 @@ export default function CohortWorkspace() {
       setWorkTitle("");
       setWorkInstructions("");
       setWorkDue("");
+      setWorkAudience([]);
       queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
     },
     onError: () => toast({ title: "Could not assign work", variant: "destructive" }),
@@ -280,6 +286,14 @@ export default function CohortWorkspace() {
   ];
   const progressByFellow = new Map<string, any>(progress.map((row: any) => [row.teacherId, row]));
   const assessments = assignments.filter((item: any) => item.kind === "assessment");
+  // A Mark submissions link names one assessment; bring it into view once the list has loaded, once.
+  const scrolledToLinked = useRef(false);
+  useEffect(() => {
+    const linkedId = linked.get("work");
+    if (!linkedId || scrolledToLinked.current || !assessments.some((item: any) => item.id === linkedId)) return;
+    scrolledToLinked.current = true;
+    requestAnimationFrame(() => document.getElementById(`work-${linkedId}`)?.scrollIntoView({ block: "start" }));
+  }, [assessments]);
   const addFellow = () => {
     const name = addName.replace(/["\r\n,]+/g, " ").trim();
     const email = addEmail.replace(/["\r\n,\s]+/g, "").toLowerCase();
@@ -599,6 +613,27 @@ export default function CohortWorkspace() {
               <label htmlFor="work-due" className={LABEL}>Due</label>
               <input id="work-due" className={FIELD} type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} />
             </div>
+            <fieldset className="space-y-1.5" data-testid="work-audience">
+              <legend className={LABEL}>Who sits this</legend>
+              <p className="text-xs text-sl-muted">Tick Fellows to give it only to them. Leave every box empty for the whole cohort.</p>
+              {teachers.length === 0 ? (
+                <p className="text-xs text-sl-muted">No Fellows are in this cohort yet.</p>
+              ) : (
+                <div className="max-h-36 space-y-1 overflow-y-auto">
+                  {teachers.map((teacher: any) => (
+                    <label key={teacher.id} className="flex items-center gap-2 text-sm text-sl-ink">
+                      <input
+                        type="checkbox"
+                        checked={workAudience.includes(teacher.id)}
+                        onChange={(e) => setWorkAudience((ids) => e.target.checked ? [...ids, teacher.id] : ids.filter((id) => id !== teacher.id))}
+                        data-testid={`check-work-teacher-${teacher.id}`}
+                      />
+                      {teacher.name || teacher.email || "Fellow"}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
             <button type="button" className={BTN_PRIMARY} disabled={!workTitle.trim() || !workInstructions.trim() || createWork.isPending} onClick={() => createWork.mutate()}>
               Assign assessment
             </button>
@@ -611,10 +646,11 @@ export default function CohortWorkspace() {
           ) : assessments.length === 0 ? (
             <Empty text="No assessments in this cohort yet." />
           ) : assessments.map((item: any) => (
-            <div key={item.id} className={`${PANEL} space-y-3 px-5 py-4`}>
+            <div key={item.id} id={`work-${item.id}`} className={`${PANEL} scroll-mt-20 space-y-3 px-5 py-4`}>
               <div>
                 <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
                 <p className="mt-1 text-sm text-sl-muted">{item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
+                <p className="text-sm text-sl-muted" data-testid={`work-given-to-${item.id}`}>Given to {audienceLabel(item.audience)}</p>
               </div>
               <div className="flex flex-wrap items-end gap-2">
                 <div className="space-y-1.5">
@@ -655,17 +691,28 @@ export default function CohortWorkspace() {
                   {submissionsLoading ? (
                     <SkeletonRows label="Loading submissions" rows={2} className="-mx-5" />
                   ) : submissions.length === 0 ? (
-                    <p className="text-sm text-sl-muted">No submissions yet.</p>
+                    <p className="text-sm text-sl-muted">Nobody sits this yet.</p>
                   ) : submissions.map((row: any) => {
                     const teacherId = row.teacher_id || row.teacherId;
                     const draft = markDrafts[teacherId] || {
                       score: row.trainer_score ?? row.trainerScore ?? "",
                       comment: row.trainer_comment || row.trainerComment || "",
                     };
+                    if (row.submitted === false) {
+                      return (
+                        <div key={row.id} className="flex items-center justify-between gap-2 border-t border-sl-line pt-3" data-testid={`waiting-${teacherId}`}>
+                          <p className="font-medium text-sl-ink">{row.teacher_name}</p>
+                          <p className="text-sm text-sl-muted">Not submitted yet</p>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={row.id} className="space-y-2 border-t border-sl-line pt-3">
-                        <p className="font-medium text-sl-ink">{row.teacher_name || row.teacherName}</p>
-                        <p className="text-sm text-sl-muted">{row.response}</p>
+                        <p className="font-medium text-sl-ink">
+                          {row.teacher_name || row.teacherName}
+                          {row.submitted_at && <span className="ml-2 text-xs font-normal text-sl-muted">Submitted {new Date(row.submitted_at).toLocaleString()}</span>}
+                        </p>
+                        <p className="whitespace-pre-wrap text-sm text-sl-muted">{row.response}</p>
                         <div className="flex flex-wrap gap-2">
                           <input
                             className={`${FIELD} w-24`}

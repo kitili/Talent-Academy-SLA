@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   role: varchar("role").notNull().default("trainer"), // 'admin' or 'trainer'
   approvalStatus: varchar("approval_status").notNull().default("pending"), // 'pending', 'approved', 'rejected'
   passwordSet: varchar("password_set").notNull().default("yes"),
+  trainerType: varchar("trainer_type").notNull().default("in_house"), // 'in_house' or 'instructional'
   approvedBy: varchar("approved_by"), // ID of admin who approved (null if pending)
   approvedAt: timestamp("approved_at"), // timestamp when approved
   resetToken: varchar("reset_token"), // password reset token
@@ -93,6 +94,8 @@ export const courses = pgTable("courses", {
   publishStatus: varchar("publish_status").notNull().default("published"),
   orderIndex: integer("order_index").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
+  // The Trainer who made the course; they may edit it before it is on a cohort. Null for courses an Admin made.
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
 });
 
 export const insertCourseSchema = createInsertSchema(courses).omit({
@@ -272,6 +275,7 @@ export const teachers = pgTable("teachers", {
   password: varchar("password").notNull(), // hashed password
   approvalStatus: varchar("approval_status").notNull().default("pending"), // 'pending', 'approved', 'rejected'
   passwordSet: varchar("password_set").notNull().default("yes"),
+  fellowType: varchar("fellow_type").notNull().default("in_house"), // 'in_house' or 'pre_service'
   approvedBy: varchar("approved_by"), // ID of admin/trainer who approved (null if pending)
   approvedByRole: varchar("approved_by_role"), // 'admin' or 'trainer' - who approved them
   approvedAt: timestamp("approved_at"), // timestamp when approved
@@ -912,6 +916,9 @@ export const scheduledEvents = pgTable("scheduled_events", {
   endDate: timestamp("end_date"),
   batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
   createdBy: varchar("created_by").references(() => users.id),
+  meetingUrl: text("meeting_url"), // an online session's Google Meet (or similar) link
+  videoUrl: text("video_url"), // a recorded lesson for Fellows to watch
+  materialsUrl: text("materials_url"), // slides or handouts for the session
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_events_batch").on(table.batchId),
@@ -922,6 +929,25 @@ export const insertScheduledEventSchema = createInsertSchema(scheduledEvents).om
   id: true,
   createdAt: true,
 });
+
+/** The academy's year: terms, holidays, training weeks and exams. Admin writes it; Trainers and Fellows read it. */
+export const academyCalendar = pgTable("academy_calendar", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  kind: varchar("kind").notNull().default("event"), // 'term', 'holiday', 'training', 'assessment', 'event', 'deadline'
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  // Null while the Admin is still drafting; set when they press Done. The default makes rows that existed before this
+  // column (and any row written without it) published, so adding the column hides nothing. New entries set it null.
+  publishedAt: timestamp("published_at").defaultNow(),
+}, (table) => [
+  index("idx_academy_calendar_start").on(table.startDate),
+]);
+
+export type AcademyCalendarEntry = typeof academyCalendar.$inferSelect;
 
 export type InsertScheduledEvent = z.infer<typeof insertScheduledEventSchema>;
 export type ScheduledEvent = typeof scheduledEvents.$inferSelect;
@@ -984,6 +1010,14 @@ export const insertWrittenAssignmentSchema = createInsertSchema(writtenAssignmen
   id: true,
   createdAt: true,
 });
+
+/** Empty audience means every Fellow in the cohort. Rows mean only those Fellows. Same rule as `assigned_quiz_teachers`. */
+export const writtenAssignmentTeachers = pgTable("written_assignment_teachers", {
+  assignmentId: varchar("assignment_id").notNull().references(() => writtenAssignments.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
+}, (table) => [
+  primaryKey({ columns: [table.assignmentId, table.teacherId] }),
+]);
 
 export type InsertWrittenAssignment = z.infer<typeof insertWrittenAssignmentSchema>;
 export type WrittenAssignment = typeof writtenAssignments.$inferSelect;

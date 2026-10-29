@@ -15,7 +15,7 @@ import {
   teachers,
   users,
 } from "@shared/schema";
-import { enrolmentsToAdd } from "./cohortRoster";
+import { enrolmentsToAdd, rosterChanges } from "./cohortRoster";
 import { ACADEMY_TERMS, batchHoldingCourse, moveBatchOrder, nextBatchName, normalizeCohortsRequired, pathSummary, sortBatches } from "@shared/academyPath";
 
 const SETTINGS_ID = "path";
@@ -97,6 +97,12 @@ async function loadTree() {
     .select({ id: teachers.id, name: teachers.name, email: teachers.email, approvalStatus: teachers.approvalStatus })
     .from(teachers)
     .orderBy(asc(teachers.name));
+  // The Fellows enrolled in each cohort (`batch_teachers`), whoever put them there: an Admin, a Trainer or a CSV import.
+  const enrolments = await db
+    .select({ cohortId: batchTeachers.batchId, id: teachers.id, name: teachers.name, email: teachers.email })
+    .from(batchTeachers)
+    .innerJoin(teachers, eq(batchTeachers.teacherId, teachers.id))
+    .orderBy(asc(teachers.name));
   const cohorts = [];
   for (const cohort of cohortRows) {
     const trainerIds = trainerLinks
@@ -113,6 +119,9 @@ async function loadTree() {
       trainerIds,
       status: cohort.status,
       quizzesStatus: cohort.quizzesStatus,
+      fellows: enrolments
+        .filter((row) => row.cohortId === cohort.id)
+        .map((row) => ({ id: row.id, name: row.name, email: row.email })),
       batches: await stepsForCohort(cohort.id),
     });
   }
@@ -373,6 +382,39 @@ export function registerAcademyPathRoutes(
     } catch (error) {
       console.error("Error saving batch teachers:", error);
       res.status(500).json({ error: "Failed to save teachers" });
+    }
+  });
+
+  // The cohort roster: who is enrolled. Newly ticked Fellows join the cohort; Fellows no longer ticked leave it
+  // (and any step they were ticked on). Their progress rows stay.
+  app.put("/api/admin/academy-path/cohorts/:cohortId/teachers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const cohort = await storage.getBatch(req.params.cohortId);
+      if (!cohort) return res.status(404).json({ error: "Cohort not found" });
+      const wanted: string[] = Array.from(new Set((Array.isArray(req.body?.teacherIds) ? req.body.teacherIds : []).map((id: unknown) => String(id))));
+      if (wanted.length > 0) {
+        const known = await db.select({ id: teachers.id }).from(teachers).where(inArray(teachers.id, wanted));
+        if (known.length !== wanted.length) return res.status(400).json({ error: "Choose Fellows from the Fellow list" });
+      }
+      const rows = await db.select({ teacherId: batchTeachers.teacherId }).from(batchTeachers).where(eq(batchTeachers.batchId, cohort.id));
+      const { add, remove } = rosterChanges({ current: rows.map((row) => row.teacherId), wanted });
+      if (add.length > 0) {
+        await db.insert(batchTeachers).values(add.map((teacherId) => ({ batchId: cohort.id, teacherId }))).onConflictDoNothing();
+      }
+      if (remove.length > 0) {
+        await db.delete(batchTeachers).where(and(eq(batchTeachers.batchId, cohort.id), inArray(batchTeachers.teacherId, remove)));
+        const steps = await db.select({ id: cohortBatches.id }).from(cohortBatches).where(eq(cohortBatches.cohortId, cohort.id));
+        if (steps.length > 0) {
+          await db.delete(cohortBatchTeachers).where(and(
+            inArray(cohortBatchTeachers.cohortBatchId, steps.map((step) => step.id)),
+            inArray(cohortBatchTeachers.teacherId, remove),
+          ));
+        }
+      }
+      res.json({ teacherIds: wanted, added: add.length, removed: remove.length });
+    } catch (error) {
+      console.error("Error saving cohort roster:", error);
+      res.status(500).json({ error: "Failed to save the roster" });
     }
   });
 

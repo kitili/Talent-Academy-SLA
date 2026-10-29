@@ -22,6 +22,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "approvals", label: "Approvals", href: "/approvals", test: "approvals" },
     { key: "people", label: "People", href: "/admin/people", test: "people", also: ["/admin/trainers", "/admin/teachers"] },
     { key: "cohorts", label: "Cohorts", href: "/admin/batches", test: "cohorts", also: ["/cohorts", "/courses", "/course"] },
+    { key: "calendar", label: "Calendar", href: "/calendar", test: "calendar" },
     { key: "attendance", label: "Attendance", href: "/admin/attendance", test: "attendance" },
     { key: "analytics", label: "Analytics", href: "/admin/analytics", test: "analytics" },
     { key: "certificates", label: "Certificates", href: "/admin/certificates", test: "certificates" },
@@ -29,11 +30,14 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
   trainer: [
     { key: "home", label: "Home", href: "/trainer/batches?tab=home", test: "home" },
     { key: "cohorts", label: "Cohorts", href: "/trainer/batches?tab=cohorts", test: "cohorts", also: ["/cohorts", "/courses", "/course", "/trainer/teachers"] },
+    { key: "fellows", label: "Fellows", href: "/trainer/fellows", test: "fellows" },
+    { key: "courses", label: "Courses", href: "/trainer/courses", test: "courses" },
     { key: "assessments", label: "Assessments", href: "/trainer/batches?tab=assessments", test: "assessments" },
     { key: "progress", label: "Progress", href: "/trainer/batches?tab=progress", test: "progress" },
     { key: "attendance", label: "Attendance", href: "/trainer/batches?tab=attendance", test: "attendance" },
     { key: "messages", label: "Messages", href: "/trainer/batches?tab=messages", test: "messages" },
     { key: "schedule", label: "Schedule", href: "/trainer/batches?tab=schedule", test: "schedule" },
+    { key: "calendar", label: "Calendar", href: "/calendar", test: "calendar" },
   ],
   fellow: [
     { key: "home", label: "Home", href: "/teacher/dashboard?tab=home", test: "home" },
@@ -43,6 +47,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "progress", label: "Progress", href: "/teacher/dashboard?tab=progress", test: "progress" },
     { key: "reflect", label: "Reflect", href: "/teacher/dashboard?tab=reflect", test: "reflect" },
     { key: "messages", label: "Messages", href: "/teacher/dashboard?tab=messages", test: "messages" },
+    { key: "calendar", label: "Calendar", href: "/calendar", test: "calendar" },
     { key: "certificates", label: "Certificates", href: "/teacher/certificates", test: "certificates", tour: "teacher-certificates" },
   ],
 };

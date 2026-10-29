@@ -8,8 +8,9 @@ import { writeFile, readFile, unlink, mkdir, readdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars, contentItems } from "@shared/schema";
+import { ObjectStorageService, ObjectNotFoundError, directUploadsAvailable } from "./objectStorage";
+import { UPLOAD_CONTENT_TYPES, UPLOAD_MAX_BYTES } from "@shared/uploads";
+import { insertTrainingWeekSchema, updateTrainingWeekSchema, scheduledEvents, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars, contentItems } from "@shared/schema";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
@@ -26,7 +27,7 @@ import {
 } from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
-import { parseDeadline } from "@shared/academyPath";
+import { DEADLINE_PASSED, fellowStillSees, isPastDue, parseDeadline } from "@shared/academyPath";
 import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, QUIZ_ATTEMPTS, refusal } from "@shared/constants";
 import { cohortIsOpen, trainerMayEditCourse } from "./scope";
 import { cohortsInScope, trainerCohortCounts } from "./cohortRoster";
@@ -62,6 +63,8 @@ import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
+import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
+import { audienceWithNames, canRunOnlineSessions, countKinds, fellowTypeOf, FELLOW_TYPES, parseOnlineFields, trainerTypeOf, TRAINER_TYPES } from "@shared/academyPeople";
 import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
@@ -1252,6 +1255,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Whether this deployment uploads straight from the browser to Vercel Blob (see shared/uploads.ts).
+  app.get("/api/objects/upload-mode", isAuthenticated, isTrainer, (_req, res) => {
+    res.json({ direct: directUploadsAvailable() });
+  });
+
+  // Signs a browser-direct Blob upload for a signed-in Trainer or Admin. Vercel also posts the upload-completed event
+  // here without a session; handleUpload checks that event's signature itself, so this route has no session guard.
+  app.post("/api/blob-upload", async (req, res) => {
+    try {
+      if (!directUploadsAvailable()) return res.status(503).json({ error: "Direct uploads are not set up here" });
+      const { handleUpload } = await import("@vercel/blob/client");
+      const result = await handleUpload({
+        body: req.body,
+        request: req,
+        onBeforeGenerateToken: async () => {
+          const role = req.isAuthenticated?.() ? req.user?.role : undefined;
+          if (role !== "admin" && role !== "trainer") throw new Error("Sign in as a Trainer to upload");
+          return {
+            allowedContentTypes: UPLOAD_CONTENT_TYPES,
+            maximumSizeInBytes: UPLOAD_MAX_BYTES,
+            addRandomSuffix: true,
+          };
+        },
+        onUploadCompleted: async () => {},
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Upload refused" });
+    }
+  });
+
   app.put("/api/local-objects/:id", express.raw({ type: "*/*", limit: "80mb" }), isAuthenticated, isTrainer, async (req, res) => {
     try {
       const data = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
@@ -2399,7 +2433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
-      res.json({ ...batch, teachers });
+      res.json({ ...batch, teachers: teachers.map(publicFellow) });
     } catch (error) {
       console.error("Error fetching batch:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -2920,7 +2954,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const quizzes = await storage.getAssignedQuizzesForBatch(req.params.batchId);
       const audience = await storage.getQuizAudienceMap(quizzes.map((quiz) => quiz.id));
-      res.json(quizzes.map((quiz) => ({ ...quiz, teacherIds: audience[quiz.id] || [] })));
+      const names = await storage.getTeacherNameMap(Object.values(audience).flat());
+      res.json(quizzes.map((quiz) => ({
+        ...quiz,
+        teacherIds: audience[quiz.id] || [],
+        audience: audienceWithNames(audience[quiz.id] || [], names),
+      })));
     } catch (error) {
       console.error("Error fetching assigned quizzes:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -3101,7 +3140,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/quizzes", isTeacherAuthenticated, async (req, res) => {
     try {
       const quizzes = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
-      res.json(quizzes.map((quiz) => ({
+      const tried = new Set((await storage.getAllTeacherQuizAttempts(req.teacherId!)).map((attempt) => attempt.assignedQuizId));
+      const now = new Date();
+      res.json(quizzes.filter((quiz) => fellowStillSees(quiz.dueDate, tried.has(quiz.id), now)).map((quiz) => ({
         ...learnerQuiz(quiz),
         kind: quiz.paperUrl ? "paper" : isWritingExam(quiz) ? "written" : "quiz",
       })));
@@ -3122,6 +3163,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visible = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
+      }
+      if (isPastDue(quiz.dueDate)) {
+        const tries = await storage.getTeacherQuizAttemptsByQuiz(req.teacherId!, quiz.id);
+        if (tries.length === 0) return res.status(410).json({ error: DEADLINE_PASSED });
       }
       const writing = isWritingExam(quiz);
       const questions = writing || quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
@@ -3146,6 +3191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
       }
+      if (isPastDue(quiz.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
 
       // Get all existing attempts for this quiz
       const existingAttempts = await storage.getTeacherQuizAttemptsByQuiz(
@@ -3933,6 +3979,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pendingTrainers = await storage.getPendingTrainers();
       const pendingTeachers = await storage.getPendingTeachers();
       const allCourses = await storage.getAllCourses();
+      const weekAhead = await db.execute(sql`
+        SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE meeting_url IS NOT NULL)::int AS online
+        FROM scheduled_events
+        WHERE event_type = 'session' AND start_date >= date_trunc('day', now()) AND start_date < date_trunc('day', now()) + interval '7 days'
+      `);
+      const unmarked = await db.execute(sql`SELECT COUNT(*)::int AS count FROM assignment_submissions WHERE trainer_score IS NULL`);
+      const week = (weekAhead.rows?.[0] || {}) as { total?: number; online?: number };
 
       res.json({
         totalTrainers: approvedTrainers.length,
@@ -3941,6 +3994,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activeUsers: approvedTrainers.length + approvedTeachers.length,
         pendingTrainers: pendingTrainers.length,
         pendingTeachers: pendingTeachers.length,
+        fellowKinds: countKinds(approvedTeachers.map((row) => fellowTypeOf(row.fellowType)), FELLOW_TYPES),
+        trainerKinds: countKinds(approvedTrainers.map((row) => trainerTypeOf(row.trainerType)), TRAINER_TYPES),
+        sessionsNextSevenDays: Number(week.total || 0),
+        onlineSessionsNextSevenDays: Number(week.online || 0),
+        answersToMark: Number((unmarked.rows?.[0] as { count?: number } | undefined)?.count || 0),
       });
     } catch (error) {
       console.error("Error getting dashboard stats:", error);
@@ -4121,7 +4179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Trainer not found" });
       }
 
-      const { password, ...sanitized } = trainer;
+      const { password, resetToken: _resetToken, ...sanitized } = trainer;
       const trainerBatches = await storage.getAllBatches(id);
       res.json({
         ...sanitized,
@@ -4269,10 +4327,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update course (admin only)
-  app.patch("/api/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
+  // Update course: an admin, or a trainer who may edit it (made it, or it is on a cohort they teach).
+  app.patch("/api/courses/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const course = await storage.updateCourse(req.params.id, req.body);
+      if (!(await trainerMayEditCourse(req.user, req.params.id))) {
+        return res.status(403).json(refusal("NOT_YOUR_COURSE"));
+      }
+      const { name, description, objectives, publishStatus, stage, track, orderIndex } = req.body || {};
+      const course = await storage.updateCourse(req.params.id, Object.fromEntries(Object.entries({
+        name, description, objectives, publishStatus, stage, track, orderIndex,
+      }).filter(([, value]) => value !== undefined)));
       if (!course) return res.status(404).json({ error: "Course not found" });
       res.json(course);
     } catch (error) {
@@ -6057,6 +6121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { title, instructions, dueDate, fileUrl, fileName, kind } = req.body;
       const assignmentKind = kind === "assessment" ? "assessment" : "assignment";
       if (!title || (!instructions && !fileUrl)) return res.status(400).json({ error: "title and instructions are required" });
+      const audience = await resolveQuizAudience(batch.id, req.body?.teacherIds);
+      if (audience.error) return res.status(400).json({ error: audience.error });
       const assignment = await storage.createWrittenAssignment({
         batchId: batch.id,
         title,
@@ -6067,13 +6133,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileName: fileName || null,
         kind: assignmentKind,
       });
-      notifyBatchTeachers(
+      await storage.replaceWrittenAssignmentAudience(assignment.id, audience.teacherIds);
+      notifyQuizTeachers(
         batch.id,
+        audience.teacherIds,
         "Written work is ready",
-        `${title} is waiting in ${batch.name}. Open My work on your dashboard.`,
-        "deadline",
+        `${title} is waiting in ${batch.name}. Open Work on your dashboard.`,
       ).catch((error) => console.error("Assignment notice failed:", error));
-      res.status(201).json(assignment);
+      res.status(201).json({ ...assignment, teacherIds: audience.teacherIds });
     } catch (error) {
       console.error("Error creating assignment:", error);
       res.status(500).json({ error: "Failed to create assignment" });
@@ -6092,13 +6159,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updated = await storage.updateWrittenAssignment(assignment.id, { dueDate: parseDeadline(req.body.dueDate) });
       const due = parseDeadline(req.body.dueDate);
-      notifyBatchTeachers(
+      const audience = (await storage.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
+      notifyQuizTeachers(
         batch.id,
+        audience,
         "Deadline updated",
         due
           ? `${assignment.title} is now due ${due.toLocaleString()}.`
           : `${assignment.title} no longer has a deadline.`,
-        "deadline",
       ).catch((error) => console.error("Assignment deadline notice failed:", error));
       res.json(updated);
     } catch (error) {
@@ -6111,7 +6179,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
-      res.json(await storage.getAssignmentSubmissions(req.params.assignmentId));
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (!batch || !assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
+      res.json(await storage.getAssignmentRoster(assignment));
     } catch (error) {
       console.error("Error listing submissions:", error);
       res.status(500).json({ error: "Failed to list submissions" });
@@ -6122,6 +6192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (!batch || !assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
       const score = req.body?.trainerScore == null || req.body?.trainerScore === ""
         ? null
         : Number(req.body.trainerScore);
@@ -6200,7 +6272,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/teacher/assignments", isTeacherAuthenticated, async (req, res) => {
     try {
-      res.json(await storage.getWrittenAssignmentsForTeacher(req.teacherId!));
+      const rows = (await storage.getWrittenAssignmentsForTeacher(req.teacherId!)) as any[];
+      const now = new Date();
+      res.json(rows.filter((row) => fellowStillSees(row.due_date, Boolean(row.my_response), now)));
     } catch (error) {
       console.error("Error listing teacher assignments:", error);
       res.status(500).json({ error: "Failed to list assignments" });
@@ -6211,6 +6285,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const response = String(req.body?.response || "").trim();
       if (!response) return res.status(400).json({ error: "response is required" });
+      if (!(await storage.teacherCanSeeAssignment(req.params.assignmentId, req.teacherId!))) {
+        return res.status(403).json({ error: "This work is not assigned to you" });
+      }
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (isPastDue(assignment?.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
       const row = await storage.upsertAssignmentSubmission(req.params.assignmentId, req.teacherId!, response);
       res.json(row);
     } catch (error) {
@@ -6223,7 +6302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Scheduled Event Endpoints
   // ══════════════════════════════════════════════════════════════
 
-  // Create event (trainer/admin)
+  // Create event (trainer/admin). A Trainer schedules only for a cohort they teach.
   app.post("/api/batches/:batchId/events", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { batchId } = req.params;
@@ -6231,14 +6310,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!title || !eventType || !startDate) {
         return res.status(400).json({ error: "title, eventType, and startDate are required" });
       }
+      const batch = await storage.getBatch(batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const start = new Date(startDate);
+      const end = endDate ? new Date(endDate) : null;
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
+        return res.status(400).json({ error: "The date is not a date" });
+      }
+      if (end && end.getTime() < start.getTime()) return res.status(400).json({ error: "The session ends before it starts" });
+      const online = parseOnlineFields(req.body, req.user as any);
+      if ("error" in online) return res.status(online.error.startsWith("Only") ? 403 : 400).json({ error: online.error });
       const event = await storage.createScheduledEvent({
         title,
         description: description || null,
         eventType,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: start,
+        endDate: end,
         batchId,
         createdBy: (req.user as any)?.id,
+        ...online,
       });
       notifyBatchTeachers(
         batchId,
@@ -6256,6 +6347,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get batch events (trainer/admin)
   app.get("/api/batches/:batchId/events", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const events = await storage.getScheduledEvents(req.params.batchId);
       res.json(events);
     } catch (error) {
@@ -6264,9 +6358,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete event (trainer/admin)
+  // Edit a session (trainer/admin). The same rules as scheduling it; a Trainer edits only in a cohort they teach.
+  // Someone who may not add links (an in-house Trainer) can still move or rename a session: its links are kept as they are.
+  app.patch("/api/events/:id", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const [event] = await db.select().from(scheduledEvents).where(eq(scheduledEvents.id, req.params.id));
+      if (!event) return res.status(404).json({ error: "Event not found" });
+      const batch = await storage.getBatch(event.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const { title, description, eventType, startDate, endDate } = req.body || {};
+      if (!title || !eventType || !startDate) {
+        return res.status(400).json({ error: "title, eventType, and startDate are required" });
+      }
+      const start = new Date(startDate);
+      const end = endDate ? new Date(endDate) : null;
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
+        return res.status(400).json({ error: "The date is not a date" });
+      }
+      if (end && end.getTime() < start.getTime()) return res.status(400).json({ error: "The session ends before it starts" });
+      const online = canRunOnlineSessions(req.user as any)
+        ? parseOnlineFields(req.body, req.user as any)
+        : { meetingUrl: event.meetingUrl, videoUrl: event.videoUrl, materialsUrl: event.materialsUrl };
+      if ("error" in online) return res.status(400).json({ error: online.error });
+      const updated = await storage.updateScheduledEvent(event.id, {
+        title,
+        description: description || null,
+        eventType,
+        startDate: start,
+        endDate: end,
+        ...online,
+      });
+      notifyBatchTeachers(
+        batch.id,
+        "Session changed",
+        `${title} has changed. Open Calendar to see when and where.`,
+        "session_reminder",
+      ).catch((error) => console.error("Calendar notice failed:", error));
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating event:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Delete event (trainer/admin). A Trainer removes only sessions in a cohort they teach.
   app.delete("/api/events/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      const [event] = await db.select().from(scheduledEvents).where(eq(scheduledEvents.id, req.params.id));
+      if (!event) return res.status(404).json({ error: "Event not found" });
+      const batch = await storage.getBatch(event.batchId);
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       await storage.deleteScheduledEvent(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -6470,6 +6612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   registerAcademyPathRoutes(app, isAuthenticated, isAdmin, isTeacherAuthenticated);
+  registerAcademyDeskRoutes(app, isAuthenticated, isTrainer, isAdmin);
 
   const httpServer = createServer(app);
   return httpServer;

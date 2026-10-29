@@ -26,12 +26,21 @@ export type ScopeReaders = {
   cohortSteps(cohortId: string): Promise<StepRow[]>;
   /** The courses placed on the cohort (`batch_courses`): what a teacher in it sees. */
   cohortPlacements(cohortId: string): Promise<PlacementRow[]>;
+  /** Who made the course (`courses.created_by`), or null. Optional so older readers keep working. */
+  courseCreator?(courseId: string): Promise<string | null>;
 };
 
 export const storageScopeReaders: ScopeReaders = {
   async trainerCohorts(trainerId) {
     const { storage } = await import("./storage");
     return storage.getAllBatches(trainerId);
+  },
+  async courseCreator(courseId) {
+    const { db } = await import("./db");
+    const { courses } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const [row] = await db.select({ createdBy: courses.createdBy }).from(courses).where(eq(courses.id, courseId));
+    return row?.createdBy ?? null;
   },
   async cohortIdsHoldingCourse(courseId) {
     const { db } = await import("./db");
@@ -87,8 +96,8 @@ export async function trainerCohortIds(trainerId: string, readers: ScopeReaders 
 }
 
 /**
- * Who may edit a course's modules, lesson files and quizzes (D2): an admin, or a trainer when the
- * course is placed on a cohort they run. Anyone else, and a course on no cohort in scope, is refused.
+ * Who may edit a course's modules, lesson files and quizzes (D2): an admin, a trainer when the course is placed on a
+ * cohort they run, or the trainer who made it. Anyone else, and a course on no cohort in scope, is refused.
  */
 export async function trainerMayEditCourse(
   user: Actor,
@@ -98,6 +107,7 @@ export async function trainerMayEditCourse(
   if (!user || !courseId) return false;
   if (user.role === "admin") return true;
   if (user.role !== "trainer" || !user.id) return false;
+  if (readers.courseCreator && (await readers.courseCreator(courseId)) === user.id) return true;
   const [mine, holding] = await Promise.all([
     trainerCohortIds(user.id, readers),
     readers.cohortIdsHoldingCourse(courseId),

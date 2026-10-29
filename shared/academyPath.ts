@@ -109,6 +109,22 @@ export function parseDeadline(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** True once a deadline has passed. Work with no deadline is never past due. */
+export function isPastDue(due: unknown, now: Date = new Date()) {
+  const date = parseDeadline(due);
+  return date !== null && date.getTime() <= now.getTime();
+}
+
+/**
+ * Past-due work leaves a Fellow's lists. Work they already handed in or tried stays, read-only, so they keep their
+ * mark; answering is refused either way once the deadline passes.
+ */
+export function fellowStillSees(due: unknown, handedIn: boolean, now: Date = new Date()) {
+  return handedIn || !isPastDue(due, now);
+}
+
+export const DEADLINE_PASSED = "The deadline has passed";
+
 /** Local datetime-local value for an existing deadline so the trainer can change it. */
 export function deadlineLocalValue(value?: string | Date | null) {
   if (!value) return "";

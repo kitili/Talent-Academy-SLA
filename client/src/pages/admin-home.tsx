@@ -49,6 +49,11 @@ interface DashboardStats {
   activeUsers: number;
   pendingTrainers?: number;
   pendingTeachers?: number;
+  fellowKinds?: { in_house: number; pre_service: number };
+  trainerKinds?: { in_house: number; instructional: number };
+  sessionsNextSevenDays?: number;
+  onlineSessionsNextSevenDays?: number;
+  answersToMark?: number;
 }
 
 type AttentionRow = {
@@ -245,8 +250,18 @@ export default function AdminHome() {
   const attended = (attendance?.teachers || []).reduce((sum, row) => sum + row.present + row.late, 0);
   const pathReady = !pathLoading && !pathError;
   const figures: Array<{ label: string; value: string; note: string; ready: boolean }> = [
-    { label: "Fellows", value: String(stats?.totalTeachers ?? 0), note: "approved", ready: !isLoading },
-    { label: "Trainers", value: String(stats?.totalTrainers ?? 0), note: "approved", ready: !isLoading },
+    {
+      label: "Fellows",
+      value: String(stats?.totalTeachers ?? 0),
+      note: stats?.fellowKinds ? `${stats.fellowKinds.in_house} in-house · ${stats.fellowKinds.pre_service} pre-service` : "approved",
+      ready: !isLoading,
+    },
+    {
+      label: "Trainers",
+      value: String(stats?.totalTrainers ?? 0),
+      note: stats?.trainerKinds ? `${stats.trainerKinds.in_house} in-house · ${stats.trainerKinds.instructional} instructional` : "approved",
+      ready: !isLoading,
+    },
     { label: "Open cohorts", value: String(openCohorts), note: `${cohorts.length - openCohorts} closed`, ready: pathReady },
     { label: "Courses", value: String(stats?.totalCourses ?? 0), note: `${placedCourses} on cohorts`, ready: !isLoading && pathReady },
     {
@@ -254,6 +269,18 @@ export default function AdminHome() {
       value: marks ? `${Math.round((attended / marks) * 100)}%` : "None yet",
       note: marks ? plural(marks, "mark") : "No marks yet",
       ready: attendance !== undefined,
+    },
+    {
+      label: "Sessions, next 7 days",
+      value: String(stats?.sessionsNextSevenDays ?? 0),
+      note: `${stats?.onlineSessionsNextSevenDays ?? 0} online`,
+      ready: !isLoading,
+    },
+    {
+      label: "Written answers to mark",
+      value: String(stats?.answersToMark ?? 0),
+      note: "handed in, not yet marked",
+      ready: !isLoading,
     },
   ];
 

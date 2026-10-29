@@ -14,7 +14,9 @@ import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { CohortMedals } from "@/components/CohortMedals";
 import { PageStrip, usePager } from "@/components/PageStrip";
-import { batchIsComplete } from "@shared/academyPath";
+import { batchIsComplete, fellowStillSees, isPastDue } from "@shared/academyPath";
+import { sessionPhase } from "@shared/academyPeople";
+import { SessionLinks } from "@/components/SessionLinks";
 import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import type { Medal } from "@shared/cohortMedals";
 import { Loading, SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
@@ -587,7 +589,7 @@ export default function TeacherDashboard() {
   const resumeWeek =
     assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson || (shelfIsEmpty ? firstModule : undefined);
 
-  const { data: upcomingEvents = [], isLoading: eventsLoading } = useQuery<any[]>({
+  const { data: allEvents = [], isLoading: eventsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/events"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/events");
@@ -607,7 +609,7 @@ export default function TeacherDashboard() {
     },
   });
 
-  const { data: myExams = [], isLoading: examsQueryLoading } = useQuery<any[]>({
+  const { data: listedExams = [], isLoading: examsQueryLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/quizzes"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/quizzes", { credentials: "include" });
@@ -629,7 +631,7 @@ export default function TeacherDashboard() {
     },
   });
 
-  const { data: myWork = [], isLoading: workLoading } = useQuery<any[]>({
+  const { data: listedWork = [], isLoading: workLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/assignments"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/assignments");
@@ -671,7 +673,24 @@ export default function TeacherDashboard() {
   // An exam row's standing (Not started, Passed, tries left) needs the tries too.
   const examsLoading = examsQueryLoading || attemptsLoading;
 
+  // The server already leaves out past-due work; this drops what passes its deadline while the page is open.
+  const now = new Date();
+  const myExams = listedExams.filter((exam: any) =>
+    fellowStillSees(exam.dueDate, examAttempts.some((attempt: any) => attempt.assignedQuizId === exam.id), now));
+  const myWork = listedWork.filter((item: any) =>
+    fellowStillSees(pickField(item, "due_date", "dueDate"), Boolean(item.my_response || item.myResponse), now));
   const assessments = myWork.filter((item: any) => item.kind === "assessment");
+  // The route sends every session of the Fellow's cohorts, oldest first, in its column names; keep those not yet over.
+  const upcomingEvents = allEvents
+    .map((event: any) => ({
+      ...event,
+      startDate: pickField(event, "start_date", "startDate"),
+      endDate: pickField(event, "end_date", "endDate"),
+      meetingUrl: pickField(event, "meeting_url", "meetingUrl"),
+      videoUrl: pickField(event, "video_url", "videoUrl"),
+      materialsUrl: pickField(event, "materials_url", "materialsUrl"),
+    }))
+    .filter((event: any) => event.startDate && sessionPhase(event, now) !== "ended");
   const eventPager = usePager(upcomingEvents, 5);
   const workPager = usePager(assessments, 4);
   const reflectionPager = usePager(reflections, 4);
@@ -708,8 +727,9 @@ export default function TeacherDashboard() {
   // ── Home ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
   const openWork = assessments.filter((item: any) => !(item.my_response || item.myResponse));
+  const nextExam = myExams.find((exam: any) => !isPastDue(exam.dueDate, now));
   const todoItems = [
-    myExams[0] && { key: "exam", title: myExams[0].title, detail: myExams[0].paperUrl ? "Open the paper and write your answers" : "Write this exam on your desk", go: () => setLocation(`/teacher/exams/${myExams[0].id}`) },
+    nextExam && { key: "exam", title: nextExam.title, detail: nextExam.paperUrl ? "Open the paper and write your answers" : "Write this exam on your desk", go: () => setLocation(`/teacher/exams/${nextExam.id}`) },
     openWork[0] && { key: "work", title: openWork[0].title, detail: "Written work still due", go: () => setTab("work") },
   ].filter(Boolean) as Array<{ key: string; title: string; detail: string; go: () => void }>;
 
@@ -838,7 +858,8 @@ export default function TeacherDashboard() {
                 {upcomingEvents.slice(0, 3).map((event: any) => (
                   <li key={event.id}>
                     <p className="font-medium text-sl-ink">{event.title || "Session"}</p>
-                    <p>{fmtWhen(pickField(event, "start_date", "startDate"))}</p>
+                    <p>{fmtWhen(event.startDate)}</p>
+                    <SessionLinks session={event} now={now} />
                   </li>
                 ))}
               </ul>
@@ -1193,7 +1214,8 @@ export default function TeacherDashboard() {
                     const standing = examStanding(exam);
                     const paper = exam.kind === "paper";
                     const finished = standing.passed || (standing.tries > 0 && standing.left === 0);
-                    const action = paper ? "Open" : finished ? "Review answers" : standing.tries > 0 ? "Try again" : "Start";
+                    const closed = isPastDue(exam.dueDate, now);
+                    const action = closed ? "Review answers" : paper ? "Open" : finished ? "Review answers" : standing.tries > 0 ? "Try again" : "Start";
                     return (
                       <li key={exam.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sl-line px-4 py-3">
                         <div className="min-w-0">

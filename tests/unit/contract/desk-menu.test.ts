@@ -12,9 +12,9 @@ import {
 
 test('each desk lists the board\'s items in order', () => {
     const labels = (desk: keyof typeof DESK_MENUS) => DESK_MENUS[desk].map((item) => item.label)
-    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Attendance', 'Analytics', 'Certificates'])
-    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule'])
-    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Certificates'])
+    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Calendar', 'Attendance', 'Analytics', 'Certificates'])
+    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule', 'Calendar'])
+    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Calendar', 'Certificates'])
 })
 
 test('/admin opens Home, and each admin page names its own item', () => {
@@ -43,6 +43,14 @@ test('Trainer and Fellow sections follow ?tab=, and a desk page with no tab open
     assert.equal(deskItemForLocation('fellow', '/teacher/dashboard', 'tab=reflect'), 'reflect')
     assert.equal(deskItemForLocation('fellow', '/teacher/dashboard'), 'home')
     assert.equal(deskItemForLocation('fellow', '/teacher/dashboard', 'tab=unknown'), 'home')
+})
+
+test('the shared Calendar and the Trainer\'s Fellows page keep their own menu items current', () => {
+    assert.equal(deskItemForLocation('admin', '/calendar'), 'calendar')
+    assert.equal(deskItemForLocation('trainer', '/calendar'), 'calendar')
+    assert.equal(deskItemForLocation('fellow', '/calendar'), 'calendar')
+    assert.equal(deskItemForLocation('trainer', '/trainer/fellows'), 'fellows')
+    assert.equal(deskItemForLocation('trainer', '/trainer/courses'), 'courses')
 })
 
 test('a page outside the desk makes no item current', () => {

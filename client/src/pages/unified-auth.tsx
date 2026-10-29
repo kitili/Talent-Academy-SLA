@@ -67,6 +67,7 @@ export default function UnifiedAuth() {
   const [requestName, setRequestName] = useState("");
   const [requestUsername, setRequestUsername] = useState("");
   const [requestEmail, setRequestEmail] = useState("");
+  const [requestType, setRequestType] = useState("in_house");
   const [requestSent, setRequestSent] = useState(false);
   // True while the status of a saved desk request is being asked, so the form does not flash before it turns into "create your password".
   const [checkingRequest, setCheckingRequest] = useState(() => savedDeskRequest() !== null);
@@ -252,6 +253,7 @@ export default function UnifiedAuth() {
     setMode(next);
     setRequestSent(false);
     if (next !== "sign-in" && loginRole === "admin") setLoginRole("trainer");
+    setRequestType("in_house");
   };
 
   const handleRequest = async (event: React.FormEvent) => {
@@ -266,6 +268,7 @@ export default function UnifiedAuth() {
           username: requestUsername,
           email: requestEmail,
           role: loginRole,
+          type: requestType,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -402,7 +405,7 @@ export default function UnifiedAuth() {
                   name="role"
                   value={role.value}
                   checked={isSelected}
-                  onChange={() => setLoginRole(role.value as Role)}
+                  onChange={() => { setLoginRole(role.value as Role); setRequestType("in_house"); }}
                   data-testid={`radio-${role.value}`}
                   className="m-0 h-[18px] w-[18px] accent-[rgb(var(--sl-accent-strong))]"
                 />
@@ -569,6 +572,18 @@ export default function UnifiedAuth() {
                     <label htmlFor="request-username" className={labelClass}>Username</label>
                     <input id="request-username" data-testid="input-request-username" type="text" autoComplete="username" aria-describedby="request-username-hint" value={requestUsername} onChange={(e) => setRequestUsername(e.target.value)} required className={fieldClass} />
                     <span id="request-username-hint" className={hintClass}>3 to 40 letters or numbers. You can also sign in with it.</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="request-type" className={labelClass}>{loginRole === "teacher" ? "Kind of Fellow" : "Kind of Trainer"}</label>
+                    <select id="request-type" data-testid="select-request-type" value={requestType} onChange={(e) => setRequestType(e.target.value)} className={fieldClass}>
+                      <option value="in_house">In-house</option>
+                      <option value={loginRole === "teacher" ? "pre_service" : "instructional"}>{loginRole === "teacher" ? "Pre-service" : "Instructional"}</option>
+                    </select>
+                    <span id="request-type-hint" className={hintClass}>
+                      {loginRole === "teacher"
+                        ? "In-house Fellows learn at Talent Academy. Pre-service Fellows come for two or three weeks of assessments."
+                        : "In-house Trainers train at the academy. Instructional Trainers visit to teach and may run online sessions."}
+                    </span>
                   </div>
                 </>
               )}
