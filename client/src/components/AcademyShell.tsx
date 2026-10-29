@@ -132,7 +132,7 @@ function DeskLink({
 
 const itemClass = (on: boolean) =>
   `flex min-h-11 items-center rounded-md px-3 py-2.5 text-[15px] no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent ${
-    on ? "bg-sl-accent-soft font-semibold text-sl-accent" : "text-sl-neutral hover:bg-sl-neutral-soft hover:text-sl-ink"
+    on ? "bg-sl-surface font-semibold text-sl-ink shadow-[0_0_0_1px_rgb(var(--sl-line))]" : "text-sl-neutral hover:bg-sl-surface/60 hover:text-sl-ink"
   }`;
 
 /** The desk's side menu: a column at 1024 px and wider, a wrapped strip above the page on narrower screens. */
@@ -143,7 +143,7 @@ export function DeskNav({ desk, current, onNavigate }: { desk: Desk; current?: s
       aria-label={`${DESK_LABELS[desk]} desk`}
       data-tour={DESK_NAV_TOUR[desk]}
       data-testid={desk === "admin" ? "admin-nav" : `nav-${desk}`}
-      className="hidden shrink-0 border-b border-sl-line bg-sl-surface print:hidden sm:block lg:max-w-[280px] lg:flex-[1_1_232px] lg:overflow-y-auto lg:border-b-0 lg:border-r"
+      className="hidden shrink-0 border-b border-sl-line bg-sl-nav print:hidden sm:block lg:max-w-[280px] lg:flex-[1_1_232px] lg:overflow-y-auto lg:border-b-0 lg:border-r"
     >
       <div className="flex flex-wrap gap-1 px-4 py-2 sm:px-6 lg:flex-col lg:flex-nowrap lg:px-3 lg:py-5">
         {DESK_MENUS[desk].map((item) => (
@@ -256,7 +256,7 @@ export function AcademyShell({
         {/* The frame fills the window and does not scroll; the header, the menu and the phone bar stay in place, and
             only <main> scrolls. When printing, everything flows on paper and the frame is hidden. */}
         <div className="flex h-dvh flex-col overflow-hidden print:h-auto print:overflow-visible">
-          <header className="z-40 h-14 shrink-0 border-b border-sl-line bg-sl-surface text-sl-ink print:hidden sm:h-[68px]" data-tour={admin ? "admin-header" : undefined}>
+          <header className="z-40 h-14 shrink-0 border-b border-sl-line bg-sl-ground text-sl-ink print:hidden sm:h-[68px]" data-tour={admin ? "admin-header" : undefined}>
             <div className="flex h-full flex-nowrap items-center justify-between gap-x-3 pl-4 pr-2 sm:px-6">
               <div className="flex min-w-0 items-center gap-3" data-tour={admin ? "admin-brand" : undefined}>
                 <img src={logoImage} alt="" width={30} height={36} className="block h-[30px] w-[25px] object-contain sm:h-9 sm:w-[30px]" />

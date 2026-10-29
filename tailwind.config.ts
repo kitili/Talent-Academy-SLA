@@ -6,16 +6,18 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        // design/DESIGN-BRIEF.md "Look": 8 for buttons and inputs (rounded-md), 12 for cards and dialogs.
-        lg: ".75rem", /* 12px */
-        md: ".5rem", /* 8px */
-        sm: ".25rem", /* 4px */
+        // Warm studio: softer corners. 10 for buttons and inputs (rounded-md), 16 for cards and dialogs (lg, xl).
+        xl: "1rem", /* 16px */
+        lg: "1rem", /* 16px */
+        md: ".625rem", /* 10px */
+        sm: ".375rem", /* 6px */
       },
       colors: {
         // Silverleaf redesign tokens (client/src/index.css --sl-*): bg-sl-ground, text-sl-muted, border-sl-line, ...
         sl: {
           "ground": "rgb(var(--sl-ground) / <alpha-value>)",
           "surface": "rgb(var(--sl-surface) / <alpha-value>)",
+          "nav": "rgb(var(--sl-nav) / <alpha-value>)",
           "line": "rgb(var(--sl-line) / <alpha-value>)",
           "control": "rgb(var(--sl-control) / <alpha-value>)",
           "ink": "rgb(var(--sl-ink) / <alpha-value>)",

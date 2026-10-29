@@ -733,9 +733,40 @@ export default function TeacherDashboard() {
     openWork[0] && { key: "work", title: openWork[0].title, detail: "Written work still due", go: () => setTab("work") },
   ].filter(Boolean) as Array<{ key: string; title: string; detail: string; go: () => void }>;
 
+  // A session on right now (from 15 minutes before it starts) goes to the top of Home, with its Join button.
+  const liveNow = upcomingEvents.find((event: any) => event.meetingUrl && sessionPhase(event, now) === "live");
+
   const home = (
     <>
-      <PageHeading title={`Hello, ${firstName}`} sub={headerLine} testId="text-welcome" titleLoading={teacherLoading} />
+      <PageHeading title={`Habari, ${firstName}`} sub={headerLine} testId="text-welcome" titleLoading={teacherLoading} />
+      {liveNow && (
+        <section
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sl-line bg-sl-surface px-5 py-4"
+          aria-labelledby="live-now-heading"
+          data-testid="card-live-now"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-sl-accent">
+              On now{liveNow.endDate ? ` · until ${new Date(liveNow.endDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
+            </p>
+            <h2 id="live-now-heading" className="truncate text-lg font-semibold text-sl-ink">{liveNow.title || "Session"}</h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {liveNow.materialsUrl && (
+              <a className={`text-sm font-medium ${LINK}`} href={liveNow.materialsUrl} target="_blank" rel="noopener noreferrer">Materials</a>
+            )}
+            <a
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-sl-accent-strong px-5 text-[15px] font-semibold text-white no-underline hover:opacity-90"
+              href={liveNow.meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="link-live-now-join"
+            >
+              <span className="h-2 w-2 rounded-full bg-white" aria-hidden="true" /> Join
+            </a>
+          </div>
+        </section>
+      )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-6">
           <section className="rounded-xl border border-sl-line bg-sl-surface px-5 py-5" data-tour="teacher-continue" aria-labelledby="continue-heading">
@@ -851,11 +882,11 @@ export default function TeacherDashboard() {
           <SideCard title="Coming up">
             {eventsLoading ? (
               <SideLines label="Loading what is coming up" />
-            ) : upcomingEvents.length === 0 ? (
-              <p>Nothing scheduled. Sessions and deadlines from your trainer appear here.</p>
+            ) : upcomingEvents.filter((event: any) => event !== liveNow).length === 0 ? (
+              <p>{liveNow ? "Nothing else scheduled." : "Nothing scheduled. Sessions and deadlines from your trainer appear here."}</p>
             ) : (
               <ul className="space-y-2">
-                {upcomingEvents.slice(0, 3).map((event: any) => (
+                {upcomingEvents.filter((event: any) => event !== liveNow).slice(0, 3).map((event: any) => (
                   <li key={event.id}>
                     <p className="font-medium text-sl-ink">{event.title || "Session"}</p>
                     <p>{fmtWhen(event.startDate)}</p>

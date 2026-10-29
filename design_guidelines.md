@@ -1,5 +1,11 @@
 # Silverleaf Academy Training Program Planner - Design Guidelines
 
+> **Current look (2026-10-29): Warm studio.** The live tokens are in `client/src/index.css` (`--sl-*`) and win over the
+> palette below: cream ground `#FBF7F0`, white cards with 16px corners, a warm side menu `#F3ECE0` where the current page
+> is a white pill, brown text `#2E1F12` / `#6E5440`, one teal accent `#0F6E56` for actions and links, page titles in a
+> book serif (`--font-display`), and a warm dark mode. Every text pair passes 4.5:1 in both modes. The Fellow Home greets
+> with "Habari" and puts a session that is on now at the top with **Join**.
+
 ## Design Approach
 **Brand Identity**: Silverleaf Academy professional branding with deep navy blue primary color
 **Purpose**: Internal training program management tool for admins and teachers
