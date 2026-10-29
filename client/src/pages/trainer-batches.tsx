@@ -1204,7 +1204,7 @@ export default function TrainerBatches() {
           <div className="border-t border-sl-line px-5 py-3.5"><SkeletonBar className="h-4 w-2/3" /></div>
         ) : (
           <p className="border-t border-sl-line px-5 py-3 text-sm text-sl-muted" data-testid="trainer-today-line">
-            Open answers to mark: {pendingReviews.length === 0 ? "none" : pendingReviews.length}
+            Quiz answers to mark: {pendingReviews.length === 0 ? "none" : pendingReviews.length}
             <span className="ml-5">Sessions today: {sessionsToday.length === 0 ? "none scheduled" : sessionsToday.length}</span>
             <span className="ml-5">
               <Link href="/approvals" className="text-sl-accent underline" data-testid="link-trainer-approvals">
@@ -1291,7 +1291,7 @@ export default function TrainerBatches() {
             <span>Fellows <b className="text-sl-ink">{desk?.teacherCount ?? "—"}</b></span>
             <span>Quizzes open <b className="text-sl-ink">{desk?.openQuizzes ?? "—"}</b></span>
             <span>Assessments <b className="text-sl-ink">{desk?.assessments ?? desk?.paperExams ?? "—"}</b></span>
-            <span>To mark <b className="text-sl-ink">{desk?.toMark ?? "—"}</b></span>
+            <span>Written answers to mark <b className="text-sl-ink">{desk?.toMark ?? "—"}</b></span>
             <span>Sessions coming up <b className="text-sl-ink">{desk?.upcomingEvents ?? "—"}</b></span>
             <span>Attendance <b className="text-sl-ink">{desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`}</b></span>
           </p>
@@ -1698,7 +1698,7 @@ export default function TrainerBatches() {
       </div>
 
       {pendingReviews.length > 0 && (
-        <Panel title="Open answers to mark" titleSuffix={pendingReviews.length} testId="trainer-open-reviews">
+        <Panel title="Quiz answers to mark" titleSuffix={pendingReviews.length} testId="trainer-open-reviews">
           <ul className="space-y-3">
             {pendingReviews.map((review: any) => {
               const mark = async (passed: boolean) => {
