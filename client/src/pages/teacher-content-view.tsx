@@ -104,7 +104,7 @@ function DocumentViewer({ url }: { url: string }) {
   return (
     <div 
       ref={contentRef}
-      className="w-full p-8 bg-white dark:bg-slate-900 text-black dark:text-white prose dark:prose-invert max-w-none"
+      className="w-full p-8 bg-white dark:bg-sl-surface text-black dark:text-white prose dark:prose-invert max-w-none"
       dangerouslySetInnerHTML={{ __html: html }}
       onContextMenu={(e) => e.preventDefault()}
     />
@@ -714,7 +714,7 @@ export default function TeacherContentView() {
                             onContextMenu={(e) => e.preventDefault()}
                           />
                         ) : isDocxFile ? (
-                          <div className="overflow-hidden rounded-lg bg-white dark:bg-slate-900">
+                          <div className="overflow-hidden rounded-lg bg-white dark:bg-sl-surface">
                             <DocumentViewer url={viewUrl} />
                           </div>
                         ) : (
@@ -951,7 +951,7 @@ export default function TeacherContentView() {
                   </div>
                 ) : isDocxFile ? (
                   <div className="flex h-full items-start justify-center overflow-auto p-6">
-                    <div className="max-h-[calc(100vh-180px)] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-2xl dark:bg-slate-900">
+                    <div className="max-h-[calc(100vh-180px)] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-2xl dark:bg-sl-surface">
                       <DocumentViewer url={viewUrl || ''} />
                     </div>
                   </div>

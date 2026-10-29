@@ -84,7 +84,7 @@ function DocumentViewer({ url }: { url: string }) {
   return (
     <div 
       ref={contentRef}
-      className="w-full p-8 bg-white dark:bg-slate-900 text-black dark:text-white prose dark:prose-invert max-w-none"
+      className="w-full p-8 bg-white dark:bg-sl-surface text-black dark:text-white prose dark:prose-invert max-w-none"
       dangerouslySetInnerHTML={{ __html: html }}
       onContextMenu={(e) => e.preventDefault()}
     />
@@ -620,9 +620,9 @@ export default function CourseView() {
                   {viewUrl ? (
                     <div className="w-full max-w-4xl flex flex-col gap-6">
                       {selectedFile.fileName.toLowerCase().endsWith('.txt') ? (
-                        <textarea readOnly className="w-full min-h-[400px] sm:min-h-[600px] rounded-lg shadow-md border-0 p-4 sm:p-6 bg-white dark:bg-slate-900 text-black dark:text-white font-mono resize-none" data-testid="text-viewer" style={{ lineHeight: '1.5' }} onContextMenu={(e) => e.preventDefault()} />
+                        <textarea readOnly className="w-full min-h-[400px] sm:min-h-[600px] rounded-lg shadow-md border-0 p-4 sm:p-6 bg-white dark:bg-sl-surface text-black dark:text-white font-mono resize-none" data-testid="text-viewer" style={{ lineHeight: '1.5' }} onContextMenu={(e) => e.preventDefault()} />
                       ) : (selectedFile.fileName.toLowerCase().endsWith('.docx') || selectedFile.fileName.toLowerCase().endsWith('.doc')) ? (
-                        <div className="rounded-lg shadow-md overflow-hidden bg-white dark:bg-slate-900"><DocumentViewer url={viewUrl} /></div>
+                        <div className="rounded-lg shadow-md overflow-hidden bg-white dark:bg-sl-surface"><DocumentViewer url={viewUrl} /></div>
                       ) : (
                         <div className="rounded-lg shadow-md overflow-hidden"><iframe src={viewUrl} className="w-full min-h-[400px] sm:min-h-[600px] border-0 select-none pointer-events-auto" title={selectedFile.fileName} data-testid="file-viewer" style={{ userSelect: 'none', WebkitUserSelect: 'none' }} sandbox="allow-same-origin allow-scripts" onContextMenu={(e) => e.preventDefault()} /></div>
                       )}
@@ -800,7 +800,7 @@ export default function CourseView() {
                   </div>
                 ) : (selectedFile?.fileName.toLowerCase().endsWith('.docx') || selectedFile?.fileName.toLowerCase().endsWith('.doc')) ? (
                   <div className="h-full flex items-start justify-center p-4 sm:p-6 overflow-auto">
-                    <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-lg shadow-2xl overflow-y-auto max-h-[calc(100dvh-180px)]"><DocumentViewer url={viewUrl || ''} /></div>
+                    <div className="w-full max-w-4xl bg-white dark:bg-sl-surface rounded-lg shadow-2xl overflow-y-auto max-h-[calc(100dvh-180px)]"><DocumentViewer url={viewUrl || ''} /></div>
                   </div>
                 ) : (selectedFile?.fileName.toLowerCase().endsWith('.mp4') || selectedFile?.fileName.toLowerCase().endsWith('.webm') || selectedFile?.fileName.toLowerCase().endsWith('.mov')) ? (
                   <div className="h-full flex flex-col items-center justify-center"><video src={viewUrl || ''} controls controlsList="nodownload" className="w-full h-full object-contain bg-black" data-testid="video-viewer-fullscreen">Your browser does not support the video tag.</video></div>

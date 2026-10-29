@@ -16,7 +16,7 @@ The header holds the logo, "Silverleaf Academy" and a **Trainer** pill. On the r
 
 You land on **Home**, with **Add a session** at the top. Top to bottom:
 
-- **Needs you today.** One row for each thing waiting, with one button on the row: Fellows waiting for approval (**Review approvals**), a module with no lesson file (**Add a lesson file**), and a Fellow who has not started (**Send a note**). A line under the rows counts open answers to mark, sessions today, and approvals.
+- **Needs you today.** One row for each thing waiting, with one button on the row: Fellows waiting for approval (**Review approvals**), a module with no lesson file (**Add a lesson file**), and a Fellow who has not started (**Send a note**). A line under the rows counts quiz answers to mark, sessions today, and approvals. **This term** below counts written answers to mark.
 - **Quizzes waiting for your approval.** The newest drafts; **See all** opens Assessments.
 - **Your cohorts.** The first four, with their Fellows, steps and status. **See all cohorts** opens Cohorts.
 - **This term.** Fellows, quizzes open, assessments, and attendance.
@@ -38,7 +38,7 @@ Each of the other names in the side menu works across your cohorts:
 
 | Name | What you do |
 | --- | --- |
-| Assessments | Approve the quizzes waiting for you. Under **Exams**, **Upload an assessment**, **Upload a paper exam** or **Write an exam**, and give it to the whole cohort or only to the Fellows you tick. Under **Lesson quizzes on your cohorts**, review them, and assign a **Checkpoint quiz** or a **File quiz**. An assigned quiz or exam allows three tries and passes at 80% unless the exam sets its own mark. **Reset Attempts** lets a Fellow who has used all three try again; open a quiz's Fellow attempts to do it. **Open answers to mark** appears when a Fellow wrote an open answer; mark it **Pass** or **Fail**. |
+| Assessments | Approve the quizzes waiting for you. Under **Exams**, **Upload an assessment**, **Upload a paper exam** or **Write an exam**, and give it to the whole cohort or only to the Fellows you tick. Under **Lesson quizzes on your cohorts**, review them, and assign a **Checkpoint quiz** or a **File quiz**. An assigned quiz or exam allows three tries and passes at 80% unless the exam sets its own mark. **Reset Attempts** lets a Fellow who has used all three try again; open a quiz's Fellow attempts to do it. **Quiz answers to mark** appears when a Fellow wrote an open answer in a quiz; mark it **Pass** or **Fail**. Written assessments are marked from **Mark submissions** instead, and Home counts them as **Written answers to mark**. |
 | Progress | Choose a cohort. A table shows each Fellow's status in each course placed on that cohort, and their medals. Click a Fellow's name for details. **Download CSV** saves the gradebook. |
 | Attendance | **Mark attendance for today** (or another date): choose the cohort and the date, then mark each Fellow present, late, absent or excused, or use **Set everyone**. **Save attendance** saves the marks for that day. **Recent marks** and **Attendance in figures** follow. |
 | Messages | Desk mail with a Fellow, **Send a cohort note** to the whole cohort, **Feedback comments**, and your inbox. |

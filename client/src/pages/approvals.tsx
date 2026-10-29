@@ -69,7 +69,9 @@ export default function ApprovalsPage() {
     queryKey: [currentUser?.role === "admin" ? "/api/admin/pending-teachers" : "/api/trainer/pending-teachers"],
   });
 
-  const isAdmin = currentUser?.role === "admin";
+  // The signed-in user is known before this page draws; waiting on its own /api/user read showed an Admin the
+  // Trainer menu until that answered.
+  const isAdmin = (currentUser ?? user)?.role === "admin";
 
   // The decisions already saved (the same rows the CSV export holds), newest first.
   const { data: history, isLoading: historyLoading } = useQuery<{ items: HistoryItem[] }>({
