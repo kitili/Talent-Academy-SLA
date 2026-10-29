@@ -5,7 +5,10 @@ There is no `docs/README.md`: this file is the index.
 
 ## Features
 
-One line per `docs/<feature>/` folder, linking to its `README.md`. None yet.
+One line per `docs/<feature>/` folder, linking to its `README.md`.
+
+- [Academy desk](../academy-desk/README.md): Fellow and Trainer kinds, Trainers registering Fellows, the timetable, the
+  academy year, assessment sharing, and sign-in after an approved request
 
 ## Cross-feature map
 

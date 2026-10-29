@@ -10,7 +10,7 @@ The words: a **cohort** is a group of Fellows. It has **steps**, a step holds **
 
 Open the Trainer tab and sign in. One browser holds one sign-in at a time: signing in as someone else replaces the earlier session. The first visit starts a short tour. **Help** in the header plays it again.
 
-The header holds the logo, "Silverleaf Academy" and a **Trainer** pill. On the right are **Help**, the bell (a blue number means unread notes), the light and dark switch, your name, and **Log out**. The side menu runs down the left: Home, Cohorts, Assessments, Progress, Attendance, Messages, and Schedule. On a narrower screen it moves above the page. On a phone it is a bottom bar with Home, Cohorts, Assessments and Messages, and **More** opens Progress, Attendance and Schedule; the header shows your initials, and tapping them opens Help, the switch and Log out. There are no pictures on any page.
+The header holds the logo, "Silverleaf Academy" and a **Trainer** pill. On the right are **Help**, the bell (a blue number means unread notes), the light and dark switch, your name, and **Log out**. The side menu runs down the left: Home, Cohorts, Fellows, Assessments, Progress, Attendance, Messages, Schedule, and Calendar. On a narrower screen it moves above the page. On a phone it is a bottom bar with Home, Cohorts, Assessments and Messages, and **More** opens Fellows, Progress, Attendance, Schedule and Calendar; the header shows your initials, and tapping them opens Help, the switch and Log out. There are no pictures on any page.
 
 ## B. Home
 
