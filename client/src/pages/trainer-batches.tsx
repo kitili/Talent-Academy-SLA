@@ -1290,7 +1290,9 @@ export default function TrainerBatches() {
           <p className={`${PANEL} flex flex-wrap gap-x-7 gap-y-1 px-5 py-4 text-sl-muted`}>
             <span>Fellows <b className="text-sl-ink">{desk?.teacherCount ?? "—"}</b></span>
             <span>Quizzes open <b className="text-sl-ink">{desk?.openQuizzes ?? "—"}</b></span>
-            <span>Assessments <b className="text-sl-ink">{desk?.paperExams ?? "—"}</b></span>
+            <span>Assessments <b className="text-sl-ink">{desk?.assessments ?? desk?.paperExams ?? "—"}</b></span>
+            <span>To mark <b className="text-sl-ink">{desk?.toMark ?? "—"}</b></span>
+            <span>Sessions coming up <b className="text-sl-ink">{desk?.upcomingEvents ?? "—"}</b></span>
             <span>Attendance <b className="text-sl-ink">{desk?.attendanceRate == null ? "—" : `${desk.attendanceRate}%`}</b></span>
           </p>
         )}

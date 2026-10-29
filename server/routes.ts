@@ -64,7 +64,7 @@ import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
-import { audienceWithNames, canRunOnlineSessions, parseOnlineFields } from "@shared/academyPeople";
+import { audienceWithNames, canRunOnlineSessions, countKinds, fellowTypeOf, FELLOW_TYPES, parseOnlineFields, trainerTypeOf, TRAINER_TYPES } from "@shared/academyPeople";
 import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
@@ -3979,6 +3979,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pendingTrainers = await storage.getPendingTrainers();
       const pendingTeachers = await storage.getPendingTeachers();
       const allCourses = await storage.getAllCourses();
+      const weekAhead = await db.execute(sql`
+        SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE meeting_url IS NOT NULL)::int AS online
+        FROM scheduled_events
+        WHERE event_type = 'session' AND start_date >= date_trunc('day', now()) AND start_date < date_trunc('day', now()) + interval '7 days'
+      `);
+      const unmarked = await db.execute(sql`SELECT COUNT(*)::int AS count FROM assignment_submissions WHERE trainer_score IS NULL`);
+      const week = (weekAhead.rows?.[0] || {}) as { total?: number; online?: number };
 
       res.json({
         totalTrainers: approvedTrainers.length,
@@ -3987,6 +3994,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activeUsers: approvedTrainers.length + approvedTeachers.length,
         pendingTrainers: pendingTrainers.length,
         pendingTeachers: pendingTeachers.length,
+        fellowKinds: countKinds(approvedTeachers.map((row) => fellowTypeOf(row.fellowType)), FELLOW_TYPES),
+        trainerKinds: countKinds(approvedTrainers.map((row) => trainerTypeOf(row.trainerType)), TRAINER_TYPES),
+        sessionsNextSevenDays: Number(week.total || 0),
+        onlineSessionsNextSevenDays: Number(week.online || 0),
+        answersToMark: Number((unmarked.rows?.[0] as { count?: number } | undefined)?.count || 0),
       });
     } catch (error) {
       console.error("Error getting dashboard stats:", error);

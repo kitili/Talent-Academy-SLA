@@ -19,6 +19,10 @@ export type TrainerDeskInput = {
   certificateCount: number;
   upcomingEvents: number;
   progressPercent: number | null;
+  /** Assessments uploaded as written work (`written_assignments` of kind assessment). */
+  uploadedAssessments?: number;
+  /** Written answers handed in and not yet marked. */
+  toMark?: number;
 };
 
 export function quizVisibleToTeacher(audience: string[] | undefined, teacherId: string) {
@@ -58,6 +62,9 @@ export function summarizeTrainerDesk(input: TrainerDeskInput) {
     teacherCount: input.teacherCount,
     openQuizzes: open.filter((quiz) => !quiz.paperUrl).length,
     paperExams: open.filter((quiz) => !!quiz.paperUrl).length,
+    // Paper exams and uploaded assessments are both "assessments" on the Trainer's Assessments page.
+    assessments: open.filter((quiz) => !!quiz.paperUrl).length + (input.uploadedAssessments ?? 0),
+    toMark: input.toMark ?? 0,
     attendanceRate: input.attendanceRate,
     certificateCount: input.certificateCount,
     upcomingEvents: input.upcomingEvents,

@@ -225,3 +225,10 @@ export function sessionPhase(session: { startDate: string | Date; endDate?: stri
   if (t <= end) return "live";
   return "ended";
 }
+
+/** How many of each kind, with every kind present (a kind nobody has counts 0). */
+export function countKinds<K extends string>(kinds: K[], all: readonly K[]): Record<K, number> {
+  const counts = Object.fromEntries(all.map((kind) => [kind, 0])) as Record<K, number>;
+  for (const kind of kinds) if (kind in counts) counts[kind] += 1;
+  return counts;
+}

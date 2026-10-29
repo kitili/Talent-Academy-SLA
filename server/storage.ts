@@ -2231,6 +2231,17 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
+    const [uploaded, waiting] = await Promise.all([
+      db.select({ count: sqlOp`COUNT(*)::int` }).from(writtenAssignments).where(and(
+        inArray(writtenAssignments.batchId, ids),
+        eq(writtenAssignments.kind, "assessment"),
+      )),
+      db.select({ count: sqlOp`COUNT(*)::int` })
+        .from(assignmentSubmissions)
+        .innerJoin(writtenAssignments, eq(writtenAssignments.id, assignmentSubmissions.assignmentId))
+        .where(and(inArray(writtenAssignments.batchId, ids), sqlOp`${assignmentSubmissions.trainerScore} IS NULL`)),
+    ]);
+
     const [quizRows, stepRows, attendance, certs, events, people, progress] = await Promise.all([
       db.select({
         status: assignedQuizzes.status,
@@ -2247,6 +2258,7 @@ export class DatabaseStorage implements IStorage {
       db.select({ count: sqlOp`COUNT(*)::int` }).from(teacherCertificates).where(inArray(teacherCertificates.batchId, ids)),
       db.select({ count: sqlOp`COUNT(*)::int` }).from(scheduledEvents).where(and(
         inArray(scheduledEvents.batchId, ids),
+        eq(scheduledEvents.eventType, "session"),
         sqlOp`${scheduledEvents.startDate} >= now()`,
       )),
       db.select({ count: sqlOp`COUNT(DISTINCT ${batchTeachers.teacherId})::int` }).from(batchTeachers).where(inArray(batchTeachers.batchId, ids)),
@@ -2275,6 +2287,8 @@ export class DatabaseStorage implements IStorage {
       certificateCount: Number(certs[0]?.count || 0),
       upcomingEvents: Number(events[0]?.count || 0),
       progressPercent: progressAvg === null || progressAvg === undefined ? null : Number(progressAvg),
+      uploadedAssessments: Number(uploaded[0]?.count || 0),
+      toMark: Number(waiting[0]?.count || 0),
     });
   }
 
@@ -2333,12 +2347,28 @@ export class DatabaseStorage implements IStorage {
       else genderDistribution.notSpecified += cnt;
     }
 
-    // Participation rate: teachers in at least one batch / total approved
-    const participatingResult = await db
-      .select({ count: sqlOp`COUNT(DISTINCT ${batchTeachers.teacherId})::int` })
-      .from(batchTeachers);
-    const participating = Number(participatingResult[0]?.count) || 0;
-    const participationRate = totalCandidates > 0 ? Math.round((participating / totalCandidates) * 1000) / 10 : 0;
+    // Enrolled: approved Fellows on at least one cohort.
+    const enrolledResult = await db.execute(sqlOp`
+      SELECT COUNT(DISTINCT bt.teacher_id)::int AS count
+      FROM batch_teachers bt
+      JOIN teachers t ON t.id = bt.teacher_id AND t.approval_status = 'approved'
+    `);
+    const enrolled = Number((enrolledResult.rows?.[0] as { count?: number } | undefined)?.count) || 0;
+
+    // Participation rate: approved Fellows who opened a lesson, tried a quiz or handed in work in the last 30 days.
+    const activeResult = await db.execute(sqlOp`
+      SELECT COUNT(*)::int AS count
+      FROM teachers t
+      WHERE t.approval_status = 'approved'
+        AND (
+          EXISTS (SELECT 1 FROM teacher_content_progress p WHERE p.teacher_id = t.id
+                  AND GREATEST(p.viewed_at, p.completed_at) >= now() - interval '30 days')
+          OR EXISTS (SELECT 1 FROM teacher_quiz_attempts a WHERE a.teacher_id = t.id AND a.completed_at >= now() - interval '30 days')
+          OR EXISTS (SELECT 1 FROM assignment_submissions s WHERE s.teacher_id = t.id AND s.submitted_at >= now() - interval '30 days')
+        )
+    `);
+    const activeLast30Days = Number((activeResult.rows?.[0] as { count?: number } | undefined)?.count) || 0;
+    const participationRate = totalCandidates > 0 ? Math.round((activeLast30Days / totalCandidates) * 1000) / 10 : 0;
 
     // Graduation rate: distinct teachers with certificates / total approved
     const graduatedResult = await db
@@ -2366,6 +2396,8 @@ export class DatabaseStorage implements IStorage {
 
     return {
       totalCandidates,
+      enrolled,
+      activeLast30Days,
       genderDistribution,
       participationRate,
       graduationRate,
@@ -2472,10 +2504,13 @@ export class DatabaseStorage implements IStorage {
       const completionResult = await db
         .select({
           avgCompletion: sqlOp`COALESCE(AVG(CASE WHEN ${teacherCourseCompletion.totalWeeks} > 0 THEN (${teacherCourseCompletion.completedWeeks}::float / ${teacherCourseCompletion.totalWeeks}) * 100 ELSE 0 END), 0)::float`,
+          rows: sqlOp`COUNT(*)::int`,
         })
         .from(teacherCourseCompletion)
         .where(eq(teacherCourseCompletion.batchId, batch.id));
       const completionPercentage = Math.round(Number(completionResult[0]?.avgCompletion || 0) * 10) / 10;
+      // A cohort nobody has started has no completion yet: it is neither 0% nor at risk.
+      const hasProgress = Number(completionResult[0]?.rows || 0) > 0;
 
       // Graduation rate (certificates / enrollment)
       const certResult = await db
@@ -2495,8 +2530,8 @@ export class DatabaseStorage implements IStorage {
 
       // Traffic light status
       let status: 'green' | 'yellow' | 'red' = 'green';
-      if (completionPercentage < 50) status = 'red';
-      else if (completionPercentage < 80) status = 'yellow';
+      if (hasProgress && completionPercentage < 50) status = 'red';
+      else if (hasProgress && completionPercentage < 80) status = 'yellow';
 
       cohorts.push({
         batchId: batch.id,
@@ -2504,6 +2539,7 @@ export class DatabaseStorage implements IStorage {
         enrollment: enrollmentCount,
         enrollmentCount,
         completionPercentage,
+        hasProgress,
         graduationRate,
         avgQuizScore,
         status,
@@ -2559,9 +2595,10 @@ export class DatabaseStorage implements IStorage {
         )
     `);
     const cohorts = await this.getCohortAnalytics();
-    const averageCompletion = cohorts.length
-      ? Math.round((cohorts.reduce((sum: number, cohort: any) => sum + Number(cohort.completionPercentage || 0), 0) / cohorts.length) * 10) / 10
-      : 0;
+    const started = cohorts.filter((cohort: any) => cohort.hasProgress);
+    const averageCompletion = started.length
+      ? Math.round((started.reduce((sum: number, cohort: any) => sum + Number(cohort.completionPercentage || 0), 0) / started.length) * 10) / 10
+      : null;
     return {
       teachers: Number(teacherCount?.count || 0),
       trainers: Number(trainerCount?.count || 0),
