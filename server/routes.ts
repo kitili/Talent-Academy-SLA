@@ -1367,7 +1367,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileSize: 0,
         youtubeId,
       };
-      const updatedWeek = await storage.updateTrainingWeek(req.params.id, {
+      // updateTrainingWeek takes one object with the id in it; called with (id, changes) it updated nothing and threw.
+      const updatedWeek = await storage.updateTrainingWeek({
+        id: req.params.id,
         deckFiles: [...(week.deckFiles || []), newFile],
       });
       res.status(201).json(updatedWeek);

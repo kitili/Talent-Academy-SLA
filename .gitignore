@@ -17,3 +17,6 @@ temp-add-users.sql
 /designs
 /.test-runs/
 **/.claude/worktrees/
+
+# Demo account passwords written by scripts/demo-academy.ts
+demo-accounts.local.md
