@@ -189,6 +189,12 @@ async function main() {
   check("Admin adds to the academy year", entry.status === 201 && Boolean(entry.json?.id), JSON.stringify(entry));
   const badEntry = await admin.post("/api/admin/academy-calendar", { title: "x", kind: "term", startDate: "2027-05-03" });
   check("An entry with no real title is refused", badEntry.status === 400);
+  const draftForTrainer = (await trainer.get("/api/academy-calendar")).json || [];
+  check("A draft is hidden from the Trainer", !draftForTrainer.some((e: any) => e.title === "Term 2 begins"));
+  check("The Admin sees the draft", ((await admin.get("/api/academy-calendar")).json || []).some((e: any) => e.title === "Term 2 begins" && !e.publishedAt));
+  check("A Trainer cannot press Done", (await trainer.post("/api/admin/academy-calendar/publish", {})).status === 403);
+  const done = await admin.post("/api/admin/academy-calendar/publish", {});
+  check("Admin presses Done", done.status === 200 && done.json?.published >= 1, JSON.stringify(done.json));
   const seenByTrainer = (await trainer.get("/api/academy-calendar")).json || [];
   const seenByFellow = (await fellowB.get("/api/academy-calendar")).json || [];
   check("The Trainer sees the entry without anyone sending it", seenByTrainer.some((e: any) => e.title === "Term 2 begins"));

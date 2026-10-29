@@ -938,6 +938,9 @@ export const academyCalendar = pgTable("academy_calendar", {
   endDate: timestamp("end_date"),
   createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
+  // Null while the Admin is still drafting; set when they press Done. The default makes rows that existed before this
+  // column (and any row written without it) published, so adding the column hides nothing. New entries set it null.
+  publishedAt: timestamp("published_at").defaultNow(),
 }, (table) => [
   index("idx_academy_calendar_start").on(table.startDate),
 ]);

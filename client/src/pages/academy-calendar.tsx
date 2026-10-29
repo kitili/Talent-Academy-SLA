@@ -60,6 +60,7 @@ type YearEntry = {
   kind: CalendarKind;
   startDate: string;
   endDate?: string | null;
+  publishedAt?: string | null;
 };
 
 const SECTIONS = ["timetable", "year"] as const;
@@ -213,6 +214,16 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const months = useMemo(() => groupByMonth(entries), [entries]);
+  const drafts = entries.filter((entry) => !entry.publishedAt).length;
+
+  const publish = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/admin/academy-calendar/publish")).json(),
+    onSuccess: (data: { published?: number }) => {
+      toast({ title: `${data.published || 0} ${data.published === 1 ? "entry is" : "entries are"} now on every Trainer's and Fellow's calendar` });
+      queryClient.invalidateQueries({ queryKey: ["/api/academy-calendar"] });
+    },
+    onError: (error: Error) => toast({ title: "Could not publish", description: error.message, variant: "destructive" }),
+  });
 
   const save = useMutation({
     mutationFn: async () => {
@@ -263,9 +274,20 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
     <div className="space-y-4" data-testid="academy-year">
       <p className="text-sm text-sl-muted">
         {canEdit
-          ? "Everything you add here appears for every Trainer and Fellow. Nothing needs to be sent."
+          ? "New entries are drafts only you see. Press Done to show them to every Trainer and Fellow."
           : "Terms, holidays, training weeks and exams, set by the Admin."}
       </p>
+
+      {canEdit && drafts > 0 && (
+        <div className={`${PANEL} flex flex-wrap items-center justify-between gap-3 px-5 py-4`} data-testid="year-drafts">
+          <p className="text-sm text-sl-ink">
+            <span className="font-semibold">{drafts} {drafts === 1 ? "draft" : "drafts"}</span> not yet shown to Trainers and Fellows.
+          </p>
+          <button type="button" className={BTN_PRIMARY} disabled={publish.isPending} onClick={() => publish.mutate()} data-testid="button-year-publish">
+            {publish.isPending ? "Publishing…" : "Done — show to Trainers and Fellows"}
+          </button>
+        </div>
+      )}
 
       {canEdit && (
         <form
@@ -332,6 +354,9 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-base font-semibold text-sl-ink">{entry.title}</h4>
                   <Chip kind={entry.kind} label={CALENDAR_KIND_LABELS[entry.kind] ?? entry.kind} />
+                  {canEdit && !entry.publishedAt && (
+                    <span className="rounded-full border border-dashed border-sl-control px-2.5 py-0.5 text-xs font-semibold text-sl-muted">Draft</span>
+                  )}
                 </div>
                 <p className="text-sm text-sl-muted">{dayRange(entry.startDate, entry.endDate)}</p>
                 {entry.description && <p className="text-sm text-sl-ink">{entry.description}</p>}

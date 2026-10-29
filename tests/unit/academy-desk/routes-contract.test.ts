@@ -130,3 +130,22 @@ describe("sign-in after an approved request", () => {
     assert.match(accessRequests, /fellowType: parsed\.type/);
   });
 });
+
+describe("the academy year is a draft until the Admin presses Done", () => {
+  it("shows drafts to the Admin only", () => {
+    const read = route(desk, "get", "/api/academy-calendar");
+    assert.match(read, /const admin = isStaff\(req\.user\) && req\.user!\.role === "admin"/);
+    assert.match(read, /admin \? sql`true` : isNotNull\(academyCalendar\.publishedAt\)/);
+  });
+  it("starts every new entry as a draft", () => {
+    assert.match(route(desk, "post", "/api/admin/academy-calendar"), /publishedAt: null/);
+  });
+  it("publishes every draft at once, Admin only", () => {
+    const publish = route(desk, "post", "/api/admin/academy-calendar/publish");
+    assert.match(publish, /isAuthenticated, isAdmin/);
+    assert.match(publish, /\.where\(isNull\(academyCalendar\.publishedAt\)\)/);
+  });
+  it("leaves entries that existed before the column published", () => {
+    assert.match(schema, /publishedAt: timestamp\("published_at"\)\.defaultNow\(\)/);
+  });
+});

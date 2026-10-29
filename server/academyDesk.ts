@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
 import type { Express, Request, Response, NextFunction } from "express";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { academyCalendar, batches, batchTeachers, scheduledEvents, teachers, users } from "@shared/schema";
 import { parseCalendarEntry, parseFellowType, parseTrainerType, FELLOW_TYPE_LABELS } from "@shared/academyPeople";
 import { parseAccessRequest } from "@shared/accessRequest";
@@ -153,11 +153,17 @@ export function registerAcademyDeskRoutes(
   });
 
   // ── The annual calendar ───────────────────────────────────────────────────
-  // Admin writes it. Trainers and Fellows read the same rows, so nothing is copied to them.
+  // Admin writes it. Trainers and Fellows read the same rows, so nothing is copied to them, but only once the Admin
+  // presses Done: until then an entry is a draft only the Admin sees.
   app.get("/api/academy-calendar", async (req, res) => {
     try {
       if (!isStaff(req.user) && !fellowIdOf(req)) return res.status(401).json({ message: "Unauthorized" });
-      const rows = await db.select().from(academyCalendar).orderBy(asc(academyCalendar.startDate));
+      const admin = isStaff(req.user) && req.user!.role === "admin";
+      const rows = await db
+        .select()
+        .from(academyCalendar)
+        .where(admin ? sql`true` : isNotNull(academyCalendar.publishedAt))
+        .orderBy(asc(academyCalendar.startDate));
       res.json(rows);
     } catch (error) {
       console.error("Calendar list failed:", error);
@@ -169,11 +175,26 @@ export function registerAcademyDeskRoutes(
     try {
       const parsed = parseCalendarEntry(req.body);
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
-      const [row] = await db.insert(academyCalendar).values({ ...parsed, createdBy: req.user!.id }).returning();
+      const [row] = await db.insert(academyCalendar).values({ ...parsed, createdBy: req.user!.id, publishedAt: null }).returning();
       res.status(201).json(row);
     } catch (error) {
       console.error("Calendar add failed:", error);
       res.status(500).json({ message: "Could not add to the calendar" });
+    }
+  });
+
+  // Done: every draft goes to Trainers and Fellows at once.
+  app.post("/api/admin/academy-calendar/publish", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const published = await db
+        .update(academyCalendar)
+        .set({ publishedAt: new Date() })
+        .where(isNull(academyCalendar.publishedAt))
+        .returning({ id: academyCalendar.id });
+      res.json({ published: published.length });
+    } catch (error) {
+      console.error("Calendar publish failed:", error);
+      res.status(500).json({ message: "Could not publish the calendar" });
     }
   });
 
