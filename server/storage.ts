@@ -131,6 +131,25 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 
 import { resolveDatabaseUrl } from "./databaseUrl";
+
+/**
+ * Raw SQL (`db.execute`) returns a `timestamp` column as text with no zone, such as `2026-10-29 13:46:08.395`. The app
+ * stores UTC there, but a browser reads zone-less text in its own zone, three hours off in Dar es Salaam. Rows that go
+ * to a page through raw SQL pass their timestamp columns through this, which marks them as the UTC they are.
+ */
+export function utcTimestamps<T extends Record<string, unknown>>(rows: T[], keys: string[]): T[] {
+  return rows.map((row) => {
+    const copy: Record<string, unknown> = { ...row };
+    for (const key of keys) {
+      const value = copy[key];
+      if (typeof value === "string" && value && !/(Z|[+-]\d\d(:?\d\d)?)$/.test(value)) {
+        const date = new Date(`${value.replace(" ", "T")}Z`);
+        if (!Number.isNaN(date.getTime())) copy[key] = date.toISOString();
+      }
+    }
+    return copy as T;
+  });
+}
 import { TALENT_SIGNATORY_1, TALENT_SIGNATORY_2 } from "@shared/talentCertificate";
 import { kindForIssue, wordingForIssue } from "@shared/certificateDesigns";
 
@@ -3386,7 +3405,7 @@ export class DatabaseStorage implements IStorage {
       WHERE bt.teacher_id = ${teacherId}
       ORDER BY se.start_date ASC
     `);
-    return result.rows as ScheduledEvent[];
+    return utcTimestamps(result.rows as Record<string, unknown>[], ["start_date", "end_date", "created_at"]) as unknown as ScheduledEvent[];
   }
 
   async updateScheduledEvent(id: string, updates: Partial<InsertScheduledEvent>): Promise<ScheduledEvent | undefined> {
@@ -3535,7 +3554,7 @@ export class DatabaseStorage implements IStorage {
         )
       ORDER BY wa.created_at DESC
     `);
-    return result.rows;
+    return utcTimestamps(result.rows as Record<string, unknown>[], ["due_date", "created_at"]);
   }
 
   async upsertAssignmentSubmission(assignmentId: string, teacherId: string, response: string) {
@@ -3556,7 +3575,7 @@ export class DatabaseStorage implements IStorage {
       WHERE s.assignment_id = ${assignmentId}
       ORDER BY s.submitted_at DESC
     `);
-    return result.rows;
+    return utcTimestamps(result.rows as Record<string, unknown>[], ["submitted_at", "reviewed_at"]);
   }
 
   /**

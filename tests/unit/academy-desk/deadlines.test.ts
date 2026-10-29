@@ -57,3 +57,14 @@ describe("the Fellow routes keep to the deadline", () => {
     assert.equal(DEADLINE_PASSED, "The deadline has passed");
   });
 });
+
+describe("times read by raw SQL", () => {
+  it("are marked as the UTC they are stored in, so a browser in another zone reads the right moment", async () => {
+    const { utcTimestamps } = await import("../../../server/storage.ts");
+    const [row] = utcTimestamps([{ due_date: "2026-10-29 13:46:08.395", title: "x", end_date: null }], ["due_date", "end_date"]);
+    assert.equal(row.due_date, "2026-10-29T13:46:08.395Z");
+    assert.equal(row.end_date, null);
+    const [kept] = utcTimestamps([{ due_date: "2026-10-29T13:46:08.395Z" }], ["due_date"]);
+    assert.equal(kept.due_date, "2026-10-29T13:46:08.395Z");
+  });
+});

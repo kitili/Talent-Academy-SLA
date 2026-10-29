@@ -31,4 +31,11 @@ database behind that server is yours to protect: never point the server at the l
    Two checks fail on an empty database, on the original code as well: the graduation certificate (the test Fellow has not
    finished the path) and the shared module thread (403 from `discussionAccess`).
 
-Last run: 74 of 74 on 2026-10-29 against a temporary Neon project, deleted afterwards.
+9. Round 2: who sits an assessment by name, the marking roster, the cross-cohort refusal on marking, deadlines (hidden,
+   refused with 410, kept when handed in), session editing (Trainer, Admin, an in-house Trainer keeping links), Trainer
+   courses (make, place, rename; refused to another Trainer; delete refused), the upload mode without a Blob token, and
+   the new figures.
+
+Last run: 104 of 104 on 2026-10-29 against a temporary Neon project, deleted afterwards. The same day each desk was
+clicked through in a browser on that database; the run found the raw-SQL time zone bug
+(`docs/_learnings/a-timestamp-read-by-raw-sql-reaches-the-browser-without-its-zone.md`).

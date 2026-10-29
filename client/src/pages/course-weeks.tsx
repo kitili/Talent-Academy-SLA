@@ -883,7 +883,7 @@ export default function CourseWeeks() {
             {course?.description && <p className="text-sm leading-relaxed text-sl-muted">{course.description}</p>}
             {!isAdmin && isTrainer && (
               <p className="text-sm leading-relaxed text-sl-muted">
-                You can edit this course's modules, lesson files and quizzes. Only an Admin can rename or delete the course.
+                You can edit this course's modules, lesson files and quizzes. Only an Admin can delete a course.
               </p>
             )}
             {isTrainer && (

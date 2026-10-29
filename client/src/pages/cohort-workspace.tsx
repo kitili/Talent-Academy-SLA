@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -286,6 +286,14 @@ export default function CohortWorkspace() {
   ];
   const progressByFellow = new Map<string, any>(progress.map((row: any) => [row.teacherId, row]));
   const assessments = assignments.filter((item: any) => item.kind === "assessment");
+  // A Mark submissions link names one assessment; bring it into view once the list has loaded, once.
+  const scrolledToLinked = useRef(false);
+  useEffect(() => {
+    const linkedId = linked.get("work");
+    if (!linkedId || scrolledToLinked.current || !assessments.some((item: any) => item.id === linkedId)) return;
+    scrolledToLinked.current = true;
+    requestAnimationFrame(() => document.getElementById(`work-${linkedId}`)?.scrollIntoView({ block: "start" }));
+  }, [assessments]);
   const addFellow = () => {
     const name = addName.replace(/["\r\n,]+/g, " ").trim();
     const email = addEmail.replace(/["\r\n,\s]+/g, "").toLowerCase();
@@ -638,7 +646,7 @@ export default function CohortWorkspace() {
           ) : assessments.length === 0 ? (
             <Empty text="No assessments in this cohort yet." />
           ) : assessments.map((item: any) => (
-            <div key={item.id} className={`${PANEL} space-y-3 px-5 py-4`}>
+            <div key={item.id} id={`work-${item.id}`} className={`${PANEL} scroll-mt-20 space-y-3 px-5 py-4`}>
               <div>
                 <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
                 <p className="mt-1 text-sm text-sl-muted">{item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>

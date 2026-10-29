@@ -193,5 +193,6 @@ every project reads the same text and later entries can flow in.
 
 | Entry | One line |
 | --- | --- |
+| [a-timestamp-read-by-raw-sql-reaches-the-browser-without-its-zone.md](a-timestamp-read-by-raw-sql-reaches-the-browser-without-its-zone.md) | Raw SQL returns a zone-less `timestamp` as text, so a browser outside UTC reads every time hours off; the server in UTC looks right. |
 | [an-upload-through-a-vercel-function-stops-at-its-body-limit.md](an-upload-through-a-vercel-function-stops-at-its-body-limit.md) | On Vercel a file uploaded or viewed through an API route stops at about 4.5 MB, whatever limit the Express route sets; large files must go straight to Blob. |
 | [a-sign-in-lookup-that-skips-the-field-the-form-collected-locks-people-out.md](a-sign-in-lookup-that-skips-the-field-the-form-collected-locks-people-out.md) | A request form collected a username but sign-in looked Fellows up by email or ID only, so an approved person who had just made a password could not sign in. |

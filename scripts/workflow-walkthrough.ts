@@ -190,8 +190,8 @@ async function main() {
   const badEntry = await admin.post("/api/admin/academy-calendar", { title: "x", kind: "term", startDate: "2027-05-03" });
   check("An entry with no real title is refused", badEntry.status === 400);
   const draftForTrainer = (await trainer.get("/api/academy-calendar")).json || [];
-  check("A draft is hidden from the Trainer", !draftForTrainer.some((e: any) => e.title === "Term 2 begins"));
-  check("The Admin sees the draft", ((await admin.get("/api/academy-calendar")).json || []).some((e: any) => e.title === "Term 2 begins" && !e.publishedAt));
+  check("A draft is hidden from the Trainer", !draftForTrainer.some((e: any) => e.id === entry.json?.id));
+  check("The Admin sees the draft", ((await admin.get("/api/academy-calendar")).json || []).some((e: any) => e.id === entry.json?.id && !e.publishedAt));
   check("A Trainer cannot press Done", (await trainer.post("/api/admin/academy-calendar/publish", {})).status === 403);
   const done = await admin.post("/api/admin/academy-calendar/publish", {});
   check("Admin presses Done", done.status === 200 && done.json?.published >= 1, JSON.stringify(done.json));
@@ -257,6 +257,63 @@ async function main() {
   const html = await trainer.post(`/api/batches/${cohortId}/events`, { title: "<img src=x onerror=alert(1)>", eventType: "session", startDate: soon });
   const stored = ((await fellowA.get("/api/timetable")).json || []).find((e: any) => e.id === html.json?.id);
   check("A script in a title is stored as plain text (the pages print it escaped)", html.status === 200 && stored?.title === "<img src=x onerror=alert(1)>");
+  // ── 11. Round 2: names, marking, deadlines, editing, the year's Done, courses, uploads, figures ───────────
+  const givenTo = ((await trainer.get(`/api/batches/${cohortId}/assignments`)).json || []).find((w: any) => w.id === sharedId);
+  check("The assessment list names who sits it", givenTo?.audience?.length === 1 && givenTo.audience[0].name === "Walk Fellow", JSON.stringify(givenTo?.audience));
+  const everyoneRoster = (await trainer.get(`/api/batches/${cohortId}/assignments/${toEveryone.json?.id}/submissions`)).json || [];
+  check("Marking lists the Fellows still to submit", Array.isArray(everyoneRoster) && everyoneRoster.filter((row: any) => row.submitted === false).length === 2, JSON.stringify(everyoneRoster));
+
+  const cohort2 = await admin.post("/api/batches", { name: `Walkthrough cohort two ${stamp}` });
+  await admin.put(`/api/admin/academy-path/cohorts/${cohort2.json?.id}/trainers`, { trainerIds: [otherRow?.id] });
+  const crossRead = await other.get(`/api/batches/${cohort2.json?.id}/assignments/${sharedId}/submissions`);
+  const crossMark = await other.patch(`/api/batches/${cohort2.json?.id}/assignments/${sharedId}/submissions/${fellowAId}`, { trainerScore: 0, trainerComment: "x" });
+  check("A Trainer cannot read another cohort's answers through their own cohort", crossRead.status === 404, JSON.stringify(crossRead));
+  check("A Trainer cannot mark another cohort's answers through their own cohort", crossMark.status === 404, JSON.stringify(crossMark));
+
+  const past = new Date(Date.now() - 3_600_000).toISOString();
+  const late = await trainer.post(`/api/batches/${cohortId}/assignments`, { title: "Already closed", instructions: "x", kind: "assessment", dueDate: past });
+  check("Work past its deadline is not on the Fellow's list", !((await fellowB.get("/api/teacher/assignments")).json || []).some((w: any) => w.id === late.json?.id));
+  const lateAnswer = await fellowB.post(`/api/teacher/assignments/${late.json?.id}/submit`, { response: "too late" });
+  check("An answer after the deadline is refused", lateAnswer.status === 410, JSON.stringify(lateAnswer));
+  const closing = await trainer.post(`/api/batches/${cohortId}/assignments`, { title: "Handed in before it closed", instructions: "x", kind: "assessment", dueDate: soon });
+  await fellowB.post(`/api/teacher/assignments/${closing.json?.id}/submit`, { response: "on time" });
+  await trainer.patch(`/api/batches/${cohortId}/assignments/${closing.json?.id}`, { dueDate: past });
+  check("Work handed in stays on the Fellow's list after the deadline", ((await fellowB.get("/api/teacher/assignments")).json || []).some((w: any) => w.id === closing.json?.id));
+  check("...but cannot be answered again", (await fellowB.post(`/api/teacher/assignments/${closing.json?.id}/submit`, { response: "again" })).status === 410);
+
+  const moved = await trainer.patch(`/api/events/${sessionId}`, { title: "Online phonics (moved)", eventType: "session", startDate: soon, endDate: later, meetingUrl: "https://meet.google.com/abc-defg-hij" });
+  check("The Trainer edits their session", moved.status === 200 && moved.json?.title === "Online phonics (moved)", JSON.stringify(moved));
+  check("The Fellow sees the edited session", ((await fellowA.get("/api/timetable")).json || []).some((e: any) => e.title === "Online phonics (moved)"));
+  check("The other Trainer cannot edit it", (await other.patch(`/api/events/${sessionId}`, { title: "Mine now", eventType: "session", startDate: soon })).status === 403);
+  const byAdmin = await admin.patch(`/api/events/${sessionId}`, { title: "Online phonics (Admin)", eventType: "session", startDate: soon, endDate: later, meetingUrl: "https://meet.google.com/abc-defg-hij" });
+  check("The Admin edits the Trainer's session", byAdmin.status === 200, JSON.stringify(byAdmin));
+  await admin.patch(`/api/admin/trainers/${trainerRow?.id}/type`, { trainerType: "in_house" });
+  const inHouseEdit = await trainer.patch(`/api/events/${sessionId}`, { title: "Online phonics (in-house edit)", eventType: "session", startDate: soon, endDate: later });
+  check("An in-house Trainer can move a session and its link is kept", inHouseEdit.status === 200 && inHouseEdit.json?.meetingUrl === "https://meet.google.com/abc-defg-hij", JSON.stringify(inHouseEdit.json));
+  await admin.patch(`/api/admin/trainers/${trainerRow?.id}/type`, { trainerType: "instructional" });
+
+  const course = await trainer.post("/api/trainer/courses", { name: `Walk course ${stamp}`, cohortId });
+  check("A Trainer makes a course on their cohort", course.status === 201, JSON.stringify(course));
+  const myCourses = (await trainer.get("/api/trainer/courses")).json || [];
+  check("The course is on the Trainer's Courses page, on the cohort", myCourses.some((c: any) => c.id === course.json?.id && c.mine && c.cohorts.some((b: any) => b.id === cohortId)), JSON.stringify(myCourses));
+  check("The Trainer renames their course", (await trainer.patch(`/api/courses/${course.json?.id}`, { name: `Walk course renamed ${stamp}` })).status === 200);
+  check("The other Trainer cannot edit it", (await other.patch(`/api/courses/${course.json?.id}`, { name: "Mine" })).status === 403);
+  check("The Trainer cannot delete a course", (await trainer.del(`/api/courses/${course.json?.id}`)).status === 403);
+  check("The other Trainer cannot put it on their cohort", (await other.post(`/api/trainer/courses/${course.json?.id}/cohorts`, { cohortId: cohort2.json?.id })).status === 403);
+  check("A Trainer cannot place a course on a cohort they do not teach", (await trainer.post("/api/trainer/courses", { name: `Elsewhere ${stamp}`, cohortId: cohort2.json?.id })).status === 403);
+  const module = await trainer.post("/api/training-weeks", { courseId: course.json?.id, title: "Module one", weekNumber: 1 });
+  check("The Trainer adds a module to their course", module.status === 200 || module.status === 201, JSON.stringify(module));
+
+  check("Without a Blob token uploads go through the server", (await trainer.get("/api/objects/upload-mode")).json?.direct === false);
+  check("The Blob signer is off without a token", (await trainer.post("/api/blob-upload", {})).status === 503);
+
+  const stats = (await admin.get("/api/admin/dashboard-stats")).json || {};
+  check("Admin Home counts kinds, sessions and answers to mark", stats.fellowKinds?.pre_service >= 1 && stats.trainerKinds?.instructional >= 1 && stats.answersToMark >= 1 && typeof stats.sessionsNextSevenDays === "number", JSON.stringify(stats));
+  const deskFigures = (await trainer.get("/api/trainer/desk")).json || {};
+  check("The Trainer's figures count uploaded assessments and answers to mark", deskFigures.assessments >= 2 && deskFigures.toMark >= 1, JSON.stringify({ a: deskFigures.assessments, m: deskFigures.toMark }));
+  const pipeline = (await admin.get("/api/admin/analytics/pipeline")).json || {};
+  check("Participation counts Fellows active in the last 30 days", pipeline.activeLast30Days >= 2 && pipeline.enrolled >= 2, JSON.stringify(pipeline));
+
   await trainer.del(`/api/events/${sessionId}`);
   check("The owning Trainer can remove their session", ((await trainer.get("/api/timetable")).json || []).every((e: any) => e.id !== sessionId));
 

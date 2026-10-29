@@ -11,11 +11,19 @@ Verification run:
 - Full `npm test`, with no database variables set: green.
 - `npm run typecheck`: 29 errors, the same 29 as `main`.
 - `vite build` into a scratch folder: built.
-- **Not run:**
-  - `scripts/workflow-walkthrough.ts`, because it needs a throwaway Neon database. It is updated for the Done step.
-  - Phase 0 (whether `BLOB_READ_WRITE_TOKEN` is set on the live project). Without the token, uploads keep the old
-    path.
-  - No page was clicked through in a browser.
+- `scripts/workflow-walkthrough.ts` (extended with the round-2 checks): 104 of 104 against a temporary Neon project,
+  deleted afterwards.
+- A browser click-through of each desk on that database. It covered:
+  - request, approve, create password, sign in;
+  - Fellow Home, Work and the deadline;
+  - Trainer Assessments, marking, Courses and Calendar editing;
+  - Admin Home figures and the academy year's Done.
+- The click-through found and fixed:
+  - raw-SQL timestamps sent without their zone, three hours off in the browser;
+  - the marking link not scrolling to its assessment;
+  - the course page saying only an Admin can rename.
+- **Not run:** Phase 0 (whether `BLOB_READ_WRITE_TOKEN` is set on the live project). Without the token, uploads keep the
+  old path. A real Blob upload has not been tried.
 
 Deviations:
 - **B:** work a Fellow already handed in or tried stays visible after its deadline, read-only, so their mark is not hidden.
