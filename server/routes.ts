@@ -26,7 +26,7 @@ import {
 } from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
-import { parseDeadline } from "@shared/academyPath";
+import { DEADLINE_PASSED, fellowStillSees, isPastDue, parseDeadline } from "@shared/academyPath";
 import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, QUIZ_ATTEMPTS, refusal } from "@shared/constants";
 import { cohortIsOpen, trainerMayEditCourse } from "./scope";
 import { cohortsInScope, trainerCohortCounts } from "./cohortRoster";
@@ -3108,7 +3108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/quizzes", isTeacherAuthenticated, async (req, res) => {
     try {
       const quizzes = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
-      res.json(quizzes.map((quiz) => ({
+      const tried = new Set((await storage.getAllTeacherQuizAttempts(req.teacherId!)).map((attempt) => attempt.assignedQuizId));
+      const now = new Date();
+      res.json(quizzes.filter((quiz) => fellowStillSees(quiz.dueDate, tried.has(quiz.id), now)).map((quiz) => ({
         ...learnerQuiz(quiz),
         kind: quiz.paperUrl ? "paper" : isWritingExam(quiz) ? "written" : "quiz",
       })));
@@ -3129,6 +3131,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visible = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
+      }
+      if (isPastDue(quiz.dueDate)) {
+        const tries = await storage.getTeacherQuizAttemptsByQuiz(req.teacherId!, quiz.id);
+        if (tries.length === 0) return res.status(410).json({ error: DEADLINE_PASSED });
       }
       const writing = isWritingExam(quiz);
       const questions = writing || quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
@@ -3153,6 +3159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
       }
+      if (isPastDue(quiz.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
 
       // Get all existing attempts for this quiz
       const existingAttempts = await storage.getTeacherQuizAttemptsByQuiz(
@@ -6215,7 +6222,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/teacher/assignments", isTeacherAuthenticated, async (req, res) => {
     try {
-      res.json(await storage.getWrittenAssignmentsForTeacher(req.teacherId!));
+      const rows = (await storage.getWrittenAssignmentsForTeacher(req.teacherId!)) as any[];
+      const now = new Date();
+      res.json(rows.filter((row) => fellowStillSees(row.due_date, Boolean(row.my_response), now)));
     } catch (error) {
       console.error("Error listing teacher assignments:", error);
       res.status(500).json({ error: "Failed to list assignments" });
@@ -6229,6 +6238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await storage.teacherCanSeeAssignment(req.params.assignmentId, req.teacherId!))) {
         return res.status(403).json({ error: "This work is not assigned to you" });
       }
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (isPastDue(assignment?.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
       const row = await storage.upsertAssignmentSubmission(req.params.assignmentId, req.teacherId!, response);
       res.json(row);
     } catch (error) {

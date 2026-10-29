@@ -1,3 +1,4 @@
+import { isPastDue } from "@shared/academyPath";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
@@ -113,7 +114,7 @@ export default function TeacherExam() {
           <QuizSkeleton label="Opening the exam" />
         </section>
       )}
-      {error && <p className="m-0 text-sm text-sl-risk">This exam is not on your desk.</p>}
+      {error && <p className="m-0 text-sm text-sl-risk">{String((error as Error).message || "").startsWith("410") ? "The deadline for this exam has passed." : "This exam is not on your desk."}</p>}
       {ready && writing && (
         <div className="grid gap-4 lg:grid-cols-2" data-testid="exam-split">
           <section className="flex min-h-[24rem] flex-col rounded-xl border border-sl-line bg-sl-surface p-4 text-sl-ink" data-testid="exam-paper">
@@ -144,7 +145,7 @@ export default function TeacherExam() {
                 type="button"
                 className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-sl-accent-strong px-[18px] text-[15px] font-semibold text-white disabled:opacity-50"
                 onClick={() => submit.mutate()}
-                disabled={submit.isPending || mine.length >= QUIZ_ATTEMPTS}
+                disabled={submit.isPending || mine.length >= QUIZ_ATTEMPTS || isPastDue(quiz?.dueDate)}
                 data-testid="button-submit-exam"
               >
                 {submit.isPending ? "Sending…" : "Send answers"}

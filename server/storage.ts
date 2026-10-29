@@ -2166,6 +2166,10 @@ export class DatabaseStorage implements IStorage {
             SELECT 1 FROM assignment_submissions s
             WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id
           )
+          AND (
+            NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+            OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = bt.teacher_id)
+          )
       `);
       const enrolledTeachers = Number(enrolled[0]?.count || 0);
       const completionPercentage = Math.round(Number(completion[0]?.avg || 0) * 10) / 10;
@@ -2547,6 +2551,10 @@ export class DatabaseStorage implements IStorage {
         AND NOT EXISTS (
           SELECT 1 FROM assignment_submissions s
           WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id
+        )
+        AND (
+          NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+          OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = bt.teacher_id)
         )
     `);
     const cohorts = await this.getCohortAnalytics();
