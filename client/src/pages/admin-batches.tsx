@@ -1,3 +1,4 @@
+import { audienceLabel, type AudienceMember } from "@shared/academyPeople";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -678,7 +679,7 @@ export default function AdminBatches() {
                   <div key={quiz.id} className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-sl-ink">{quiz.title}</p>
-                      <p className="text-xs text-sl-muted">{stopped ? "Stopped" : "Open"}</p>
+                      <p className="text-xs text-sl-muted">{stopped ? "Stopped" : "Open"} · Given to {audienceLabel((quiz as { audience?: AudienceMember[] }).audience)}</p>
                     </div>
                     <button
                       type="button"

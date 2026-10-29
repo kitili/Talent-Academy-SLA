@@ -122,6 +122,7 @@ import {
 import { db } from "./db";
 import { eq, and, or, sql as sqlOp, desc, max, inArray } from "drizzle-orm";
 import { quizVisibleToTeacher, summarizeTrainerDesk, type TrainerCohortSummary } from "@shared/trainerDesk";
+import { assignmentRoster, audienceWithNames } from "@shared/academyPeople";
 import { courseHealth, quizStoppedReason } from "./cohortAccess";
 import { batchRiskStatus, moduleCoveragePercentage } from "./progressLogic";
 import { computeCourseCompletion } from "./completion";
@@ -3402,7 +3403,25 @@ export class DatabaseStorage implements IStorage {
   async getWrittenAssignments(batchId: string) {
     const rows = await db.select().from(writtenAssignments).where(eq(writtenAssignments.batchId, batchId)).orderBy(desc(writtenAssignments.createdAt));
     const audience = await this.getWrittenAssignmentAudienceMap(rows.map((row) => row.id));
-    return rows.map((row) => ({ ...row, teacherIds: audience[row.id] || [] }));
+    const names = await this.getTeacherNameMap(Object.values(audience).flat());
+    return rows.map((row) => ({
+      ...row,
+      teacherIds: audience[row.id] || [],
+      audience: audienceWithNames(audience[row.id] || [], names),
+    }));
+  }
+
+  /** Display name for each Fellow id (name, else email). Ids with no Fellow are left out. */
+  async getTeacherNameMap(teacherIds: string[]): Promise<Record<string, string>> {
+    const unique = Array.from(new Set(teacherIds.filter(Boolean)));
+    if (unique.length === 0) return {};
+    const rows = await db
+      .select({ id: teachers.id, name: teachers.name, email: teachers.email })
+      .from(teachers)
+      .where(inArray(teachers.id, unique));
+    const map: Record<string, string> = {};
+    for (const row of rows) map[row.id] = row.name || row.email || "Fellow";
+    return map;
   }
 
   async replaceWrittenAssignmentAudience(assignmentId: string, teacherIds: string[]): Promise<void> {
@@ -3487,6 +3506,19 @@ export class DatabaseStorage implements IStorage {
       ORDER BY s.submitted_at DESC
     `);
     return result.rows;
+  }
+
+  /**
+   * Everyone who sits the assignment (its named Fellows, or the whole cohort when none are named), each with their
+   * submission or none, followed by anyone who submitted but has since left the audience.
+   */
+  async getAssignmentRoster(assignment: { id: string; batchId: string }) {
+    const submissions = (await this.getAssignmentSubmissions(assignment.id)) as any[];
+    const named = (await this.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
+    const sitters = named.length > 0
+      ? Object.entries(await this.getTeacherNameMap(named)).map(([id, name]) => ({ id, name }))
+      : (await this.getTeachersInBatch(assignment.batchId)).map((t) => ({ id: t.id, name: t.name || t.email || "Fellow" }));
+    return assignmentRoster(sitters, submissions);
   }
 
   async listDiscussionPosts(weekId: string) {

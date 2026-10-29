@@ -182,3 +182,29 @@ export function coversDay(row: DatedRow, day: Date) {
   const from = Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate());
   return start < from + 86_400_000 && end >= from;
 }
+
+export type AudienceMember = { teacherId: string; name: string };
+
+/** The named Fellows a piece of work is given to, in the order saved. An empty list means the whole cohort. */
+export function audienceWithNames(teacherIds: string[], names: Record<string, string>): AudienceMember[] {
+  return teacherIds.map((teacherId) => ({ teacherId, name: names[teacherId] || "Fellow no longer on file" }));
+}
+
+/** "Amina, Baraka" or "Whole cohort", for the line that says who sits a piece of work. */
+export function audienceLabel(audience: AudienceMember[] | undefined) {
+  return audience && audience.length > 0 ? audience.map((member) => member.name).join(", ") : "Whole cohort";
+}
+
+/**
+ * One marking row per Fellow who sits the work: their submission, or none yet. Submitted rows come first (newest
+ * first), then those still to submit by name. Anyone who submitted but has left the audience is kept.
+ */
+export function assignmentRoster(sitters: Array<{ id: string; name: string }>, submissions: any[]) {
+  const byTeacher = new Map(submissions.map((row) => [row.teacher_id, row]));
+  const submitted = submissions.map((row) => ({ ...row, submitted: true }));
+  const waiting = sitters
+    .filter((sitter) => !byTeacher.has(sitter.id))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((sitter) => ({ id: `waiting-${sitter.id}`, teacher_id: sitter.id, teacher_name: sitter.name, response: null, submitted: false }));
+  return [...submitted, ...waiting];
+}

@@ -21,7 +21,7 @@ import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import { AcademyShell } from "@/components/AcademyShell";
 import { DESK_MENUS } from "@/components/deskMenu";
-import { canRunOnlineSessions } from "@shared/academyPeople";
+import { canRunOnlineSessions, audienceLabel } from "@shared/academyPeople";
 import { Users, Plus, Trash2, FileText, X, CheckCircle, Upload, ChevronLeft, ChevronRight, MoreHorizontal, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CohortMedals } from "@/components/CohortMedals";
@@ -256,7 +256,15 @@ function AssessmentDesk({ batchId, cohortName }: { batchId: string; cohortName: 
         <div key={item.id} className="rounded-lg border border-sl-line p-4">
           <p className="font-semibold text-sl-ink">{item.title}</p>
           <p className="text-sm text-sl-muted">{cohortName} · Fellows open it on Work · {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
+          <p className="text-sm text-sl-muted" data-testid={`assessment-given-to-${item.id}`}>Given to {audienceLabel(item.audience)}</p>
           {item.instructions && <p className="mt-1 text-sm text-sl-muted">{item.instructions}</p>}
+          <a
+            className="mt-2 inline-block text-sm font-semibold text-sl-accent underline"
+            href={`/cohorts/${batchId}?tab=work&work=${item.id}`}
+            data-testid={`link-mark-${item.id}`}
+          >
+            Mark submissions
+          </a>
           <WorkDeadlineEditor
             current={item.dueDate}
             pending={saveDue.isPending}
@@ -1517,7 +1525,7 @@ export default function TrainerBatches() {
   const lessonQuizList = cohortQuizzes.filter((quiz) => !isWritingExam(quiz));
   const quizzesLoading = batchesLoading || quizQueries.some((query) => query.isLoading);
   const examsLoading = quizzesLoading || assignmentQueries.some((query) => query.isLoading);
-  const givenTo = (quiz: any) => (quiz.teacherIds?.length ? plural(quiz.teacherIds.length, "Fellow") : "Whole cohort");
+  const givenTo = (quiz: any) => audienceLabel(quiz.audience);
 
   const renderAssessments = () => (
     <div className="space-y-6">

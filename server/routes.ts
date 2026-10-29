@@ -63,7 +63,7 @@ import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
-import { parseOnlineFields } from "@shared/academyPeople";
+import { audienceWithNames, parseOnlineFields } from "@shared/academyPeople";
 import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
@@ -2922,7 +2922,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const quizzes = await storage.getAssignedQuizzesForBatch(req.params.batchId);
       const audience = await storage.getQuizAudienceMap(quizzes.map((quiz) => quiz.id));
-      res.json(quizzes.map((quiz) => ({ ...quiz, teacherIds: audience[quiz.id] || [] })));
+      const names = await storage.getTeacherNameMap(Object.values(audience).flat());
+      res.json(quizzes.map((quiz) => ({
+        ...quiz,
+        teacherIds: audience[quiz.id] || [],
+        audience: audienceWithNames(audience[quiz.id] || [], names),
+      })));
     } catch (error) {
       console.error("Error fetching assigned quizzes:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -6097,13 +6102,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updated = await storage.updateWrittenAssignment(assignment.id, { dueDate: parseDeadline(req.body.dueDate) });
       const due = parseDeadline(req.body.dueDate);
-      notifyBatchTeachers(
+      const audience = (await storage.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
+      notifyQuizTeachers(
         batch.id,
+        audience,
         "Deadline updated",
         due
           ? `${assignment.title} is now due ${due.toLocaleString()}.`
           : `${assignment.title} no longer has a deadline.`,
-        "deadline",
       ).catch((error) => console.error("Assignment deadline notice failed:", error));
       res.json(updated);
     } catch (error) {
@@ -6116,7 +6122,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
-      res.json(await storage.getAssignmentSubmissions(req.params.assignmentId));
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (!batch || !assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
+      res.json(await storage.getAssignmentRoster(assignment));
     } catch (error) {
       console.error("Error listing submissions:", error);
       res.status(500).json({ error: "Failed to list submissions" });
@@ -6127,6 +6135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const batch = await storage.getBatch(req.params.batchId);
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (!batch || !assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
       const score = req.body?.trainerScore == null || req.body?.trainerScore === ""
         ? null
         : Number(req.body.trainerScore);
