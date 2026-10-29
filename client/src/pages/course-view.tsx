@@ -1,3 +1,4 @@
+import { isBlobUrl, isVideoName } from "@shared/uploads";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -296,7 +297,10 @@ export default function CourseView() {
 
         revokeObjectUrl();
         setDocumentLoadError(false);
-        setViewUrl(`/api/files/proxy?url=${encodeURIComponent(selectedFile.fileUrl)}`);
+        // A video in Blob plays from Blob: through the server it would stop at Vercel's body limit.
+        setViewUrl(isBlobUrl(selectedFile.fileUrl) && isVideoName(selectedFile.fileName)
+          ? selectedFile.fileUrl
+          : `/api/files/proxy?url=${encodeURIComponent(selectedFile.fileUrl)}`);
       } catch (error) {
         console.error('Error fetching view URL:', error);
         revokeObjectUrl();

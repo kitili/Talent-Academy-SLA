@@ -94,6 +94,8 @@ export const courses = pgTable("courses", {
   publishStatus: varchar("publish_status").notNull().default("published"),
   orderIndex: integer("order_index").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
+  // The Trainer who made the course; they may edit it before it is on a cohort. Null for courses an Admin made.
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
 });
 
 export const insertCourseSchema = createInsertSchema(courses).omit({

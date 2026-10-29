@@ -1,12 +1,14 @@
 import { randomBytes } from "crypto";
 import type { Express, Request, Response, NextFunction } from "express";
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { academyCalendar, batches, batchTeachers, scheduledEvents, teachers, users } from "@shared/schema";
+import { academyCalendar, batchCourses, batches, batchTeachers, cohortBatchCourses, cohortBatches, courses, scheduledEvents, teachers, users } from "@shared/schema";
+import { nextBatchName, sortBatches } from "@shared/academyPath";
 import { parseCalendarEntry, parseFellowType, parseTrainerType, FELLOW_TYPE_LABELS } from "@shared/academyPeople";
 import { parseAccessRequest } from "@shared/accessRequest";
 import { db, hasDatabaseUrl } from "./db";
 import { storage } from "./storage";
 import { trainerOwnsBatch } from "./access";
+import { trainerMayEditCourse } from "./scope";
 
 type Guard = (req: Request, res: Response, next: NextFunction) => void;
 
@@ -24,6 +26,24 @@ function fellowIdOf(req: Request): string | undefined {
 export function publicFellow<T extends { password?: unknown }>(row: T) {
   const { password: _password, ...rest } = row;
   return rest;
+}
+
+/**
+ * Put a course on a cohort the way the Admin page does: on the cohort's last step, or on a first step made for it when
+ * the cohort has none, and in `batch_courses` so its Fellows see it. Refuses a course the cohort already has.
+ */
+async function placeCourseOnCohort(courseId: string, cohortId: string, userId: string): Promise<string | null> {
+  const [held] = await db
+    .select({ id: batchCourses.id })
+    .from(batchCourses)
+    .where(and(eq(batchCourses.batchId, cohortId), eq(batchCourses.courseId, courseId)));
+  if (held) return "That course is already on this cohort";
+  const steps = sortBatches(await db.select().from(cohortBatches).where(eq(cohortBatches.cohortId, cohortId)));
+  const step = steps[steps.length - 1]
+    ?? (await db.insert(cohortBatches).values({ cohortId, name: nextBatchName(0), orderIndex: 0 }).returning())[0];
+  await db.insert(cohortBatchCourses).values({ cohortBatchId: step.id, courseId }).onConflictDoNothing();
+  await storage.assignCourseToBatch({ batchId: cohortId, courseId, assignedBy: userId });
+  return null;
 }
 
 export function registerAcademyDeskRoutes(
@@ -149,6 +169,76 @@ export function registerAcademyDeskRoutes(
     } catch (error) {
       console.error("Trainer type failed:", error);
       res.status(500).json({ message: "Could not change the Trainer type" });
+    }
+  });
+
+  // ── Trainers make courses ─────────────────────────────────────────────────
+  // Any Trainer can make a course, add its modules and files, and put it on a cohort they teach. Deleting stays Admin.
+  app.get("/api/trainer/courses", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const mine = req.user!.role === "admin" ? null : (await storage.getAllBatches(req.user!.id)).map((batch: any) => batch.id as string);
+      const placed = mine === null || mine.length > 0
+        ? await db
+          .select({ courseId: batchCourses.courseId, cohortId: batches.id, cohortName: batches.name })
+          .from(batchCourses)
+          .innerJoin(batches, eq(batchCourses.batchId, batches.id))
+          .where(mine === null ? sql`true` : inArray(batchCourses.batchId, mine))
+        : [];
+      const ids = Array.from(new Set(placed.map((row) => row.courseId)));
+      const rows = await db
+        .select()
+        .from(courses)
+        .where(mine === null ? sql`true` : sql`${courses.createdBy} = ${req.user!.id} OR ${ids.length ? inArray(courses.id, ids) : sql`false`}`)
+        .orderBy(asc(courses.name));
+      res.json(rows.map((course) => ({
+        ...course,
+        mine: course.createdBy === req.user!.id,
+        cohorts: placed.filter((row) => row.courseId === course.id).map(({ cohortId, cohortName }) => ({ id: cohortId, name: cohortName })),
+      })));
+    } catch (error) {
+      console.error("Trainer courses failed:", error);
+      res.status(500).json({ message: "Could not load your courses" });
+    }
+  });
+
+  app.post("/api/trainer/courses", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      if (name.length < 3) return res.status(400).json({ message: "Give the course a name" });
+      const cohortId = typeof req.body?.cohortId === "string" && req.body.cohortId ? req.body.cohortId : null;
+      if (cohortId) {
+        const cohort = await storage.getBatch(cohortId);
+        if (!cohort) return res.status(404).json({ message: "That cohort does not exist" });
+        if (!trainerOwnsBatch(req.user, cohort)) return res.status(403).json({ message: "That cohort is not yours" });
+      }
+      const [course] = await db.insert(courses).values({
+        name,
+        description: req.body?.description ? String(req.body.description).trim() : null,
+        publishStatus: "published",
+        createdBy: req.user!.id,
+      }).returning();
+      if (cohortId) await placeCourseOnCohort(course.id, cohortId, req.user!.id);
+      res.status(201).json(course);
+    } catch (error) {
+      console.error("Trainer course create failed:", error);
+      res.status(500).json({ message: "Could not make the course" });
+    }
+  });
+
+  app.post("/api/trainer/courses/:id/cohorts", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const course = await storage.getCourse(req.params.id);
+      if (!course) return res.status(404).json({ message: "Course not found" });
+      if (!(await trainerMayEditCourse(req.user, course.id))) return res.status(403).json({ message: "That course is not yours" });
+      const cohort = await storage.getBatch(String(req.body?.cohortId || ""));
+      if (!cohort) return res.status(404).json({ message: "That cohort does not exist" });
+      if (!trainerOwnsBatch(req.user, cohort)) return res.status(403).json({ message: "That cohort is not yours" });
+      const refused = await placeCourseOnCohort(course.id, cohort.id, req.user!.id);
+      if (refused) return res.status(409).json({ message: refused });
+      res.status(201).json({ courseId: course.id, cohortId: cohort.id });
+    } catch (error) {
+      console.error("Trainer course placement failed:", error);
+      res.status(500).json({ message: "Could not put the course on the cohort" });
     }
   });
 

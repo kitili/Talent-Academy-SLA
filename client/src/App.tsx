@@ -20,6 +20,7 @@ import TrainerBatches from "@/pages/trainer-batches";
 import TrainerTeacherContentHistory from "@/pages/trainer-teacher-content-history";
 import Approvals from "@/pages/approvals";
 import TrainerFellows from "@/pages/trainer-fellows";
+import TrainerCourses from "@/pages/trainer-courses";
 import AcademyCalendarPage from "@/pages/academy-calendar";
 import AdminHome from "@/pages/admin-home";
 import AdminPeople from "@/pages/admin-people";
@@ -51,6 +52,7 @@ function Router() {
       <ProtectedRoute path="/trainer/batches" component={TrainerBatches} />
       <ProtectedRoute path="/trainer/teachers/:teacherId/weeks/:weekId/content-history" component={TrainerTeacherContentHistory} />
       <ProtectedRoute path="/trainer/fellows" component={TrainerFellows} />
+      <ProtectedRoute path="/trainer/courses" component={TrainerCourses} />
       <ProtectedRoute path="/calendar" component={AcademyCalendarPage} />
       <ProtectedRoute path="/approvals" component={Approvals} />
       <ProtectedRoute path="/admin/certificates" component={AdminCertificates} />

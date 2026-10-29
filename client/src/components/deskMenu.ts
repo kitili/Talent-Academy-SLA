@@ -31,6 +31,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "home", label: "Home", href: "/trainer/batches?tab=home", test: "home" },
     { key: "cohorts", label: "Cohorts", href: "/trainer/batches?tab=cohorts", test: "cohorts", also: ["/cohorts", "/courses", "/course", "/trainer/teachers"] },
     { key: "fellows", label: "Fellows", href: "/trainer/fellows", test: "fellows" },
+    { key: "courses", label: "Courses", href: "/trainer/courses", test: "courses" },
     { key: "assessments", label: "Assessments", href: "/trainer/batches?tab=assessments", test: "assessments" },
     { key: "progress", label: "Progress", href: "/trainer/batches?tab=progress", test: "progress" },
     { key: "attendance", label: "Attendance", href: "/trainer/batches?tab=attendance", test: "attendance" },

@@ -8,7 +8,8 @@ import { writeFile, readFile, unlink, mkdir, readdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError, directUploadsAvailable } from "./objectStorage";
+import { UPLOAD_CONTENT_TYPES, UPLOAD_MAX_BYTES } from "@shared/uploads";
 import { insertTrainingWeekSchema, updateTrainingWeekSchema, scheduledEvents, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars, contentItems } from "@shared/schema";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
@@ -1251,6 +1252,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[UPLOAD ERROR] Error getting upload URL:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Whether this deployment uploads straight from the browser to Vercel Blob (see shared/uploads.ts).
+  app.get("/api/objects/upload-mode", isAuthenticated, isTrainer, (_req, res) => {
+    res.json({ direct: directUploadsAvailable() });
+  });
+
+  // Signs a browser-direct Blob upload for a signed-in Trainer or Admin. Vercel also posts the upload-completed event
+  // here without a session; handleUpload checks that event's signature itself, so this route has no session guard.
+  app.post("/api/blob-upload", async (req, res) => {
+    try {
+      if (!directUploadsAvailable()) return res.status(503).json({ error: "Direct uploads are not set up here" });
+      const { handleUpload } = await import("@vercel/blob/client");
+      const result = await handleUpload({
+        body: req.body,
+        request: req,
+        onBeforeGenerateToken: async () => {
+          const role = req.isAuthenticated?.() ? req.user?.role : undefined;
+          if (role !== "admin" && role !== "trainer") throw new Error("Sign in as a Trainer to upload");
+          return {
+            allowedContentTypes: UPLOAD_CONTENT_TYPES,
+            maximumSizeInBytes: UPLOAD_MAX_BYTES,
+            addRandomSuffix: true,
+          };
+        },
+        onUploadCompleted: async () => {},
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Upload refused" });
     }
   });
 
@@ -4283,10 +4315,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update course (admin only)
-  app.patch("/api/courses/:id", isAuthenticated, isAdmin, async (req, res) => {
+  // Update course: an admin, or a trainer who may edit it (made it, or it is on a cohort they teach).
+  app.patch("/api/courses/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
-      const course = await storage.updateCourse(req.params.id, req.body);
+      if (!(await trainerMayEditCourse(req.user, req.params.id))) {
+        return res.status(403).json(refusal("NOT_YOUR_COURSE"));
+      }
+      const { name, description, objectives, publishStatus, stage, track, orderIndex } = req.body || {};
+      const course = await storage.updateCourse(req.params.id, Object.fromEntries(Object.entries({
+        name, description, objectives, publishStatus, stage, track, orderIndex,
+      }).filter(([, value]) => value !== undefined)));
       if (!course) return res.status(404).json({ error: "Course not found" });
       res.json(course);
     } catch (error) {

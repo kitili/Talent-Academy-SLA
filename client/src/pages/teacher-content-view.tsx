@@ -1,3 +1,4 @@
+import { isBlobUrl, isVideoName } from "@shared/uploads";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -366,7 +367,10 @@ export default function TeacherContentView() {
         } else {
           // For all other files (videos, documents, etc.), use the proxy endpoint
           // This ensures files are served with inline disposition headers
-          const proxyUrl = `/api/files/proxy?url=${encodeURIComponent(selectedFile.fileUrl)}`;
+          // A video in Blob plays from Blob: through the server it would stop at Vercel's body limit.
+          const proxyUrl = isBlobUrl(selectedFile.fileUrl) && isVideoName(selectedFile.fileName)
+            ? selectedFile.fileUrl
+            : `/api/files/proxy?url=${encodeURIComponent(selectedFile.fileUrl)}`;
           setDocumentLoadError(false);
           setViewUrl(proxyUrl);
         }

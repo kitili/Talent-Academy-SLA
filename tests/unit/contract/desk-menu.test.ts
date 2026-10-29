@@ -13,7 +13,7 @@ import {
 test('each desk lists the board\'s items in order', () => {
     const labels = (desk: keyof typeof DESK_MENUS) => DESK_MENUS[desk].map((item) => item.label)
     assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Calendar', 'Attendance', 'Analytics', 'Certificates'])
-    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule', 'Calendar'])
+    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule', 'Calendar'])
     assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Calendar', 'Certificates'])
 })
 
@@ -50,6 +50,7 @@ test('the shared Calendar and the Trainer\'s Fellows page keep their own menu it
     assert.equal(deskItemForLocation('trainer', '/calendar'), 'calendar')
     assert.equal(deskItemForLocation('fellow', '/calendar'), 'calendar')
     assert.equal(deskItemForLocation('trainer', '/trainer/fellows'), 'fellows')
+    assert.equal(deskItemForLocation('trainer', '/trainer/courses'), 'courses')
 })
 
 test('a page outside the desk makes no item current', () => {

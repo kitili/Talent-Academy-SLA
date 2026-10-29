@@ -5,12 +5,18 @@ import { randomUUID } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
+import { isBlobUrl } from "@shared/uploads";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 const LOCAL_UPLOAD_DIR = join(process.cwd(), "local-uploads");
 
 function usesBlobStorage(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
+
+/** Browser-direct uploads need a read-write token to sign; a store linked by id alone keeps the old path. */
+export function directUploadsAvailable(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
 function usesLocalObjectStorage(): boolean {
@@ -228,6 +234,12 @@ export class ObjectStorageService {
   }
 
   async getObjectEntity(objectPath: string): Promise<Buffer> {
+    // A file uploaded straight from the browser lives at its Blob URL. Only Blob hosts are fetched.
+    if (isBlobUrl(objectPath)) {
+      const response = await fetch(objectPath);
+      if (!response.ok) throw new ObjectNotFoundError();
+      return Buffer.from(await response.arrayBuffer());
+    }
     let localId = localObjectId(objectPath);
     if (!localId && usesLocalObjectStorage() && /^[0-9a-fA-F-]{36}$/.test(objectPath)) {
       localId = objectPath;
