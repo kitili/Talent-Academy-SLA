@@ -117,6 +117,19 @@ function staffCanAccessBatch(
   return trainerOwnsBatch(user, batch);
 }
 
+/**
+ * True when this staff member may act on this Fellow: an Admin always, a Trainer only when the Fellow is enrolled in
+ * a cohort the Trainer teaches. `getAllBatches(trainerId)` is the Trainer's cohort list, multi-trainer cohorts included.
+ */
+async function staffTeachesFellow(user: Express.User | undefined, teacherId: string) {
+  if (!user || !teacherId) return false;
+  if (user.role === "admin") return true;
+  if (user.role !== "trainer") return false;
+  const [mine, theirs] = await Promise.all([storage.getAllBatches(user.id), storage.getBatchesForTeacher(teacherId)]);
+  const taught = new Set(mine.map((batch: any) => batch.id as string));
+  return theirs.some((batch) => taught.has(batch.id));
+}
+
 function fileRequestAllowed(req: Request) {
   if (req.isAuthenticated?.() && req.user) return true;
   if ((req.session as any)?.teacherId) return true;
@@ -1101,6 +1114,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teacher = await storage.getTeacher(teacherId);
       if (!teacher) {
         return res.status(404).json({ error: "Teacher not found" });
+      }
+      if (!(await staffTeachesFellow(req.user, teacherId))) {
+        return res.status(403).json({ error: "That Fellow is not in your cohorts" });
       }
 
       // Hash the new password
@@ -3045,8 +3061,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { questions } = req.body;
       const hasQuestions = Array.isArray(questions);
-      const hasDueDate = Object.prototype.hasOwnProperty.call(req.body || {}, "dueDate");
-      if (!hasQuestions && !hasDueDate) {
+      const has = (key: string) => Object.prototype.hasOwnProperty.call(req.body || {}, key);
+      const hasDueDate = has("dueDate");
+      // Also editable: title, description, passMark (whole percent, 1 to 100).
+      const details: { title?: string; description?: string | null; passMark?: number } = {};
+      if (has("title")) {
+        const title = String(req.body.title || "").trim();
+        if (!title) return res.status(400).json({ error: "The title cannot be empty" });
+        details.title = title.slice(0, 200);
+      }
+      if (has("description")) details.description = String(req.body.description || "").trim() || null;
+      if (has("passMark")) {
+        const mark = Math.round(Number(req.body.passMark));
+        if (!Number.isFinite(mark) || mark < 1 || mark > 100) return res.status(400).json({ error: "The pass mark must be 1 to 100" });
+        details.passMark = mark;
+      }
+      if (!hasQuestions && !hasDueDate && Object.keys(details).length === 0) {
         return res.status(400).json({ error: "questions must be an array" });
       }
       const quiz = await storage.getAssignedQuiz(req.params.quizId);
@@ -3058,8 +3088,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (hasQuestions) {
         await storage.updateAssignedQuizQuestions(req.params.quizId, questions);
       }
-      if (hasDueDate) {
-        await storage.updateAssignedQuiz(req.params.quizId, { dueDate: parseDeadline(req.body.dueDate) });
+      if (hasDueDate || Object.keys(details).length > 0) {
+        await storage.updateAssignedQuiz(req.params.quizId, {
+          ...details,
+          ...(hasDueDate ? { dueDate: parseDeadline(req.body.dueDate) } : {}),
+        });
       }
       const updated = await storage.getAssignedQuiz(req.params.quizId);
       res.json(updated);
@@ -3101,15 +3134,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "reviews must be a non-empty array" });
       }
 
-      // Fetch the attempt to validate it exists and get quiz/teacher info
-      const allAttempts = await storage.getAllTeacherQuizAttempts("__placeholder__"); // we need by attemptId
-      // Directly query by attemptId — use getTeacherQuizAttemptById if available, else use approach below
-      // For now, patch each review and update status
+      // The attempt says whose answers these are and which quiz; the request body is not trusted for either.
+      const attempt = await storage.getTeacherQuizAttemptById(req.params.attemptId);
+      if (!attempt) return res.status(404).json({ error: "Attempt not found" });
+      const quiz = await storage.getAssignedQuiz(attempt.assignedQuizId);
+      const batch = quiz ? await storage.getBatch(quiz.batchId) : undefined;
+      if (!batch) return res.status(404).json({ error: "Quiz not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       for (const review of reviews) {
         await storage.createOpenEndedReview({
-          attemptId: req.params.attemptId,
-          assignedQuizId: review.assignedQuizId || "",
-          teacherId: review.teacherId || "",
+          attemptId: attempt.id,
+          assignedQuizId: attempt.assignedQuizId,
+          teacherId: attempt.teacherId,
           questionId: review.questionId,
           questionText: review.questionText || "",
           teacherAnswer: review.teacherAnswer || "",
@@ -5303,6 +5339,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!teacher) {
         return res.status(404).json({ error: "Teacher not found" });
       }
+      const batch = await storage.getBatch(String(batchId));
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      if (!(await storage.getTeachersInBatch(batch.id)).some((row) => row.id === teacherId)) {
+        return res.status(400).json({ error: "That Fellow is not in this cohort" });
+      }
       const disqualification = await storage.disqualifyFellow({
         teacherId,
         batchId,
@@ -5389,6 +5431,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!teacherId || !comment) {
         return res.status(400).json({ error: "teacherId and comment are required" });
       }
+      if (!(await staffTeachesFellow(req.user, String(teacherId)))) {
+        return res.status(403).json({ error: "That Fellow is not in your cohorts" });
+      }
       const result = await storage.createTrainerComment({
         trainerId: req.user!.id,
         teacherId,
@@ -5429,7 +5474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Course Repetition Endpoints
 
   // Record a course repetition (trainer/admin)
-  app.post("/api/course-repetitions", isAuthenticated, isTrainer, async (req, res) => {
+  app.post("/api/course-repetitions", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { teacherId, courseId, batchId, repetitionNumber, reason } = req.body;
       if (!teacherId || !courseId || !batchId) {
@@ -5545,11 +5590,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!date || !Array.isArray(records) || records.length === 0) {
         return res.status(400).json({ error: "date and records array are required" });
       }
+      const batch = await storage.getBatch(batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      // Only Fellows enrolled in this cohort can be marked in it.
+      const enrolled = new Set((await storage.getTeachersInBatch(batchId)).map((teacher) => teacher.id));
       const markerId = (req.user as any)?.id;
       const attendanceDate = new Date(`${date}T00:00:00.000Z`);
       const results = [];
       for (const record of records) {
-        if (!record.teacherId || !record.status) continue;
+        if (!record.teacherId || !record.status || !enrolled.has(record.teacherId)) continue;
         const result = await storage.upsertAttendanceRecord({
           teacherId: record.teacherId,
           batchId,
@@ -5599,6 +5649,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!title || !message) {
         return res.status(400).json({ error: "title and message are required" });
       }
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const enrolled = await storage.getTeachersInBatch(req.params.batchId);
       const created = [];
       for (const teacher of enrolled) {
@@ -5781,6 +5834,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? String((req as any).teacherName || "Teacher")
         : `${(req.user as any)?.firstName || ""} ${(req.user as any)?.lastName || ""}`.trim() || (req.user as any)?.username || "Staff";
       if (!fromId || !fromRole) return res.status(401).json({ error: "Not authenticated" });
+      // Who may write to whom: a Fellow to staff; a Trainer to staff or their own Fellows; an Admin to anyone. The
+      // recipient must exist with the role given, so a message cannot be addressed to an id that is not that person.
+      if (toRole === "teacher") {
+        if (fromRole === "teacher" || !(await storage.getTeacher(toId))) return res.status(403).json({ error: "You cannot message that person" });
+        if (!(await staffTeachesFellow(req.user, toId))) return res.status(403).json({ error: "That Fellow is not in your cohorts" });
+      } else if (toRole === "trainer" || toRole === "admin") {
+        const recipient = await storage.getUser(toId);
+        if (!recipient || recipient.role !== toRole) return res.status(403).json({ error: "You cannot message that person" });
+      } else {
+        return res.status(400).json({ error: "toRole must be teacher, trainer or admin" });
+      }
       const row = await storage.createDeskMessage({ fromId, fromRole, fromName, toId, toRole, body: body.slice(0, 2000) });
       await storage.createNotification({
         recipientId: toId,
@@ -5904,7 +5968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ══════════════════════════════════════════════════════════════
 
   // Create alert rule (trainer/admin)
-  app.post("/api/alert-rules", isAuthenticated, isTrainer, async (req, res) => {
+  app.post("/api/alert-rules", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { batchId, ruleType, threshold } = req.body;
       if (!ruleType || threshold === undefined) {
@@ -5936,7 +6000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete alert rule (trainer/admin)
-  app.delete("/api/alert-rules/:id", isAuthenticated, isTrainer, async (req, res) => {
+  app.delete("/api/alert-rules/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       await storage.deleteAlertRule(req.params.id);
       res.json({ success: true });
@@ -6154,24 +6218,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
       if (!assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
-      if (!Object.prototype.hasOwnProperty.call(req.body || {}, "dueDate")) {
-        return res.status(400).json({ error: "dueDate is required" });
+      // Any of: dueDate, title, instructions, teacherIds (who sits it). Only the fields sent change.
+      const body = req.body || {};
+      const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
+      if (!has("dueDate") && !has("title") && !has("instructions") && !has("teacherIds")) {
+        return res.status(400).json({ error: "Send dueDate, title, instructions or teacherIds" });
       }
-      const updated = await storage.updateWrittenAssignment(assignment.id, { dueDate: parseDeadline(req.body.dueDate) });
-      const due = parseDeadline(req.body.dueDate);
-      const audience = (await storage.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
-      notifyQuizTeachers(
-        batch.id,
-        audience,
-        "Deadline updated",
-        due
-          ? `${assignment.title} is now due ${due.toLocaleString()}.`
-          : `${assignment.title} no longer has a deadline.`,
-      ).catch((error) => console.error("Assignment deadline notice failed:", error));
+      const updates: { dueDate?: Date | null; title?: string; instructions?: string } = {};
+      if (has("title")) {
+        const title = String(body.title || "").trim();
+        if (!title) return res.status(400).json({ error: "The title cannot be empty" });
+        updates.title = title.slice(0, 200);
+      }
+      if (has("instructions")) updates.instructions = String(body.instructions || "").trim();
+      if (has("dueDate")) updates.dueDate = parseDeadline(body.dueDate);
+      if (has("teacherIds")) {
+        const audience = await resolveQuizAudience(batch.id, body.teacherIds);
+        if (audience.error) return res.status(400).json({ error: audience.error });
+        await storage.replaceWrittenAssignmentAudience(assignment.id, audience.teacherIds);
+      }
+      const updated = Object.keys(updates).length > 0
+        ? await storage.updateWrittenAssignment(assignment.id, updates)
+        : assignment;
+      if (has("dueDate")) {
+        const due = updates.dueDate ?? null;
+        const audience = (await storage.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
+        notifyQuizTeachers(
+          batch.id,
+          audience,
+          "Deadline updated",
+          due
+            ? `${updated.title} is now due ${due.toLocaleString()}.`
+            : `${updated.title} no longer has a deadline.`,
+        ).catch((error) => console.error("Assignment deadline notice failed:", error));
+      }
       res.json(updated);
     } catch (error) {
       console.error("Error updating assignment:", error);
       res.status(500).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  // Delete an assessment with its submissions. Staff of the cohort only.
+  app.delete("/api/batches/:batchId/assignments/:assignmentId", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
+      if (!assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
+      await storage.deleteWrittenAssignment(assignment.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      res.status(500).json({ error: "Failed to delete assignment" });
     }
   });
 

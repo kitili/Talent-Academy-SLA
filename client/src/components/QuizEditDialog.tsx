@@ -37,6 +37,8 @@ interface QuizEditDialogProps {
   onClose: () => void;
   quizId: string;
   quizTitle: string;
+  /** When given, the pass mark can be changed here too (whole percent). */
+  initialPassMark?: number;
   initialQuestions: QuizQuestion[];
   batchId?: string;
   onRegenerate?: () => void;
@@ -74,6 +76,7 @@ export function QuizEditDialog({
   onClose,
   quizId,
   quizTitle,
+  initialPassMark,
   initialQuestions,
   batchId,
   onRegenerate,
@@ -82,6 +85,13 @@ export function QuizEditDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [questions, setQuestions] = useState<QuizQuestion[]>(initialQuestions);
+  const [title, setTitle] = useState(quizTitle);
+  const [passMark, setPassMark] = useState(initialPassMark != null ? String(initialPassMark) : "");
+  useEffect(() => {
+    if (!open) return;
+    setTitle(quizTitle);
+    setPassMark(initialPassMark != null ? String(initialPassMark) : "");
+  }, [open, quizTitle, initialPassMark]);
   const [addingType, setAddingType] = useState<QuizQuestion["type"]>("multiple_choice");
 
   // Sync if parent loads quiz data after dialog opens
@@ -93,7 +103,11 @@ export function QuizEditDialog({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/assigned-quizzes/${quizId}`, { questions });
+      const res = await apiRequest("PATCH", `/api/assigned-quizzes/${quizId}`, {
+        questions,
+        ...(title.trim() && title.trim() !== quizTitle ? { title: title.trim() } : {}),
+        ...(initialPassMark != null && passMark !== "" && Number(passMark) !== initialPassMark ? { passMark: Number(passMark) } : {}),
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -105,8 +119,8 @@ export function QuizEditDialog({
       }
       onClose();
     },
-    onError: () => {
-      toast({ title: "Failed to save quiz", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Failed to save quiz", description: error.message, variant: "destructive" });
     },
   });
 
@@ -140,6 +154,19 @@ export function QuizEditDialog({
         <DialogHeader>
           <DialogTitle>Edit Quiz — {quizTitle}</DialogTitle>
         </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
+          <div className="space-y-1.5">
+            <Label htmlFor="quiz-edit-title">Title</Label>
+            <Input id="quiz-edit-title" value={title} onChange={(e) => setTitle(e.target.value)} data-testid="input-quiz-edit-title" />
+          </div>
+          {initialPassMark != null && (
+            <div className="space-y-1.5">
+              <Label htmlFor="quiz-edit-pass">Pass mark %</Label>
+              <Input id="quiz-edit-pass" type="number" min={1} max={100} value={passMark} onChange={(e) => setPassMark(e.target.value)} />
+            </div>
+          )}
+        </div>
 
         <div className="space-y-4 py-2">
           {questions.map((q, idx) => (

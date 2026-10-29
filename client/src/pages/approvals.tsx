@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation } from "@tanstack/react-query";
+import { PageStrip } from "@/components/PageStrip";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -74,9 +75,13 @@ export default function ApprovalsPage() {
   const isAdmin = (currentUser ?? user)?.role === "admin";
 
   // The decisions already saved (the same rows the CSV export holds), newest first.
-  const { data: history, isLoading: historyLoading } = useQuery<{ items: HistoryItem[] }>({
-    queryKey: ["/api/admin/approval-history"],
+  // The server pages it (8 a page); without a page strip only the newest 8 could ever be seen.
+  const [historyPage, setHistoryPage] = useState(1);
+  const { data: history, isLoading: historyLoading } = useQuery<{ items: HistoryItem[]; page: number; pages: number }>({
+    queryKey: ["/api/admin/approval-history", historyPage],
     enabled: isAdmin,
+    placeholderData: keepPreviousData,
+    queryFn: async () => (await apiRequest("GET", `/api/admin/approval-history?page=${historyPage}`)).json(),
   });
 
   const refreshHistory = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/approval-history"] });
@@ -361,6 +366,7 @@ export default function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          {history.pages > 1 && <PageStrip page={history.page} pages={history.pages} setPage={setHistoryPage} />}
         </section>
       )}
     </div>

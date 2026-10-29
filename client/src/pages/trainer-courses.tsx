@@ -25,6 +25,7 @@ export default function TrainerCourses() {
   const { toast } = useToast();
   const [form, setForm] = useState(blank);
   const [placing, setPlacing] = useState<Record<string, string>>({});
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const { data: cohorts = [] } = useQuery<Cohort[]>({ queryKey: ["/api/batches"] });
   const { data: courses = [], isLoading } = useQuery<Course[]>({ queryKey: ["/api/trainer/courses"] });
 
@@ -41,6 +42,16 @@ export default function TrainerCourses() {
       refresh();
     },
     onError: (error: Error) => toast({ title: "Could not make the course", description: error.message, variant: "destructive" }),
+  });
+
+  const rename = useMutation({
+    mutationFn: async (draft: { id: string; name: string }) => (await apiRequest("PATCH", `/api/courses/${draft.id}`, { name: draft.name })).json(),
+    onSuccess: () => {
+      toast({ title: "Course renamed" });
+      setRenaming(null);
+      refresh();
+    },
+    onError: (error: Error) => toast({ title: "Could not rename the course", description: error.message, variant: "destructive" }),
   });
 
   const place = useMutation({
@@ -100,8 +111,25 @@ export default function TrainerCourses() {
             return (
               <article key={course.id} className={`${PANEL} space-y-3 px-5 py-4`} data-testid={`course-row-${course.id}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-sl-ink">{course.name}</h3>
+                  <div className="min-w-0 flex-1">
+                    {renaming?.id === course.id ? (
+                      <form
+                        className="flex flex-wrap items-center gap-2"
+                        onSubmit={(event) => { event.preventDefault(); if (renaming.name.trim().length >= 3) rename.mutate({ id: course.id, name: renaming.name.trim() }); }}
+                      >
+                        <label className="sr-only" htmlFor={`rename-${course.id}`}>Course name</label>
+                        <input id={`rename-${course.id}`} className={`${FIELD} max-w-xs`} value={renaming.name} onChange={(e) => setRenaming({ id: course.id, name: e.target.value })} />
+                        <button type="submit" className={BTN_SECONDARY} disabled={rename.isPending || renaming.name.trim().length < 3}>Save</button>
+                        <button type="button" className={BTN_SECONDARY} onClick={() => setRenaming(null)}>Cancel</button>
+                      </form>
+                    ) : (
+                      <h3 className="font-semibold text-sl-ink">
+                        {course.name}
+                        <button type="button" className="ml-2 text-sm font-normal text-sl-accent underline" onClick={() => setRenaming({ id: course.id, name: course.name })} data-testid={`button-rename-course-${course.id}`}>
+                          Rename
+                        </button>
+                      </h3>
+                    )}
                     <p className="text-sm text-sl-muted">
                       {course.cohorts.length ? `On ${course.cohorts.map((cohort) => cohort.name).join(", ")}` : "Not on a cohort yet: Fellows cannot see it"}
                       {course.mine ? " · made by you" : ""}

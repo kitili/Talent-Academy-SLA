@@ -255,6 +255,15 @@ export default function CohortWorkspace() {
     onError: () => toast({ title: "Could not add event", variant: "destructive" }),
   });
 
+  const deleteWork = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/batches/${batchId}/assignments/${id}`),
+    onSuccess: () => {
+      toast({ title: "Assessment deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
+    },
+    onError: () => toast({ title: "Could not delete the assessment", variant: "destructive" }),
+  });
+
   const markWork = useMutation({
     mutationFn: async (payload: { teacherId: string; trainerScore: string; trainerComment: string }) => {
       const res = await apiRequest(
@@ -651,6 +660,15 @@ export default function CohortWorkspace() {
                 <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
                 <p className="mt-1 text-sm text-sl-muted">{item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
                 <p className="text-sm text-sl-muted" data-testid={`work-given-to-${item.id}`}>Given to {audienceLabel(item.audience)}</p>
+                <button
+                  type="button"
+                  className="mt-1 text-sm text-sl-risk underline"
+                  disabled={deleteWork.isPending}
+                  onClick={() => { if (window.confirm(`Delete "${item.title}" and every answer handed in for it?`)) deleteWork.mutate(item.id); }}
+                  data-testid={`button-delete-work-${item.id}`}
+                >
+                  Delete assessment
+                </button>
               </div>
               <div className="flex flex-wrap items-end gap-2">
                 <div className="space-y-1.5">

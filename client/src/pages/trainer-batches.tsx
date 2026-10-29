@@ -249,12 +249,66 @@ function AssessmentDesk({ batchId, cohortName }: { batchId: string; cohortName: 
     },
     onError: (error: Error) => toast({ title: "Could not save the deadline", description: error.message, variant: "destructive" }),
   });
+  const [editing, setEditing] = useState<{ id: string; title: string; instructions: string } | null>(null);
+  const editDraft = (change: Partial<{ title: string; instructions: string }>) => setEditing((draft) => (draft ? { ...draft, ...change } : draft));
+  const saveDetails = useMutation({
+    mutationFn: async (draft: { id: string; title: string; instructions: string }) =>
+      (await apiRequest("PATCH", `/api/batches/${batchId}/assignments/${draft.id}`, { title: draft.title, instructions: draft.instructions })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
+      setEditing(null);
+      toast({ title: "Assessment saved" });
+    },
+    onError: (error: Error) => toast({ title: "Could not save the assessment", description: error.message, variant: "destructive" }),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/batches/${batchId}/assignments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
+      toast({ title: "Assessment deleted" });
+    },
+    onError: (error: Error) => toast({ title: "Could not delete the assessment", description: error.message, variant: "destructive" }),
+  });
   if (assessments.length === 0) return null;
   return (
     <>
       {assessments.map((item: any) => (
         <div key={item.id} className="rounded-lg border border-sl-line p-4">
-          <p className="font-semibold text-sl-ink">{item.title}</p>
+          {editing?.id === item.id ? (
+            <form
+              className="space-y-2"
+              onSubmit={(event) => { event.preventDefault(); if (editing?.title.trim()) saveDetails.mutate(editing); }}
+              aria-label={`Edit ${item.title}`}
+            >
+              <Label htmlFor={`assessment-title-${item.id}`}>Title</Label>
+              <Input id={`assessment-title-${item.id}`} value={editing?.title ?? ""} onChange={(e) => editDraft({ title: e.target.value })} />
+              <Label htmlFor={`assessment-instructions-${item.id}`}>Instructions</Label>
+              <Textarea id={`assessment-instructions-${item.id}`} rows={3} value={editing?.instructions ?? ""} onChange={(e) => editDraft({ instructions: e.target.value })} />
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" disabled={saveDetails.isPending || !editing?.title.trim()}>Save</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="font-semibold text-sl-ink">{item.title}</p>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setEditing({ id: item.id, title: item.title, instructions: item.instructions || "" })} data-testid={`button-edit-assessment-${item.id}`}>
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={remove.isPending}
+                  onClick={() => { if (window.confirm(`Delete "${item.title}" and every answer handed in for it?`)) remove.mutate(item.id); }}
+                  data-testid={`button-delete-assessment-${item.id}`}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
           <p className="text-sm text-sl-muted">{cohortName} · Fellows open it on Work · {item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
           <p className="text-sm text-sl-muted" data-testid={`assessment-given-to-${item.id}`}>Given to {audienceLabel(item.audience)}</p>
           {item.instructions && <p className="mt-1 text-sm text-sl-muted">{item.instructions}</p>}
@@ -2609,8 +2663,9 @@ export default function TrainerBatches() {
           onClose={() => { setEditQuizOpen(false); setEditingQuiz(null); }}
           quizId={editingQuiz.id}
           quizTitle={editingQuiz.title}
+          initialPassMark={typeof editingQuiz.passMark === "number" ? editingQuiz.passMark : undefined}
           initialQuestions={editingQuiz.questions ?? []}
-          batchId={selectedBatch?.id}
+          batchId={editingQuiz.batchId || selectedBatch?.id}
         />
       )}
 

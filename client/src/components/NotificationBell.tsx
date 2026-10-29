@@ -31,7 +31,7 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
   });
 
   const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
-    queryKey: ["/api/notifications"],
+    queryKey: ["/api/notifications", { limit: 30 }],
     queryFn: async () => {
       const res = await fetch("/api/notifications?limit=30");
       if (!res.ok) return [];

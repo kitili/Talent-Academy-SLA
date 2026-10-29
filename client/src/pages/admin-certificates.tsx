@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { PageStrip, usePager } from "@/components/PageStrip";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AcademyShell } from "@/components/AcademyShell";
 import { SilverleafCertificate } from "@/components/SilverleafCertificate";
@@ -85,6 +86,7 @@ export default function AdminCertificates() {
   const { data: teachers = [] } = useQuery<Teacher[]>({ queryKey: ["/api/admin/teachers"] });
   const { data: courses = [] } = useQuery<Course[]>({ queryKey: ["/api/courses"] });
   const { data: issued = [], isLoading: issuedLoading } = useQuery<Issued[]>({ queryKey: ["/api/admin/certificates"] });
+  const issuedPager = usePager(issued, 15);
   const { data: eligible, isError: eligibilityFailed } = useQuery<EligibleFellow[]>({ queryKey: ["/api/admin/certificates/eligible"] });
 
   const activeTeachers = teachers.filter((teacher) => teacher.approvalStatus !== "inactive");
@@ -401,7 +403,7 @@ export default function AdminCertificates() {
                   </tr>
                 </thead>
                 <tbody>
-                  {issued.map((cert) => (
+                  {issuedPager.slice.map((cert) => (
                     <tr key={cert.id} className="border-t border-sl-neutral-soft" data-testid={`issued-cert-${cert.id}`}>
                       <td className="px-5 py-3 text-sl-muted">{issuedDate(cert.generatedAt)}</td>
                       <td className="px-3 py-3 text-sl-ink">{cert.teacherName}</td>
@@ -411,6 +413,7 @@ export default function AdminCertificates() {
                   ))}
                 </tbody>
               </table>
+              {issuedPager.pages > 1 && <div className="px-5 pb-4"><PageStrip page={issuedPager.page} pages={issuedPager.pages} setPage={issuedPager.setPage} /></div>}
             </div>
           )}
         </section>

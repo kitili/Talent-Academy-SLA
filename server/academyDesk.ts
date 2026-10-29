@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
 import type { Express, Request, Response, NextFunction } from "express";
-import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { academyCalendar, batchCourses, batches, batchTeachers, cohortBatchCourses, cohortBatches, courses, scheduledEvents, teachers, users } from "@shared/schema";
 import { nextBatchName, sortBatches } from "@shared/academyPath";
 import { parseCalendarEntry, parseFellowType, parseTrainerType, FELLOW_TYPE_LABELS } from "@shared/academyPeople";
@@ -317,6 +317,7 @@ export function registerAcademyDeskRoutes(
   app.get("/api/timetable", async (req, res) => {
     try {
       const fellowId = fellowIdOf(req);
+      const past = req.query.past === "1";
       let batchIds: string[] | null = null; // null means every cohort
       if (isStaff(req.user) && req.user!.role === "trainer") {
         const mine = await storage.getAllBatches(req.user!.id);
@@ -349,8 +350,15 @@ export function registerAcademyDeskRoutes(
         .from(scheduledEvents)
         .innerJoin(batches, eq(scheduledEvents.batchId, batches.id))
         .leftJoin(users, eq(scheduledEvents.createdBy, users.id))
-        .where(batchIds ? inArray(scheduledEvents.batchId, batchIds) : sql`true`)
-        .orderBy(asc(scheduledEvents.startDate));
+        .where(and(
+          batchIds ? inArray(scheduledEvents.batchId, batchIds) : sql`true`,
+          // By default only what is current: the last 14 days and everything ahead. ?past=1 asks for what came before.
+          past
+            ? sql`${scheduledEvents.startDate} < now() - interval '14 days'`
+            : sql`COALESCE(${scheduledEvents.endDate}, ${scheduledEvents.startDate}) >= now() - interval '14 days'`,
+        ))
+        .orderBy(past ? desc(scheduledEvents.startDate) : asc(scheduledEvents.startDate))
+        .limit(past ? 200 : 1000);
 
       res.json(rows.map(({ trainerFirstName, trainerLastName, trainerUsername, ...row }) => ({
         ...row,

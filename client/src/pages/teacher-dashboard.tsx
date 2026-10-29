@@ -317,7 +317,8 @@ export default function TeacherDashboard() {
   const certificatesLoading = teacherLoading || certificatesQueryLoading;
 
   const { data: deskNotices = [], isLoading: noticesLoading } = useQuery<any[]>({
-    queryKey: ["/api/notifications"],
+    // Its own key: the bell asks for 30 under ["/api/notifications"]; sharing one key let whichever loaded first fill both.
+    queryKey: ["/api/notifications", { limit: 8 }],
     queryFn: async () => {
       const res = await fetch("/api/notifications?limit=8");
       if (!res.ok) return [];

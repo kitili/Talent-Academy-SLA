@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageStrip, usePager } from "@/components/PageStrip";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -24,6 +25,7 @@ export default function TrainerFellows() {
   const [done, setDone] = useState<string | null>(null);
   const { data: cohorts = [] } = useQuery<Cohort[]>({ queryKey: ["/api/batches"] });
   const { data: fellows = [], isLoading } = useQuery<Fellow[]>({ queryKey: ["/api/trainer/fellows"] });
+  const fellowPager = usePager(fellows, 15);
 
   const register = useMutation({
     mutationFn: async () => {
@@ -116,7 +118,7 @@ export default function TrainerFellows() {
             <SkeletonRows label="Loading Fellows" rows={3} />
           ) : fellows.length === 0 ? (
             <p className={`${PANEL} px-5 py-6 text-sm text-sl-muted`}>No Fellows yet. Register the first one above.</p>
-          ) : fellows.map((fellow) => (
+          ) : fellowPager.slice.map((fellow) => (
             <div key={fellow.id} className={`${PANEL} flex flex-wrap items-center justify-between gap-3 px-5 py-3`} data-testid={`fellow-row-${fellow.id}`}>
               <div className="min-w-0">
                 <p className="truncate font-semibold text-sl-ink">{fellow.name}</p>
@@ -138,6 +140,7 @@ export default function TrainerFellows() {
               </label>
             </div>
           ))}
+          {fellowPager.pages > 1 && <PageStrip page={fellowPager.page} pages={fellowPager.pages} setPage={fellowPager.setPage} />}
         </section>
       </div>
     </AcademyShell>

@@ -97,7 +97,14 @@ function Timetable({ desk }: { desk: Desk }) {
   const [editing, setEditing] = useState<Session | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const staff = desk === "admin" || desk === "trainer";
-  const { data: sessions = [], isLoading, isError } = useQuery<Session[]>({ queryKey: ["/api/timetable"] });
+  const { data: current = [], isLoading, isError } = useQuery<Session[]>({ queryKey: ["/api/timetable"] });
+  // Older sessions load only when asked for (the newest 200 before the last two weeks).
+  const { data: older = [] } = useQuery<Session[]>({
+    queryKey: ["/api/timetable", "past"],
+    enabled: showPast,
+    queryFn: async () => (await apiRequest("GET", "/api/timetable?past=1")).json(),
+  });
+  const sessions = useMemo(() => (showPast ? [...older, ...current] : current), [showPast, older, current]);
   // GET /api/batches gives a Trainer the cohorts they teach and the Admin every cohort.
   const { data: cohorts = [] } = useQuery<Array<{ id: string; name: string }>>({ queryKey: ["/api/batches"], enabled: staff });
   const remove = useMutation({

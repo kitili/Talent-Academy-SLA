@@ -151,7 +151,9 @@ describe("trainer desk wiring", () => {
     assert.match(trainer, /Save deadline/);
     assert.match(trainer, /\/api\/assigned-quizzes\/\$\{quizId\}/);
     assert.match(routes, /parseDeadline\(req\.body\?\.dueDate\)/);
-    assert.match(routes, /hasOwnProperty\.call\(req\.body \|\| \{\}, "dueDate"\)/);
+    // Deadline edits read dueDate only when it was sent (a has() helper over hasOwnProperty since 2026-10-29).
+    assert.match(routes, /hasOwnProperty\.call\(req\.body \|\| \{\}, key\)/);
+    assert.match(routes, /const hasDueDate = has\("dueDate"\)/);
     assert.match(routes, /\/api\/batches\/:batchId\/assignments\/:assignmentId/);
     assert.equal(trainer.includes("Adult teachers"), false);
     assert.match(trainer, /button-upload-exam/);

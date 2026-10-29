@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { PageStrip, usePager } from "@/components/PageStrip";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -434,6 +435,7 @@ export default function AdminAnalytics() {
       return await response.json();
     },
   });
+  const reflectionPager = usePager(allReflections, 10);
 
   const { data: engagementData, isLoading: loadingEngagement } = useQuery({
     queryKey: ["/api/analytics/engagement"],
@@ -3680,7 +3682,8 @@ export default function AdminAnalytics() {
               </div>
             ) : (
               <div className="space-y-4 py-1">
-                {allReflections.map((r: any) => (
+                {reflectionPager.pages > 1 && <PageStrip page={reflectionPager.page} pages={reflectionPager.pages} setPage={reflectionPager.setPage} />}
+                {reflectionPager.slice.map((r: any) => (
                   <Card key={r.id} className="border">
                     <CardContent className="pt-4 pb-4">
                       <div className="flex flex-wrap items-center gap-2 mb-3">

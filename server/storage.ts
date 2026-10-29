@@ -265,7 +265,7 @@ export interface IStorage {
   getQuizAudienceMap(quizIds: string[]): Promise<Record<string, string[]>>;
   deleteAssignedQuiz(id: string): Promise<boolean>;
   updateAssignedQuizQuestions(quizId: string, questions: QuizQuestion[]): Promise<AssignedQuiz>;
-  updateAssignedQuiz(quizId: string, updates: { dueDate?: Date | null }): Promise<AssignedQuiz | undefined>;
+  updateAssignedQuiz(quizId: string, updates: { dueDate?: Date | null; title?: string; description?: string | null; passMark?: number }): Promise<AssignedQuiz | undefined>;
   resetTeacherQuizAttempts(quizId: string, teacherId: string): Promise<void>;
 
   // Open-ended review operations
@@ -277,6 +277,7 @@ export interface IStorage {
   // Teacher quiz attempt operations
   saveTeacherQuizAttempt(attempt: InsertTeacherQuizAttempt): Promise<TeacherQuizAttempt>;
   getTeacherQuizAttempt(teacherId: string, assignedQuizId: string): Promise<TeacherQuizAttempt | undefined>;
+  getTeacherQuizAttemptById(id: string): Promise<TeacherQuizAttempt | undefined>;
   getAllTeacherQuizAttempts(teacherId: string): Promise<TeacherQuizAttempt[]>;
   
   // Teacher report card operations
@@ -1193,9 +1194,15 @@ export class DatabaseStorage implements IStorage {
     return teacher;
   }
 
+  /**
+   * Removing a Fellow makes their desk inactive (no sign-in, out of the People lists) and takes them off every cohort
+   * roster. Their marks, attempts, attendance and certificates stay: a hard delete cascaded through all of them.
+   */
   async dismissTeacher(teacherId: string): Promise<boolean> {
-    const result = await db.delete(teachers).where(eq(teachers.id, teacherId));
-    return result.rowCount !== null && result.rowCount > 0;
+    const [row] = await db.update(teachers).set({ approvalStatus: "inactive" }).where(eq(teachers.id, teacherId)).returning({ id: teachers.id });
+    if (!row) return false;
+    await db.delete(batchTeachers).where(eq(batchTeachers.teacherId, teacherId));
+    return true;
   }
 
   async updateTeacherProfile(teacherId: string, data: { name?: string; email?: string }): Promise<Teacher | undefined> {
@@ -1220,9 +1227,13 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  /**
+   * Removing a Trainer makes their desk inactive. A hard delete cascaded through `batches.created_by` and
+   * `assigned_quizzes.assigned_by`, wiping every cohort and exam they had made, or failed on a foreign key.
+   */
   async dismissUser(userId: string): Promise<boolean> {
-    const result = await db.delete(users).where(eq(users.id, userId));
-    return result.rowCount !== null && result.rowCount > 0;
+    const [row] = await db.update(users).set({ approvalStatus: "inactive" }).where(eq(users.id, userId)).returning({ id: users.id });
+    return Boolean(row);
   }
 
   async addApprovalHistory(history: InsertApprovalHistory): Promise<ApprovalHistory> {
@@ -1304,7 +1315,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Batch teacher operations
+  /** Enrols a Fellow once: batch_teachers has no unique constraint, so a second call returns the existing row. */
   async addTeacherToBatch(batchTeacher: InsertBatchTeacher): Promise<BatchTeacher> {
+    const [existing] = await db
+      .select()
+      .from(batchTeachers)
+      .where(and(eq(batchTeachers.batchId, batchTeacher.batchId), eq(batchTeachers.teacherId, batchTeacher.teacherId)));
+    if (existing) return existing;
     const [result] = await db
       .insert(batchTeachers)
       .values(batchTeacher)
@@ -1453,7 +1470,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async updateAssignedQuiz(quizId: string, updates: { dueDate?: Date | null }): Promise<AssignedQuiz | undefined> {
+  async updateAssignedQuiz(quizId: string, updates: { dueDate?: Date | null; title?: string; description?: string | null; passMark?: number }): Promise<AssignedQuiz | undefined> {
     const [result] = await db
       .update(assignedQuizzes)
       .set(updates)
@@ -1535,6 +1552,11 @@ export class DatabaseStorage implements IStorage {
       .values(attempt as any)
       .returning();
     return result;
+  }
+
+  async getTeacherQuizAttemptById(id: string): Promise<TeacherQuizAttempt | undefined> {
+    const [row] = await db.select().from(teacherQuizAttempts).where(eq(teacherQuizAttempts.id, id));
+    return row;
   }
 
   async getTeacherQuizAttempt(teacherId: string, assignedQuizId: string): Promise<TeacherQuizAttempt | undefined> {
@@ -3530,7 +3552,14 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async updateWrittenAssignment(id: string, updates: { dueDate?: Date | null }) {
+  /** Deletes an assessment, its named Fellows and (by cascade) its submissions. */
+  async deleteWrittenAssignment(id: string) {
+    await db.delete(writtenAssignmentTeachers).where(eq(writtenAssignmentTeachers.assignmentId, id));
+    const removed = await db.delete(writtenAssignments).where(eq(writtenAssignments.id, id)).returning({ id: writtenAssignments.id });
+    return removed.length > 0;
+  }
+
+  async updateWrittenAssignment(id: string, updates: { dueDate?: Date | null; title?: string; instructions?: string }) {
     const [row] = await db
       .update(writtenAssignments)
       .set(updates)
