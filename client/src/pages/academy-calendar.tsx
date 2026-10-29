@@ -8,9 +8,12 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AcademyShell } from "@/components/AcademyShell";
 import { SkeletonCard } from "@/components/Skeletons";
 import type { Desk } from "@/components/deskMenu";
+import { SessionDialog, type SessionRow } from "@/components/SessionDialog";
+import { SessionLinks } from "@/components/SessionLinks";
 import {
   CALENDAR_KINDS,
   CALENDAR_KIND_LABELS,
+  canRunOnlineSessions,
   groupByMonth,
   monthTitle,
   type CalendarKind,
@@ -37,6 +40,7 @@ const KIND_CHIP: Record<string, string> = {
 
 type Session = {
   id: string;
+  batchId: string;
   title: string;
   description?: string | null;
   eventType: string;
@@ -86,8 +90,24 @@ function Empty({ children }: { children: ReactNode }) {
 
 /** Sessions Trainers scheduled, in date order. The Admin sees every cohort, a Trainer theirs, a Fellow their own. */
 function Timetable({ desk }: { desk: Desk }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [showPast, setShowPast] = useState(false);
+  const [editing, setEditing] = useState<Session | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const staff = desk === "admin" || desk === "trainer";
   const { data: sessions = [], isLoading, isError } = useQuery<Session[]>({ queryKey: ["/api/timetable"] });
+  // GET /api/batches gives a Trainer the cohorts they teach and the Admin every cohort.
+  const { data: cohorts = [] } = useQuery<Array<{ id: string; name: string }>>({ queryKey: ["/api/batches"], enabled: staff });
+  const remove = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/events/${id}`),
+    onSuccess: () => {
+      toast({ title: "Session removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/events"] });
+    },
+    onError: (error: Error) => toast({ title: "Could not remove the session", description: error.message, variant: "destructive" }),
+  });
   const visible = useMemo(() => {
     const cut = Date.now() - 6 * 60 * 60 * 1000;
     return showPast ? sessions : sessions.filter((item) => new Date(item.endDate || item.startDate).getTime() >= cut);
@@ -99,10 +119,32 @@ function Timetable({ desk }: { desk: Desk }) {
     <div className="space-y-4" data-testid="timetable">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-sl-muted">Sessions, assessments and deadlines for {who}, set by Trainers.</p>
-        <button type="button" className={BTN_SECONDARY} onClick={() => setShowPast((value) => !value)} aria-pressed={showPast} data-testid="button-timetable-past">
-          {showPast ? "Hide past sessions" : "Show past sessions"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={BTN_SECONDARY} onClick={() => setShowPast((value) => !value)} aria-pressed={showPast} data-testid="button-timetable-past">
+            {showPast ? "Hide past sessions" : "Show past sessions"}
+          </button>
+          {staff && (
+            <button
+              type="button"
+              className={BTN_PRIMARY}
+              disabled={cohorts.length === 0}
+              onClick={() => { setEditing(null); setDialogOpen(true); }}
+              data-testid="button-schedule-session"
+            >
+              Schedule a session
+            </button>
+          )}
+        </div>
       </div>
+      {staff && (
+        <SessionDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          cohorts={cohorts}
+          session={editing as SessionRow | null}
+          canAddLinks={canRunOnlineSessions(user as any)}
+        />
+      )}
       {isLoading ? (
         <>
           <SkeletonCard label="Loading the timetable" lines={2} />
@@ -113,7 +155,7 @@ function Timetable({ desk }: { desk: Desk }) {
       ) : months.length === 0 ? (
         <Empty>
           {desk === "trainer"
-            ? "Nothing is scheduled yet. Add a session on Schedule and it appears here for you, the Admin and your Fellows."
+            ? "Nothing is scheduled yet. Schedule a session here and it appears for you, the Admin and your Fellows."
             : desk === "fellow"
               ? "No sessions are scheduled for your cohort yet."
               : "No cohort has a session yet."}
@@ -133,12 +175,22 @@ function Timetable({ desk }: { desk: Desk }) {
                 {session.trainerName && desk !== "trainer" ? ` · ${session.trainerName}` : ""}
               </p>
               {session.description && <p className="text-sm text-sl-ink">{session.description}</p>}
-              {(session.meetingUrl || session.videoUrl || session.materialsUrl) && (
-                <p className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm font-semibold">
-                  {session.meetingUrl && <a className="text-sl-accent underline" href={session.meetingUrl} target="_blank" rel="noopener noreferrer">Join online</a>}
-                  {session.videoUrl && <a className="text-sl-accent underline" href={session.videoUrl} target="_blank" rel="noopener noreferrer">Watch the video</a>}
-                  {session.materialsUrl && <a className="text-sl-accent underline" href={session.materialsUrl} target="_blank" rel="noopener noreferrer">Materials</a>}
-                </p>
+              <SessionLinks session={session} />
+              {staff && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button type="button" className={BTN_SECONDARY} onClick={() => { setEditing(session); setDialogOpen(true); }} data-testid={`button-edit-session-${session.id}`}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className={BTN_SECONDARY}
+                    disabled={remove.isPending}
+                    onClick={() => { if (window.confirm(`Remove "${session.title}" from the timetable?`)) remove.mutate(session.id); }}
+                    data-testid={`button-remove-session-${session.id}`}
+                  >
+                    Remove
+                  </button>
+                </div>
               )}
             </article>
           ))}

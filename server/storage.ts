@@ -418,6 +418,7 @@ export interface IStorage {
   createScheduledEvent(event: InsertScheduledEvent): Promise<ScheduledEvent>;
   getScheduledEvents(batchId: string): Promise<ScheduledEvent[]>;
   getScheduledEventsForTeacher(teacherId: string): Promise<ScheduledEvent[]>;
+  updateScheduledEvent(id: string, updates: Partial<InsertScheduledEvent>): Promise<ScheduledEvent | undefined>;
   deleteScheduledEvent(id: string): Promise<void>;
 
   // User profile operations (admin/trainer)
@@ -3349,6 +3350,11 @@ export class DatabaseStorage implements IStorage {
       ORDER BY se.start_date ASC
     `);
     return result.rows as ScheduledEvent[];
+  }
+
+  async updateScheduledEvent(id: string, updates: Partial<InsertScheduledEvent>): Promise<ScheduledEvent | undefined> {
+    const [row] = await db.update(scheduledEvents).set(updates).where(eq(scheduledEvents.id, id)).returning();
+    return row;
   }
 
   async deleteScheduledEvent(id: string): Promise<void> {

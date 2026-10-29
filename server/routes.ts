@@ -63,7 +63,7 @@ import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
-import { audienceWithNames, parseOnlineFields } from "@shared/academyPeople";
+import { audienceWithNames, canRunOnlineSessions, parseOnlineFields } from "@shared/academyPeople";
 import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
@@ -6304,6 +6304,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(events);
     } catch (error) {
       console.error("Error getting events:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Edit a session (trainer/admin). The same rules as scheduling it; a Trainer edits only in a cohort they teach.
+  // Someone who may not add links (an in-house Trainer) can still move or rename a session: its links are kept as they are.
+  app.patch("/api/events/:id", isAuthenticated, isTrainer, async (req, res) => {
+    try {
+      const [event] = await db.select().from(scheduledEvents).where(eq(scheduledEvents.id, req.params.id));
+      if (!event) return res.status(404).json({ error: "Event not found" });
+      const batch = await storage.getBatch(event.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const { title, description, eventType, startDate, endDate } = req.body || {};
+      if (!title || !eventType || !startDate) {
+        return res.status(400).json({ error: "title, eventType, and startDate are required" });
+      }
+      const start = new Date(startDate);
+      const end = endDate ? new Date(endDate) : null;
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
+        return res.status(400).json({ error: "The date is not a date" });
+      }
+      if (end && end.getTime() < start.getTime()) return res.status(400).json({ error: "The session ends before it starts" });
+      const online = canRunOnlineSessions(req.user as any)
+        ? parseOnlineFields(req.body, req.user as any)
+        : { meetingUrl: event.meetingUrl, videoUrl: event.videoUrl, materialsUrl: event.materialsUrl };
+      if ("error" in online) return res.status(400).json({ error: online.error });
+      const updated = await storage.updateScheduledEvent(event.id, {
+        title,
+        description: description || null,
+        eventType,
+        startDate: start,
+        endDate: end,
+        ...online,
+      });
+      notifyBatchTeachers(
+        batch.id,
+        "Session changed",
+        `${title} has changed. Open Calendar to see when and where.`,
+        "session_reminder",
+      ).catch((error) => console.error("Calendar notice failed:", error));
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating event:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

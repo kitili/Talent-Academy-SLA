@@ -15,6 +15,8 @@ import { DeskMail } from "@/components/DeskMail";
 import { CohortMedals } from "@/components/CohortMedals";
 import { PageStrip, usePager } from "@/components/PageStrip";
 import { batchIsComplete, fellowStillSees, isPastDue } from "@shared/academyPath";
+import { sessionPhase } from "@shared/academyPeople";
+import { SessionLinks } from "@/components/SessionLinks";
 import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import type { Medal } from "@shared/cohortMedals";
 import { Loading, SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
@@ -587,7 +589,7 @@ export default function TeacherDashboard() {
   const resumeWeek =
     assignedWeeks.find((week: any) => week.id === lastWeekId && !week.locked) || nextLesson || (shelfIsEmpty ? firstModule : undefined);
 
-  const { data: upcomingEvents = [], isLoading: eventsLoading } = useQuery<any[]>({
+  const { data: allEvents = [], isLoading: eventsLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/events"],
     queryFn: async () => {
       const res = await fetch("/api/teacher/events");
@@ -678,6 +680,17 @@ export default function TeacherDashboard() {
   const myWork = listedWork.filter((item: any) =>
     fellowStillSees(pickField(item, "due_date", "dueDate"), Boolean(item.my_response || item.myResponse), now));
   const assessments = myWork.filter((item: any) => item.kind === "assessment");
+  // The route sends every session of the Fellow's cohorts, oldest first, in its column names; keep those not yet over.
+  const upcomingEvents = allEvents
+    .map((event: any) => ({
+      ...event,
+      startDate: pickField(event, "start_date", "startDate"),
+      endDate: pickField(event, "end_date", "endDate"),
+      meetingUrl: pickField(event, "meeting_url", "meetingUrl"),
+      videoUrl: pickField(event, "video_url", "videoUrl"),
+      materialsUrl: pickField(event, "materials_url", "materialsUrl"),
+    }))
+    .filter((event: any) => event.startDate && sessionPhase(event, now) !== "ended");
   const eventPager = usePager(upcomingEvents, 5);
   const workPager = usePager(assessments, 4);
   const reflectionPager = usePager(reflections, 4);
@@ -845,7 +858,8 @@ export default function TeacherDashboard() {
                 {upcomingEvents.slice(0, 3).map((event: any) => (
                   <li key={event.id}>
                     <p className="font-medium text-sl-ink">{event.title || "Session"}</p>
-                    <p>{fmtWhen(pickField(event, "start_date", "startDate"))}</p>
+                    <p>{fmtWhen(event.startDate)}</p>
+                    <SessionLinks session={event} now={now} />
                   </li>
                 ))}
               </ul>

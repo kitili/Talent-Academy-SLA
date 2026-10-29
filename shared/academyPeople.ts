@@ -208,3 +208,20 @@ export function assignmentRoster(sitters: Array<{ id: string; name: string }>, s
     .map((sitter) => ({ id: `waiting-${sitter.id}`, teacher_id: sitter.id, teacher_name: sitter.name, response: null, submitted: false }));
   return [...submitted, ...waiting];
 }
+
+/** A session opens to join this long before it starts. */
+export const JOIN_OPENS_MINUTES = 15;
+/** A session with no end time is treated as this long. */
+export const SESSION_DEFAULT_MINUTES = 120;
+
+export type SessionPhase = "upcoming" | "live" | "ended";
+
+/** Upcoming until the join window opens, live until it ends, then ended (when a recording may be watched). */
+export function sessionPhase(session: { startDate: string | Date; endDate?: string | Date | null }, now: Date = new Date()): SessionPhase {
+  const start = new Date(session.startDate).getTime();
+  const end = session.endDate ? new Date(session.endDate).getTime() : start + SESSION_DEFAULT_MINUTES * 60_000;
+  const t = now.getTime();
+  if (t < start - JOIN_OPENS_MINUTES * 60_000) return "upcoming";
+  if (t <= end) return "live";
+  return "ended";
+}
