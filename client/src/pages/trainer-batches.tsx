@@ -21,6 +21,7 @@ import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import { AcademyShell } from "@/components/AcademyShell";
 import { DESK_MENUS } from "@/components/deskMenu";
+import { canRunOnlineSessions } from "@shared/academyPeople";
 import { Users, Plus, Trash2, FileText, X, CheckCircle, Upload, ChevronLeft, ChevronRight, MoreHorizontal, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CohortMedals } from "@/components/CohortMedals";
@@ -35,7 +36,8 @@ import { deskName } from "@shared/deskName";
 
 /** The desk's sections, in the order of its side menu (components/deskMenu.ts). `?tab=` names one of them. */
 type SectionKey = "home" | "cohorts" | "assessments" | "progress" | "attendance" | "messages" | "schedule";
-const SECTION_KEYS = DESK_MENUS.trainer.map((item) => item.key) as SectionKey[];
+// Fellows and Calendar are pages of their own (/trainer/fellows, /calendar); this page draws the other sections.
+const SECTION_KEYS = DESK_MENUS.trainer.map((item) => item.key).filter((key) => key !== "fellows" && key !== "calendar") as SectionKey[];
 
 /** The section a `?tab=` names. The old name for Home was "desk"; links that still carry it land on Home. */
 function sectionFromSearch(search: string): SectionKey {
@@ -204,7 +206,9 @@ function TeacherAudience({
       {loading ? (
         <Bars rows={2} label="Loading Fellows" />
       ) : teachers.length === 0 ? (
-        <p className="text-xs text-sl-muted">No Fellows in this cohort yet.</p>
+        <p className="text-xs text-sl-muted" data-testid="quiz-audience-empty">
+          No Fellows are in this cohort yet. <a className="font-semibold text-sl-accent underline" href="/trainer/fellows">Register a Fellow</a> and choose this cohort.
+        </p>
       ) : (
         <div className="max-h-36 space-y-2 overflow-y-auto">
           {teachers.map((teacher) => (
@@ -322,6 +326,9 @@ export default function TrainerBatches() {
   const [newEventStart, setNewEventStart] = useState("");
   const [newEventEnd, setNewEventEnd] = useState("");
   const [newEventDesc, setNewEventDesc] = useState("");
+  const [newMeetingUrl, setNewMeetingUrl] = useState("");
+  const [newVideoUrl, setNewVideoUrl] = useState("");
+  const [newMaterialsUrl, setNewMaterialsUrl] = useState("");
   const [listQuery, setListQuery] = useState("");
   const [passMark, setPassMark] = useState("80");
   const [quizTeacherIds, setQuizTeacherIds] = useState<string[]>([]);
@@ -352,6 +359,8 @@ export default function TrainerBatches() {
     if (!next || next.id === selectedBatch?.id) return;
     setSelectedBatch(next);
     setExpandedTeacherId(null);
+    // Names ticked for one cohort's work must not travel to another cohort.
+    setQuizTeacherIds([]);
     // Marks pick the Fellows of one cohort; they must not travel to another.
     setAttendanceRecordsState({});
   };
@@ -670,7 +679,7 @@ export default function TrainerBatches() {
 
   // Create scheduled event
   const createEventMutation = useMutation({
-    mutationFn: async (data: { title: string; eventType: string; startDate: string; endDate?: string; description?: string }) => {
+    mutationFn: async (data: { title: string; eventType: string; startDate: string; endDate?: string; description?: string; meetingUrl?: string; videoUrl?: string; materialsUrl?: string }) => {
       const res = await apiRequest("POST", `/api/batches/${eventBatchId}/events`, data);
       return res.json();
     },
@@ -680,6 +689,9 @@ export default function TrainerBatches() {
       queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
       setAddEventOpen(false);
       setNewEventTitle(""); setNewEventType("session"); setNewEventStart(""); setNewEventEnd(""); setNewEventDesc("");
+      setNewMeetingUrl(""); setNewVideoUrl(""); setNewMaterialsUrl("");
+      queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/events"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -845,6 +857,7 @@ export default function TrainerBatches() {
         fileName,
         kind: "assessment",
         dueDate: deadlineIso(deadline),
+        teacherIds: quizTeacherIds,
       });
       return response.json();
     },
@@ -859,6 +872,7 @@ export default function TrainerBatches() {
       setTaskNote("");
       setTaskFile(null);
       setDeadline("");
+      setQuizTeacherIds([]);
     },
     onError: (error: Error) => {
       toast({ title: "Could not upload", description: error.message, variant: "destructive" });
@@ -2170,6 +2184,7 @@ export default function TrainerBatches() {
                         <Label htmlFor="task-note">What they should do</Label>
                         <Textarea id="task-note" value={taskNote} onChange={(event) => setTaskNote(event.target.value)} data-testid="input-task-note" />
                       </div>
+                      <TeacherAudience teachers={batchDetails?.teachers || []} loading={teachersLoading} selected={quizTeacherIds} onChange={setQuizTeacherIds} />
                       <DeadlineField id="task-deadline" value={deadline} onChange={setDeadline} />
                       <div className="space-y-2">
                         <Label htmlFor="task-file">File</Label>
@@ -2861,15 +2876,37 @@ export default function TrainerBatches() {
               <Label htmlFor="event-description">Description (optional)</Label>
               <Input id="event-description" value={newEventDesc} onChange={(e) => setNewEventDesc(e.target.value)} placeholder="Additional details..." data-testid="input-event-description" />
             </div>
+            {canRunOnlineSessions(user as any) && (
+              <fieldset className="space-y-3 rounded-lg border border-sl-line p-3" data-testid="online-session-fields">
+                <legend className="px-1 text-sm font-semibold text-sl-ink">Online session</legend>
+                <p className="text-[13px] text-sl-muted">As an instructional Trainer you can teach online. Paste a Google Meet or Zoom link, a recorded video, or a materials link. Fellows open them from the timetable.</p>
+                <div className="space-y-2">
+                  <Label htmlFor="event-meeting">Meeting link (Google Meet, Zoom)</Label>
+                  <Input id="event-meeting" type="url" inputMode="url" value={newMeetingUrl} onChange={(e) => setNewMeetingUrl(e.target.value)} placeholder="https://meet.google.com/…" data-testid="input-event-meeting" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="event-video">Video link</Label>
+                  <Input id="event-video" type="url" inputMode="url" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} placeholder="https://youtu.be/…" data-testid="input-event-video" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="event-materials">Materials link</Label>
+                  <Input id="event-materials" type="url" inputMode="url" value={newMaterialsUrl} onChange={(e) => setNewMaterialsUrl(e.target.value)} placeholder="https://drive.google.com/…" data-testid="input-event-materials" />
+                </div>
+              </fieldset>
+            )}
             <Button
               className={PRIMARY_BUTTON}
               disabled={createEventMutation.isPending || !eventBatchId || !newEventTitle.trim() || !newEventStart}
               onClick={() => createEventMutation.mutate({
                 title: newEventTitle,
                 eventType: newEventType,
-                startDate: newEventStart,
-                endDate: newEventEnd || undefined,
+                // The browser's clock zone travels with the time, so Fellows in another zone see the same moment.
+                startDate: new Date(newEventStart).toISOString(),
+                endDate: newEventEnd ? new Date(newEventEnd).toISOString() : undefined,
                 description: newEventDesc || undefined,
+                ...(canRunOnlineSessions(user as any)
+                  ? { meetingUrl: newMeetingUrl.trim() || undefined, videoUrl: newVideoUrl.trim() || undefined, materialsUrl: newMaterialsUrl.trim() || undefined }
+                  : {}),
               })}
               data-testid="button-submit-event"
             >

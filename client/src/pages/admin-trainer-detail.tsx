@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { TRAINER_TYPES, TRAINER_TYPE_LABELS, trainerTypeOf } from "@shared/academyPeople";
 import { useLocation, useRoute } from "wouter";
 import { AcademyShell } from "@/components/AcademyShell";
 import { deskName } from "@shared/deskName";
@@ -30,6 +33,7 @@ interface TrainerDetail {
   role: string;
   approvalStatus: string;
   createdAt: string;
+  trainerType?: string;
   lastLogin?: string;
   cohortCount?: number;
   completedLessons?: string[];
@@ -52,6 +56,18 @@ export default function AdminTrainerDetail() {
   const [resetOpen, setResetOpen] = useState(false);
 
   const trainerId = params?.id;
+  const { toast } = useToast();
+  const retype = useMutation({
+    mutationFn: async (trainerType: string) => {
+      const res = await apiRequest("PATCH", `/api/admin/trainers/${trainerId}/type`, { trainerType });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/trainers", trainerId] });
+      toast({ title: "Kind of Trainer saved" });
+    },
+    onError: (error: Error) => toast({ title: "Could not change the kind", description: error.message, variant: "destructive" }),
+  });
 
   // Fetch trainer details
   const { data: trainer, isLoading } = useQuery<TrainerDetail>({
@@ -124,11 +140,22 @@ export default function AdminTrainerDetail() {
             <StatusChip status={trainer.approvalStatus} />
           </div>
           <p className="text-sm text-sl-muted">
-            Trainer · {trainer.email || "No email"} · Joined {format(new Date(trainer.createdAt), "d MMM yyyy")} ·{" "}
+            Trainer · {TRAINER_TYPE_LABELS[trainerTypeOf(trainer.trainerType)]} · {trainer.email || "No email"} · Joined {format(new Date(trainer.createdAt), "d MMM yyyy")} ·{" "}
             {trainer.lastLogin ? `Last active ${format(new Date(trainer.lastLogin), "PPP p")}` : "Last active not recorded"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-sm text-sl-muted">
+            Kind
+            <select
+              className="min-h-11 rounded-lg border border-sl-control bg-sl-surface px-3 text-sm text-sl-ink"
+              value={trainerTypeOf(trainer.trainerType)}
+              onChange={(event) => retype.mutate(event.target.value)}
+              data-testid="select-trainer-type"
+            >
+              {TRAINER_TYPES.map((type) => <option key={type} value={type}>{TRAINER_TYPE_LABELS[type]}</option>)}
+            </select>
+          </label>
           <button type="button" className={secondaryButton} onClick={() => setResetOpen(true)} data-testid="button-reset-person-password">
             Reset password…
           </button>

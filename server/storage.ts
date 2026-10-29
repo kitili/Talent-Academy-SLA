@@ -108,6 +108,7 @@ import {
   teacherProfiles,
   openEndedReviews,
   writtenAssignments,
+  writtenAssignmentTeachers,
   assignmentSubmissions,
   discussionPosts,
   deskMessages,
@@ -3399,7 +3400,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getWrittenAssignments(batchId: string) {
-    return db.select().from(writtenAssignments).where(eq(writtenAssignments.batchId, batchId)).orderBy(desc(writtenAssignments.createdAt));
+    const rows = await db.select().from(writtenAssignments).where(eq(writtenAssignments.batchId, batchId)).orderBy(desc(writtenAssignments.createdAt));
+    const audience = await this.getWrittenAssignmentAudienceMap(rows.map((row) => row.id));
+    return rows.map((row) => ({ ...row, teacherIds: audience[row.id] || [] }));
+  }
+
+  async replaceWrittenAssignmentAudience(assignmentId: string, teacherIds: string[]): Promise<void> {
+    await db.delete(writtenAssignmentTeachers).where(eq(writtenAssignmentTeachers.assignmentId, assignmentId));
+    const unique = Array.from(new Set(teacherIds.filter(Boolean)));
+    if (unique.length === 0) return;
+    await db.insert(writtenAssignmentTeachers).values(unique.map((teacherId) => ({ assignmentId, teacherId })));
+  }
+
+  async getWrittenAssignmentAudienceMap(assignmentIds: string[]): Promise<Record<string, string[]>> {
+    if (assignmentIds.length === 0) return {};
+    const rows = await db.select().from(writtenAssignmentTeachers).where(inArray(writtenAssignmentTeachers.assignmentId, assignmentIds));
+    const map: Record<string, string[]> = {};
+    for (const row of rows) (map[row.assignmentId] ||= []).push(row.teacherId);
+    return map;
+  }
+
+  /** True when this Fellow may see and answer the assignment: enrolled in its cohort and inside its audience. */
+  async teacherCanSeeAssignment(assignmentId: string, teacherId: string): Promise<boolean> {
+    const result = await db.execute(sqlOp`
+      SELECT 1
+      FROM written_assignments wa
+      JOIN batch_teachers bt ON bt.batch_id = wa.batch_id AND bt.teacher_id = ${teacherId}
+      WHERE wa.id = ${assignmentId}
+        AND (
+          NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+          OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = ${teacherId})
+        )
+      LIMIT 1
+    `);
+    return result.rows.length > 0;
   }
 
   async getWrittenAssignment(id: string) {
@@ -3425,6 +3459,10 @@ export class DatabaseStorage implements IStorage {
       FROM written_assignments wa
       JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
       WHERE bt.teacher_id = ${teacherId}
+        AND (
+          NOT EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id)
+          OR EXISTS (SELECT 1 FROM written_assignment_teachers a WHERE a.assignment_id = wa.id AND a.teacher_id = ${teacherId})
+        )
       ORDER BY wa.created_at DESC
     `);
     return result.rows;

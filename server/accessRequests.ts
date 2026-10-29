@@ -7,29 +7,40 @@ import { db, hasDatabaseUrl } from "./db";
 import { loginRateLimit } from "./security";
 import { storage } from "./storage";
 
-async function staffByIdentifier(identifier: string) {
+/** Every staff desk the name or email opens. Spelling and capital letters do not matter. */
+export async function staffCandidates(identifier: string) {
   const id = identifier.trim();
-  const [user] = await db
+  if (!id) return [];
+  return db
     .select()
     .from(users)
     .where(or(
       sql`LOWER(${users.username}) = LOWER(${id})`,
       sql`LOWER(${users.email}) = LOWER(${id})`,
-    ))
-    .limit(1);
-  return user;
+    ));
+}
+
+/** Every Fellow desk the username, email or numeric Fellow ID opens. */
+export async function teacherCandidates(identifier: string) {
+  const id = identifier.trim();
+  if (!id) return [];
+  const clauses = [
+    sql`LOWER(${teachers.username}) = LOWER(${id})`,
+    sql`LOWER(${teachers.email}) = LOWER(${id})`,
+  ];
+  if (/^\d{1,9}$/.test(id)) clauses.push(eq(teachers.teacherId, parseInt(id, 10)));
+  return db.select().from(teachers).where(or(...clauses));
+}
+
+async function staffByIdentifier(identifier: string, role?: string) {
+  const rows = await staffCandidates(identifier);
+  return (role ? rows.find((row) => row.role === role) : undefined) ?? rows[0];
 }
 
 async function teacherByIdentifier(identifier: string) {
-  const id = identifier.trim();
-  if (id.includes("@")) {
-    const byEmail = await storage.getTeacherByEmail(id);
-    if (byEmail) return byEmail;
-  }
-  const byUsername = await storage.getTeacherByUsername(id);
-  if (byUsername) return byUsername;
-  if (/^\d+$/.test(id)) return storage.getTeacherByTeacherId(parseInt(id, 10));
-  return undefined;
+  const rows = await teacherCandidates(identifier);
+  // A person who has set a password is the desk to sign in to; otherwise the one still waiting for a password.
+  return rows.find((row) => deskState(row) === "approved") ?? rows.find((row) => deskState(row) === "needs_password") ?? rows[0];
 }
 
 export async function signInBlock(identifier: string, role: string) {
@@ -37,7 +48,7 @@ export async function signInBlock(identifier: string, role: string) {
   const wanted = (role || "").trim().toLowerCase();
   const account = wanted === "teacher"
     ? await teacherByIdentifier(identifier)
-    : await staffByIdentifier(identifier);
+    : await staffByIdentifier(identifier, wanted);
   if (!account) return null;
   if (wanted === "trainer" && "role" in account && account.role !== "trainer") return null;
   if (wanted === "admin" && "role" in account && account.role !== "admin") return null;
@@ -77,6 +88,7 @@ export function registerAccessRequestRoutes(app: Express) {
               firstName: names.firstName,
               lastName: names.lastName,
               username: parsed.username,
+              trainerType: parsed.type,
             }).where(eq(users.id, existing.id));
             return res.status(201).json({ status: "pending" });
           }
@@ -94,6 +106,7 @@ export function registerAccessRequestRoutes(app: Express) {
           role: "trainer",
           approvalStatus: "pending",
           passwordSet: "no",
+          trainerType: parsed.type,
         });
         return res.status(201).json({ status: "pending" });
       }
@@ -109,6 +122,7 @@ export function registerAccessRequestRoutes(app: Express) {
             email: parsed.email,
             name: parsed.name,
             username: parsed.username,
+            fellowType: parsed.type,
           }).where(eq(teachers.id, existingTeacher.id));
           return res.status(201).json({ status: "pending" });
         }
@@ -123,6 +137,7 @@ export function registerAccessRequestRoutes(app: Express) {
         password: lockedPassword,
         approvalStatus: "pending",
         passwordSet: "no",
+        fellowType: parsed.type,
       });
       return res.status(201).json({ status: "pending" });
     } catch (error) {
@@ -142,7 +157,7 @@ export function registerAccessRequestRoutes(app: Express) {
       if (!hasDatabaseUrl()) return res.status(503).json({ message: "Requests need the academy database." });
       const account = role === "teacher"
         ? await teacherByIdentifier(identifier)
-        : await staffByIdentifier(identifier);
+        : await staffByIdentifier(identifier, role);
       if (!account || ("role" in account && account.role !== role)) return res.json({ code: "unknown" });
       res.json({ code: deskState(account) });
     } catch (error) {
@@ -160,7 +175,7 @@ export function registerAccessRequestRoutes(app: Express) {
       }
       const account = parsed.role === "teacher"
         ? await teacherByIdentifier(parsed.identifier)
-        : await staffByIdentifier(parsed.identifier);
+        : await staffByIdentifier(parsed.identifier, parsed.role);
       if (!account || ("role" in account && account.role !== parsed.role)) {
         return res.status(404).json({ message: "No desk is waiting for that username or email." });
       }

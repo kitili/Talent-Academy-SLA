@@ -10,7 +10,7 @@ import { hasDatabaseUrl } from "./db";
 import { loginRateLimit } from "./security";
 import { User as SelectUser } from "@shared/schema";
 import { matchTestLogin, TEACHER_PASSWORD, TEST_LOGINS } from "./testLogins";
-import { registerAccessRequestRoutes, signInBlock } from "./accessRequests";
+import { registerAccessRequestRoutes, signInBlock, staffCandidates, teacherCandidates } from "./accessRequests";
 
 declare global {
   namespace Express {
@@ -101,33 +101,45 @@ export async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
+type Desk = { approvalStatus: string; passwordSet: string; password: string };
+
+/** A desk can be signed in to only once an admin approved it and its owner chose a password. */
+function readyToSignIn(desk: Desk) {
+  return desk.approvalStatus === "approved" && desk.passwordSet !== "no";
+}
+
+/** The staff desk among `candidates` that this password opens, for the role asked (any role when none). */
+export async function pickApprovedStaff<T extends Desk & { role: string }>(candidates: T[], password: string, role: string) {
+  for (const user of candidates) {
+    if (readyToSignIn(user) && (!role || user.role === role) && await comparePasswords(password, user.password)) {
+      return user;
+    }
+  }
+  return null;
+}
+
+/** The Fellow desk among `candidates` that this password opens. */
+export async function pickApprovedTeacher<T extends Desk>(candidates: T[], password: string) {
+  for (const teacher of candidates) {
+    if (readyToSignIn(teacher) && await comparePasswords(password, teacher.password)) return teacher;
+  }
+  return null;
+}
+
+/**
+ * The approved desk this name (or email, or Fellow ID) and password open. Every desk the name matches is tried,
+ * so a person who is both a Fellow and a Trainer, or whose username was typed in other capitals, still gets in.
+ */
 export async function findApprovedAccount(identifier: string, password: string, role: string) {
   const wantStaff = !role || role === "admin" || role === "trainer";
   const wantTeacher = !role || role === "teacher";
   if (wantStaff) {
-    let user = await storage.getUserByUsername(identifier);
-    if (!user) user = await storage.getUserByEmail(identifier);
-    if (
-      user
-      && user.approvalStatus === "approved"
-      && (!role || user.role === role)
-      && await comparePasswords(password, user.password)
-    ) {
-      return { user };
-    }
+    const user = await pickApprovedStaff(await staffCandidates(identifier), password, role);
+    if (user) return { user };
   }
   if (wantTeacher) {
-    let teacher = await storage.getTeacherByEmail(identifier);
-    if (!teacher && /^\d+$/.test(identifier)) {
-      teacher = await storage.getTeacherByTeacherId(parseInt(identifier, 10));
-    }
-    if (
-      teacher
-      && teacher.approvalStatus === "approved"
-      && await comparePasswords(password, teacher.password)
-    ) {
-      return { teacher };
-    }
+    const teacher = await pickApprovedTeacher(await teacherCandidates(identifier), password);
+    if (teacher) return { teacher };
   }
   return null;
 }

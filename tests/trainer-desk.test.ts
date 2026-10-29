@@ -138,7 +138,7 @@ describe("trainer desk wiring", () => {
     assert.match(trainer, /DESK_MENUS\.trainer\.map/);
     assert.equal(trainer.includes('data-testid="trainer-sidebar"'), false);
     assert.equal(trainer.includes("button-back-to-desk"), false);
-    for (const item of DESK_MENUS.trainer) assert.match(trainer, new RegExp(`\\b${item.key}: render`));
+    for (const item of DESK_MENUS.trainer.filter((entry) => entry.href.startsWith("/trainer/batches"))) assert.match(trainer, new RegExp(`\\b${item.key}: render`));
     assert.equal(trainer.includes('id: "assignments"'), false);
     assert.equal(trainer.includes('id: "certificates"'), false);
     assert.equal(trainer.includes('id: "assessments", label: "Assessments", icon'), false);

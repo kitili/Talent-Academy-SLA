@@ -9,7 +9,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertTrainingWeekSchema, updateTrainingWeekSchema, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars, contentItems } from "@shared/schema";
+import { insertTrainingWeekSchema, updateTrainingWeekSchema, scheduledEvents, users, teachers, batches, batchCourses, batchTeachers, courses, teacherCourseCompletion, assignedQuizzes, quizAttempts, teacherReportCards, trainerStars, contentItems } from "@shared/schema";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import { setupTeacherAuth, isTeacherAuthenticated } from "./teacherAuth";
 import { z } from "zod";
@@ -62,6 +62,8 @@ import { sendTransactionalEmail } from "./mailer";
 import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
+import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
+import { parseOnlineFields } from "@shared/academyPeople";
 import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
 import { encouragementFor } from "./trainerEncouragement";
@@ -2399,7 +2401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
       const teachers = await storage.getTeachersInBatch(req.params.batchId);
-      res.json({ ...batch, teachers });
+      res.json({ ...batch, teachers: teachers.map(publicFellow) });
     } catch (error) {
       console.error("Error fetching batch:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -4121,7 +4123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Trainer not found" });
       }
 
-      const { password, ...sanitized } = trainer;
+      const { password, resetToken: _resetToken, ...sanitized } = trainer;
       const trainerBatches = await storage.getAllBatches(id);
       res.json({
         ...sanitized,
@@ -6057,6 +6059,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { title, instructions, dueDate, fileUrl, fileName, kind } = req.body;
       const assignmentKind = kind === "assessment" ? "assessment" : "assignment";
       if (!title || (!instructions && !fileUrl)) return res.status(400).json({ error: "title and instructions are required" });
+      const audience = await resolveQuizAudience(batch.id, req.body?.teacherIds);
+      if (audience.error) return res.status(400).json({ error: audience.error });
       const assignment = await storage.createWrittenAssignment({
         batchId: batch.id,
         title,
@@ -6067,13 +6071,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileName: fileName || null,
         kind: assignmentKind,
       });
-      notifyBatchTeachers(
+      await storage.replaceWrittenAssignmentAudience(assignment.id, audience.teacherIds);
+      notifyQuizTeachers(
         batch.id,
+        audience.teacherIds,
         "Written work is ready",
-        `${title} is waiting in ${batch.name}. Open My work on your dashboard.`,
-        "deadline",
+        `${title} is waiting in ${batch.name}. Open Work on your dashboard.`,
       ).catch((error) => console.error("Assignment notice failed:", error));
-      res.status(201).json(assignment);
+      res.status(201).json({ ...assignment, teacherIds: audience.teacherIds });
     } catch (error) {
       console.error("Error creating assignment:", error);
       res.status(500).json({ error: "Failed to create assignment" });
@@ -6211,6 +6216,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const response = String(req.body?.response || "").trim();
       if (!response) return res.status(400).json({ error: "response is required" });
+      if (!(await storage.teacherCanSeeAssignment(req.params.assignmentId, req.teacherId!))) {
+        return res.status(403).json({ error: "This work is not assigned to you" });
+      }
       const row = await storage.upsertAssignmentSubmission(req.params.assignmentId, req.teacherId!, response);
       res.json(row);
     } catch (error) {
@@ -6223,7 +6231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Scheduled Event Endpoints
   // ══════════════════════════════════════════════════════════════
 
-  // Create event (trainer/admin)
+  // Create event (trainer/admin). A Trainer schedules only for a cohort they teach.
   app.post("/api/batches/:batchId/events", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { batchId } = req.params;
@@ -6231,14 +6239,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!title || !eventType || !startDate) {
         return res.status(400).json({ error: "title, eventType, and startDate are required" });
       }
+      const batch = await storage.getBatch(batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      const start = new Date(startDate);
+      const end = endDate ? new Date(endDate) : null;
+      if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
+        return res.status(400).json({ error: "The date is not a date" });
+      }
+      if (end && end.getTime() < start.getTime()) return res.status(400).json({ error: "The session ends before it starts" });
+      const online = parseOnlineFields(req.body, req.user as any);
+      if ("error" in online) return res.status(online.error.startsWith("Only") ? 403 : 400).json({ error: online.error });
       const event = await storage.createScheduledEvent({
         title,
         description: description || null,
         eventType,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: start,
+        endDate: end,
         batchId,
         createdBy: (req.user as any)?.id,
+        ...online,
       });
       notifyBatchTeachers(
         batchId,
@@ -6256,6 +6276,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get batch events (trainer/admin)
   app.get("/api/batches/:batchId/events", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const events = await storage.getScheduledEvents(req.params.batchId);
       res.json(events);
     } catch (error) {
@@ -6264,9 +6287,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete event (trainer/admin)
+  // Delete event (trainer/admin). A Trainer removes only sessions in a cohort they teach.
   app.delete("/api/events/:id", isAuthenticated, isTrainer, async (req, res) => {
     try {
+      const [event] = await db.select().from(scheduledEvents).where(eq(scheduledEvents.id, req.params.id));
+      if (!event) return res.status(404).json({ error: "Event not found" });
+      const batch = await storage.getBatch(event.batchId);
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       await storage.deleteScheduledEvent(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -6470,6 +6497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   registerAcademyPathRoutes(app, isAuthenticated, isAdmin, isTeacherAuthenticated);
+  registerAcademyDeskRoutes(app, isAuthenticated, isTrainer, isAdmin);
 
   const httpServer = createServer(app);
   return httpServer;

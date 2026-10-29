@@ -5,6 +5,7 @@ import { useLocation, useRoute } from "wouter";
 import { AcademyShell } from "@/components/AcademyShell";
 import { deskName } from "@shared/deskName";
 import { format } from "date-fns";
+import { FELLOW_TYPES, FELLOW_TYPE_LABELS, fellowTypeOf } from "@shared/academyPeople";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,7 @@ interface TeacherDetail {
   role: string;
   approvalStatus: string;
   createdAt: string;
+  fellowType?: string;
   lastLogin?: string;
   progress?: number;
   filesViewed?: number;
@@ -66,6 +68,17 @@ export default function AdminTeacherDetail() {
   const { user, logoutMutation } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const retype = useMutation({
+    mutationFn: async (fellowType: string) => {
+      const res = await apiRequest("PATCH", `/api/trainer/fellows/${teacherId}/type`, { fellowType });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/teachers", teacherId] });
+      toast({ title: "Kind of Fellow saved" });
+    },
+    onError: (error: Error) => toast({ title: "Could not change the kind", description: error.message, variant: "destructive" }),
+  });
   const [, params] = useRoute("/admin/teachers/:id");
   const [resetOpen, setResetOpen] = useState(false);
   const [editing, setEditing] = useState<{ name: string; email: string } | null>(null);
@@ -252,9 +265,20 @@ export default function AdminTeacherDetail() {
             <h1 className="text-[28px] font-semibold leading-tight text-sl-ink">{teacher.name}</h1>
             <StatusChip status={teacher.approvalStatus} />
           </div>
-          <p className="text-sm text-sl-muted">Fellow · Fellow ID {teacher.teacherId} · {teacher.email}</p>
+          <p className="text-sm text-sl-muted">Fellow · {FELLOW_TYPE_LABELS[fellowTypeOf(teacher.fellowType)]} · Fellow ID {teacher.teacherId} · {teacher.email}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-sm text-sl-muted">
+            Kind
+            <select
+              className="min-h-11 rounded-lg border border-sl-control bg-sl-surface px-3 text-sm text-sl-ink"
+              value={fellowTypeOf(teacher.fellowType)}
+              onChange={(event) => retype.mutate(event.target.value)}
+              data-testid="select-fellow-type"
+            >
+              {FELLOW_TYPES.map((type) => <option key={type} value={type}>{FELLOW_TYPE_LABELS[type]}</option>)}
+            </select>
+          </label>
           <button type="button" className={secondaryButton} onClick={() => setResetOpen(true)} data-testid="button-reset-person-password">
             Reset password…
           </button>

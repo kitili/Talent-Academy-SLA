@@ -19,6 +19,8 @@ import TeacherContentView from "@/pages/teacher-content-view";
 import TrainerBatches from "@/pages/trainer-batches";
 import TrainerTeacherContentHistory from "@/pages/trainer-teacher-content-history";
 import Approvals from "@/pages/approvals";
+import TrainerFellows from "@/pages/trainer-fellows";
+import AcademyCalendarPage from "@/pages/academy-calendar";
 import AdminHome from "@/pages/admin-home";
 import AdminPeople from "@/pages/admin-people";
 import AdminTrainerDetail from "@/pages/admin-trainer-detail";
@@ -48,6 +50,8 @@ function Router() {
       {/* Other routes */}
       <ProtectedRoute path="/trainer/batches" component={TrainerBatches} />
       <ProtectedRoute path="/trainer/teachers/:teacherId/weeks/:weekId/content-history" component={TrainerTeacherContentHistory} />
+      <ProtectedRoute path="/trainer/fellows" component={TrainerFellows} />
+      <ProtectedRoute path="/calendar" component={AcademyCalendarPage} />
       <ProtectedRoute path="/approvals" component={Approvals} />
       <ProtectedRoute path="/admin/certificates" component={AdminCertificates} />
       <ProtectedRoute path="/admin/trainers/:id" component={AdminTrainerDetail} />
