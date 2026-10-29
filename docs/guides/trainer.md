@@ -10,7 +10,7 @@ The words: a **cohort** is a group of Fellows. It has **steps**, a step holds **
 
 Open the Trainer tab and sign in. One browser holds one sign-in at a time: signing in as someone else replaces the earlier session. The first visit starts a short tour. **Help** in the header plays it again.
 
-The header holds the logo, "Silverleaf Academy" and a **Trainer** pill. On the right are **Help**, the bell (a blue number means unread notes), the light and dark switch, your name, and **Log out**. The side menu runs down the left: Home, Cohorts, Fellows, Assessments, Progress, Attendance, Messages, Schedule, and Calendar. On a narrower screen it moves above the page. On a phone it is a bottom bar with Home, Cohorts, Assessments and Messages, and **More** opens Fellows, Progress, Attendance, Schedule and Calendar; the header shows your initials, and tapping them opens Help, the switch and Log out. There are no pictures on any page.
+The header holds the logo, "Silverleaf Academy" and a **Trainer** pill. On the right are **Help**, the bell (a blue number means unread notes), the light and dark switch, your name, and **Log out**. The side menu runs down the left: Home, Cohorts, Fellows, Courses, Assessments, Progress, Attendance, Messages, Schedule, and Calendar. On a narrower screen it moves above the page. On a phone it is a bottom bar with Home, Cohorts, Assessments and Messages, and **More** opens Fellows, Courses, Progress, Attendance, Schedule and Calendar; the header shows your initials, and tapping them opens Help, the switch and Log out. There are no pictures on any page.
 
 ## B. Home
 
@@ -42,7 +42,7 @@ Each of the other names in the side menu works across your cohorts:
 | Progress | Choose a cohort. A table shows each Fellow's status in each course placed on that cohort, and their medals. Click a Fellow's name for details. **Download CSV** saves the gradebook. |
 | Attendance | **Mark attendance for today** (or another date): choose the cohort and the date, then mark each Fellow present, late, absent or excused, or use **Set everyone**. **Save attendance** saves the marks for that day. **Recent marks** and **Attendance in figures** follow. |
 | Messages | Desk mail with a Fellow, **Send a cohort note** to the whole cohort, **Feedback comments**, and your inbox. |
-| Schedule | This week, day by day, with sessions and deadlines. **Add a session** opens a form: cohort, title, type (Session, Assessment, Deadline, Holiday or Other), start, optional end, and a description. **Add to the schedule** saves it. The **×** removes an entry. |
+| Schedule | This week, day by day, with sessions and deadlines. To change a session, use **Calendar → Timetable**: **Edit** or **Remove** on the session, or **Schedule a session**. **Add a session** opens a form: cohort, title, type (Session, Assessment, Deadline, Holiday or Other), start, optional end, and a description. **Add to the schedule** saves it. The **×** removes an entry. |
 
 Certificates are not on your menu. An admin issues them (section F).
 
@@ -50,7 +50,9 @@ Certificates are not on your menu. An admin issues them (section F).
 
 ## D. Build the course
 
-An admin adds a course and places it on a step of your cohort. You do not add or delete courses.
+An admin adds a course and places it on a step of your cohort, or you make one: **Courses** → **Make a course**, then **Open and add content**, and **Add to a cohort** to put it on one of your cohorts (Fellows see it only once it is on a cohort). You can edit a course you made or one on your cohorts. Only an admin deletes a course.
+
+Uploading: slides, documents, images, audio and video up to 500 MB go straight to storage, so a recorded session can be a lesson file. A video plays in the page.
 
 Open a course from the link on the cohort page. That page lists its modules. You can add a module, add or replace its lesson files, and edit the quiz for each lesson file.
 

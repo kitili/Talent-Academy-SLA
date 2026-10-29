@@ -2,7 +2,31 @@
 
 ## Status
 
-**Approved — 2026-10-29.** Branch `feat/academy-desk-2`, cut from `feat/academy-desk` at `df57a31` so the round-1 PR stays as it is. Not started.
+**Implemented — 2026-10-29.** Branch `feat/academy-desk-2`, cut from `feat/academy-desk` at `df57a31` so the round-1 PR
+stays as it is. Not merged or deployed.
+
+Commits: A `cf469ee`, B `37654b4`, C `0f26b51`, D `0250e00`, E `1fba0ed`, F `8d576bf`, then the tests and docs commit.
+
+Verification run:
+- Full `npm test`, with no database variables set: green.
+- `npm run typecheck`: 29 errors, the same 29 as `main`.
+- `vite build` into a scratch folder: built.
+- **Not run:**
+  - `scripts/workflow-walkthrough.ts`, because it needs a throwaway Neon database. It is updated for the Done step.
+  - Phase 0 (whether `BLOB_READ_WRITE_TOKEN` is set on the live project). Without the token, uploads keep the old
+    path.
+  - No page was clicked through in a browser.
+
+Deviations:
+- **B:** work a Fellow already handed in or tried stays visible after its deadline, read-only, so their mark is not hidden.
+  Unsubmitted work disappears as decided.
+- **C:** the session form is a new component used from the Calendar. The Trainer's Schedule page keeps its own add dialog,
+  which has no Edit button; editing happens on the Calendar.
+- **C:** Fellow Home's Coming up showed past sessions first, so it now lists only sessions not yet over.
+- **E:** Trainers make courses through `POST /api/trainer/courses`. `POST /api/courses` stays Admin only.
+  `courses.created_by` was added so a Trainer can edit a course before it is on a cohort.
+- **E:** Blob files open through the existing viewers, which now fetch Blob URLs and only Blob URLs. Videos play from Blob.
+- **F:** the Trainer's Upcoming count now counts sessions only, not every event type.
 
 Decisions taken by the steering engineer (kitili) on 2026-10-29:
 - Google Meet: the Trainer pastes a link; the app shows a **Live now · Join** button. No Google API.
