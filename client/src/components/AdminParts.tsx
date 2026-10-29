@@ -205,6 +205,8 @@ export type PathCohort = {
   trainerIds?: string[];
   status?: string | null;
   quizzesStatus?: string | null;
+  /** The Fellows enrolled in the cohort, whoever enrolled them. */
+  fellows?: PathPerson[];
   batches: PathStep[];
 };
 export type PathTrainer = { id: string; username: string; email?: string | null };
@@ -220,8 +222,9 @@ export function orderedSteps(cohort: PathCohort) {
   return [...cohort.batches].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
 }
 
-/** The Fellows enrolled in a cohort: everyone ticked on any of its steps, once. */
+/** The Fellows enrolled in a cohort. The server sends them; older payloads fall back to the steps' ticks, once each. */
 export function cohortFellows(cohort: PathCohort): PathPerson[] {
+  if (cohort.fellows) return cohort.fellows;
   const seen = new Map<string, PathPerson>();
   for (const step of cohort.batches) for (const person of step.teachers || []) seen.set(person.id, person);
   return Array.from(seen.values());

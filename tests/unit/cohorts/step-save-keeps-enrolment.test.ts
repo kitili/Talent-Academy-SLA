@@ -42,9 +42,11 @@ test('the step teacher save deletes no enrolment and adds through enrolmentsToAd
     assert.match(handler, /db\.insert\(batchTeachers\)/)
 })
 
-test('the step editor says removal from the cohort is the roster Remove', () => {
+test('the cohort roster dialog says unticking takes a Fellow out of the cohort and keeps their progress', () => {
+    // The per-step ticks moved behind "Split into parts"; the roster the Admin edits is the cohort's own, so
+    // the Remove is the untick there. A step save (above) still never removes an enrolment.
     const page = readFileSync('client/src/pages/admin-batches.tsx', 'utf8')
-    assert.match(page, /data-testid=\{`step-roster-note-\$\{batch\.id\}`\}/)
-    assert.match(page, /stay in the cohort/)
-    assert.match(page, /Remove on the cohort roster/)
+    assert.match(page, /untick to take them out/)
+    assert.match(page, /Their progress is kept/)
+    assert.match(page, /check-roster-/)
 })

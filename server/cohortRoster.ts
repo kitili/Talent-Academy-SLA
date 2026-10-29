@@ -29,6 +29,19 @@ export function enrolmentsToAdd({
   return Array.from(new Set(stepAfter)).filter((id) => !before.has(id) && !inCohort.has(id));
 }
 
+/**
+ * What saving the cohort roster changes: Fellows newly ticked are enrolled, Fellows no longer ticked are taken out of
+ * the cohort. Unlike a step save (D9), this is the explicit roster, so unticking is the Remove.
+ */
+export function rosterChanges({ current, wanted }: { current: string[]; wanted: string[] }) {
+  const now = new Set(current);
+  const next = new Set(wanted);
+  return {
+    add: Array.from(next).filter((id) => !now.has(id)),
+    remove: Array.from(now).filter((id) => !next.has(id)),
+  };
+}
+
 /** How many cohorts each trainer runs, by C4 (D8): a `cohort_trainers` row or `batches.trainer_id`. */
 export async function trainerCohortCounts(
   trainerIds: string[],

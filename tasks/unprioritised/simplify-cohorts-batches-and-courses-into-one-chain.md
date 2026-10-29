@@ -21,7 +21,7 @@ Cohort -> ordered Courses -> Content. A cohort has Trainers, Fellows and an orde
 
 ## Stages (each lands on its own, behind tests, on a throwaway database)
 
-1. UI only: stop showing "batch/step"; one cohort page with three lists (Trainers, Fellows, Courses in order).
+1. **Done 2026-10-29** (UI only): the Admin cohort page shows Trainers, Fellows and Courses in order. The cohort's own roster (`batch_teachers`) is what it lists and edits (`PUT /api/admin/academy-path/cohorts/:id/teachers`); a cohort's first course starts its first part by itself; steps sit behind "Split into parts (advanced)". Still to do in stage 1: the Trainer's cohort room, the Fellow's path and Analytics still say "step".
 2. Make `batch_courses` the single write target, writing through to the old tables.
 3. Move readers (`server/academyPathRoutes.ts`, `server/scope.ts`, `server/learnerPath.ts`, certificate eligibility,
    `shared/academyPath.ts`) to `batch_courses` + `order_index`.
@@ -30,4 +30,4 @@ Cohort -> ordered Courses -> Content. A cohort has Trainers, Fellows and an orde
 ## Risk
 
 Progress, completion and certificates read the step tables (`pathSummary`, `courseCompleted`, `batchIsComplete`).
-Stage 3 touches all of them. Blocked on: the steering engineer choosing the stage to start with.
+Stage 3 touches all of them. Blocked on: the steering engineer choosing whether to start stage 2.

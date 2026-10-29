@@ -15,6 +15,8 @@ Everything here is shipped unless a section says **Not built**.
 | Academy year | **Calendar → Academy year**. Admin adds terms, holidays, training, assessments, events and deadlines. Trainers and Fellows read the same rows; nothing is copied or sent. |
 | Sharing an assessment | The "Who sits this" picker on Upload an assessment names Fellows of the cohort. Only those Fellows see the assessment on **Work** and only they can answer it. Leaving every box empty gives it to the whole cohort. |
 
+| Admin cohort page | Shows Trainers, Fellows and **Courses in order**. The Fellows listed are the cohort's own roster (`batch_teachers`), so Fellows a Trainer registered or enrolled appear; **Manage the roster** ticks Fellows in and out of the cohort (progress is kept). A cohort's first course starts its first part automatically; parts (steps) are under **Split into parts (advanced)**. |
+
 ## Rules worth knowing
 
 - A kind is chosen on the request form and changed afterwards by an Admin (Trainer or Fellow page) or, for a Fellow,
@@ -32,9 +34,9 @@ Everything here is shipped unless a section says **Not built**.
 | --- | --- |
 | Shared rules (kinds, link and calendar checks, month grouping) | `shared/academyPeople.ts`, `shared/accessRequest.ts` |
 | Tables | `shared/schema.ts`: `users.trainer_type`, `teachers.fellow_type`, `scheduled_events.meeting_url / video_url / materials_url`, `academy_calendar`, `written_assignment_teachers` |
-| Routes | `server/academyDesk.ts` (register Fellows, kinds, academy year, timetable); `server/routes.ts` (sessions, assessments, roster); `server/auth.ts`, `server/accessRequests.ts` (sign-in) |
+| Routes | `server/academyPathRoutes.ts` (cohort roster, `fellows` on each cohort), `server/academyDesk.ts` (register Fellows, kinds, academy year, timetable); `server/routes.ts` (sessions, assessments, roster); `server/auth.ts`, `server/accessRequests.ts` (sign-in) |
 | Storage | `server/storage.ts` (assessment audience, `teacherCanSeeAssignment`) |
-| Pages | `client/src/pages/trainer-fellows.tsx`, `client/src/pages/academy-calendar.tsx`, `client/src/pages/trainer-batches.tsx` (Schedule dialog, assessment picker), `client/src/pages/unified-auth.tsx`, `admin-trainer-detail.tsx`, `admin-teacher-detail.tsx` |
+| Pages | `client/src/pages/admin-batches.tsx` (cohort page), `client/src/pages/trainer-fellows.tsx`, `client/src/pages/academy-calendar.tsx`, `client/src/pages/trainer-batches.tsx` (Schedule dialog, assessment picker), `client/src/pages/unified-auth.tsx`, `admin-trainer-detail.tsx`, `admin-teacher-detail.tsx` |
 | Menus | `client/src/components/deskMenu.ts` (Fellows on the Trainer menu; Calendar on all three) |
 
 New tables and columns are created at server start by `server/schemaGuard.ts` (additive; existing rows take the defaults).
@@ -48,7 +50,7 @@ certificates are untouched. Quizzes already had an audience (`assigned_quiz_teac
 - Email to a Fellow a Trainer registered. The Trainer tells them to open Sign in, choose Fellow, and create a password.
 - A month-grid view of the calendar. It is a dated list grouped by month.
 - Narrowing pre-service Fellows to assessments only. Both kinds see everything, as asked.
-- Simplifying cohorts, steps and courses: filed as `tasks/unprioritised/simplify-cohorts-batches-and-courses-into-one-chain.md`.
+- Simplifying cohorts, steps and courses beyond the Admin page (the Trainer's cohort room, the Fellow's path and Analytics still say "step"; the data model is unchanged): filed as `tasks/unprioritised/simplify-cohorts-batches-and-courses-into-one-chain.md`.
 
 ## See also
 
