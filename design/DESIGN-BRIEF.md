@@ -8,7 +8,7 @@ Do NOT edit `canvas.json` or any other file, do NOT publish anything, do NOT run
 ## Read first (they are your reference for markup, shell and quality)
 - `project/AdminHome.dc.html` — the shared shell (header, side menu, main). COPY ITS HEADER AND NAV MARKUP VERBATIM, then change only:
   the desk pill text (Admin / Trainer / Fellow), the person's name, the nav items for that desk, and which nav item has
-  `aria-current="page"` (the current one gets `background: #E8F0FB; color: #0A48A5; font-weight: 600`).
+  `aria-current="page"` (the current one gets `background: #FFFFFF; font-weight: 600`, a 4px yellow #F5B800 bar on its left edge and a 1px #DCE4F0 outline; on the phone bar it is blue text with the yellow bar on its top edge).
 - `project/AdminCohorts.dc.html` — list + detail layout, a "More actions" menu, step list, status chips.
 - `project/FellowLearning.dc.html` — Fellow shell, example-state block with [bracketed] placeholders.
 - `project/TrainerHome.dc.html` — Trainer shell, table markup.
@@ -32,16 +32,22 @@ Do NOT edit `canvas.json` or any other file, do NOT publish anything, do NOT run
 - Icons: only inline stroke SVG with `aria-hidden="true"` (bell, moon, chevrons, etc. — copy from the references). No emoji.
 
 ## Look
-- Inter. Page title 28/600; section 18/600; body 15/400; secondary 13–14 in #4B5563.
-- Ground #F6F7F9, surfaces #FFFFFF with 1px #E3E6EB borders, radius 12 (cards) / 8 (buttons, inputs) / 999 (chips).
-- ONE accent: Silverleaf blue #0A48A5 for links, the current page, primary buttons (white text), selected tabs (`border-bottom: 2px solid #0A48A5`).
-  Soft accent #E8F0FB. Secondary buttons: white with 1px #D5D9E0 border, ink text.
-- Colour means status only: at risk / error #B42318 on #FEF3F2; overdue / needs attention #B54708 on #FFFAEB; passed / done / open #067647 on #ECFDF3;
-  neutral #374151 on #EEF0F3. Never decorate with colour; no gradients, no pastel tiles of different hues, no left-border cards, no photos, no text over images.
+- Inter. Page title 28/600 (a book serif the device has, weight 500, where the app sets it); section 18/600; body 15/400; secondary 13–14 in #475569.
+- Ground #F6F8FC, surfaces #FFFFFF with 1px #DCE4F0 borders, side menu #EDF2FA, ink (navy) #0D1B3D, radius 12 (cards) / 8 (buttons, inputs) / 999 (chips).
+- Blue and yellow, no green anywhere. Silverleaf blue #0A48A5 is the accent for links, the current page, primary buttons (white text), selected tabs
+  (`border-bottom: 2px solid #0A48A5`); soft accent #E8F0FB. Secondary buttons: white with 1px #C3CFE0 border, ink text.
+- Silverleaf yellow #F5B800 (chip ground #FFF4CC) is the marker: the bar beside the current menu item, a 40 by 3 px rule under each page title, chips.
+  Never yellow text on white (1.7:1); text on a yellow ground is navy #0D1B3D.
+- Status: at risk / error #B42318 on #FEF3F2; overdue / needs attention #B54708 on #FFFAEB; passed / done / open is BLUE, #083A8A on #E1ECFC (never green);
+  neutral #334155 on #EAEFF6. Other than status and the yellow marker, never decorate with colour; no gradients, no pastel tiles of different hues, no left-border cards.
+- Dark mode keeps the same roles: ground #0B1220, surface #121C30, ink #EEF2FA, secondary text #A9B6CC, links #7FB0FF, primary button #1D5FC9 (white text 5.9:1),
+  yellow #FFC933, risk #FDA29B, attention #FEC84B, done #93C5FD. Checked 2026-11-06, every text pair 4.5:1 or better in both modes: ink, secondary, link and neutral text on ground, surface, menu, soft blue, soft neutral and soft yellow; risk, attention and done on their soft grounds and on surface.
+- Photos: a few, on each desk's Home page (`DeskPhoto`, a short decorative strip, `alt=""`, hidden when printing) and on the sign-in page, taken from `client/public/places`.
+  Nowhere else, never behind text and never with text over them. No emojis.
 - Each page: page header (h1 + one-line context + ONE primary button where a primary action exists), then the work first, figures after.
   Destructive actions (delete, close, stop, clear) never sit beside the main action: put them in a "More actions" menu or a separate red-outlined "careful" box,
   and mark the ones that ask for confirmation with "…".
-- Empty states say plainly what is empty and what will appear there; never a false 0 — loading shows a skeleton (grey bars #EEF0F3).
+- Empty states say plainly what is empty and what will appear there; never a false 0 — loading shows a skeleton (grey-blue bars #EAEFF6).
 
 ## Words (approved decisions — use them exactly)
 - The learner is a **Fellow** (never "teacher" in the UI). Coaches are **Trainers**; **Admin** runs the academy.
