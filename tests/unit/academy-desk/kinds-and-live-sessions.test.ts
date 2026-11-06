@@ -65,7 +65,20 @@ describe("the live sessions page's grouping (splitLiveSessions)", () => {
   });
 });
 
-// Text contract: reads the source, does not render the page.
+// Text contract: reads the source, does not render the pages.
+describe("the pages use the kind helpers (text contract)", () => {
+  it("both People lists filter and draw the kind through the tested functions", () => {
+    for (const [path, role] of [["client/src/pages/admin-teachers.tsx", "teacher"], ["client/src/pages/admin-trainers.tsx", "trainer"]]) {
+      const text = source(path);
+      assert.match(text, new RegExp(`filterByKind\\([^)]*"${role}"`), path);
+      assert.match(text, new RegExp(`<KindChip role="${role}"`), path);
+    }
+  });
+  it("Account settings shows the signed-in person's own kind", () => {
+    assert.match(source("client/src/components/ProfileSettingsDialog.tsx"), /<KindBadge \/>/);
+  });
+});
+
 describe("the live sessions page reads the existing session route (text contract)", () => {
   const page = source("client/src/pages/trainer-live-sessions.tsx");
   const calendar = source("client/src/pages/academy-calendar.tsx");
