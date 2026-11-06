@@ -38,7 +38,7 @@ interface Trainer {
   username: string;
   email?: string;
   role: string;
-  /** in_house or instructional. Not yet sent by GET /api/admin/trainers (see the T1-H report). */
+  /** in_house or instructional. */
   trainerType?: string;
   approvalStatus: string;
   createdAt: string;

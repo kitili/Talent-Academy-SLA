@@ -38,7 +38,7 @@ interface Teacher {
   name: string;
   email: string;
   role: string;
-  /** in_house or pre_service. Not yet sent by GET /api/admin/teachers (see the T1-H report). */
+  /** in_house or pre_service. */
   fellowType?: string;
   approvalStatus: string;
   createdAt: string;

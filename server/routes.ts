@@ -4204,6 +4204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cohortCounts = await trainerCohortCounts(allTrainers.map((trainer) => trainer.id));
       const trainersData = allTrainers.map((trainer: any) => ({
         id: trainer.id,
+        trainerType: trainer.trainerType,
         username: trainer.username,
         email: trainer.email,
         role: trainer.role,
@@ -4255,6 +4256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const summary = summaries.get(teacher.id) || emptyTeacherSummary();
         return {
           id: teacher.id,
+          fellowType: teacher.fellowType,
           teacherId: teacher.teacherId,
           name: teacher.name,
           email: teacher.email,
