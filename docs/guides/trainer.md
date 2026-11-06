@@ -10,7 +10,7 @@ The words: a **cohort** is a group of Fellows. It has **steps**, a step holds **
 
 Open the Trainer tab and sign in. One browser holds one sign-in at a time: signing in as someone else replaces the earlier session. The first visit starts a short tour. **Help** in the header plays it again.
 
-The header holds the logo, "Silverleaf Academy" and a **Trainer** pill. On the right are **Help**, the bell (a blue number means unread notes), the light and dark switch, your name, and **Log out**. The side menu runs down the left: Home, Cohorts, Fellows, Courses, Assessments, Progress, Attendance, Messages, Schedule, and Calendar. On a narrower screen it moves above the page. On a phone it is a bottom bar with Home, Cohorts, Assessments and Messages, and **More** opens Fellows, Courses, Progress, Attendance, Schedule and Calendar; the header shows your initials, and tapping them opens Help, the switch and Log out. There are no pictures on any page.
+The header holds the logo, "Silverleaf Academy" and a **Trainer** pill. On the right are **Help**, the bell (a blue number means unread notes), the light and dark switch, your name, and **Log out**. The side menu runs down the left: Home, Cohorts, Fellows, Courses, Assessments, Progress, Attendance, Messages, and Calendar / Schedule. On a narrower screen it moves above the page. On a phone it is a bottom bar with Home, Cohorts, Assessments and Messages, and **More** opens Fellows, Courses, Progress, Attendance and Calendar / Schedule; the header shows your initials, and tapping them opens Help, the switch and Log out. Home carries one photo strip at the top, with your kind (for example In-house Trainer) beside the date; no other page has a picture.
 
 ## B. Home
 
@@ -38,15 +38,15 @@ Each of the other names in the side menu works across your cohorts:
 
 | Name | What you do |
 | --- | --- |
-| Assessments | Approve the quizzes waiting for you. Under **Exams**, **Upload an assessment**, **Upload a paper exam** or **Write an exam**, and give it to the whole cohort or only to the Fellows you tick. Under **Lesson quizzes on your cohorts**, review them, and assign a **Checkpoint quiz** or a **File quiz**. An assigned quiz or exam allows three tries and passes at 80% unless the exam sets its own mark. **Reset Attempts** lets a Fellow who has used all three try again; open a quiz's Fellow attempts to do it. **Quiz answers to mark** appears when a Fellow wrote an open answer in a quiz; mark it **Pass** or **Fail**. Written assessments are marked from **Mark submissions** instead, and Home counts them as **Written answers to mark**. |
-| Progress | Choose a cohort. A table shows each Fellow's status in each course placed on that cohort, and their medals. Click a Fellow's name for details. **Download CSV** saves the gradebook. |
-| Attendance | **Mark attendance for today** (or another date): choose the cohort and the date, then mark each Fellow present, late, absent or excused, or use **Set everyone**. **Save attendance** saves the marks for that day. **Recent marks** and **Attendance in figures** follow. |
+| Assessments | Approve the quizzes waiting for you. Under **Exams**, **Upload an assessment**, **Upload a paper exam** or **Write an exam**, and give it to the whole cohort or only to the Fellows you tick. Under **Lesson quizzes on your cohorts**, review them, and assign a **Checkpoint quiz** or a **File quiz**. An assigned quiz or exam allows three tries and passes at 80% unless the exam sets its own mark. **Reset Attempts** lets a Fellow who has used all three try again; open a quiz's Fellow attempts to do it. **Quiz answers to mark** appears when a Fellow wrote an open answer in a quiz; mark it **Pass** or **Fail**. Written assessments are marked from **Mark submissions** instead, and Home counts them as **Written answers to mark**. **Reopen** on a quiz, exam or written assessment that has a deadline gives one Fellow (from those who sit it) or everyone a new deadline; the dialog lists the Fellows who already have their own. |
+| Progress | Choose a cohort. A bar chart shows each Fellow's overall progress, lowest first, and a table below shows each Fellow's status in each course placed on that cohort, and their medals. Click a Fellow's name for details. **Download CSV** saves the gradebook; **Download PDF** opens the browser's print dialog (choose Save as PDF). |
+| Attendance | **Mark attendance for today** (or another date): choose the cohort and the date, then mark each Fellow present, late, absent or excused, or use **Set everyone**. **Save attendance** saves the marks for that day. **Recent marks** and **Attendance in figures** follow. **Download CSV** saves the cohort's attendance; **Download PDF** prints the recent marks and figures (the marking form stays off the page). |
 | Messages | Desk mail with a Fellow, **Send a cohort note** to the whole cohort, **Feedback comments**, and your inbox. |
-| Schedule | This week, day by day, with sessions and deadlines. To change a session, use **Calendar → Timetable**: **Edit** or **Remove** on the session, or **Schedule a session**. **Add a session** opens a form: cohort, title, type (Session, Assessment, Deadline, Holiday or Other), start, optional end, and a description. **Add to the schedule** saves it. The **×** removes an entry. |
+| Calendar / Schedule | Sessions and deadlines are on the **Calendar / Schedule** page (its **Schedule** tab), not on this page. An old `?tab=schedule` link goes there. **Add a session** on Home still opens the form: cohort, title, type (Session, Assessment, Deadline, Holiday or Other), start, optional end, and a description. **Add to the schedule** saves it. |
 
 Certificates are not on your menu. An admin issues them (section F).
 
-**Open cohort room** is the cohort's office. Its tabs are People (the roster, with **Add a Fellow** and **Import a roster (CSV)**), Quizzes, Gradebook, Graduates, Announce (a note to the whole cohort), Calendar, Assessments (set written work, then **Mark submissions**), and Import.
+**Open cohort room** is the cohort's office. Its tabs are People (the roster, with **Add a Fellow** and **Import a roster (CSV)**), Assessments (quizzes and exams, then written work: set it, **Mark submissions**, **Reopen**), Materials (**Share a file or link** with the whole cohort or the Fellows you tick, see **Given to**, **Remove**; a material is not a course), Gradebook, Graduates, Announce (a note to the whole cohort), Calendar, and Import. Old links to the Quizzes or Work tab open Assessments.
 
 ## D. Build the course
 
@@ -79,7 +79,7 @@ You do not issue certificates. An admin does, by hand, and only after the Fellow
 3. Confirm the course for each step is placed.
 4. Add or check the lesson file on the current module, and approve its quiz.
 5. Assign a quiz or an exam, or set a written task in the cohort room.
-6. Put the live session on the calendar (Schedule).
+6. Put the live session on the Calendar / Schedule.
 7. After they work, read Progress, mark written work, and mark attendance for the day.
 8. Write a feedback comment when one Fellow needs a note that is not a score.
 9. Send a cohort note when the whole cohort needs the same message.

@@ -80,6 +80,8 @@ export function SessionDialog({
     onSuccess: () => {
       toast({ title: session ? "Session saved" : "Session scheduled" });
       queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+      // The Trainer's Home counts "Sessions today" from each cohort's own events.
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "/api/batches" && query.queryKey[2] === "events" });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/events"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
       onOpenChange(false);
@@ -95,7 +97,7 @@ export function SessionDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{session ? "Edit session" : "Schedule a session"}</DialogTitle>
-          <DialogDescription>Fellows in the cohort see it on their Calendar and Home.</DialogDescription>
+          <DialogDescription>Fellows in the cohort see it on their Calendar / Schedule and Home.</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (ready) save.mutate(); }}>
           {!session && (
