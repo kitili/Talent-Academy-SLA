@@ -26,7 +26,7 @@ describe("admin desk", () => {
     assert.equal(nav.includes('href: "/courses"'), false);
     assert.equal(nav.includes('label: "Trainers"'), false);
     assert.equal(nav.includes('label: "Teachers"'), false);
-    assert.match(shell, /DESK_MENUS\[desk\]\.map/);
+    assert.match(shell, /deskMenuFor\(desk,/);
     assert.match(shell, /lg:flex-col/);
     assert.match(shell, /aria-current=\{on \? "page" : undefined\}/);
     assert.equal(nav.toLowerCase().includes("handover"), false);
