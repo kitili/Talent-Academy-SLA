@@ -51,6 +51,22 @@ function totalsFor(teachers: TeacherRow[]) {
   return { totals, marked, rate };
 }
 
+const EXPORT_BUTTON =
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-3.5 py-2.5 text-sm text-sl-ink no-underline hover:bg-sl-neutral-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent";
+
+/**
+ * Download CSV is the server's export. Download PDF is the browser's print-to-PDF, as certificates are: the shell's
+ * header and menus hide themselves on paper, and a page marks anything else that should stay off it with `print:hidden`.
+ */
+export function AttendanceExportButtons({ csvHref }: { csvHref: string }) {
+  return (
+    <div className="flex flex-wrap gap-2 print:hidden" data-testid="attendance-export">
+      <a href={csvHref} download className={EXPORT_BUTTON} data-testid="link-download-attendance-csv">Download CSV</a>
+      <button type="button" onClick={() => window.print()} className={EXPORT_BUTTON} data-testid="button-download-attendance-pdf">Download PDF</button>
+    </div>
+  );
+}
+
 /** One white line of figures: the rate, then each status. */
 function SummaryLine({ totals, marked, rate }: { totals: Record<StatusKey, number>; marked: number; rate: number | null }) {
   const figures: Array<[string, string | number]> = [
@@ -67,7 +83,7 @@ function SummaryLine({ totals, marked, rate }: { totals: Record<StatusKey, numbe
         ))}
       </p>
       {marked > 0 && (
-        <div className="flex h-2 gap-[2px] overflow-hidden rounded-full bg-sl-neutral-soft" role="img" aria-label="Attendance split by status">
+        <div className="flex h-2 gap-[2px] overflow-hidden rounded-full bg-sl-neutral-soft [print-color-adjust:exact]" role="img" aria-label="Attendance split by status">
           {STATUSES.filter((status) => totals[status.key] > 0).map((status) => (
             <span
               key={status.key}
