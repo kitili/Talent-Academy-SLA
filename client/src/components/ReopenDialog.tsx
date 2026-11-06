@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiErrorText, reopenBody, reopenCandidates } from "@/components/trainerDeskRules";
+import { DateTimeField } from "@/components/DateField";
 
 const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sl-accent";
 const FIELD = `w-full rounded-lg border border-sl-control bg-sl-surface px-3 py-2.5 text-[15px] text-sl-ink ${FOCUS}`;
@@ -113,7 +114,7 @@ export function ReopenDialog({ target, onClose }: { target: ReopenTarget | null;
           )}
           <div className="space-y-1.5">
             <label htmlFor="reopen-due" className={LABEL}>New deadline</label>
-            <input id="reopen-due" type="datetime-local" className={FIELD} value={due} onChange={(event) => setDue(event.target.value)} data-testid="input-reopen-due" />
+            <DateTimeField id="reopen-due" value={due} onChange={setDue} data-testid="input-reopen-due" />
             <p className="text-xs text-sl-muted">
               {scope === "everyone" ? "This becomes the deadline of the item itself." : "Only this Fellow gets this deadline. Everyone else keeps the item's own."}
             </p>

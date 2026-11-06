@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AttendanceBoard, AttendanceExportButtons } from "@/components/AttendanceBoard";
 import { markDateLabel, type AttendancePerson } from "@shared/attendanceDesk";
+import { DateField } from "@/components/DateField";
 
 type Payload = {
   teachers: AttendancePerson[];
@@ -156,7 +157,7 @@ export default function AdminAttendance() {
                 </select>
               </Field>
               <Field id="att-date" label="Date" hint="Today is filled in.">
-                <Input id="att-date" type="date" className="min-h-11 border-sl-control text-[15px]" value={date} onChange={(event) => setDate(event.target.value)} aria-describedby="att-date-hint" data-testid="input-attendance-date" />
+                <DateField id="att-date" value={date} onChange={setDate} required aria-describedby="att-date-hint" data-testid="input-attendance-date" />
               </Field>
             </div>
 
