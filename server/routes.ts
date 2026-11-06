@@ -1351,6 +1351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await objectStorageService.saveLocalObject(req.params.id, data);
       res.sendStatus(200);
     } catch (error) {
+      if (error instanceof ObjectNotFoundError) return res.sendStatus(404);
       console.error("[UPLOAD ERROR] Local object save failed:", error);
       res.status(500).json({ error: "Internal server error" });
     }

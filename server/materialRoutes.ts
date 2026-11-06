@@ -167,8 +167,7 @@ export function materialRecipients(teacherIds: string[], rosterIds: string[]) {
 }
 
 /**
- * The cohort when this Admin or Trainer may act on it, otherwise answers and returns null. `staffCanAccessBatch` in
- * `server/routes.ts` is not used: it lets any staff member through when the cohort does not exist.
+ * The cohort when this Admin or Trainer may act on it, otherwise answers and returns null.
  */
 async function cohortForStaff(req: Request, res: Response, store: MaterialStore) {
   const cohort = await store.cohort(req.params.batchId);

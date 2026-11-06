@@ -115,8 +115,7 @@ function readId(value: unknown) {
 
 /**
  * The item, when this person may act on it: an Admin on any item, a Trainer only in a cohort they teach. Calls
- * `trainerOwnsBatch`, the rule under the deadline edit routes' `staffCanAccessBatch`, and not that wrapper: it answers
- * yes for any staff when the cohort is `undefined`, so here a cohort that cannot be found is a 404.
+ * `trainerOwnsBatch`, the rule under the deadline edit routes' `staffCanAccessBatch`. A cohort that cannot be found is a 404.
  */
 async function itemInScope(actor: Actor, kind: DeadlineKind, itemId: string, deps: DeadlineDeps): Promise<DeadlineItem | RouteAnswer> {
   const item = await deps.loadItem(kind, itemId);
