@@ -100,4 +100,10 @@ Paste into every worker brief, whichever the model. When a line is added, name t
 
 ## Patterns so far
 
-None yet. Write the step back here at each program's close.
+**sla-feedback-fixes, 2026-11-06.** 12 tasks: 5 Opus, 7 Sonnet, none sent back.
+
+- **Every worktree started on the default branch** (`baseReset` true on all 12). The base line in the brief caught it each time, so keep it.
+- **The Opus tasks found the serious gaps, and all outside their briefs:** an open quiz read, no cohort check on attendance reads, unvalidated file addresses, a Fellow locked out of their certificate, and a path traversal. Their reports named them with the exact fix, so "problems in files you do not own" earns its place.
+- **Sonnet held on UI over server-guarded routes** (the desks, the calendar). Its findings were low. Sonnet tasks over routes the server guards can stay Sonnet, with the orchestrator's browser run as the review.
+- **Workers cannot see the screen.** The browser run needs a local database from the start of the program, not the end.
+- **Empty route modules registered in the contract commit** let five server tasks run together in spite of the size of `server/routes.ts`. Reuse this.

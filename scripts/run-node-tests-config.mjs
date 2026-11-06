@@ -65,6 +65,9 @@ export const TEST_RUNTIME_IMPORTS = Object.freeze(['--import', 'tsx'])
  * Trim the list to the project's own layout when you adapt it.
  */
 export const COVERED_PATHS = Object.freeze([
+    'client',
+    'server',
+    'shared',
     'src',
     'app',
     'pages',

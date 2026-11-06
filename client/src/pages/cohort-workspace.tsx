@@ -14,6 +14,9 @@ import { audienceLabel } from "@shared/academyPeople";
 import { AcademyShell } from "@/components/AcademyShell";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { ReopenDialog, type ReopenTarget } from "@/components/ReopenDialog";
+import { MonthCalendar } from "@/components/MonthCalendar";
+import { DateTimeField } from "@/components/DateField";
+import type { CalendarItem } from "@shared/calendarGrid";
 import { cohortTabFromSearch } from "@/components/deskSections";
 import { apiErrorText, canReopen, materialBody } from "@/components/trainerDeskRules";
 import { SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
@@ -300,7 +303,8 @@ export default function CohortWorkspace() {
       const res = await apiRequest("POST", `/api/batches/${batchId}/events`, {
         title: eventTitle,
         eventType,
-        startDate: eventStart,
+        // datetime-local has no zone; the browser's is applied here so the server stores the moment meant.
+        startDate: new Date(eventStart).toISOString(),
       });
       return res.json();
     },
@@ -312,6 +316,28 @@ export default function CohortWorkspace() {
     },
     onError: () => toast({ title: "Could not add event", variant: "destructive" }),
   });
+
+  const deleteEvent = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/events/${id}`),
+    onSuccess: () => {
+      toast({ title: "Removed from the calendar" });
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
+    },
+    onError: () => toast({ title: "Could not remove the event", variant: "destructive" }),
+  });
+  const eventItems = useMemo<CalendarItem<any>[]>(
+    () => events.map((event: any) => ({
+      id: event.id,
+      title: event.title,
+      kind: event.eventType,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      basis: "local-instant" as const, // a session is a moment: it sits on the viewer's own day
+      source: event,
+    })),
+    [events],
+  );
 
   const deleteWork = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/batches/${batchId}/assignments/${id}`),
@@ -571,7 +597,7 @@ export default function CohortWorkspace() {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="work-due" className={LABEL}>Due</label>
-              <input id="work-due" className={FIELD} type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} />
+              <DateTimeField id="work-due" value={workDue} onChange={setWorkDue} />
             </div>
             <fieldset className="space-y-1.5" data-testid="work-audience">
               <legend className={LABEL}>Who sits this</legend>
@@ -624,12 +650,10 @@ export default function CohortWorkspace() {
               <div className="flex flex-wrap items-end gap-2">
                 <div className="space-y-1.5">
                   <label htmlFor={`work-deadline-${item.id}`} className={LABEL}>Deadline</label>
-                  <input
+                  <DateTimeField
                     id={`work-deadline-${item.id}`}
-                    className={FIELD}
-                    type="datetime-local"
                     value={dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate)}
-                    onChange={(event) => setDueDrafts((drafts) => ({ ...drafts, [item.id]: event.target.value }))}
+                    onChange={(value) => setDueDrafts((drafts) => ({ ...drafts, [item.id]: value }))}
                     data-testid={`input-work-deadline-${item.id}`}
                   />
                 </div>
@@ -836,7 +860,7 @@ export default function CohortWorkspace() {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="event-start" className={LABEL}>Starts</label>
-              <input id="event-start" className={FIELD} type="datetime-local" value={eventStart} onChange={(e) => setEventStart(e.target.value)} />
+              <DateTimeField id="event-start" value={eventStart} onChange={setEventStart} />
             </div>
             <button type="button" className={BTN_PRIMARY} disabled={!eventTitle.trim() || !eventStart || createEvent.isPending} onClick={() => createEvent.mutate()}>
               Add to calendar
@@ -847,16 +871,34 @@ export default function CohortWorkspace() {
               <SkeletonCard label="Loading the calendar" lines={1} />
               <SkeletonCard label="Loading the calendar" lines={1} />
             </>
-          ) : events.length === 0 ? (
-            <Empty text="Nothing on the calendar yet." />
-          ) : events.map((event: any) => (
-            <div key={event.id} className={`${PANEL} px-5 py-4`}>
-              <h3 className="text-base font-semibold text-sl-ink">{event.title}</h3>
-              <p className="mt-1 text-sm text-sl-muted">
-                <span className="capitalize">{event.eventType}</span> · {event.startDate ? new Date(event.startDate).toLocaleString() : ""}
-              </p>
-            </div>
-          ))}
+          ) : (
+            <MonthCalendar
+              items={eventItems}
+              emptyDay="Nothing on the calendar for this day."
+              renderEntry={(item) => (
+                <div className={`${PANEL} px-5 py-4`} data-testid={`cohort-event-${item.id}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
+                      <p className="mt-1 text-sm text-sl-muted">
+                        <span className="capitalize">{item.source.eventType}</span> · {item.startDate ? new Date(item.startDate).toLocaleString() : ""}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={BTN_SECONDARY}
+                      disabled={deleteEvent.isPending}
+                      onClick={() => { if (window.confirm(`Remove "${item.title}" from the calendar?`)) deleteEvent.mutate(item.id); }}
+                      data-testid={`button-remove-cohort-event-${item.id}`}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+              data-testid="cohort-month"
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="materials" className="mt-5 space-y-4">

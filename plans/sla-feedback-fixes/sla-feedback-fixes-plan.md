@@ -2,7 +2,19 @@
 
 ## Status
 
-**Approved. In progress — 2026-11-06.** Working branch `feat/curriculum-branches`, base `85d68b9`. Tranche 0 (this plan and the contract) committed; workers run as background subagents, because the steering engineer left the orchestrator in charge. Not merged to `main`, not deployed.
+**Implemented — 2026-11-06.** Working branch `feat/curriculum-branches`, base `85d68b9`. Workers ran as background subagents, because the steering engineer left the orchestrator in charge. Not merged to `main`, not deployed. Deploying applies `users.can_edit_calendar`, `deadline_reopenings`, `shared_materials` and a unique index to the live database at server start.
+
+Verification, on a local Postgres with no `.env`: `scripts/workflow-walkthrough.ts` 157 of 157; `npm test`, `npm run typecheck` (28 errors, baseline 29) and `npm run build` on the final tree; a browser run of the Admin, Trainer and Fellow desks, covering closed work, Reopen, materials, Admin mail, kinds, certificates on screen, the month calendar and the date picker, at desktop and phone widths and in dark mode.
+
+**Not run:** a real Blob upload (needs the live token); the print dialog's PDF output; Excel opening a CSV; item 4, which waits on the steering engineer.
+
+Added during the work, at the steering engineer's request: a month-grid calendar and one themed date and time picker (task T4).
+
+Deviations and additions:
+- **Items found by workers and fixed, though outside the plan:** an unguarded read of any quiz at `/attempts`; attendance reads with no cohort check; unvalidated file addresses on assignments and paper exams; `staffCanAccessBatch` passing staff when a cohort is missing; a Fellow unable to open their own certificate; a path traversal at `/api/local-objects/:id`; missing CSV formula guards.
+- **T1-B:** moving an item's own date also deletes earlier personal deadlines, so "reopen for everyone" reaches them. Not in the contract; decided by the orchestrator, because the notice would otherwise tell a Fellow a date that does not apply to them.
+- **T2-F:** `safeFileHref` also allows `http://`, matching `safeLink`.
+- **T2-N:** removed one notice (a failed-quiz streak told a Fellow about their own action); the rest kept, some reworded. Trainers still cannot issue certificates: `tasks/unprioritised/decide-who-issues-and-edits-certificates.md`.
 
 Decisions taken by the steering engineer, 2026-11-06 ("proceed as recommended"):
 

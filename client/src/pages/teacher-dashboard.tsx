@@ -25,6 +25,7 @@ import { SessionLinks } from "@/components/SessionLinks";
 import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import type { Medal } from "@shared/cohortMedals";
 import { Loading, SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
+import { DateField } from "@/components/DateField";
 
 
 // ── Look: the sl-* tokens (design/DESIGN-BRIEF.md) ─────────────────────────────────────────────────────────────
@@ -1552,7 +1553,7 @@ export default function TeacherDashboard() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="space-y-1.5">
               <label htmlFor="goal-date" className="text-sm font-medium text-sl-ink">Target date</label>
-              <input id="goal-date" type="date" className={`${FIELD} min-h-[44px]`} value={newGoalDate} onChange={(e) => setNewGoalDate(e.target.value)} />
+              <DateField id="goal-date" value={newGoalDate} onChange={setNewGoalDate} fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} />
             </div>
             <button type="submit" className={BTN_PRIMARY} disabled={createGoalMutation.isPending || !newGoalText.trim()}>Save goal</button>
           </div>
