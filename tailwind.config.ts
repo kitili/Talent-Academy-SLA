@@ -25,6 +25,8 @@ export default {
           "accent": "rgb(var(--sl-accent) / <alpha-value>)",
           "accent-strong": "rgb(var(--sl-accent-strong) / <alpha-value>)",
           "accent-soft": "rgb(var(--sl-accent-soft) / <alpha-value>)",
+          "highlight": "rgb(var(--sl-highlight) / <alpha-value>)",
+          "highlight-soft": "rgb(var(--sl-highlight-soft) / <alpha-value>)",
           "risk": "rgb(var(--sl-risk) / <alpha-value>)",
           "risk-soft": "rgb(var(--sl-risk-soft) / <alpha-value>)",
           "attention": "rgb(var(--sl-attention) / <alpha-value>)",

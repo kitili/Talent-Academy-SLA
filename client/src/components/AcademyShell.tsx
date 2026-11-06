@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import logoImage from "@assets/silverleaf-logo.png";
 import { SceneBackdrop, type SceneName } from "@/components/SceneBackdrop";
 import {
   DESK_LABELS,

@@ -23,29 +23,32 @@ a, button, [role="button"] {
 
 /* LIGHT MODE */
 :root {
-  /* Silverleaf "Warm studio" tokens (chosen 2026-10-29), as RGB channels for Tailwind's sl-* colours.
-     Cream ground, white cards, warm brown text and menu, one teal accent for actions and the current place.
-     Colour still means status only: risk, attention, done, neutral. */
-  --sl-ground: 251 247 240;        /* #FBF7F0 page ground */
+  /* Silverleaf blue and yellow (decided 2026-11-06, plans/sla-feedback-fixes D1), as RGB channels for Tailwind's sl-* colours.
+     Pale blue-white ground, white cards, navy text, Silverleaf blue #0A48A5 for actions and the current place, and
+     Silverleaf yellow as the marker: the current menu item, the rule under a page title, chips. No green anywhere:
+     done is blue, risk is red, attention is amber. */
+  --sl-ground: 246 248 252;        /* #F6F8FC page ground */
   --sl-surface: 255 255 255;       /* cards, header */
-  --sl-nav: 243 236 224;           /* #F3ECE0 side menu */
-  --sl-line: 234 223 205;          /* #EADFCD card and divider lines */
-  --sl-control: 220 205 182;       /* #DCCDB6 input and secondary button borders */
-  --sl-ink: 46 31 18;              /* #2E1F12 */
-  --sl-muted: 110 84 64;           /* #6E5440 secondary text, 6.5:1 on the ground */
-  --sl-accent: 15 110 86;          /* #0F6E56 links, current item, primary button */
-  --sl-accent-strong: 15 110 86;   /* primary button background: white text 6:1 */
-  --sl-accent-soft: 225 245 238;   /* #E1F5EE selected option, live card */
+  --sl-nav: 237 242 250;           /* #EDF2FA side menu */
+  --sl-line: 220 228 240;          /* #DCE4F0 card and divider lines */
+  --sl-control: 195 207 224;       /* #C3CFE0 input and secondary button borders */
+  --sl-ink: 13 27 61;              /* #0D1B3D navy text, 16:1 on the ground */
+  --sl-muted: 71 85 105;           /* #475569 secondary text, 7.1:1 on the ground */
+  --sl-accent: 10 72 165;          /* #0A48A5 links, current item, primary button */
+  --sl-accent-strong: 10 72 165;   /* primary button background: white text 8.5:1 */
+  --sl-accent-soft: 232 240 251;   /* #E8F0FB selected option, live card */
+  --sl-highlight: 245 184 0;       /* #F5B800 yellow marker: never text on white (1.7:1); navy text on it is 9.5:1 */
+  --sl-highlight-soft: 255 244 204;/* #FFF4CC yellow chip ground, navy text 15:1 */
   --sl-risk: 180 35 24;            /* #B42318 */
   --sl-risk-soft: 254 243 242;     /* #FEF3F2 */
   --sl-attention: 181 71 8;        /* #B54708 */
   --sl-attention-soft: 255 250 235;/* #FFFAEB */
-  --sl-done: 6 118 71;             /* #067647 */
-  --sl-done-soft: 236 253 243;     /* #ECFDF3 */
-  --sl-neutral: 74 58 44;          /* #4A3A2C */
-  --sl-neutral-soft: 241 233 220;  /* #F1E9DC */
+  --sl-done: 8 58 138;             /* #083A8A done is blue, 10.6:1 on white */
+  --sl-done-soft: 225 236 252;     /* #E1ECFC */
+  --sl-neutral: 51 65 85;          /* #334155 */
+  --sl-neutral-soft: 234 239 246;  /* #EAEFF6 */
 
-  /* Outline buttons and badges take the control border (#D5D9E0). */
+  /* Outline buttons and badges take the control border. */
   --button-outline: rgb(var(--sl-control));
   --badge-outline: rgb(var(--sl-line));
 
@@ -58,40 +61,39 @@ a, button, [role="button"] {
 
   /* shadcn colours, mapped to the sl palette above so untouched buttons, inputs, dialogs and tabs match the boards. */
   --background: 0 0% 100%;            /* surface: inputs, dialogs and sheets sit on it; the page ground is body and the shell */
-  --foreground: 28 44% 13%;           /* ink #2E1F12 */
-  --border: 37 46% 86%;               /* line #EADFCD */
+  --foreground: 223 65% 15%;          /* ink #0D1B3D */
+  --border: 216 40% 90%;              /* line #DCE4F0 */
   --card: 0 0% 100%;
-  --card-foreground: 28 44% 13%;
-  --card-border: 37 46% 86%;
-  --sidebar: 37 48% 92%;              /* menu #F3ECE0 */
-  --sidebar-foreground: 28 44% 13%;
-  --sidebar-border: 37 46% 86%;
-  --sidebar-primary: 165 76% 25%;
+  --card-foreground: 223 65% 15%;
+  --card-border: 216 40% 90%;
+  --sidebar: 217 57% 95%;             /* menu #EDF2FA */
+  --sidebar-foreground: 223 65% 15%;
+  --sidebar-border: 216 40% 90%;
+  --sidebar-primary: 216 89% 34%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 158 52% 92%;
-  --sidebar-accent-foreground: 165 76% 25%;
-  --sidebar-ring: 165 76% 25%;
+  --sidebar-accent: 215 70% 95%;
+  --sidebar-accent-foreground: 216 89% 34%;
+  --sidebar-ring: 216 89% 34%;
   --popover: 0 0% 100%;
-  --popover-foreground: 28 44% 13%;
-  --popover-border: 37 46% 86%;
-  --primary: 165 76% 25%;             /* teal #0F6E56 */
+  --popover-foreground: 223 65% 15%;
+  --popover-border: 216 40% 90%;
+  --primary: 216 89% 34%;             /* Silverleaf blue #0A48A5 */
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 100%;             /* secondary buttons: white, control border, ink text */
-  --secondary-foreground: 28 44% 13%;
-  --muted: 37 47% 90%;                /* neutral soft #F1E9DC */
-  --muted-foreground: 26 26% 34%;     /* secondary text #6E5440 */
-  --accent: 158 52% 92%;              /* accent soft #E1F5EE: hovered and selected options */
-  --accent-foreground: 28 44% 13%;
+  --secondary-foreground: 223 65% 15%;
+  --muted: 215 40% 94%;               /* neutral soft #EAEFF6 */
+  --muted-foreground: 215 19% 35%;    /* secondary text #475569 */
+  --accent: 215 70% 95%;              /* accent soft #E8F0FB: hovered and selected options */
+  --accent-foreground: 223 65% 15%;
   --destructive: 4 76% 40%;           /* risk #B42318 */
   --destructive-foreground: 0 0% 100%;
-  --input: 36 38% 79%;                /* control #DCCDB6 */
-  --ring: 165 76% 25%;
-  --chart-1: 165 76% 25%;
-  --chart-2: 142 76% 36%;
-  --chart-3: 280 65% 55%;
-  --chart-4: 25 95% 53%;
-  --chart-5: 340 75% 55%;
-
+  --input: 215 32% 82%;               /* control #C3CFE0 */
+  --ring: 216 89% 34%;
+  --chart-1: 216 89% 34%;             /* Silverleaf blue */
+  --chart-2: 45 100% 48%;             /* Silverleaf yellow */
+  --chart-3: 223 65% 15%;             /* navy */
+  --chart-4: 212 80% 58%;             /* sky blue */
+  --chart-5: 215 19% 55%;             /* slate */
   /* Inter where the device has it. The CSP keeps Google Fonts out, so the system stack follows. */
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: Georgia, serif;
@@ -162,24 +164,26 @@ a, button, [role="button"] {
 }
 
 .dark {
-  --sl-ground: 23 18 13;           /* #17120D */
-  --sl-surface: 34 26 19;          /* #221A13 */
-  --sl-nav: 29 22 16;              /* #1D1610 */
-  --sl-line: 58 46 34;             /* #3A2E22 */
-  --sl-control: 84 68 47;          /* #54442F */
-  --sl-ink: 245 237 226;           /* #F5EDE2 */
-  --sl-muted: 201 180 155;         /* #C9B49B */
-  --sl-accent: 93 202 165;         /* #5DCAA5 */
-  --sl-accent-strong: 15 110 86;   /* #0F6E56: white text 6:1 */
-  --sl-accent-soft: 18 59 48;      /* #123B30 */
+  --sl-ground: 11 18 32;           /* #0B1220 */
+  --sl-surface: 18 28 48;          /* #121C30 */
+  --sl-nav: 14 22 39;              /* #0E1627 */
+  --sl-line: 35 48 74;             /* #23304A */
+  --sl-control: 58 74 107;         /* #3A4A6B */
+  --sl-ink: 238 242 250;           /* #EEF2FA */
+  --sl-muted: 169 182 204;         /* #A9B6CC */
+  --sl-accent: 127 176 255;        /* #7FB0FF links and current item, 7.7:1 on surface */
+  --sl-accent-strong: 29 95 201;   /* #1D5FC9 primary button: white text 5.9:1 */
+  --sl-accent-soft: 20 40 79;      /* #14284F */
+  --sl-highlight: 255 201 51;      /* #FFC933 yellow marker */
+  --sl-highlight-soft: 58 48 16;   /* #3A3010 yellow chip ground, ink text 11.6:1 */
   --sl-risk: 253 162 155;
   --sl-risk-soft: 59 21 20;
   --sl-attention: 254 200 75;
   --sl-attention-soft: 58 42 10;
-  --sl-done: 117 224 167;
-  --sl-done-soft: 14 51 36;
-  --sl-neutral: 226 213 196;
-  --sl-neutral-soft: 46 36 26;
+  --sl-done: 147 197 253;          /* #93C5FD done is blue */
+  --sl-done-soft: 17 38 77;        /* #11264D */
+  --sl-neutral: 213 222 238;
+  --sl-neutral-soft: 27 39 64;
 
   --button-outline: rgb(var(--sl-control));
   --badge-outline: rgb(var(--sl-line));
@@ -190,40 +194,40 @@ a, button, [role="button"] {
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 28 28% 10%;           /* surface #221A13 */
-  --foreground: 35 53% 92%;           /* ink #F5EDE2 */
-  --border: 30 26% 18%;               /* line #3A2E22 */
-  --card: 28 28% 10%;                 /* surface */
-  --card-foreground: 35 53% 92%;
-  --card-border: 30 26% 18%;
-  --sidebar: 29 29% 9%;
-  --sidebar-foreground: 35 53% 92%;
-  --sidebar-border: 30 26% 18%;
-  --sidebar-primary: 165 76% 25%;
+  --background: 220 45% 13%;          /* surface #121C30 */
+  --foreground: 220 55% 96%;          /* ink #EEF2FA */
+  --border: 220 36% 21%;              /* line #23304A */
+  --card: 220 45% 13%;                /* surface */
+  --card-foreground: 220 55% 96%;
+  --card-border: 220 36% 21%;
+  --sidebar: 221 47% 10%;
+  --sidebar-foreground: 220 55% 96%;
+  --sidebar-border: 220 36% 21%;
+  --sidebar-primary: 217 75% 45%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 163 53% 15%;
-  --sidebar-accent-foreground: 160 51% 58%;
-  --sidebar-ring: 160 51% 58%;
-  --popover: 28 28% 10%;
-  --popover-foreground: 35 53% 92%;
-  --popover-border: 30 26% 18%;
-  --primary: 165 76% 25%;             /* accent strong #0F6E56: white text passes 4.5:1 */
+  --sidebar-accent: 220 60% 19%;
+  --sidebar-accent-foreground: 217 100% 75%;
+  --sidebar-ring: 217 100% 75%;
+  --popover: 220 45% 13%;
+  --popover-foreground: 220 55% 96%;
+  --popover-border: 220 36% 21%;
+  --primary: 217 75% 45%;             /* accent strong #1D5FC9: white text passes 4.5:1 */
   --primary-foreground: 0 0% 100%;
-  --secondary: 28 28% 10%;
-  --secondary-foreground: 35 53% 92%;
-  --muted: 30 28% 14%;                /* neutral soft */
-  --muted-foreground: 33 32% 70%;     /* secondary text */
-  --accent: 163 53% 15%;              /* accent soft */
-  --accent-foreground: 35 53% 92%;
+  --secondary: 220 45% 13%;
+  --secondary-foreground: 220 55% 96%;
+  --muted: 221 41% 18%;               /* neutral soft */
+  --muted-foreground: 218 26% 73%;    /* secondary text */
+  --accent: 220 60% 19%;              /* accent soft */
+  --accent-foreground: 220 55% 96%;
   --destructive: 4 70% 46%;
   --destructive-foreground: 0 0% 100%;
-  --input: 34 28% 26%;                /* control */
-  --ring: 160 51% 58%;
-  --chart-1: 160 51% 58%;
-  --chart-2: 142 76% 50%;
-  --chart-3: 280 65% 70%;
-  --chart-4: 25 95% 60%;
-  --chart-5: 340 75% 65%;
+  --input: 220 30% 32%;               /* control */
+  --ring: 217 100% 75%;
+  --chart-1: 217 100% 75%;
+  --chart-2: 44 100% 60%;
+  --chart-3: 220 55% 90%;
+  --chart-4: 212 80% 65%;
+  --chart-5: 215 25% 65%;
 
   --shadow-2xs: 0px 1px 2px 0px hsl(216 20% 5% / 0.3);
   --shadow-xs: 0px 1px 2px 0px hsl(216 20% 5% / 0.4);
@@ -283,7 +287,7 @@ a, button, [role="button"] {
     letter-spacing: -0.02em;
   }
   
-  /* Page titles in the display serif: the Warm studio's friendly voice. Everything else stays sans. */
+  /* Page titles in the display serif: the friendly voice. Everything else stays sans. */
   h1 {
     font-family: var(--font-display);
     font-weight: 500;
@@ -861,7 +865,7 @@ body {
 }
 
 /* Pages not yet inside AcademyShell still wrap themselves in these. They are plain ground and surface now:
-   no photo, navy, cream or gold (design/board/Shell.dc.html, "photos never sit behind text"). */
+   no photo behind them ("photos never sit behind text"; design/DESIGN-BRIEF.md). */
 .sl-page {
   background-color: rgb(var(--sl-ground));
   color: rgb(var(--sl-ink));
@@ -1015,4 +1019,25 @@ body {
 
 .sla-tour-target {
   border-radius: 8px;
+}
+
+/* Silverleaf yellow, the marker colour (design/DESIGN-BRIEF.md "Look"). Never text: the current menu item gets a yellow
+   bar on its left edge (the phone bar: on its top edge) and a page title gets a short yellow rule under it. The current
+   item is still told by bold text and aria-current, so the yellow is decoration and needs no contrast of its own. */
+nav[aria-label$=" desk"] a[aria-current="page"] {
+  box-shadow: inset 4px 0 0 rgb(var(--sl-highlight)), 0 0 0 1px rgb(var(--sl-line));
+}
+nav[data-testid^="phone-nav-"] a[aria-current="page"],
+nav[data-testid^="phone-nav-"] button[aria-current="page"] {
+  box-shadow: inset 0 3px 0 rgb(var(--sl-highlight));
+}
+/* Not the hidden h1 a page keeps for its name, nor the certificate headings (bold). */
+main h1:not(.sr-only):not(.font-serif):not(.font-bold)::after {
+  content: "";
+  display: block;
+  width: 2.5rem;
+  height: 3px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
+  background: rgb(var(--sl-highlight));
 }
