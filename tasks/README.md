@@ -49,6 +49,7 @@ Not ranked.
 
 | Task | Added | Blocked on |
 |---|---|---|
+| [Decide who issues and edits certificates](unprioritised/decide-who-issues-and-edits-certificates.md) | 2026-11-06 | The steering engineer |
 
 ### Database and start-up
 
@@ -64,6 +65,7 @@ Not ranked.
 
 | Task | Added | Blocked on |
 |---|---|---|
+| [Tidy the notices and wording left from the SLA fixes](unprioritised/tidy-the-notices-and-wording-left-from-the-sla-fixes.md) | 2026-11-06 | |
 | [Send the data the redesigned pages show](unprioritised/send-the-data-the-redesigned-pages-show.md) | 2026-10-27 | |
 
 ## Families

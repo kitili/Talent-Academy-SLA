@@ -13,7 +13,7 @@ Sign in on the Admin tab. One browser holds one sign-in at a time: signing in as
 | Course | The lessons taught in a step. |
 | Module | One part of a course. |
 | Lesson file | A file a Fellow reads inside a module. |
-| Session | One meeting of a cohort on the calendar. A trainer adds it under Schedule or on **Calendar → Timetable**; you can schedule, edit and remove any cohort's sessions there too. It is not attendance. |
+| Session | One meeting of a cohort on the calendar. A trainer adds it under Schedule or on **Calendar / Schedule → Schedule**; you can schedule, edit and remove any cohort's sessions there too. It is not attendance. |
 | Attendance mark | Present, late, absent or excused for one person, one cohort, one day. It is tied to a date, not to a session. |
 | Fellow | A learner in the academy. The code and the database still say `teacher`. |
 | Trainer | The academy coach. |
@@ -59,7 +59,7 @@ Three tools sit on Home, under **Tools**:
 
 ## C. The side menu
 
-The side menu has seven names: Home, Approvals, People, Cohorts, Attendance, Analytics, and Certificates. Courses are a tab of Cohorts.
+The side menu has nine names: Home, Approvals, People, Cohorts, Messages, Calendar / Schedule, Attendance, Analytics, and Certificates. Courses are a tab of Cohorts.
 
 | Name | What you do |
 | --- | --- |
@@ -67,8 +67,9 @@ The side menu has seven names: Home, Approvals, People, Cohorts, Attendance, Ana
 | Approvals | People ask for a desk from the sign-in page. They wait under **Trainers waiting** or **Fellows waiting**. **Approve** them, or **Decline…**. They create their own password after you approve. **Recent decisions** lists what you decided, and **Export approval history** downloads it. |
 | People | Trainers and Fellows share this one page, on two tabs. **Add a trainer** or **Add a Fellow** creates an account that is already approved. Open a name to see that account; there you can **Reset password…**, and on a Fellow's page **More actions** holds **Edit details…** and **Remove Fellow…**. Inactive desks stay folded under **Inactive desks**, and starting the app does not delete them. |
 | Cohorts | Two tabs, **Cohorts** and **Courses**. Add cohorts, steps and courses, and place courses on steps (section D). |
+| Messages | Private desk mail with any approved Trainer or Fellow. Find them by name; they can answer you. |
 | Attendance | Mark Fellows and trainers for a day. Choose who, the person, the cohort, the date (today is filled in) and present, late, absent or excused, then **Save**. **Recent marks** lists them with their date, cohort and status, and **By cohort** adds up the marks. |
-| Calendar | **Timetable**: every cohort's sessions, with **Schedule a session**, **Edit** and **Remove**. **Academy year**: terms, holidays, training, assessments, events and deadlines. New entries are drafts only you see; **Done — show to Trainers and Fellows** publishes them all at once. |
+| Calendar / Schedule | **Schedule**: every cohort's sessions, with **Schedule a session**, **Edit** and **Remove**. **Academy calendar**: terms, holidays, training, assessments, events and deadlines. New entries are drafts only you see; **Done — show to Trainers and Fellows** publishes them all at once. |
 | Analytics | The gradebook for the whole academy. Tabs: Overview, Cohorts, Engagement, Retention, Demographics, Performance, People. It covers Fellows, open cohorts, completion, attendance, quizzes, reflections, course ratings, and who is at risk. It does not list the to-dos; a line at the top points to Home. A cohort's quiz list, with the quizzes waiting for approval, is under Cohorts, in that cohort's **Quizzes** tab (section E). |
 | Certificates | See who is ready, then issue a certificate (section F). |
 
