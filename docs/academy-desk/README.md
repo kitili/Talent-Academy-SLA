@@ -11,9 +11,9 @@ Everything here is shipped unless a section says **Not built**.
 | Kinds of Fellow | **In-house** (learns at Talent Academy) and **pre-service** (comes for two or three weeks of assessments). Both see every lesson, quiz and assessment. The kind only labels the person. |
 | Kinds of Trainer | **In-house** (as before) and **instructional** (visits to teach). Only an instructional Trainer, or an Admin, can attach a meeting link, a video link or a materials link to a session. |
 | Trainers register Fellows | Trainer desk, **Fellows**. The Fellow is approved at once, optionally enrolled in one of the Trainer's cohorts, and creates their own password at sign-in. The Trainer never sets one. |
-| Timetable | Sessions show on **Calendar → Timetable** for every desk: Admin sees all cohorts, a Trainer the cohorts they teach, a Fellow the cohorts they are in. Admin and Trainers **Schedule a session**, **Edit** and **Remove** there (a Trainer only in their cohorts); the Trainer's **Schedule** page still adds sessions too. An in-house Trainer who edits a session keeps its links as they are. |
+| Timetable | Sessions show on **Calendar / Schedule → Schedule** for every desk: Admin sees all cohorts, a Trainer the cohorts they teach, a Fellow the cohorts they are in. Admin and Trainers **Schedule a session**, **Edit** and **Remove** there (a Trainer only in their cohorts). The Trainer's menu has no separate **Schedule** item. An in-house Trainer who edits a session keeps its links as they are. |
 | Live sessions | From 15 minutes before a session starts until it ends (two hours when it has no end), a session with a meeting link shows **Live now · Join** on the Calendar and the Fellow's Home. After it ends, a video link reads **Watch the recording**. Home's **Coming up** lists only sessions not yet over. |
-| Academy year | **Calendar → Academy year**. Admin adds terms, holidays, training, assessments, events and deadlines. New entries are **drafts** only the Admin sees, marked Draft; **Done — show to Trainers and Fellows** publishes every draft at once. Entries that existed before drafts were added stay published. Editing a published entry keeps it published. |
+| Academy year | **Calendar / Schedule → Academy calendar**. Admin adds terms, holidays, training, assessments, events and deadlines. The Admin's new entries are **drafts** only the Admin sees, marked Draft; **Done — show to Trainers and Fellows** publishes every draft at once, and only the Admin can press it. Entries that existed before drafts were added stay published. Editing a published entry keeps it published. The Admin may let a Trainer add entries (**May add to the academy calendar** on the Trainer's page). That Trainer's entries publish at once, and they can edit or remove only the entries they created; the Admin can change any entry. The server enforces this and the page only hides the controls. |
 | Sharing an assessment | The "Who sits this" picker (Trainer Assessments page and the cohort room) names Fellows of the cohort. Only those Fellows see the assessment on **Work** and only they can answer it. Leaving every box empty gives it to the whole cohort. Every list of quizzes, exams and assessments (Trainer, cohort room, Admin cohort page) prints **Given to** with the names, or Whole cohort. |
 | Marking | **Mark submissions** on each assessment of the Trainer's Assessments page opens its marking in the cohort room. Marking lists everyone who sits it: submitted answers first, with the time, then **Not submitted yet**. A Trainer can only read or mark an assessment through its own cohort. |
 | Deadlines | Once a deadline passes, the quiz, exam or assessment leaves the Fellow's lists and answers are refused (410 "The deadline has passed"). Work the Fellow already handed in or tried stays, read-only, so they keep their mark and can review their tries. Trainers and Admin still see everything. |
@@ -54,14 +54,14 @@ sets `DEMO_EMAIL_TAG`. Seeded on the live site on 2026-10-29 (60 of 60 steps).
 
 | Area | Files |
 | --- | --- |
-| Shared rules (kinds, link and calendar checks, month grouping) | `shared/academyPeople.ts`, `shared/accessRequest.ts` |
-| Tables | `shared/schema.ts`: `users.trainer_type`, `teachers.fellow_type`, `scheduled_events.meeting_url / video_url / materials_url`, `academy_calendar` (`published_at`), `written_assignment_teachers`, `courses.created_by` |
+| Shared rules (kinds, link and calendar checks, who may write the calendar, month grouping) | `shared/academyPeople.ts`, `shared/accessRequest.ts` |
+| Tables | `shared/schema.ts`: `users.trainer_type`, `users.can_edit_calendar`, `teachers.fellow_type`, `scheduled_events.meeting_url / video_url / materials_url`, `academy_calendar` (`published_at`), `written_assignment_teachers`, `courses.created_by` |
 | Shared rules (round 2) | `shared/academyPath.ts` (`isPastDue`, `fellowStillSees`), `shared/academyPeople.ts` (audience names, `assignmentRoster`, `sessionPhase`, `countKinds`), `shared/uploads.ts` (Blob URLs, upload types and size), `shared/trainerDesk.ts` |
 | Pages (round 2) | `client/src/pages/trainer-courses.tsx`, `client/src/components/SessionDialog.tsx`, `client/src/components/SessionLinks.tsx`, `client/src/components/ObjectUploader.tsx` (direct uploads), `teacher-dashboard.tsx`, `teacher-exam.tsx`, `cohort-workspace.tsx`, `admin-home.tsx`, `admin-analytics.tsx` |
-| Routes | `server/academyPathRoutes.ts` (cohort roster, `fellows` on each cohort), `server/academyDesk.ts` (register Fellows, kinds, academy year, timetable); `server/routes.ts` (sessions, assessments, roster); `server/auth.ts`, `server/accessRequests.ts` (sign-in) |
+| Routes | `server/academyPathRoutes.ts` (cohort roster, `fellows` on each cohort), `server/academyDesk.ts` (register Fellows, kinds, calendar rights, academy year, timetable); `server/routes.ts` (sessions, assessments, roster); `server/auth.ts`, `server/accessRequests.ts` (sign-in) |
 | Storage | `server/storage.ts` (assessment audience, `teacherCanSeeAssignment`) |
 | Pages | `client/src/pages/admin-batches.tsx` (cohort page), `client/src/pages/trainer-fellows.tsx`, `client/src/pages/academy-calendar.tsx`, `client/src/pages/trainer-batches.tsx` (Schedule dialog, assessment picker), `client/src/pages/unified-auth.tsx`, `admin-trainer-detail.tsx`, `admin-teacher-detail.tsx` |
-| Menus | `client/src/components/deskMenu.ts` (Fellows on the Trainer menu; Calendar on all three) |
+| Menus | `client/src/components/deskMenu.ts` (Fellows on the Trainer menu; Calendar / Schedule on all three) |
 
 New tables and columns are created at server start by `server/schemaGuard.ts` (additive; existing rows take the defaults).
 
@@ -72,7 +72,7 @@ certificates are untouched. Quizzes already had an audience (`assigned_quiz_teac
 
 - Creating a Google Meet from inside the app. An instructional Trainer pastes the Meet link; the app shows **Live now · Join**.
 - Uploading a recording from the session form. A video is uploaded to a course module, or its link is pasted on the session.
-- The Trainer's **Schedule** page still has its own add-session dialog and no Edit; editing is on the Calendar.
+- A week-by-week view of sessions. The Trainer's **Schedule** menu item, which opened one, is gone; the same sessions and deadlines are on **Calendar / Schedule → Schedule**, as a list grouped by month. Of sessions older than two weeks, **Show past sessions** lists the newest 200.
 - Email to a Fellow a Trainer registered. The Trainer tells them to open Sign in, choose Fellow, and create a password.
 - A month-grid view of the calendar. It is a dated list grouped by month.
 - Narrowing pre-service Fellows to assessments only. Both kinds see everything, as asked.

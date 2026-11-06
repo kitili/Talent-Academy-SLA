@@ -25,7 +25,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "people", label: "People", href: "/admin/people", test: "people", also: ["/admin/trainers", "/admin/teachers"] },
     { key: "cohorts", label: "Cohorts", href: "/admin/batches", test: "cohorts", also: ["/cohorts", "/courses", "/course"] },
     { key: "messages", label: "Messages", href: "/admin/messages", test: "messages" },
-    { key: "calendar", label: "Calendar", href: "/calendar", test: "calendar" },
+    { key: "calendar", label: "Calendar / Schedule", href: "/calendar", test: "calendar" },
     { key: "attendance", label: "Attendance", href: "/admin/attendance", test: "attendance" },
     { key: "analytics", label: "Analytics", href: "/admin/analytics", test: "analytics" },
     { key: "certificates", label: "Certificates", href: "/admin/certificates", test: "certificates" },
@@ -40,8 +40,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "progress", label: "Progress", href: "/trainer/batches?tab=progress", test: "progress" },
     { key: "attendance", label: "Attendance", href: "/trainer/batches?tab=attendance", test: "attendance" },
     { key: "messages", label: "Messages", href: "/trainer/batches?tab=messages", test: "messages" },
-    { key: "schedule", label: "Schedule", href: "/trainer/batches?tab=schedule", test: "schedule" },
-    { key: "calendar", label: "Calendar", href: "/calendar", test: "calendar" },
+    { key: "calendar", label: "Calendar / Schedule", href: "/calendar", test: "calendar" },
   ],
   fellow: [
     { key: "home", label: "Home", href: "/teacher/dashboard?tab=home", test: "home" },
@@ -51,7 +50,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "progress", label: "Progress", href: "/teacher/dashboard?tab=progress", test: "progress" },
     { key: "reflect", label: "Reflect", href: "/teacher/dashboard?tab=reflect", test: "reflect" },
     { key: "messages", label: "Messages", href: "/teacher/dashboard?tab=messages", test: "messages" },
-    { key: "calendar", label: "Calendar", href: "/calendar", test: "calendar" },
+    { key: "calendar", label: "Calendar / Schedule", href: "/calendar", test: "calendar" },
     { key: "certificates", label: "Certificates", href: "/teacher/certificates", test: "certificates", tour: "teacher-certificates" },
   ],
 };

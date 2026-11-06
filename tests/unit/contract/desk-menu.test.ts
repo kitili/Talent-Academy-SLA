@@ -13,9 +13,15 @@ import {
 
 test('each desk lists the board\'s items in order', () => {
     const labels = (desk: keyof typeof DESK_MENUS) => DESK_MENUS[desk].map((item) => item.label)
-    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Messages', 'Calendar', 'Attendance', 'Analytics', 'Certificates'])
-    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Live sessions', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule', 'Calendar'])
-    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Calendar', 'Certificates'])
+    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Messages', 'Calendar / Schedule', 'Attendance', 'Analytics', 'Certificates'])
+    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Live sessions', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Calendar / Schedule'])
+    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Calendar / Schedule', 'Certificates'])
+})
+
+test('the Trainer\'s sessions live on the Calendar page: no Schedule item of its own', () => {
+    assert.equal(DESK_MENUS.trainer.some((item) => item.key === 'schedule' || item.test === 'schedule'), false)
+    assert.equal(DESK_MENUS.trainer.find((item) => item.key === 'calendar')?.href, '/calendar')
+    assert.equal(deskItemForLocation('trainer', '/trainer/batches', '?tab=schedule'), 'home')
 })
 
 test('/admin opens Home, and each admin page names its own item', () => {
@@ -39,7 +45,7 @@ test('a person\'s or a cohort\'s own pages keep their menu item current', () => 
 
 test('Trainer and Fellow sections follow ?tab=, and a desk page with no tab opens on Home', () => {
     assert.equal(deskItemForLocation('trainer', '/trainer/batches', 'tab=messages'), 'messages')
-    assert.equal(deskItemForLocation('trainer', '/trainer/batches', '?tab=schedule'), 'schedule')
+    assert.equal(deskItemForLocation('trainer', '/trainer/batches', '?tab=progress'), 'progress')
     assert.equal(deskItemForLocation('trainer', '/trainer/batches', ''), 'home')
     assert.equal(deskItemForLocation('fellow', '/teacher/dashboard', 'tab=reflect'), 'reflect')
     assert.equal(deskItemForLocation('fellow', '/teacher/dashboard'), 'home')
