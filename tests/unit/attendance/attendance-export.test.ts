@@ -120,9 +120,9 @@ describe("attendance export routes", () => {
   const row = { person: "Amina", type: "pre_service", cohort: "Cohort 7", date: "2026-11-03", status: "late" };
   const queries: { sql: string; params: unknown[] }[] = [];
 
-  function stubDatabase(found: unknown = batch) {
+  function stubDatabase(getBatch: () => unknown = () => batch) {
     queries.length = 0;
-    mock.method(storage, "getBatch", async () => found);
+    mock.method(storage, "getBatch", async () => getBatch());
     mock.method(db, "execute", async (query: any) => {
       queries.push(new PgDialect().sqlToQuery(query));
       return { rows: [row] };
@@ -155,7 +155,7 @@ describe("attendance export routes", () => {
   });
 
   it("does not treat a cohort that is not found as open to any Trainer", async () => {
-    stubDatabase(undefined);
+    stubDatabase(() => undefined);
     const answer = await call(COHORT, { id: "lead", role: "trainer" }, { batchId: "nope" });
     assert.equal(answer.code, 404);
     assert.equal(queries.length, 0);
@@ -216,7 +216,7 @@ describe("attendance export wiring (text contracts)", () => {
     assert.match(board, /export function AttendanceExportButtons\(\{ csvHref \}: \{ csvHref: string \}\)/);
     assert.match(board, /<a href=\{csvHref\} download [^>]*>Download CSV<\/a>/);
     assert.match(board, /onClick=\{\(\) => window\.print\(\)\}[^>]*>Download PDF<\/button>/);
-    assert.equal(/pdfkit|jspdf|html2pdf|pdf-lib/i.test(source("package.json").replace(/"pdf-lib"[^\n]*/, "")) && /jspdf|html2pdf/i.test(board + page), false);
+    assert.doesNotMatch(board + page, /jspdf|html2pdf|pdf-lib|pdfkit/i);
   });
 
   it("keeps the buttons and the marking form off the paper, and the figures where they are", () => {
@@ -227,7 +227,14 @@ describe("attendance export wiring (text contracts)", () => {
     const figures = page.indexOf("<AttendanceBoard />");
     assert.ok(recent > 0 && figures > recent, "the attendance figures stay at the bottom of the page");
     assert.match(page.slice(figures), /^<AttendanceBoard \/>\r?\n\s*<\/div>\r?\n\s*<\/AcademyShell>/);
-    for (const hidden of ["header", "DeskNav", "DeskPhoneBar"]) assert.ok(source("client/src/components/AcademyShell.tsx").includes("print:hidden"), hidden);
+  });
+
+  it("relies on the shell hiding its own header and menus on paper", () => {
+    const shell = source("client/src/components/AcademyShell.tsx");
+    assert.match(shell, /<header className="[^"]*print:hidden/);
+    assert.match(shell, /data-testid=\{desk === "admin" \? "admin-nav" : `nav-\$\{desk\}`\}\r?\n\s*className="[^"]*print:hidden/);
+    assert.match(shell, /data-testid=\{`phone-nav-\$\{desk\}`\}\r?\n\s*className="[^"]*print:hidden/);
+    assert.match(shell, /h-dvh flex-col overflow-hidden print:h-auto print:overflow-visible/);
   });
 
   it("prints a mark's date through the one function the CSV uses", () => {
