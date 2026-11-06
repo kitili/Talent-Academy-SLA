@@ -315,6 +315,7 @@ async function main() {
   check("Participation counts Fellows active in the last 30 days", pipeline.activeLast30Days >= 2 && pipeline.enrolled >= 2, JSON.stringify(pipeline));
 
   // ── 12. SLA feedback: four kinds, closed work, reopening, materials, Admin mail, calendar right, exports, lines ──
+  await trainer.patch(`/api/trainer/fellows/${fellowBId}/type`, { fellowType: "in_house" });
   const trainerList = (await admin.get("/api/admin/trainers")).json || [];
   const fellowList = (await admin.get("/api/admin/teachers")).json || [];
   const kindOf = (rows: any[], id: string, field: string) => rows.find((row) => row.id === id)?.[field];
