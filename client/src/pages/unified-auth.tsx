@@ -7,7 +7,10 @@ import { queryClient } from "@/lib/queryClient";
 import { homeForRole, persistSessionUser, signInRedirect } from "@/lib/sessionUser";
 import { Loading, SkeletonBar } from "@/components/Skeletons";
 import { Shield, GraduationCap, Users, Eye, EyeOff } from "lucide-react";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import logoImage from "@assets/silverleaf-logo.png";
+
+/** The sign-in photo, from client/public/places. */
+const SIGN_IN_PHOTO = "/places/place-classroom.jpg";
 
 type Role = "admin" | "trainer" | "teacher";
 
@@ -436,7 +439,12 @@ export default function UnifiedAuth() {
   ) : mode === "request" ? "Send request" : mode === "password" ? "Save password" : "Sign in";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-sl-ground px-4 py-12 text-sl-ink sm:py-16">
+    <div className="min-h-screen bg-sl-ground text-sl-ink lg:flex">
+      {/* The photo is decoration: no text over it. Beside the form from 1024 px; a strip above the card on narrower screens. */}
+      <div aria-hidden="true" className="relative hidden lg:block lg:w-1/2">
+        <img src={SIGN_IN_PHOTO} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center" />
+      </div>
+      <div className="flex min-h-screen flex-1 flex-col items-center justify-center gap-6 px-4 py-12 sm:py-16">
       {/* Multi-role picker dialog */}
       <Dialog open={showRolePicker} onOpenChange={setShowRolePicker}>
         <DialogContent className="sm:max-w-md">
@@ -481,6 +489,8 @@ export default function UnifiedAuth() {
         <SilverleafLogo />
         <span className="text-lg font-semibold">Silverleaf Academy</span>
       </div>
+
+      <img src={SIGN_IN_PHOTO} alt="" aria-hidden="true" loading="lazy" decoding="async" width={1280} height={720} className="h-28 w-full max-w-[480px] rounded-xl object-cover object-center sm:h-36 lg:hidden" />
 
       <main className={`flex w-full flex-col gap-6 rounded-xl border border-sl-line bg-sl-surface p-6 sm:px-8 sm:pb-7 sm:pt-8 ${mode === "sign-in" ? "max-w-[420px]" : "max-w-[480px]"}`}>
         {checkingRequest ? (
@@ -641,6 +651,7 @@ export default function UnifiedAuth() {
           </>
         )}
       </main>
+      </div>
     </div>
   );
 }
