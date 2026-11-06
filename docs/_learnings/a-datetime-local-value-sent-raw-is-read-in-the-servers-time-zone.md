@@ -22,3 +22,5 @@ zone, three hours off.
 Convert on the client, where the zone is known, and send an instant: `new Date(value).toISOString()`. The server should
 refuse a date it cannot read instead of storing `Invalid Date`. Date-only values (the academy year) are all-day: store
 them as UTC midnight and print them with `timeZone: "UTC"`.
+
+The cohort room's add-event form had the same fault until 2026-11-06. Now that every field is `DateTimeField`, which gives the same local string, each call site must still convert it before sending.

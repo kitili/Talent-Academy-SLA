@@ -393,6 +393,26 @@ function AcademyYear() {
         </div>
       )}
 
+      <ViewSwitch view={view} onChange={setView} />
+
+      {isLoading ? (
+        <>
+          <SkeletonCard label="Loading the academy calendar" lines={2} />
+          <SkeletonCard label="Loading the academy calendar" lines={2} />
+        </>
+      ) : isError ? (
+        <Empty>The academy calendar could not be loaded. Refresh the page.</Empty>
+      ) : view === "month" ? (
+        <MonthCalendar items={monthItems} renderEntry={(item) => renderEntry(item.source)} emptyDay="Nothing is on the academy calendar for this day." data-testid="year-month" />
+      ) : months.length === 0 ? (
+        <Empty>{canEdit ? "The academy calendar is empty. Add the first term, holiday or exam below." : "Nothing is on the academy calendar yet."}</Empty>
+      ) : months.map((month) => (
+        <section key={month.key} aria-labelledby={`year-month-${month.key}`} className="space-y-2">
+          <h3 id={`year-month-${month.key}`} className="text-base font-semibold text-sl-ink">{monthTitle(month.key)}</h3>
+          {month.rows.map(renderEntry)}
+        </section>
+      ))}
+
       {canEdit && (
         <form
           className={`${PANEL} space-y-3 px-5 py-4`}
@@ -439,26 +459,6 @@ function AcademyYear() {
           </div>
         </form>
       )}
-
-      <ViewSwitch view={view} onChange={setView} />
-
-      {isLoading ? (
-        <>
-          <SkeletonCard label="Loading the academy calendar" lines={2} />
-          <SkeletonCard label="Loading the academy calendar" lines={2} />
-        </>
-      ) : isError ? (
-        <Empty>The academy calendar could not be loaded. Refresh the page.</Empty>
-      ) : view === "month" ? (
-        <MonthCalendar items={monthItems} renderEntry={(item) => renderEntry(item.source)} emptyDay="Nothing is on the academy calendar for this day." data-testid="year-month" />
-      ) : months.length === 0 ? (
-        <Empty>{canEdit ? "The academy calendar is empty. Add the first term, holiday or exam above." : "Nothing is on the academy calendar yet."}</Empty>
-      ) : months.map((month) => (
-        <section key={month.key} aria-labelledby={`year-month-${month.key}`} className="space-y-2">
-          <h3 id={`year-month-${month.key}`} className="text-base font-semibold text-sl-ink">{monthTitle(month.key)}</h3>
-          {month.rows.map(renderEntry)}
-        </section>
-      ))}
     </div>
   );
 }

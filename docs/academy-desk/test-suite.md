@@ -8,6 +8,7 @@
 | `tests/unit/contract/desk-menu.test.ts`, `tests/trainer-desk.test.ts` | The new menu items (Calendar, Fellows, Courses) and that the Trainer page draws only its own sections. |
 | `tests/unit/academy-desk/assessment-audience.test.ts` | Audience names and the "Given to" label, the marking roster (submitted first, then those still to submit), the cross-cohort refusal on the submission routes, deadline notices to the audience only. |
 | `tests/unit/academy-desk/deadlines.test.ts`, `tests/unit/deadlines/reopening.test.ts` | `isPastDue`, the effective deadline, what a closed item carries, and reopening: who may, the future-date and audience checks, and that one Fellow's date reaches nobody else. Route wiring is a text contract. |
+| `tests/unit/calendar/` | `monthGrid`, day matching in three time zones, the over-7-days rule and "+N more". `contract.test.ts` is a text contract: fixed columns, truncation, and no native date input left in `client/src`. |
 | `tests/unit/materials/` | Who a material reaches, its link and file rules, and the real handlers over rows in memory. |
 | `tests/unit/messages/` | The Admin's peers and threads, sender names on desk mail, and notices. |
 | `tests/unit/attendance/attendance-export.test.ts` | The CSV rows, formula neutralising, and who may download. |
