@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { deadlineLocalValue, parseDeadline } from "@shared/academyPath";
+import { DateTimeField } from "@/components/DateField";
 
 const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sl-accent";
 const FIELD = `w-full rounded-lg border border-sl-control bg-sl-surface px-3 py-2.5 text-[15px] text-sl-ink placeholder:text-sl-muted ${FOCUS}`;
@@ -125,11 +126,11 @@ export function SessionDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label htmlFor="session-start" className={LABEL}>Starts</label>
-              <input id="session-start" type="datetime-local" className={FIELD} value={form.start} onChange={set("start")} data-testid="input-session-start" />
+              <DateTimeField id="session-start" value={form.start} onChange={(value) => setForm((now) => ({ ...now, start: value }))} data-testid="input-session-start" />
             </div>
             <div className="space-y-1.5">
               <label htmlFor="session-end" className={LABEL}>Ends (optional)</label>
-              <input id="session-end" type="datetime-local" className={FIELD} value={form.end} onChange={set("end")} />
+              <DateTimeField id="session-end" value={form.end} min={form.start || undefined} onChange={(value) => setForm((now) => ({ ...now, end: value }))} data-testid="input-session-end" />
             </div>
           </div>
           <div className="space-y-1.5">

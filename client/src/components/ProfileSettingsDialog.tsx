@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loading, SkeletonBar } from "@/components/Skeletons";
 import { Settings } from "lucide-react";
 import { KindBadge } from "@/components/KindBadge";
+import { DateField } from "@/components/DateField";
 
 interface ProfileSettingsDialogProps {
   /** 'admin' for admin/trainer users, 'teacher' for teacher users */
@@ -294,8 +295,8 @@ export function ProfileSettingsDialog({
 
             {userType === "admin" && (
               <div className="space-y-1">
-                <Label>Date of Birth</Label>
-                <Input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
+                <Label htmlFor="profile-dob">Date of Birth</Label>
+                <DateField id="profile-dob" value={dateOfBirth} onChange={setDateOfBirth} fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} data-testid="input-profile-dob" />
               </div>
             )}
 

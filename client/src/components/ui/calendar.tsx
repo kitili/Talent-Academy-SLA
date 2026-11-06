@@ -3,51 +3,58 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { buttonVariants } from "@/components/ui/button"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
+const NAV_BUTTON =
+  "inline-flex h-7 w-7 items-center justify-center rounded-md border border-sl-control bg-sl-surface p-0 text-sl-ink hover:bg-sl-neutral-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sl-accent"
+
+/**
+ * The themed day picker used by `DateField`. Colours come from the `sl-*` tokens so it follows light and dark.
+ * With `captionLayout="dropdown-buttons"` the month and year are real selects and the plain caption text is hidden
+ * (it only repeats what the selects show).
+ */
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  weekStartsOn = 1,
   ...props
 }: CalendarProps) {
+  const dropdowns = Boolean(props.captionLayout && props.captionLayout !== "buttons")
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      weekStartsOn={weekStartsOn}
       className={cn("p-3", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
-        nav_button: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-        ),
+        caption: "relative flex items-center justify-center px-8 pt-1",
+        caption_label: dropdowns ? "hidden" : "text-sm font-medium text-sl-ink",
+        caption_dropdowns: "flex items-center gap-1.5",
+        vhidden: "sr-only",
+        dropdown_month: "relative",
+        dropdown_year: "relative",
+        dropdown:
+          "h-8 rounded-md border border-sl-control bg-sl-surface px-1.5 text-sm text-sl-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sl-accent",
+        dropdown_icon: "hidden",
+        nav: "flex items-center space-x-1",
+        nav_button: NAV_BUTTON,
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
-        head_cell:
-          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-        row: "flex w-full mt-2",
-        cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-        day: cn(
-          buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
-        ),
-        day_range_end: "day-range-end",
-        day_selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        day_today: "bg-accent text-accent-foreground",
-        day_outside:
-          "day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
-        day_disabled: "text-muted-foreground opacity-50",
-        day_range_middle:
-          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+        head_cell: "w-9 rounded-md text-[0.8rem] font-normal text-sl-muted",
+        row: "mt-2 flex w-full",
+        cell: "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20",
+        day: "inline-flex h-9 w-9 items-center justify-center rounded-md p-0 text-sm font-normal text-sl-ink hover:bg-sl-neutral-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sl-accent aria-selected:opacity-100",
+        // aria-selected variants sort after plain utilities, so a selected today stays solid blue.
+        day_selected: "aria-selected:bg-sl-accent-strong aria-selected:text-white aria-selected:hover:bg-sl-accent-strong",
+        day_today: "bg-sl-accent-soft font-semibold text-sl-accent",
+        day_outside: "text-sl-muted opacity-60 aria-selected:bg-sl-neutral-soft aria-selected:text-sl-muted",
+        day_disabled: "text-sl-muted opacity-40",
+        day_range_middle: "aria-selected:bg-sl-accent-soft aria-selected:text-sl-accent",
         day_hidden: "invisible",
         ...classNames,
       }}

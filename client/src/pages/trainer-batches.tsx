@@ -39,6 +39,7 @@ import { deadlineLocalValue } from "@shared/academyPath";
 import { filterByQuery } from "@/components/PageStrip";
 import { TrainerMessages } from "@/components/TrainerMessages";
 import { deskName } from "@shared/deskName";
+import { DateField, DateTimeField } from "@/components/DateField";
 
 /** The desk's sections that this page draws, in the order of its side menu (components/deskSections.ts). `?tab=` names one of them. */
 type SectionKey = TrainerSection;
@@ -137,7 +138,7 @@ function DeadlineField({ id, value, onChange }: { id: string; value: string; onC
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>Deadline</Label>
-      <Input id={id} type="datetime-local" value={value} onChange={(event) => onChange(event.target.value)} data-testid={`input-${id}`} />
+      <DateTimeField id={id} value={value} onChange={onChange} data-testid={`input-${id}`} />
       <p className="text-xs text-sl-muted">Optional. Fellows see this date beside the work.</p>
     </div>
   );
@@ -2045,12 +2046,11 @@ export default function TrainerBatches() {
               </div>
               <div className="space-y-1">
                 <Label htmlFor="attendance-date">Date</Label>
-                <input
+                <DateField
                   id="attendance-date"
-                  type="date"
                   value={attendanceDate}
-                  onChange={(event) => setAttendanceDate(event.target.value)}
-                  className={FIELD}
+                  onChange={setAttendanceDate}
+                  required
                   max={todayValue}
                   data-testid="input-attendance-date"
                 />
@@ -2937,11 +2937,11 @@ export default function TrainerBatches() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="event-start">Start date and time</Label>
-                <input id="event-start" type="datetime-local" className={FIELD} value={newEventStart} onChange={(e) => setNewEventStart(e.target.value)} data-testid="input-event-start" />
+                <DateTimeField id="event-start" value={newEventStart} onChange={setNewEventStart} data-testid="input-event-start" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="event-end">End date and time (optional)</Label>
-                <input id="event-end" type="datetime-local" className={FIELD} value={newEventEnd} onChange={(e) => setNewEventEnd(e.target.value)} data-testid="input-event-end" />
+                <DateTimeField id="event-end" value={newEventEnd} min={newEventStart || undefined} onChange={setNewEventEnd} data-testid="input-event-end" />
               </div>
             </div>
             <div className="space-y-2">
