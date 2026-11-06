@@ -25,6 +25,8 @@ import {
   type Tone,
 } from "@/components/AdminParts";
 import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
+import { DeskPhoto } from "@/components/DeskPhoto";
+import { DailyLine } from "@/components/DailyLine";
 import { deskName } from "@shared/deskName";
 import { ADMIN_TOUR } from "@shared/guidedTour";
 import {
@@ -297,6 +299,7 @@ export default function AdminHome() {
       }
     >
       <div className="flex flex-col gap-5">
+        <DeskPhoto desk="admin" />
         <PageHeader
           title="Home"
           detail={format(new Date(), "EEEE d MMMM")}
@@ -306,6 +309,8 @@ export default function AdminHome() {
             </button>
           }
         />
+
+        <DailyLine />
 
         <section aria-labelledby="needs-attention" className={`${cardClass} overflow-hidden`} data-tour="admin-pictures">
           <h2 id="needs-attention" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">

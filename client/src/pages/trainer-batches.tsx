@@ -20,9 +20,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { QuizEditDialog } from "@/components/QuizEditDialog";
 import { FileQuizEditDialog } from "@/components/FileQuizEditDialog";
 import { AcademyShell } from "@/components/AcademyShell";
-import { DESK_MENUS } from "@/components/deskMenu";
+import { trainerSectionFromSearch, trainerTabRedirect, type TrainerSection } from "@/components/deskSections";
+import { ReopenDialog, type ReopenTarget } from "@/components/ReopenDialog";
+import { canReopen, progressBars } from "@/components/trainerDeskRules";
+import { AttendanceExportButtons } from "@/components/AttendanceBoard";
+import { DeskPhoto } from "@/components/DeskPhoto";
+import { KindBadge } from "@/components/KindBadge";
 import { canRunOnlineSessions, audienceLabel } from "@shared/academyPeople";
-import { Users, Plus, Trash2, FileText, X, CheckCircle, Upload, ChevronLeft, ChevronRight, MoreHorizontal, Search } from "lucide-react";
+import { Users, Plus, Trash2, FileText, X, CheckCircle, Upload, MoreHorizontal, Search } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CohortMedals } from "@/components/CohortMedals";
 import { GuidedTour, TourButton, useGuidedTour } from "@/components/GuidedTour";
@@ -34,17 +40,9 @@ import { filterByQuery } from "@/components/PageStrip";
 import { TrainerMessages } from "@/components/TrainerMessages";
 import { deskName } from "@shared/deskName";
 
-/** The desk's sections, in the order of its side menu (components/deskMenu.ts). `?tab=` names one of them. */
-type SectionKey = "home" | "cohorts" | "assessments" | "progress" | "attendance" | "messages" | "schedule";
-// Fellows and Calendar are pages of their own (/trainer/fellows, /calendar); this page draws the other sections.
-const SECTION_KEYS = DESK_MENUS.trainer.map((item) => item.key).filter((key) => key !== "fellows" && key !== "calendar") as SectionKey[];
-
-/** The section a `?tab=` names. The old name for Home was "desk"; links that still carry it land on Home. */
-function sectionFromSearch(search: string): SectionKey {
-  const tab = new URLSearchParams(search).get("tab");
-  if (tab === "desk") return "home";
-  return SECTION_KEYS.find((key) => key === tab) ?? "home";
-}
+/** The desk's sections that this page draws, in the order of its side menu (components/deskSections.ts). `?tab=` names one of them. */
+type SectionKey = TrainerSection;
+const sectionFromSearch = trainerSectionFromSearch;
 
 const PRIMARY_BUTTON = "min-h-11 bg-sl-accent-strong text-white hover:bg-sl-accent-strong/90";
 const SECONDARY_BUTTON = "min-h-11 border-sl-control bg-sl-surface text-sl-ink hover:bg-sl-neutral-soft";
@@ -145,6 +143,44 @@ function DeadlineField({ id, value, onChange }: { id: string; value: string; onC
   );
 }
 
+/** The browser's print dialog in the light theme (paper is white, whatever the screen is): Download PDF, as certificates do. */
+function printPage() {
+  const root = document.documentElement;
+  if (root.classList.contains("dark")) {
+    root.classList.remove("dark");
+    window.addEventListener("afterprint", () => root.classList.add("dark"), { once: true });
+  }
+  window.print();
+}
+
+/** Each Fellow's overall progress as one bar, lowest first. One series in the first chart colour; the table below is its text view. */
+function ProgressChart({ rows }: { rows: any[] }) {
+  const bars = progressBars(rows);
+  return (
+    <div
+      className="text-sl-muted"
+      style={{ height: Math.max(160, bars.length * 30 + 44) }}
+      role="img"
+      aria-label={`Overall progress of ${bars.length} Fellows, from ${bars[0]?.percent ?? 0}% to ${bars[bars.length - 1]?.percent ?? 0}%. The table below lists the same figures by course.`}
+      data-testid="progress-chart"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={bars} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }} barCategoryGap={6}>
+          <CartesianGrid horizontal={false} stroke="currentColor" strokeOpacity={0.15} />
+          <XAxis type="number" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value) => `${value}%`} stroke="currentColor" tick={{ fill: "currentColor", fontSize: 12 }} tickLine={false} />
+          <YAxis type="category" dataKey="name" width={120} stroke="currentColor" tick={{ fill: "currentColor", fontSize: 12 }} tickLine={false} interval={0} />
+          <Tooltip
+            cursor={{ fill: "currentColor", fillOpacity: 0.08 }}
+            formatter={(value: number) => [`${value}%`, "Overall progress"]}
+            contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
+          />
+          <Bar dataKey="percent" name="Overall progress" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function dueLabel(value?: string | null) {
   return value ? `Due ${new Date(value).toLocaleString()}` : "No deadline";
 }
@@ -232,7 +268,7 @@ function TeacherAudience({
 }
 
 /** The work a Trainer gave one cohort on the Fellow Work page, with its deadline. Nothing shows when there is none. */
-function AssessmentDesk({ batchId, cohortName }: { batchId: string; cohortName: string }) {
+function AssessmentDesk({ batchId, cohortName, onReopen }: { batchId: string; cohortName: string; onReopen: (target: ReopenTarget) => void }) {
   const { toast } = useToast();
   const { data: assignments = [] } = useQuery<any[]>({
     queryKey: ["/api/batches", batchId, "assignments"],
@@ -296,6 +332,17 @@ function AssessmentDesk({ batchId, cohortName }: { batchId: string; cohortName: 
                 <Button type="button" size="sm" variant="outline" onClick={() => setEditing({ id: item.id, title: item.title, instructions: item.instructions || "" })} data-testid={`button-edit-assessment-${item.id}`}>
                   Edit
                 </Button>
+                {canReopen(item.dueDate) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onReopen({ kind: "assignment", itemId: item.id, title: item.title, batchId, audience: item.audience, dueDate: item.dueDate })}
+                    data-testid={`button-reopen-assessment-${item.id}`}
+                  >
+                    Reopen
+                  </Button>
+                )}
                 <Button
                   type="button"
                   size="sm"
@@ -351,14 +398,20 @@ export default function TrainerBatches() {
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<any>(null);
   // The section is the URL's `?tab=`: a menu click, a link from another page and a reload all land on the same place.
-  const section = sectionFromSearch(useSearch());
+  const search = useSearch();
+  const section = sectionFromSearch(search);
+  // The Schedule section is the Calendar page now; an old `?tab=schedule` link goes there.
+  useEffect(() => {
+    const moved = trainerTabRedirect(search);
+    if (moved) setLocation(moved);
+  }, [search]);
   const goTo = (key: SectionKey) => setLocation(`/trainer/batches?tab=${key}`);
   const [reviewQuiz, setReviewQuiz] = useState<any>(null);
   const [showAllNeeds, setShowAllNeeds] = useState(false);
   const [addEventOpen, setAddEventOpen] = useState(false);
   const [eventBatchId, setEventBatchId] = useState("");
-  const [weekOffset, setWeekOffset] = useState(0);
   const [deadline, setDeadline] = useState("");
+  const [reopenTarget, setReopenTarget] = useState<ReopenTarget | null>(null);
 
   const [teacherId, setTeacherId] = useState("");
   const [teacherSearch, setTeacherSearch] = useState("");
@@ -517,7 +570,7 @@ export default function TrainerBatches() {
     enabled: !!selectedBatch?.id && section === "attendance",
   });
 
-  // What the Home, Assessments and Schedule pages read across every cohort on the desk
+  // What the Home and Assessments pages read across every cohort on the desk
   const cohortIds: string[] = batches.map((batch: any) => batch.id);
   const onHome = section === "home";
   const eventQueries = useQueries({
@@ -528,7 +581,7 @@ export default function TrainerBatches() {
         if (!res.ok) return [];
         return res.json();
       },
-      enabled: onHome || section === "schedule",
+      enabled: onHome,
     })),
   });
   const quizQueries = useQueries({
@@ -757,18 +810,6 @@ export default function TrainerBatches() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // Delete event
-  const deleteEventMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/events/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "/api/batches" && query.queryKey[2] === "events" });
-      queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
-      toast({ title: "Deleted", description: "Event removed" });
     },
   });
 
@@ -1211,11 +1252,17 @@ export default function TrainerBatches() {
 
   const renderHome = () => (
     <div className="space-y-6">
+      <DeskPhoto desk="trainer" />
       <PageHead
         title="Home"
         sub={batchesLoading
           ? <SkeletonBar className="h-4 w-72 max-w-full" />
-          : `${today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · ${plural(batches.length, "cohort")} · ${plural(fellowTotal, "Fellow")}`}
+          : (
+            <span className="flex flex-wrap items-center gap-2">
+              {`${today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · ${plural(batches.length, "cohort")} · ${plural(fellowTotal, "Fellow")}`}
+              <KindBadge />
+            </span>
+          )}
         action={<Button className={PRIMARY_BUTTON} onClick={openAddEvent} data-testid="button-add-session">Add a session</Button>}
       />
       {deskLoading && <SkeletonBar className="h-4 w-80 max-w-full" />}
@@ -1576,12 +1623,22 @@ export default function TrainerBatches() {
 
   // ---------- Assessments ----------
   const cohortQuizzes: any[] = quizQueries.flatMap((query, index) =>
-    ((query.data as any[]) || []).map((quiz: any) => ({ ...quiz, cohortName: batches[index]?.name || "Cohort" })));
+    ((query.data as any[]) || []).map((quiz: any) => ({ ...quiz, batchId: quiz.batchId || cohortIds[index], cohortName: batches[index]?.name || "Cohort" })));
   const examList = cohortQuizzes.filter((quiz) => isWritingExam(quiz));
   const lessonQuizList = cohortQuizzes.filter((quiz) => !isWritingExam(quiz));
   const quizzesLoading = batchesLoading || quizQueries.some((query) => query.isLoading);
   const examsLoading = quizzesLoading || assignmentQueries.some((query) => query.isLoading);
   const givenTo = (quiz: any) => audienceLabel(quiz.audience);
+  const reopenQuizButton = (quiz: any) => canReopen(quiz.dueDate) && (
+    <Button
+      variant="outline"
+      className={SECONDARY_BUTTON}
+      onClick={() => setReopenTarget({ kind: "quiz", itemId: quiz.id, title: quiz.title, batchId: quiz.batchId, audience: quiz.audience, dueDate: quiz.dueDate })}
+      data-testid={`button-reopen-quiz-${quiz.id}`}
+    >
+      Reopen
+    </Button>
+  );
 
   const renderAssessments = () => (
     <div className="space-y-6">
@@ -1634,15 +1691,18 @@ export default function TrainerBatches() {
                     {quiz.cohortName} · {quiz.paperUrl ? "Uploaded paper" : "Written exam"} · {dueLabel(quiz.dueDate)} · Given to {givenTo(quiz)}
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  className={`${SECONDARY_BUTTON} w-11 px-0 text-sl-risk`}
-                  aria-label={`Delete ${quiz.title}`}
-                  onClick={() => deleteQuizMutation.mutate(quiz.id)}
-                  data-testid={`button-delete-quiz-${quiz.id}`}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {reopenQuizButton(quiz)}
+                  <Button
+                    variant="outline"
+                    className={`${SECONDARY_BUTTON} w-11 px-0 text-sl-risk`}
+                    aria-label={`Delete ${quiz.title}`}
+                    onClick={() => deleteQuizMutation.mutate(quiz.id)}
+                    data-testid={`button-delete-quiz-${quiz.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
               </div>
               <WorkDeadlineEditor
                 current={quiz.dueDate}
@@ -1652,7 +1712,7 @@ export default function TrainerBatches() {
               />
             </div>
           ))}
-          {batches.map((batch: any) => <AssessmentDesk key={batch.id} batchId={batch.id} cohortName={batch.name} />)}
+          {batches.map((batch: any) => <AssessmentDesk key={batch.id} batchId={batch.id} cohortName={batch.name} onReopen={setReopenTarget} />)}
         </div>
       </Panel>
       </div>
@@ -1714,6 +1774,7 @@ export default function TrainerBatches() {
                   />
                 </div>
                 <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                  {reopenQuizButton(quiz)}
                   <Button
                     variant="outline"
                     className={`${SECONDARY_BUTTON} w-11 px-0`}
@@ -1815,14 +1876,24 @@ export default function TrainerBatches() {
         title="Progress"
         sub="Where each Fellow is in each course of a cohort"
         action={selectedBatch && (
-          <a
-            href={`/api/batches/${selectedBatch.id}/gradebook.csv`}
-            download
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-sl-accent underline"
-            data-testid="link-download-csv"
-          >
-            Download CSV
-          </a>
+          <div className="flex flex-wrap items-center gap-4 print:hidden">
+            <a
+              href={`/api/batches/${selectedBatch.id}/gradebook.csv`}
+              download
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-sl-accent underline"
+              data-testid="link-download-csv"
+            >
+              Download CSV
+            </a>
+            <button
+              type="button"
+              onClick={printPage}
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-sl-accent underline"
+              data-testid="button-download-marks-pdf"
+            >
+              Download PDF
+            </button>
+          </div>
         )}
       />
       {batchesLoading ? (
@@ -1838,10 +1909,15 @@ export default function TrainerBatches() {
         <Panel title="No cohorts on this desk yet" />
       ) : (
         <>
-          <div className="max-w-md space-y-1">
+          <div className="max-w-md space-y-1 print:hidden">
             <Label htmlFor="progress-cohort">Cohort</Label>
             {cohortSelect("progress-cohort")}
           </div>
+          {!progressLoading && batchProgress.length > 0 && (
+            <Panel title={`Progress of each Fellow in ${selectedBatch?.name ?? "the cohort"}`} sub="Overall progress across the cohort's courses, lowest first." testId="trainer-progress-chart">
+              <ProgressChart rows={batchProgress} />
+            </Panel>
+          )}
           <Panel
             title={cohortPending || coursesLoading || selectedBatchCourses.length === 0 ? "Courses" : `Courses on ${selectedBatch?.name}`}
             testId="trainer-progress-matrix"
@@ -1945,7 +2021,11 @@ export default function TrainerBatches() {
 
   const renderAttendance = () => (
     <div className="space-y-6">
-      <PageHead title="Attendance" sub="Mark who came, one cohort and one day at a time" />
+      <PageHead
+        title="Attendance"
+        sub="Mark who came, one cohort and one day at a time"
+        action={selectedBatch && <AttendanceExportButtons csvHref={`/api/batches/${selectedBatch.id}/attendance.csv`} />}
+      />
       {batchesLoading ? (
         <>
           <SkeletonCard label="Loading attendance" lines={5} />
@@ -1956,6 +2036,7 @@ export default function TrainerBatches() {
         <Panel title="No cohorts on this desk yet" />
       ) : (
         <>
+          <div className="print:hidden">
           <Panel title={`Mark attendance for ${attendanceDayWord}`} testId="trainer-mark-attendance">
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
               <div className="space-y-1">
@@ -2050,6 +2131,7 @@ export default function TrainerBatches() {
               )}
             </div>
           </Panel>
+          </div>
 
           <section className={`${PANEL} overflow-hidden`} aria-label="Recent marks" data-testid="trainer-recent-marks">
             <div className="p-5 pb-3">
@@ -2119,7 +2201,7 @@ export default function TrainerBatches() {
   // ---------- Messages ----------
   const renderMessages = () => (
     <div className="space-y-6">
-      <PageHead title="Messages" sub="Desk mail with your Fellows, cohort notes, and feedback comments" />
+      <PageHead title="Messages" sub="Desk mail with your Fellows and the Admin, cohort notes, and feedback comments" />
       <div data-testid="trainer-messages">
         <TrainerMessages
           batches={batches}
@@ -2135,81 +2217,6 @@ export default function TrainerBatches() {
     </div>
   );
 
-  // ---------- Schedule ----------
-  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7) + weekOffset * 7);
-  const weekDays = Array.from({ length: 7 }, (_, index) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index));
-  const weekTitle = `${weekDays[0].toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" })} – ${weekDays[6].toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}`;
-  const eventTime = (event: any) => {
-    const clock = (value: string) => new Date(value).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    return `${clock(event.startDate)}${event.endDate ? ` – ${clock(event.endDate)}` : ""}`;
-  };
-
-  const renderSchedule = () => (
-    <div className="space-y-6">
-      <PageHead
-        title="Schedule"
-        sub={batchesLoading ? <SkeletonBar className="h-4 w-72 max-w-full" /> : `Sessions and deadlines on your ${plural(batches.length, "cohort")}`}
-        action={<Button className={PRIMARY_BUTTON} onClick={openAddEvent} data-testid="button-add-session">Add a session</Button>}
-      />
-      <section className={`${PANEL} overflow-hidden`} aria-label="This week" data-testid="trainer-week">
-        <div className="flex flex-wrap items-center justify-between gap-3 p-5">
-          <h2 className="text-lg font-semibold text-sl-ink">{weekTitle}</h2>
-          <div className="flex gap-2">
-            <Button variant="outline" className={`${SECONDARY_BUTTON} w-11 px-0`} aria-label="Previous week" onClick={() => setWeekOffset((value) => value - 1)} data-testid="button-week-previous">
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </Button>
-            <Button variant="outline" className={SECONDARY_BUTTON} disabled={weekOffset === 0} onClick={() => setWeekOffset(0)} data-testid="button-week-current">This week</Button>
-            <Button variant="outline" className={`${SECONDARY_BUTTON} w-11 px-0`} aria-label="Next week" onClick={() => setWeekOffset((value) => value + 1)} data-testid="button-week-next">
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-        {eventsLoading ? (
-          <SkeletonRows label="Loading the week" rows={5} className="border-t border-sl-line" />
-        ) : (
-          <ol className="border-t border-sl-line">
-            {weekDays.map((day) => {
-              const isToday = dayKey(day) === todayKey;
-              const dayEvents = events
-                .filter((event) => dayKey(new Date(event.startDate)) === dayKey(day))
-                .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-              return (
-                <li key={dayKey(day)} className={`flex flex-wrap gap-x-6 gap-y-2 border-b border-sl-line px-5 py-3 last:border-b-0 ${isToday ? "bg-sl-neutral-soft" : ""}`} aria-current={isToday ? "date" : undefined}>
-                  <p className="w-36 shrink-0 font-semibold text-sl-ink">{day.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" })}</p>
-                  <div className="min-w-0 flex-1 space-y-2">
-                    {isToday && <Chip tone="accent">Today</Chip>}
-                    {dayEvents.length === 0 && <span className={`text-sm text-sl-muted ${isToday ? "ml-3" : ""}`}>Nothing scheduled</span>}
-                    {dayEvents.map((event) => (
-                      <div key={event.id} className="flex items-start justify-between gap-3 rounded-lg border border-sl-line bg-sl-surface p-3" data-testid={`event-${event.id}`}>
-                        <div className="min-w-0">
-                          <p className="flex flex-wrap items-center gap-2 font-semibold text-sl-ink">
-                            <Chip>{String(event.eventType).charAt(0).toUpperCase() + String(event.eventType).slice(1)}</Chip>
-                            {event.title}
-                          </p>
-                          <p className="mt-1 text-sm text-sl-muted">{event.cohortName} · {eventTime(event)}</p>
-                          {event.description && <p className="text-sm text-sl-muted">{event.description}</p>}
-                        </div>
-                        <Button
-                          variant="outline"
-                          className={`${SECONDARY_BUTTON} w-11 shrink-0 px-0 text-sl-risk`}
-                          aria-label={`Remove ${event.title}`}
-                          onClick={() => deleteEventMutation.mutate(event.id)}
-                          data-testid={`button-delete-event-${event.id}`}
-                        >
-                          <X className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </section>
-    </div>
-  );
-
   const SECTIONS: Record<SectionKey, () => ReactNode> = {
     home: renderHome,
     cohorts: renderCohorts,
@@ -2217,7 +2224,6 @@ export default function TrainerBatches() {
     progress: renderProgress,
     attendance: renderAttendance,
     messages: renderMessages,
-    schedule: renderSchedule,
   };
 
   return (
@@ -2231,6 +2237,7 @@ export default function TrainerBatches() {
       onNavigate={(key) => goTo(key as SectionKey)}
     >
       {SECTIONS[section]()}
+      <ReopenDialog target={reopenTarget} onClose={() => setReopenTarget(null)} />
 
                 <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
                   <DialogContent>
@@ -2944,7 +2951,7 @@ export default function TrainerBatches() {
             {canRunOnlineSessions(user as any) && (
               <fieldset className="space-y-3 rounded-lg border border-sl-line p-3" data-testid="online-session-fields">
                 <legend className="px-1 text-sm font-semibold text-sl-ink">Online session</legend>
-                <p className="text-[13px] text-sl-muted">As an instructional Trainer you can teach online. Paste a Google Meet or Zoom link, a recorded video, or a materials link. Fellows open them from the timetable.</p>
+                <p className="text-[13px] text-sl-muted">As an instructional Trainer you can teach online. Paste a Google Meet or Zoom link, a recorded video, or a materials link. Fellows open them from the Calendar.</p>
                 <div className="space-y-2">
                   <Label htmlFor="event-meeting">Meeting link (Google Meet, Zoom)</Label>
                   <Input id="event-meeting" type="url" inputMode="url" value={newMeetingUrl} onChange={(e) => setNewMeetingUrl(e.target.value)} placeholder="https://meet.google.com/…" data-testid="input-event-meeting" />
