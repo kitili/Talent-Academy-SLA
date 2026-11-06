@@ -439,12 +439,12 @@ export default function UnifiedAuth() {
   ) : mode === "request" ? "Send request" : mode === "password" ? "Save password" : "Sign in";
 
   return (
-    <div className="min-h-screen bg-sl-ground text-sl-ink lg:flex">
+    <div className="min-h-screen bg-sl-ground text-sl-ink lg:flex lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       {/* The photo is decoration: no text over it. Beside the form from 1024 px; a strip above the card on narrower screens. */}
       <div aria-hidden="true" className="relative hidden lg:block lg:w-1/2">
         <img src={SIGN_IN_PHOTO} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center" />
       </div>
-      <div className="flex min-h-screen flex-1 flex-col items-center justify-center gap-6 px-4 py-12 sm:py-16">
+      <div className="flex min-h-screen flex-1 flex-col items-center justify-center gap-6 px-4 py-12 sm:py-16 lg:h-dvh lg:min-h-0 lg:w-1/2 lg:flex-none lg:gap-3 lg:overflow-y-auto lg:py-4 lg:[justify-content:safe_center]">
       {/* Multi-role picker dialog */}
       <Dialog open={showRolePicker} onOpenChange={setShowRolePicker}>
         <DialogContent className="sm:max-w-md">
@@ -492,7 +492,7 @@ export default function UnifiedAuth() {
 
       <img src={SIGN_IN_PHOTO} alt="" aria-hidden="true" loading="lazy" decoding="async" width={1280} height={720} className="h-28 w-full max-w-[480px] rounded-xl object-cover object-center sm:h-36 lg:hidden" />
 
-      <main className={`flex w-full flex-col gap-6 rounded-xl border border-sl-line bg-sl-surface p-6 sm:px-8 sm:pb-7 sm:pt-8 ${mode === "sign-in" ? "max-w-[420px]" : "max-w-[480px]"}`}>
+      <main className={`flex w-full flex-col gap-6 rounded-xl border border-sl-line bg-sl-surface p-6 sm:px-8 sm:pb-7 sm:pt-8 lg:shrink-0 lg:gap-4 lg:py-5 ${mode === "sign-in" ? "max-w-[420px]" : "max-w-[480px]"}`}>
         {checkingRequest ? (
           <Loading label="Checking your request" className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">

@@ -322,7 +322,8 @@ export function AcademyShell({
           </header>
           <div className="flex min-h-0 flex-1 flex-col lg:flex-row print:block">
             {desk && <DeskNav desk={desk} current={current} onNavigate={onNavigate} />}
-            <main ref={mainRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:flex-[999_1_560px] print:overflow-visible">
+            {/* relative: a hidden native select or sr-only element is positioned absolutely, and without a positioned parent here it would escape this scroll area and stretch the whole page. */}
+            <main ref={mainRef} className="relative min-h-0 min-w-0 flex-1 overflow-y-auto lg:flex-[999_1_560px] print:static print:overflow-visible">
               <div className={`max-w-[1120px] space-y-7 px-4 pb-12 pt-5 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 ${desk ? "" : "mx-auto w-full"}`}>
                 {children}
               </div>
