@@ -11,6 +11,7 @@ import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
 
 type Notice = { id: string; title: string; message: string; isRead: string | boolean; createdAt: string };
 type Teacher = { id: string; name: string };
+type AdminPeer = { id: string; name: string; role: string };
 type Cohort = { id: string; name: string; teacherCount?: number | string | null };
 
 const isUnread = (notice: Notice) => notice.isRead === "false" || notice.isRead === false;
@@ -26,8 +27,9 @@ const CATEGORIES = [
 ];
 
 /**
- * Everything a Trainer writes or reads on one page: desk mail with a Fellow of the chosen cohort, a note to the whole
- * cohort, a feedback comment on one Fellow, and every message that reaches the Trainer from any part of the system.
+ * Everything a Trainer writes or reads on one page: desk mail with a Fellow of the chosen cohort or an Admin who has
+ * written, a note to the whole cohort, a feedback comment on one Fellow, and every message that reaches the Trainer
+ * from any part of the system.
  */
 export function TrainerMessages({
   batches,
@@ -54,6 +56,9 @@ export function TrainerMessages({
   const [feedbackFellowId, setFeedbackFellowId] = useState("");
   const [feedbackCategory, setFeedbackCategory] = useState("progress");
   const [feedback, setFeedback] = useState("");
+  const [adminPeerId, setAdminPeerId] = useState<string | null>(null);
+  // Fresh each time the page opens, so an Admin's first message is findable without a reload.
+  const { data: adminThreads = [] } = useQuery<AdminPeer[]>({ queryKey: ["/api/trainer/admin-threads"], staleTime: 0 });
   const { data: notices = [], isLoading: noticesLoading } = useQuery<Notice[]>({
     queryKey: ["/api/notifications", "inbox"],
     queryFn: async () => {
@@ -110,7 +115,11 @@ export function TrainerMessages({
     },
     onError: (error: Error) => toast({ title: "Could not save the feedback", description: error.message, variant: "destructive" }),
   });
-  const peer = teachers.find((teacher) => teacher.id === expandedId) || teachers[0];
+  const fellowPeer = teachers.find((teacher) => teacher.id === expandedId) || teachers[0];
+  const peer: AdminPeer | null = adminThreads.find((admin) => admin.id === adminPeerId)
+    || (fellowPeer ? { id: fellowPeer.id, name: fellowPeer.name, role: "teacher" } : null)
+    || adminThreads[0]
+    || null;
   const feedbackFellow = teachers.find((teacher) => teacher.id === feedbackFellowId) || teachers[0];
   const unread = notices.filter(isUnread).length;
   const cohort = batches.find((batch) => batch.id === selectedBatchId);
@@ -131,8 +140,28 @@ export function TrainerMessages({
         <section className={`${PANEL} space-y-4`} aria-label="Desk mail" data-testid="desk-mail-threads">
           <div>
             <h2 className="text-lg font-semibold text-sl-ink">Desk mail</h2>
-            <p className="text-sm text-sl-muted">Private threads between you and one Fellow</p>
+            <p className="text-sm text-sl-muted">Private threads between you and one Fellow, or an Admin who wrote to you</p>
           </div>
+          {adminThreads.length > 0 && (
+            <div className="space-y-1">
+              <h3 className="text-sm font-normal text-sl-muted">Admin</h3>
+              <ul className="space-y-2" data-testid="select-message-admin">
+                {adminThreads.map((admin) => (
+                  <li key={admin.id}>
+                    <button
+                      type="button"
+                      onClick={() => setAdminPeerId(admin.id)}
+                      aria-current={admin.id === peer?.id ? "true" : undefined}
+                      className={`min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-sl-ink ${admin.id === peer?.id ? "bg-sl-accent-soft" : "hover:bg-sl-neutral-soft"}`}
+                      data-testid={`button-mail-${admin.id}`}
+                    >
+                      {admin.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="space-y-1">
             <Label htmlFor="mail-cohort" className="text-sm font-normal text-sl-muted">Cohort</Label>
             {cohortSelect("mail-cohort")}
@@ -149,7 +178,10 @@ export function TrainerMessages({
                   <li key={teacher.id}>
                     <button
                       type="button"
-                      onClick={() => onPick(teacher.id)}
+                      onClick={() => {
+                        setAdminPeerId(null);
+                        onPick(teacher.id);
+                      }}
                       aria-current={selected ? "true" : undefined}
                       className={`min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-sl-ink ${selected ? "bg-sl-accent-soft" : "hover:bg-sl-neutral-soft"}`}
                       data-testid={`button-mail-${teacher.id}`}
@@ -163,7 +195,8 @@ export function TrainerMessages({
           )}
         </section>
         <div className="min-w-0 [&>*]:h-full [&>*]:max-w-none">
-          <DeskMail peer={peer ? { id: peer.id, name: peer.name, role: "teacher" } : null} selfLabel={selfLabel} />
+          {/* Keyed, so a half-written note never carries over to the next person. */}
+          <DeskMail key={peer?.id ?? "none"} peer={peer} selfLabel={selfLabel} />
         </div>
       </div>
 

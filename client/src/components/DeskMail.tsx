@@ -27,6 +27,8 @@ export function DeskMail({ peer, selfLabel, bare = false, loading = false }: { p
   const { data: thread = [], isLoading: threadLoading } = useQuery<any[]>({
     queryKey: ["/api/desk-messages", peer?.id],
     enabled: Boolean(peer?.id),
+    // The app caches for good by default; a reply must show when the thread is opened again.
+    staleTime: 0,
     queryFn: async () => {
       const res = await fetch(`/api/desk-messages?withId=${encodeURIComponent(peer!.id)}`, { credentials: "include" });
       if (!res.ok) return [];
@@ -91,11 +93,13 @@ export function DeskMail({ peer, selfLabel, bare = false, loading = false }: { p
           <p className="px-1 py-2 text-sm text-sl-muted">No messages yet. Write a short note.</p>
         ) : (
           pager.slice.map((item: any) => {
-            const mine = item.fromName === selfLabel;
+            // By id, because the name stored on a row is not the one a desk shows: a Fellow's rows all say "Teacher".
+            const mine = item.fromId !== peer.id;
+            const sender = mine ? selfLabel : item.fromRole === "teacher" ? peer.name : item.fromName;
             return (
               <div key={item.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] rounded-2xl px-3 py-1.5 text-sm ${mine ? "bg-sl-accent-strong text-white" : "border border-sl-line bg-sl-surface text-sl-ink"}`}>
-                  <p className={`text-[11px] ${mine ? "text-white/80" : "text-sl-muted"}`}>{item.fromName}</p>
+                  <p className={`text-[11px] ${mine ? "text-white/80" : "text-sl-muted"}`}>{sender}</p>
                   <p className="leading-snug">{item.body}</p>
                 </div>
               </div>
@@ -132,6 +136,7 @@ export function DeskMail({ peer, selfLabel, bare = false, loading = false }: { p
             <span className={bare ? "" : "sr-only"}>Send</span>
           </button>
         </div>
+        {send.isError && <p role="alert" className="text-sm text-sl-risk">Your message did not send. Try again.</p>}
       </form>
     </div>
   );
