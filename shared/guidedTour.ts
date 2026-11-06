@@ -148,7 +148,7 @@ export const TEACHER_TOUR: TourStep[] = [
   },
   {
     title: "Your progress",
-    body: "Progress shows each cohort's courses, attendance and medals, and how far you are on the academy path. Written work is on Work.",
+    body: "Progress shows each cohort's courses, attendance and medals, and how far you are on the academy path. Exams and written work are on Assessments.",
     target: "teacher-progress",
   },
   {

@@ -45,8 +45,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
   fellow: [
     { key: "home", label: "Home", href: "/teacher/dashboard?tab=home", test: "home" },
     { key: "learning", label: "Learning", href: "/teacher/dashboard?tab=learning", test: "learning", also: ["/teacher/week"] },
-    { key: "work", label: "Work", href: "/teacher/dashboard?tab=work", test: "work" },
-    { key: "quizzes", label: "Quizzes", href: "/teacher/dashboard?tab=quizzes", test: "quizzes", also: ["/teacher/exams"] },
+    { key: "assessments", label: "Assessments", href: "/teacher/dashboard?tab=assessments", test: "assessments", also: ["/teacher/exams"] },
     { key: "progress", label: "Progress", href: "/teacher/dashboard?tab=progress", test: "progress" },
     { key: "reflect", label: "Reflect", href: "/teacher/dashboard?tab=reflect", test: "reflect" },
     { key: "messages", label: "Messages", href: "/teacher/dashboard?tab=messages", test: "messages" },
@@ -66,7 +65,7 @@ export const DESK_LABELS: Record<Desk, string> = { admin: "Admin", trainer: "Tra
 export const DESK_PHONE_BAR: Record<Desk, readonly string[]> = {
   admin: ["home", "approvals", "people", "cohorts"],
   trainer: ["home", "cohorts", "assessments", "messages"],
-  fellow: ["home", "learning", "work", "messages"],
+  fellow: ["home", "learning", "assessments", "messages"],
 };
 
 /** The `data-tour` on each desk's side menu. Admin and Trainer keep the targets their tours already use. */

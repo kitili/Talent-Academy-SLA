@@ -115,15 +115,6 @@ export function isPastDue(due: unknown, now: Date = new Date()) {
   return date !== null && date.getTime() <= now.getTime();
 }
 
-/**
- * The old rule, from when past-due work left a Fellow's lists. The server no longer uses it: since D2 (2026-11-06) the
- * item and its deadline stay visible and only the way to submit goes. `teacher-dashboard.tsx` still imports it until
- * task T2-F removes the import; delete it then.
- */
-export function fellowStillSees(due: unknown, handedIn: boolean, now: Date = new Date()) {
-  return handedIn || !isPastDue(due, now);
-}
-
 /** What a deadline can be reopened on: `quiz` is an assigned quiz or exam, `assignment` a written assignment or assessment. */
 export type DeadlineKind = "quiz" | "assignment";
 
