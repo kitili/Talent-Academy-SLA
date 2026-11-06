@@ -27,7 +27,7 @@ import {
 } from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
 import { isAttendanceStatus } from "@shared/attendanceDesk";
-import { DEADLINE_PASSED, fellowStillSees, isPastDue, parseDeadline } from "@shared/academyPath";
+import { DEADLINE_PASSED, effectiveDeadline, fellowDeadline, isPastDue, parseDeadline } from "@shared/academyPath";
 import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, QUIZ_ATTEMPTS, refusal } from "@shared/constants";
 import { cohortIsOpen, trainerMayEditCourse } from "./scope";
 import { cohortsInScope, trainerCohortCounts } from "./cohortRoster";
@@ -64,7 +64,7 @@ import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
-import { registerDeadlineRoutes } from "./deadlineRoutes";
+import { fellowAssignmentItem, fellowQuizItem, quizForAttemptRead, registerDeadlineRoutes } from "./deadlineRoutes";
 import { registerMaterialRoutes } from "./materialRoutes";
 import { registerAdminMailRoutes } from "./adminMailRoutes";
 import { registerAttendanceExportRoutes } from "./attendanceExportRoutes";
@@ -198,7 +198,7 @@ async function resolveQuizAudience(batchId: string, requested: unknown) {
   return { teacherIds };
 }
 
-async function notifyQuizTeachers(batchId: string, teacherIds: string[], title: string, message: string) {
+export async function notifyQuizTeachers(batchId: string, teacherIds: string[], title: string, message: string) {
   if (teacherIds.length === 0) {
     await notifyBatchTeachers(batchId, title, message, "deadline");
     return;
@@ -3101,6 +3101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(hasDueDate ? { dueDate: parseDeadline(req.body.dueDate) } : {}),
         });
       }
+      if (hasDueDate) await storage.dropSupersededReopenings("quiz", quiz.id, parseDeadline(req.body.dueDate));
       const updated = await storage.getAssignedQuiz(req.params.quizId);
       res.json(updated);
       if (hasDueDate) {
@@ -3184,11 +3185,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const quizzes = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
       const tried = new Set((await storage.getAllTeacherQuizAttempts(req.teacherId!)).map((attempt) => attempt.assignedQuizId));
+      const reopened = await storage.getDeadlineReopeningsForTeacher("quiz", req.teacherId!);
       const now = new Date();
-      res.json(quizzes.filter((quiz) => fellowStillSees(quiz.dueDate, tried.has(quiz.id), now)).map((quiz) => ({
-        ...learnerQuiz(quiz),
-        kind: quiz.paperUrl ? "paper" : isWritingExam(quiz) ? "written" : "quiz",
-      })));
+      res.json(quizzes.map((quiz) => fellowQuizItem(quiz, reopened[quiz.id], tried.has(quiz.id), now)));
     } catch (error) {
       console.error("Error fetching teacher quizzes:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -3207,13 +3206,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
       }
-      if (isPastDue(quiz.dueDate)) {
+      const { dueDate, closed } = fellowDeadline(quiz.dueDate, await storage.getDeadlineReopening("quiz", quiz.id, req.teacherId!));
+      if (closed) {
         const tries = await storage.getTeacherQuizAttemptsByQuiz(req.teacherId!, quiz.id);
         if (tries.length === 0) return res.status(410).json({ error: DEADLINE_PASSED });
       }
       const writing = isWritingExam(quiz);
       const questions = writing || quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
-      res.json({ ...quiz, questions: learnerQuestions(questions), passMark: passMarkOf(quiz.passMark) });
+      res.json({ ...quiz, dueDate, closed, questions: learnerQuestions(questions), passMark: passMarkOf(quiz.passMark) });
     } catch (error) {
       console.error("Error fetching quiz:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -3234,7 +3234,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
       }
-      if (isPastDue(quiz.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
+      const reopened = await storage.getDeadlineReopening("quiz", quiz.id, req.teacherId!);
+      if (isPastDue(effectiveDeadline(quiz.dueDate, reopened))) return res.status(410).json({ error: DEADLINE_PASSED });
 
       // Get all existing attempts for this quiz
       const existingAttempts = await storage.getTeacherQuizAttemptsByQuiz(
@@ -3416,10 +3417,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Get quiz details for enrichment
-      const quiz = await storage.getAssignedQuiz(req.params.quizId);
-      
+      const stored = await storage.getAssignedQuiz(req.params.quizId);
+      const tried = attempts.length > 0;
+      const sits = tried || (await storage.getAssignedQuizzesForTeacher(req.teacherId!)).some((item) => item.id === stored?.id);
+      const quiz = stored
+        ? quizForAttemptRead(stored, { tried, sits, reopenedDue: await storage.getDeadlineReopening("quiz", stored.id, req.teacherId!) })
+        : stored;
+
       // Calculate quiz status at the quiz's own pass mark; answers show only once no retake is left.
-      const standing = assignedQuizStanding(attempts, passMarkOf(quiz?.passMark));
+      const standing = assignedQuizStanding(attempts, passMarkOf(stored?.passMark));
 
       res.json({
         attempts,
@@ -3456,11 +3462,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/quiz-attempts", isTeacherAuthenticated, async (req, res) => {
     try {
       const attempts = await storage.getAllTeacherQuizAttempts(req.teacherId!);
+      const reopened = await storage.getDeadlineReopeningsForTeacher("quiz", req.teacherId!);
 
       // Enrich with quiz details; answers show only once no retake is left on that quiz.
       const enrichedAttempts = await Promise.all(
         attempts.map(async (attempt) => {
-          const quiz = await storage.getAssignedQuiz(attempt.assignedQuizId);
+          const stored = await storage.getAssignedQuiz(attempt.assignedQuizId);
+          const quiz = stored && { ...stored, dueDate: effectiveDeadline(stored.dueDate, reopened[stored.id]) };
           const standing = assignedQuizStanding(
             attempts.filter((other) => other.assignedQuizId === attempt.assignedQuizId),
             passMarkOf(quiz?.passMark),
@@ -6249,6 +6257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : assignment;
       if (has("dueDate")) {
         const due = updates.dueDate ?? null;
+        await storage.dropSupersededReopenings("assignment", assignment.id, due);
         const audience = (await storage.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
         notifyQuizTeachers(
           batch.id,
@@ -6380,8 +6389,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/assignments", isTeacherAuthenticated, async (req, res) => {
     try {
       const rows = (await storage.getWrittenAssignmentsForTeacher(req.teacherId!)) as any[];
+      const reopened = await storage.getDeadlineReopeningsForTeacher("assignment", req.teacherId!);
       const now = new Date();
-      res.json(rows.filter((row) => fellowStillSees(row.due_date, Boolean(row.my_response), now)));
+      res.json(rows.map((row) => fellowAssignmentItem(row, reopened[row.id], now)));
     } catch (error) {
       console.error("Error listing teacher assignments:", error);
       res.status(500).json({ error: "Failed to list assignments" });
@@ -6396,7 +6406,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "This work is not assigned to you" });
       }
       const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
-      if (isPastDue(assignment?.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
+      const reopened = await storage.getDeadlineReopening("assignment", req.params.assignmentId, req.teacherId!);
+      if (isPastDue(effectiveDeadline(assignment?.dueDate, reopened))) return res.status(410).json({ error: DEADLINE_PASSED });
       const row = await storage.upsertAssignmentSubmission(req.params.assignmentId, req.teacherId!, response);
       res.json(row);
     } catch (error) {
