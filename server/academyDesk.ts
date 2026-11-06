@@ -3,7 +3,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { academyCalendar, batchCourses, batches, batchTeachers, cohortBatchCourses, cohortBatches, courses, scheduledEvents, teachers, users } from "@shared/schema";
 import { nextBatchName, sortBatches } from "@shared/academyPath";
-import { parseCalendarEntry, parseFellowType, parseTrainerType, FELLOW_TYPE_LABELS } from "@shared/academyPeople";
+import { canChangeCalendarEntry, canEditAcademyCalendar, parseCalendarEntry, parseFellowType, parseTrainerType, FELLOW_TYPE_LABELS } from "@shared/academyPeople";
 import { parseAccessRequest } from "@shared/accessRequest";
 import { db, hasDatabaseUrl } from "./db";
 import { storage } from "./storage";
@@ -15,6 +15,15 @@ type Guard = (req: Request, res: Response, next: NextFunction) => void;
 function isStaff(user: Express.User | undefined) {
   return user?.role === "admin" || user?.role === "trainer";
 }
+
+/**
+ * Calendar writes. `isTrainer` would let every Trainer through and `isAdmin` none, so this reads the right itself. It
+ * runs after `isAuthenticated`, and `req.user` is the row read on this request, so taking the right away is immediate.
+ */
+const mayEditCalendar: Guard = (req, res, next) => {
+  if (canEditAcademyCalendar(req.user)) return next();
+  res.status(403).json({ message: "Only the Admin, or a Trainer the Admin allows, can change the academy calendar" });
+};
 
 /** The signed-in Fellow's id when this request is a Fellow's session, else undefined. */
 function fellowIdOf(req: Request): string | undefined {
@@ -172,6 +181,25 @@ export function registerAcademyDeskRoutes(
     }
   });
 
+  /** Admin sets whether a Trainer may add to the academy calendar. Nobody can set this on themselves. */
+  app.patch("/api/admin/trainers/:id/calendar-rights", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const canEditCalendar = req.body?.canEditCalendar;
+      if (typeof canEditCalendar !== "boolean") return res.status(400).json({ message: "canEditCalendar must be true or false" });
+      const [trainer] = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, req.params.id));
+      if (!trainer || trainer.role !== "trainer") return res.status(404).json({ message: "Trainer not found" });
+      const [updated] = await db
+        .update(users)
+        .set({ canEditCalendar })
+        .where(eq(users.id, trainer.id))
+        .returning({ id: users.id, canEditCalendar: users.canEditCalendar });
+      res.json(updated);
+    } catch (error) {
+      console.error("Calendar rights failed:", error);
+      res.status(500).json({ message: "Could not change the calendar right" });
+    }
+  });
+
   // ── Trainers make courses ─────────────────────────────────────────────────
   // Any Trainer can make a course, add its modules and files, and put it on a cohort they teach. Deleting stays Admin.
   app.get("/api/trainer/courses", isAuthenticated, isTrainer, async (req, res) => {
@@ -243,8 +271,9 @@ export function registerAcademyDeskRoutes(
   });
 
   // ── The annual calendar ───────────────────────────────────────────────────
-  // Admin writes it. Trainers and Fellows read the same rows, so nothing is copied to them, but only once the Admin
-  // presses Done: until then an entry is a draft only the Admin sees.
+  // The Admin writes it, and so may a Trainer the Admin gave the right to (`mayEditCalendar`). Trainers and Fellows read
+  // the same rows, so nothing is copied to them. An Admin's entry is a draft only the Admin sees until they press Done;
+  // a Trainer's entry publishes at once, and a Trainer changes only the entries they created.
   app.get("/api/academy-calendar", async (req, res) => {
     try {
       if (!isStaff(req.user) && !fellowIdOf(req)) return res.status(401).json({ message: "Unauthorized" });
@@ -261,11 +290,12 @@ export function registerAcademyDeskRoutes(
     }
   });
 
-  app.post("/api/admin/academy-calendar", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/academy-calendar", isAuthenticated, mayEditCalendar, async (req, res) => {
     try {
       const parsed = parseCalendarEntry(req.body);
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
-      const [row] = await db.insert(academyCalendar).values({ ...parsed, createdBy: req.user!.id, publishedAt: null }).returning();
+      const publishedAt = req.user!.role === "admin" ? null : new Date();
+      const [row] = await db.insert(academyCalendar).values({ ...parsed, createdBy: req.user!.id, publishedAt }).returning();
       res.status(201).json(row);
     } catch (error) {
       console.error("Calendar add failed:", error);
@@ -288,8 +318,11 @@ export function registerAcademyDeskRoutes(
     }
   });
 
-  app.patch("/api/admin/academy-calendar/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.patch("/api/admin/academy-calendar/:id", isAuthenticated, mayEditCalendar, async (req, res) => {
     try {
+      const [entry] = await db.select({ createdBy: academyCalendar.createdBy }).from(academyCalendar).where(eq(academyCalendar.id, req.params.id));
+      if (!entry) return res.status(404).json({ message: "Entry not found" });
+      if (!canChangeCalendarEntry(req.user, entry)) return res.status(403).json({ message: "You can change only the entries you added" });
       const parsed = parseCalendarEntry(req.body);
       if ("error" in parsed) return res.status(400).json({ message: parsed.error });
       const [row] = await db.update(academyCalendar).set(parsed).where(eq(academyCalendar.id, req.params.id)).returning();
@@ -301,8 +334,11 @@ export function registerAcademyDeskRoutes(
     }
   });
 
-  app.delete("/api/admin/academy-calendar/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/academy-calendar/:id", isAuthenticated, mayEditCalendar, async (req, res) => {
     try {
+      const [entry] = await db.select({ createdBy: academyCalendar.createdBy }).from(academyCalendar).where(eq(academyCalendar.id, req.params.id));
+      if (!entry) return res.status(404).json({ message: "Entry not found" });
+      if (!canChangeCalendarEntry(req.user, entry)) return res.status(403).json({ message: "You can remove only the entries you added" });
       const removed = await db.delete(academyCalendar).where(eq(academyCalendar.id, req.params.id)).returning();
       if (removed.length === 0) return res.status(404).json({ message: "Entry not found" });
       res.json({ success: true });

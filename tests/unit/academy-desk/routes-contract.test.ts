@@ -53,9 +53,9 @@ describe("trainers register Fellows", () => {
 });
 
 describe("the annual calendar", () => {
-  it("is written by Admin only and read by any signed-in desk", () => {
+  it("is written by those the calendar rule allows (calendar-rights.test.ts) and read by any signed-in desk", () => {
     for (const [verb, path] of [["post", "/api/admin/academy-calendar"], ["patch", "/api/admin/academy-calendar/:id"], ["delete", "/api/admin/academy-calendar/:id"]]) {
-      assert.match(route(desk, verb, path), /isAuthenticated, isAdmin/, `${verb} ${path}`);
+      assert.match(route(desk, verb, path), /isAuthenticated, mayEditCalendar/, `${verb} ${path}`);
     }
     const read = route(desk, "get", "/api/academy-calendar");
     assert.match(read, /isStaff\(req\.user\)/);
@@ -137,8 +137,8 @@ describe("the academy year is a draft until the Admin presses Done", () => {
     assert.match(read, /const admin = isStaff\(req\.user\) && req\.user!\.role === "admin"/);
     assert.match(read, /admin \? sql`true` : isNotNull\(academyCalendar\.publishedAt\)/);
   });
-  it("starts every new entry as a draft", () => {
-    assert.match(route(desk, "post", "/api/admin/academy-calendar"), /publishedAt: null/);
+  it("starts an Admin's new entry as a draft", () => {
+    assert.match(route(desk, "post", "/api/admin/academy-calendar"), /req\.user!\.role === "admin" \? null : new Date\(\)/);
   });
   it("publishes every draft at once, Admin only", () => {
     const publish = route(desk, "post", "/api/admin/academy-calendar/publish");
