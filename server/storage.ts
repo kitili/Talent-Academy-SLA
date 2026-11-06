@@ -153,7 +153,7 @@ export function utcTimestamps<T extends Record<string, unknown>>(rows: T[], keys
   });
 }
 import { TALENT_SIGNATORY_1, TALENT_SIGNATORY_2 } from "@shared/talentCertificate";
-import { kindForIssue, wordingForIssue } from "@shared/certificateDesigns";
+import { kindForIssue } from "@shared/certificateDesigns";
 
 const PostgresSessionStore = connectPg(session);
 const sessionDatabaseUrl = resolveDatabaseUrl();
@@ -343,6 +343,7 @@ export interface IStorage {
     occasion: "graduation" | "course";
     courseId?: string;
     batchId?: string;
+    appreciationText: string;
   }): Promise<TeacherCertificate>;
   updateTeacherCertificate(certificateId: string, updates: Partial<Pick<TeacherCertificate, 'teacherName' | 'courseName' | 'appreciationText' | 'adminName1' | 'adminName2'>>): Promise<TeacherCertificate | undefined>;
   
@@ -1507,9 +1508,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   /**
-   * Update, then insert: not ON CONFLICT, because `schemaGuard` creates this table without
-   * `idx_deadline_reopenings_unique` and ON CONFLICT fails outright with no index to match. Two reopenings racing can
-   * then leave two rows; the readers above take the newest, and the next update moves both.
+   * Update, then insert. `server/db.ts` creates `idx_deadline_reopenings_unique` at start-up, so two reopenings racing
+   * no longer leave two rows: the second insert is refused and that request fails. If the index could not be created
+   * (that step only logs on failure) they can leave two, the readers above take the newest, and the next update moves both.
    */
   async upsertDeadlineReopening(row: { kind: DeadlineKind; itemId: string; teacherId: string; dueDate: Date; createdBy: string | null }) {
     const [updated] = await db.update(deadlineReopenings)
@@ -2121,6 +2122,7 @@ export class DatabaseStorage implements IStorage {
     occasion: "graduation" | "course";
     courseId?: string;
     batchId?: string;
+    appreciationText: string;
   }): Promise<TeacherCertificate> {
     const teacher = await this.getTeacher(input.teacherId);
     if (!teacher) throw new Error("Teacher not found");
@@ -2147,7 +2149,7 @@ export class DatabaseStorage implements IStorage {
       kind: kindForIssue(input.design, input.occasion),
       teacherName: teacher.name,
       courseName,
-      appreciationText: wordingForIssue(input.design, input.occasion, courseName),
+      appreciationText: input.appreciationText,
       adminName1: TALENT_SIGNATORY_1.name,
       adminName2: TALENT_SIGNATORY_2.name,
       completionPercentage: 100,

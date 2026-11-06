@@ -244,4 +244,9 @@ export async function ensureWrittenAssignmentTables() {
     );
   `);
   await ensureSchemaColumns((sql) => pool.query(sql));
+  // After the guard, which is what creates this table: the guard makes tables and columns but not their indexes.
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_deadline_reopenings_unique
+      ON deadline_reopenings (kind, item_id, teacher_id);
+  `);
 }

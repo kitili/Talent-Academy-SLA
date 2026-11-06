@@ -50,6 +50,29 @@ export function wordingForIssue(
   return CERTIFICATE_DESIGNS[design].body;
 }
 
+/**
+ * The most a certificate's wording may hold. The panel under the name has room for five lines at this size; a sixth runs
+ * into the signatures. Measured in Chrome with the app's Inter on the real template at 380, 900 and 1400 wide: sentences
+ * of 480 characters take five lines and 520 take six, and the longest template wording (Advanced Level) is 357. Capitals
+ * are wider: 360 fit and 420 do not, so the preview is the check for text in capitals.
+ */
+export const CERTIFICATE_WORDING_MAX = 400;
+
+/**
+ * The wording as it is stored and drawn: plain text on one run. It is never read as HTML (React escapes it), so tags are
+ * shown as typed. Line breaks and repeated spaces collapse here because the certificate would collapse them anyway.
+ */
+export function cleanCertificateWording(value: unknown): { wording: string } | { error: string } {
+  const wording = typeof value === "string"
+    ? value.replace(/[\u0000-\u0008\u000E-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim()
+    : "";
+  if (!wording) return { error: "Write the wording for this certificate" };
+  if (wording.length > CERTIFICATE_WORDING_MAX) {
+    return { error: `Keep the wording to ${CERTIFICATE_WORDING_MAX} characters so it fits on the certificate` };
+  }
+  return { wording };
+}
+
 export function designFromCertificate(cert: { design?: string | null; kind?: string | null }): CertificateDesignId {
   if (isCertificateDesignId(cert.design || "")) return cert.design as CertificateDesignId;
   if (cert.kind === "distinction" || cert.kind === "advanced") return "advanced";

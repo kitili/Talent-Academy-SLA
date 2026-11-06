@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SilverleafCertificate } from "@/components/SilverleafCertificate";
 import { AcademyShell } from "@/components/AcademyShell";
 import { Loading, SkeletonBar } from "@/components/Skeletons";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import logoImage from "@assets/silverleaf-logo.png";
 
 /** Print only the certificate, whatever the page around it is (the shell's header and menu stay out of the PDF). */
 const PRINT_CSS = `
