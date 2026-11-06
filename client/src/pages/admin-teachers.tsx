@@ -29,6 +29,8 @@ import {
   type PathPayload,
 } from "@/components/AdminParts";
 import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
+import { KindChip } from "@/components/KindBadge";
+import { FELLOW_KIND_FILTERS, filterByKind, listKindOf, type KindFilter } from "@/lib/personKind";
 
 interface Teacher {
   id: string;
@@ -36,6 +38,8 @@ interface Teacher {
   name: string;
   email: string;
   role: string;
+  /** in_house or pre_service. Not yet sent by GET /api/admin/teachers (see the T1-H report). */
+  fellowType?: string;
   approvalStatus: string;
   createdAt: string;
   lastLogin?: string;
@@ -65,8 +69,9 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
     enabled: user?.role === "admin",
   });
   const [listQuery, setListQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const filteredTeachers = filterByQuery(
-    teachers ?? [],
+    filterByKind(teachers ?? [], "teacher", kindFilter),
     listQuery,
     (teacher) => `${teacher.name} ${teacher.email} ${teacher.teacherId}`,
   );
@@ -216,6 +221,13 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
             Active Fellows
             {!isLoading && !isError && <span className="font-medium text-sl-muted"> · {allActive.length}</span>}
           </h2>
+          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="fellow-kind" className="text-[13px] text-sl-muted">Kind</label>
+            <select id="fellow-kind" className={inputClass} value={kindFilter} onChange={(e) => setKindFilter(e.target.value as KindFilter)} data-testid="select-fellow-kind">
+              {FELLOW_KIND_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </div>
           <div className="flex min-w-[220px] flex-col gap-1.5 sm:w-80">
             <label htmlFor="people-search" className="text-[13px] text-sl-muted">Find a Fellow</label>
             <input
@@ -226,6 +238,7 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
               value={listQuery}
               onChange={(e) => setListQuery(e.target.value)}
             />
+          </div>
           </div>
         </div>
 
@@ -241,11 +254,12 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-sm">
+              <table className="w-full min-w-[840px] border-collapse text-sm">
                 <thead>
                   <tr className="text-left text-sl-muted">
                     <th scope="col" className="px-5 py-2.5 font-medium">Fellow</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Email</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Kind</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Cohorts</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Progress</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Last active</th>
@@ -263,6 +277,7 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
                         </span>
                       </th>
                       <td className="px-3 py-3.5 text-sl-ink">{teacher.email}</td>
+                      <td className="px-3 py-3.5">{listKindOf("teacher", teacher) ? <KindChip role="teacher" kind={listKindOf("teacher", teacher)} /> : <span className="text-sl-muted">Not recorded</span>}</td>
                       <td className="px-3 py-3.5 text-sl-ink">{cohortsOf(teacher.id)}</td>
                       <td className="px-3 py-3.5 text-sl-ink">{teacher.progress || 0}%</td>
                       <td className="px-3 py-3.5 text-sl-muted">
@@ -286,7 +301,7 @@ export default function AdminTeachers({ tabs }: { tabs?: ReactNode }) {
                   ))}
                   {activeTeachers.length === 0 && (
                     <tr className="border-t border-sl-line">
-                      <td colSpan={7} className="px-5 py-5 text-sl-muted">No Fellow matches “{listQuery.trim()}”.</td>
+                      <td colSpan={8} className="px-5 py-5 text-sl-muted">No Fellow matches{listQuery.trim() ? ` “${listQuery.trim()}”` : " this kind"}.</td>
                     </tr>
                   )}
                 </tbody>

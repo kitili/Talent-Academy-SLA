@@ -30,12 +30,16 @@ import {
   type PathPayload,
 } from "@/components/AdminParts";
 import { SkeletonBar, SkeletonRows } from "@/components/Skeletons";
+import { KindChip } from "@/components/KindBadge";
+import { TRAINER_KIND_FILTERS, filterByKind, listKindOf, type KindFilter } from "@/lib/personKind";
 
 interface Trainer {
   id: string;
   username: string;
   email?: string;
   role: string;
+  /** in_house or instructional. Not yet sent by GET /api/admin/trainers (see the T1-H report). */
+  trainerType?: string;
   approvalStatus: string;
   createdAt: string;
   lastLogin?: string;
@@ -64,8 +68,9 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
     enabled: user?.role === "admin",
   });
   const [listQuery, setListQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const filteredTrainers = filterByQuery(
-    trainers ?? [],
+    filterByKind(trainers ?? [], "trainer", kindFilter),
     listQuery,
     (trainer) => `${trainer.username} ${trainer.email || ""}`,
   );
@@ -219,6 +224,13 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
             Active trainers
             {!isLoading && <span className="font-medium text-sl-muted"> · {allActive.length}</span>}
           </h2>
+          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="trainer-kind" className="text-[13px] text-sl-muted">Kind</label>
+            <select id="trainer-kind" className={inputClass} value={kindFilter} onChange={(e) => setKindFilter(e.target.value as KindFilter)} data-testid="select-trainer-kind">
+              {TRAINER_KIND_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </div>
           <div className="flex min-w-[220px] flex-col gap-1.5 sm:w-80">
             <label htmlFor="people-search" className="text-[13px] text-sl-muted">Find a trainer</label>
             <input
@@ -230,6 +242,7 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
               onChange={(e) => setListQuery(e.target.value)}
             />
           </div>
+          </div>
         </div>
 
         {isLoading ? (
@@ -239,11 +252,12 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-sm">
+              <table className="w-full min-w-[840px] border-collapse text-sm">
                 <thead>
                   <tr className="text-left text-sl-muted">
                     <th scope="col" className="px-5 py-2.5 font-medium">Trainer</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Email</th>
+                    <th scope="col" className="px-3 py-2.5 font-medium">Kind</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Cohorts</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Fellows</th>
                     <th scope="col" className="px-3 py-2.5 font-medium">Last active</th>
@@ -256,6 +270,7 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
                     <tr key={trainer.id} className="border-t border-sl-line" data-testid={`card-trainer-${trainer.id}`}>
                       <th scope="row" className="px-5 py-3.5 text-left font-semibold text-sl-ink">{trainer.username}</th>
                       <td className="px-3 py-3.5 text-sl-ink">{trainer.email || "No email"}</td>
+                      <td className="px-3 py-3.5">{listKindOf("trainer", trainer) ? <KindChip role="trainer" kind={listKindOf("trainer", trainer)} /> : <span className="text-sl-muted">Not recorded</span>}</td>
                       <td className="px-3 py-3.5 text-sl-ink" data-testid={`text-trainer-cohorts-${trainer.id}`}>
                         {trainer.cohortCount || 0}
                       </td>
@@ -281,7 +296,7 @@ export default function AdminTrainers({ tabs }: { tabs?: ReactNode }) {
                   ))}
                   {activeTrainers.length === 0 && (
                     <tr className="border-t border-sl-line">
-                      <td colSpan={7} className="px-5 py-5 text-sl-muted">No trainer matches “{listQuery.trim()}”.</td>
+                      <td colSpan={8} className="px-5 py-5 text-sl-muted">No trainer matches{listQuery.trim() ? ` “${listQuery.trim()}”` : " this kind"}.</td>
                     </tr>
                   )}
                 </tbody>
