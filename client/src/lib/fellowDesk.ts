@@ -27,13 +27,13 @@ export function fellowDeskRedirect(hash: string): string | null {
 }
 
 /**
- * A stored file or link, as an address a page may link to: only `https://` or a path on this site. Anything else
+ * A stored file or link, as an address a page may link to: only `http(s)://` or a path on this site. Anything else
  * (an old stored `javascript:` or `data:` value, a protocol-relative `//host`) gives nothing, so it is never clickable.
  */
 export function safeFileHref(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const href = value.trim();
-  if (/^https:\/\/\S+$/i.test(href)) return href;
+  if (/^https?:\/\/\S+$/i.test(href)) return href;
   if (/^\/(?![/\\])\S*$/.test(href)) return href;
   return null;
 }

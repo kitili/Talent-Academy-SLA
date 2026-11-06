@@ -42,13 +42,14 @@ describe("which section a link opens", () => {
 describe("a stored file or link is clickable only if it is https or a path on this site", () => {
   it("allows https and site paths", () => {
     assert.equal(safeFileHref("https://example.org/a.pdf"), "https://example.org/a.pdf");
+    assert.equal(safeFileHref("http://example.org/a"), "http://example.org/a");
     assert.equal(safeFileHref("HTTPS://example.org/a"), "HTTPS://example.org/a");
     assert.equal(safeFileHref("/api/files/abc"), "/api/files/abc");
     assert.equal(safeFileHref("  https://example.org/a  "), "https://example.org/a");
   });
 
   it("refuses javascript:, data:, http:, protocol-relative, relative and empty values", () => {
-    for (const bad of ["javascript:alert(1)", " JavaScript:alert(1)", "data:text/html,<b>x</b>", "http://example.org/a", "//evil.example/a", "/\\evil.example", "files/a.pdf", "", "https://", "https://a b", null, undefined, 5]) {
+    for (const bad of ["javascript:alert(1)", " JavaScript:alert(1)", "data:text/html,<b>x</b>", "//evil.example/a", "/\\evil.example", "files/a.pdf", "", "https://", "https://a b", null, undefined, 5]) {
       assert.equal(safeFileHref(bad), null, String(bad));
     }
   });
