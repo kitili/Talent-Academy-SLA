@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { encouragementCandidate, hallDay } from "@shared/encouragement";
+import { dailyRole, encouragementCandidate, hallDay } from "@shared/encouragement";
 import { db, hasDatabaseUrl } from "./db";
 
 async function ensureEncouragementTable() {
@@ -23,14 +23,15 @@ function savedMessage(result: { rows?: Array<{ message?: string }> }) {
 }
 
 /**
- * One encouragement for this trainer for this local day.
+ * One daily line for this person, by role (Trainer by default), for this local day.
  * The same person sees the same words until midnight in Dar es Salaam.
- * The words are stored so they are not given to anyone else, or to this trainer on another day.
+ * The words are stored so they are not given to anyone else, or to this person on another day.
  */
-export async function encouragementFor(trainerId: string, now = new Date()) {
+export async function encouragementFor(trainerId: string, role: string = "trainer", now = new Date()) {
+  const lineRole = dailyRole(role);
   const day = hallDay(now);
   if (!hasDatabaseUrl()) {
-    return encouragementCandidate({ trainerId, day, used: [] }, 0);
+    return encouragementCandidate({ trainerId, day, used: [], role: lineRole }, 0);
   }
 
   await ensureEncouragementTable();
@@ -47,7 +48,7 @@ export async function encouragementFor(trainerId: string, now = new Date()) {
     .filter(Boolean);
 
   for (let attempt = 0; attempt < 24; attempt += 1) {
-    const message = encouragementCandidate({ trainerId, day, used }, attempt);
+    const message = encouragementCandidate({ trainerId, day, used, role: lineRole }, attempt);
     try {
       await db.execute(sql`
         INSERT INTO trainer_encouragements (trainer_id, day, message)
@@ -65,5 +66,5 @@ export async function encouragementFor(trainerId: string, now = new Date()) {
     }
   }
 
-  return encouragementCandidate({ trainerId, day, used }, 24);
+  return encouragementCandidate({ trainerId, day, used, role: lineRole }, 24);
 }
