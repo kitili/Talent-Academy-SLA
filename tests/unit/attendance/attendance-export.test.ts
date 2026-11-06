@@ -22,11 +22,11 @@ const mark = (over: Partial<AttendanceExportMark> = {}): AttendanceExportMark =>
   ...over,
 });
 /** The rows of a CSV with no comma, quote or line break inside a cell. */
-const cells = (csv: string) => csv.replace(/^﻿/, "").split("\r\n").map((line) => line.slice(1, -1).split('","'));
+const cells = (csv: string) => csv.replace(/^\uFEFF/, "").split("\r\n").map((line) => line.slice(1, -1).split('","'));
 
 describe("attendance CSV rows", () => {
   it("is the header alone when nobody has a mark", () => {
-    assert.equal(attendanceCsv([]), '﻿"person","kind","cohort","date","status"');
+    assert.equal(attendanceCsv([]), '\uFEFF"person","kind","cohort","date","status"');
   });
 
   it("writes one row per mark: the kind in words, the date as the screen prints it, the status as a label", () => {
@@ -67,12 +67,12 @@ describe("attendance CSV rows", () => {
 
   it("keeps a name's letters, with the byte order mark Excel needs to read them", () => {
     const csv = attendanceCsv([mark({ person: "Wanjirũ" })]);
-    assert.ok(csv.startsWith("﻿"));
+    assert.ok(csv.startsWith("\uFEFF"));
     assert.ok(csv.includes('"Wanjirũ"'));
   });
 
   it("prefixes a value a spreadsheet would run, and leaves ordinary values alone", () => {
-    for (const value of ["=1+1", "+254700", "-2+3", "@SUM(A1)", "\t=1+1", "\r=1+1", "  =1+1", "=HYPERLINK(\"http://x\")"]) {
+    for (const value of ["=1+1", "+254700", "-2+3", "@SUM(A1)", "\tAmina", "\rAmina", "\t=1+1", "\r=1+1", "  =1+1", "=HYPERLINK(\"http://x\")"]) {
       assert.ok(csvCell(value).startsWith(`"'`), `${JSON.stringify(value)} must open as text`);
     }
     for (const value of ["Amina", "O'Brien", "Mary-Jane", "a=b", "3 Nov 2026", ""]) {

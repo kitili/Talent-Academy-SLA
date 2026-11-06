@@ -76,5 +76,5 @@ export function attendanceCsv(marks: AttendanceExportMark[]) {
       isAttendanceStatus(mark.status) ? STATUS_LABELS[mark.status] : mark.status,
     ]);
   const lines = [["person", "kind", "cohort", "date", "status"], ...rows].map((row) => row.map(csvCell).join(","));
-  return `﻿${lines.join("\r\n")}`;
+  return `\uFEFF${lines.join("\r\n")}`;
 }
