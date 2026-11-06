@@ -14,25 +14,18 @@ import { TEACHER_TOUR } from "@shared/guidedTour";
 import { DeskMail } from "@/components/DeskMail";
 import { CohortMedals } from "@/components/CohortMedals";
 import { PageStrip, usePager } from "@/components/PageStrip";
-import { batchIsComplete, fellowStillSees, isPastDue } from "@shared/academyPath";
+import { batchIsComplete } from "@shared/academyPath";
+import { ASSESSMENT_GROUP_TITLES, FELLOW_TABS, assessmentGroup, courseProgressRows, fellowDeskRedirect, safeFileHref, sortAssessments, tabFromUrl, type FellowTab } from "@/lib/fellowDesk";
+import { DeskPhoto } from "@/components/DeskPhoto";
+import { DailyLine } from "@/components/DailyLine";
+import { KindBadge } from "@/components/KindBadge";
+import { CourseProgressChart } from "@/components/CourseProgressChart";
 import { sessionPhase } from "@shared/academyPeople";
 import { SessionLinks } from "@/components/SessionLinks";
 import { MODULE_QUIZ_PASS_PERCENT, QUIZ_ATTEMPTS } from "@shared/constants";
 import type { Medal } from "@shared/cohortMedals";
 import { Loading, SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 
-/** The Fellow desk's sections. Keys are DESK_MENUS.fellow's (the shell draws the menu); `quiz` is the old key of `quizzes`. */
-const FELLOW_TABS = ["home", "learning", "work", "quizzes", "progress", "reflect", "messages"] as const;
-type FellowTab = (typeof FELLOW_TABS)[number];
-
-function tabFromUrl(search: string, hash: string): FellowTab {
-  const asked = new URLSearchParams(search).get("tab");
-  if (asked === "quiz") return "quizzes";
-  if ((FELLOW_TABS as readonly string[]).includes(asked || "")) return asked as FellowTab;
-  if (hash === "#my-learning") return "learning";
-  if (hash === "#my-work") return "work";
-  return "home";
-}
 
 // ── Look: the sl-* tokens (design/DESIGN-BRIEF.md) ─────────────────────────────────────────────────────────────
 
@@ -304,6 +297,13 @@ export default function TeacherDashboard() {
   const { data: deskPeers = [], isLoading: peersLoading } = useQuery<any[]>({
     queryKey: ["/api/teacher/desk-peers"],
   });
+  // Admins who wrote to this Fellow: the server decides who is listed.
+  const { data: adminThreads = [], isLoading: adminThreadsLoading } = useQuery<any[]>({
+    queryKey: ["/api/teacher/admin-threads"],
+  });
+  const { data: materials = [] } = useQuery<any[]>({
+    queryKey: ["/api/teacher/materials"],
+  });
   const { data: path, isLoading: pathLoading } = useQuery<any>({
     queryKey: ["/api/teacher/academy-path"],
   });
@@ -373,7 +373,9 @@ export default function TeacherDashboard() {
     const fromHash = () => {
       const hash = window.location.hash;
       if (hash === "#my-learning") setTab("learning", true);
-      if (hash === "#my-work") setTab("work", true);
+      if (hash === "#my-work") setTab("assessments", true);
+      const elsewhere = fellowDeskRedirect(hash);
+      if (elsewhere) setLocation(elsewhere, { replace: true });
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
@@ -674,13 +676,37 @@ export default function TeacherDashboard() {
   // An exam row's standing (Not started, Passed, tries left) needs the tries too.
   const examsLoading = examsQueryLoading || attemptsLoading;
 
-  // The server already leaves out past-due work; this drops what passes its deadline while the page is open.
   const now = new Date();
-  const myExams = listedExams.filter((exam: any) =>
-    fellowStillSees(exam.dueDate, examAttempts.some((attempt: any) => attempt.assignedQuizId === exam.id), now));
-  const myWork = listedWork.filter((item: any) =>
-    fellowStillSees(pickField(item, "due_date", "dueDate"), Boolean(item.my_response || item.myResponse), now));
-  const assessments = myWork.filter((item: any) => item.kind === "assessment");
+
+  // Every item stays listed after its deadline; the server says which are `closed` (for this Fellow's own deadline).
+  // A closed item the Fellow never tried carries only its title, what it was, its deadline and `closed`: no questions,
+  // paper, pass mark or file, so none of those is read without a check.
+  const examStanding = (exam: any) => {
+    const tries = examAttempts.filter((attempt: any) => attempt.assignedQuizId === exam.id);
+    const passMark = exam.passMark || MODULE_QUIZ_PASS_PERCENT;
+    const best = tries.reduce((top: number, attempt: any) => Math.max(top, attempt.totalQuestions > 0 ? Math.round((attempt.score / attempt.totalQuestions) * 100) : 0), 0);
+    const passed = tries.some((attempt: any) => attempt.totalQuestions > 0 && (attempt.score / attempt.totalQuestions) * 100 >= passMark);
+    return { tries: tries.length, passMark, best, passed, left: Math.max(0, QUIZ_ATTEMPTS - tries.length) };
+  };
+  const writtenWork = listedWork.filter((item: any) => item.kind === "assessment");
+  // One list for Assessments: exams and written work, what needs doing first.
+  type AssessmentRow =
+    | { type: "exam"; key: string; title: string; due: unknown; closed: boolean; done: boolean; item: any }
+    | { type: "work"; key: string; title: string; due: unknown; closed: boolean; done: boolean; item: any };
+  const assessmentRows = sortAssessments<AssessmentRow>([
+    ...listedExams.map((exam: any): AssessmentRow => {
+      const standing = examStanding(exam);
+      const sentOnce = exam.kind === "paper" || exam.kind === "written";
+      return {
+        type: "exam", key: `exam-${exam.id}`, title: exam.title, due: exam.dueDate, closed: Boolean(exam.closed),
+        done: sentOnce ? standing.tries > 0 : standing.passed || (standing.tries > 0 && standing.left === 0), item: exam,
+      };
+    }),
+    ...writtenWork.map((item: any): AssessmentRow => ({
+      type: "work", key: `work-${item.id}`, title: item.title, due: pickField(item, "due_date", "dueDate"), closed: Boolean(item.closed),
+      done: Boolean(item.my_response || item.myResponse), item,
+    })),
+  ]);
   // The route sends every session of the Fellow's cohorts, oldest first, in its column names; keep those not yet over.
   const upcomingEvents = allEvents
     .map((event: any) => ({
@@ -692,8 +718,7 @@ export default function TeacherDashboard() {
       materialsUrl: pickField(event, "materials_url", "materialsUrl"),
     }))
     .filter((event: any) => event.startDate && sessionPhase(event, now) !== "ended");
-  const eventPager = usePager(upcomingEvents, 5);
-  const workPager = usePager(assessments, 4);
+  const workPager = usePager(assessmentRows, 6);
   const reflectionPager = usePager(reflections, 4);
   const commentPager = usePager(trainerComments, 4);
   const goalPager = usePager(goals, 5);
@@ -727,11 +752,13 @@ export default function TeacherDashboard() {
 
   // ── Home ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-  const openWork = assessments.filter((item: any) => !(item.my_response || item.myResponse));
-  const nextExam = myExams.find((exam: any) => !isPastDue(exam.dueDate, now));
+  // To do lists only what can still be done: closed work is on Assessments, never here.
+  const toDo = assessmentRows.filter((row) => assessmentGroup(row) === 0);
+  const nextExam = toDo.find((row) => row.type === "exam")?.item;
+  const openWork = toDo.find((row) => row.type === "work")?.item;
   const todoItems = [
     nextExam && { key: "exam", title: nextExam.title, detail: nextExam.paperUrl ? "Open the paper and write your answers" : "Write this exam on your desk", go: () => setLocation(`/teacher/exams/${nextExam.id}`) },
-    openWork[0] && { key: "work", title: openWork[0].title, detail: "Written work still due", go: () => setTab("work") },
+    openWork && { key: "work", title: openWork.title, detail: "Written work still due", go: () => setTab("assessments") },
   ].filter(Boolean) as Array<{ key: string; title: string; detail: string; go: () => void }>;
 
   // A session on right now (from 15 minutes before it starts) goes to the top of Home, with its Join button.
@@ -740,6 +767,7 @@ export default function TeacherDashboard() {
   const home = (
     <>
       <PageHeading title={`Habari, ${firstName}`} sub={headerLine} testId="text-welcome" titleLoading={teacherLoading} />
+      <div className="mt-2 empty:hidden"><KindBadge /></div>
       {liveNow && (
         <section
           className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sl-line bg-sl-surface px-5 py-4"
@@ -880,6 +908,8 @@ export default function TeacherDashboard() {
         </div>
 
         <div className="min-w-0 space-y-4">
+          <DeskPhoto desk="fellow" />
+          <DailyLine />
           <SideCard title="Coming up">
             {eventsLoading ? (
               <SideLines label="Loading what is coming up" />
@@ -896,7 +926,7 @@ export default function TeacherDashboard() {
                 ))}
               </ul>
             )}
-            <p><a href="?tab=work#my-calendar" className={LINK} onClick={(event) => { event.preventDefault(); setTab("work"); window.setTimeout(() => document.getElementById("my-calendar")?.scrollIntoView(), 0); }}>Open my calendar</a></p>
+            <p><a href="/calendar" className={LINK} onClick={(event) => { event.preventDefault(); setLocation("/calendar"); }}>Open my calendar</a></p>
           </SideCard>
           <SideCard title="From your trainer">
             {commentsLoading ? (
@@ -1072,220 +1102,212 @@ export default function TeacherDashboard() {
         </Panel>
       )}
 
+      {/* Hidden when there are none: an empty "Materials" panel on every Fellow's Learning page would only be noise. */}
+      {materials.length > 0 && (
+        <Panel title="Materials" id="my-materials" testId="card-teacher-materials" sub="Files and links your trainers shared with you">
+          <ul className="divide-y divide-sl-line">
+            {materials.map((material: any) => {
+              const file = safeFileHref(material.fileUrl);
+              const link = safeFileHref(material.linkUrl);
+              return (
+                <li key={material.id} className="space-y-1 px-5 py-3">
+                  <p className="text-[15px] font-semibold text-sl-ink">{material.title}</p>
+                  <p className="text-[13px] text-sl-muted">{[material.cohortName, material.createdAt ? fmtDay(material.createdAt) : ""].filter(Boolean).join(" · ")}</p>
+                  {material.note && <p className="whitespace-pre-wrap text-[15px] text-sl-ink">{material.note}</p>}
+                  <p className="flex flex-wrap gap-4">
+                    {file && <a className={`text-sm font-medium ${LINK}`} href={file} target="_blank" rel="noopener noreferrer">Open {material.fileName || "the file"}</a>}
+                    {link && <a className={`text-sm font-medium ${LINK}`} href={link} target="_blank" rel="noopener noreferrer">Open the link</a>}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
+
       <p className="text-sm text-sl-muted">
-        Medals and your course percentages are on <a href="?tab=progress" className={LINK} onClick={goTab("progress")}>Progress</a>.
+        Medals and your course percentages are on<a href="?tab=progress" className={LINK} onClick={goTab("progress")}>Progress</a>.
       </p>
     </>
   );
 
-  // ── Work ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  // ── Assessments ──────────────────────────────────────────────────────────────────────────────────────────────
 
-  const workView = (
-    <>
-      <PageHeading
-        title="Work"
-        sub={`Written work your trainer sets${cohortNames ? ` in ${cohortNames}` : ""} · marked out of 100`}
-      />
-      <Panel title="Your written work" id="my-work" testId="card-teacher-work">
-        {workLoading ? (
-          <SkeletonRows label="Loading your written work" rows={2} />
-        ) : assessments.length === 0 ? (
-          <Empty title="No written work yet." body="When your trainer sets some, it appears here with its due date." />
-        ) : (
-          <div className="divide-y divide-sl-line">
-            {workPager.slice.map((item: any) => {
-              const id = item.id;
-              const submitted = item.my_response || item.myResponse;
-              const score = item.trainer_score ?? item.trainerScore;
-              const comment = item.trainer_comment || item.trainerComment;
-              const marked = score != null;
-              const due = pickField(item, "due_date", "dueDate");
-              const fileUrl = item.file_url || item.fileUrl;
-              const batch = cohortName(pickField(item, "batch_id", "batchId"));
-              const draft = workDrafts[id] ?? readDraft(id);
-              return (
-                <article key={id} className="space-y-3 px-5 py-4" aria-label={item.title}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-lg font-semibold text-sl-ink">{item.title}</h3>
-                      <p className="text-sm text-sl-muted">{[batch, due ? `due ${fmtWhen(due)}` : ""].filter(Boolean).join(" · ")}</p>
-                    </div>
-                    {marked ? <Chip tone="done">Marked · {score} / 100</Chip> : submitted ? <Chip>Submitted · waiting for your trainer's mark</Chip> : <Chip tone="done">Open</Chip>}
-                  </div>
-                  <div>
-                    <p className="text-[15px] font-semibold text-sl-ink">Instructions</p>
-                    <p className="whitespace-pre-wrap text-[15px] text-sl-ink">{item.instructions}</p>
-                    {fileUrl && (
-                      <a className={`text-sm font-medium ${LINK}`} href={fileUrl} target="_blank" rel="noreferrer">
-                        Open {item.file_name || item.fileName || "the file"}
-                      </a>
-                    )}
-                  </div>
-                  {submitted ? (
-                    <div className="space-y-2">
-                      {comment && (
-                        <div className="rounded-lg bg-sl-ground px-4 py-3">
-                          <p className="text-[13px] font-semibold text-sl-neutral">Comment from your trainer</p>
-                          <p className="text-[15px] text-sl-ink">{comment}</p>
-                        </div>
-                      )}
-                      {shownAnswers[id] ? (
-                        <div>
-                          <p className="text-[15px] font-semibold text-sl-ink">Your answer</p>
-                          <p className="whitespace-pre-wrap text-[15px] text-sl-ink">{submitted}</p>
-                        </div>
-                      ) : null}
-                      <button type="button" className={`min-h-[44px] ${LINK}`} onClick={() => setShownAnswers((current) => ({ ...current, [id]: !current[id] }))}>
-                        {shownAnswers[id] ? "Hide your answer" : "Show your answer"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <label htmlFor={`answer-${id}`} className="block text-[15px] font-semibold text-sl-ink">Your answer</label>
-                      <textarea
-                        id={`answer-${id}`}
-                        rows={7}
-                        className={FIELD}
-                        value={draft}
-                        onChange={(e) => setWorkDrafts((current) => ({ ...current, [id]: e.target.value }))}
-                      />
-                      <p className="text-[13px] text-sl-muted">
-                        {draftSavedAt[id] ? `Draft saved on this device at ${draftSavedAt[id]}. ` : ""}Your trainer sees it only after you submit.
-                      </p>
-                      <div className="flex flex-wrap justify-end gap-3">
-                        <button
-                          type="button"
-                          className={BTN_SECONDARY}
-                          disabled={!draft.trim()}
-                          onClick={() => {
-                            writeDraft(id, draft);
-                            setDraftSavedAt((current) => ({ ...current, [id]: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }));
-                          }}
-                        >
-                          Save draft
-                        </button>
-                        <button
-                          type="button"
-                          className={BTN_PRIMARY}
-                          disabled={!draft.trim() || submitWork.isPending}
-                          onClick={() => submitWork.mutate({ id, response: draft })}
-                        >
-                          Submit answer
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-            {workPager.pages > 1 && <div className="px-5 pb-4"><PageStrip page={workPager.page} pages={workPager.pages} setPage={workPager.setPage} /></div>}
-          </div>
+  const examKindLabel = (exam: any) => (exam.kind === "paper" ? "Paper exam" : exam.kind === "written" ? "Written exam" : "Exam");
+
+  const examRow = (row: Extract<AssessmentRow, { type: "exam" }>) => {
+    const exam = row.item;
+    const standing = examStanding(exam);
+    const paper = exam.kind === "paper";
+    const finished = row.done && !paper && exam.kind !== "written";
+    const batch = cohortName(exam.batchId);
+    // A closed exam nobody tried has no way in: no button, no link. One they tried stays readable.
+    const canOpen = !row.closed || standing.tries > 0;
+    const action = row.closed ? "Review answers" : paper ? "Open" : finished ? "Review answers" : standing.tries > 0 ? "Try again" : "Start";
+    return (
+      <li key={row.key} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4" data-testid={`row-exam-${exam.id}`}>
+        <div className="min-w-0 space-y-1">
+          <p className="text-[15px] text-sl-ink">
+            <span className="font-semibold">{exam.title}</span>
+            <span className="text-sl-muted">{exam.dueDate ? ` · due ${fmtWhen(exam.dueDate)}` : ""}</span>
+          </p>
+          <p className="text-[13px] text-sl-muted">{[examKindLabel(exam), batch].filter(Boolean).join(" · ")}</p>
+          {row.closed && standing.tries === 0 ? (
+            <Chip tone="neutral" testId={`chip-closed-${exam.id}`}>Closed</Chip>
+          ) : paper ? (
+            <p className="text-[13px] text-sl-muted">Opens as a document: read the paper on the left, write your answers on the right.</p>
+          ) : standing.passed ? (
+            <Chip tone="done">Passed · {standing.best}%{row.closed ? " · Closed" : ""}</Chip>
+          ) : standing.tries === 0 ? (
+            <Chip>Not started · pass at {standing.passMark}% · {QUIZ_ATTEMPTS} tries</Chip>
+          ) : (
+            <Chip tone={standing.left === 0 || row.closed ? "neutral" : "attention"}>
+              Not passed · {standing.best}% · {row.closed ? "Closed" : standing.left === 0 ? "no tries left" : `${standing.left} ${standing.left === 1 ? "try" : "tries"} left`}
+            </Chip>
+          )}
+          {row.closed && standing.tries === 0 && exam.description && <p className="whitespace-pre-wrap text-sm text-sl-muted">{exam.description}</p>}
+        </div>
+        {canOpen && (
+          <button
+            type="button"
+            className={action === "Start" || action === "Try again" ? BTN_PRIMARY : BTN_SECONDARY}
+            onClick={() => setLocation(`/teacher/exams/${exam.id}`)}
+            data-testid={`link-exam-${exam.id}`}
+          >
+            {action}
+          </button>
         )}
-      </Panel>
-
-      <Panel title="My calendar" id="my-calendar" sub="Sessions and deadlines for your cohorts">
-        {eventsLoading ? (
-          <SkeletonRows label="Loading your calendar" rows={3} />
-        ) : upcomingEvents.length === 0 ? (
-          <Empty title="Nothing scheduled yet." body="A session or deadline your trainer adds appears here." />
-        ) : (
-          <>
-            <ul className="divide-y divide-sl-line">
-              {eventPager.slice.map((event: any) => (
-                <li key={event.id} className="px-5 py-3 text-sm">
-                  <p className="text-[15px] font-medium text-sl-ink">{event.title}</p>
-                  <p className="text-sl-muted">
-                    {pickField(event, "event_type", "eventType")} · {fmtWhen(pickField(event, "start_date", "startDate"))}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            {eventPager.pages > 1 && <div className="px-5 pb-4"><PageStrip page={eventPager.page} pages={eventPager.pages} setPage={eventPager.setPage} /></div>}
-          </>
-        )}
-      </Panel>
-    </>
-  );
-
-  // ── Quizzes ──────────────────────────────────────────────────────────────────────────────────────────────────
-
-  const examStanding = (exam: any) => {
-    const tries = examAttempts.filter((attempt: any) => attempt.assignedQuizId === exam.id);
-    const passMark = exam.passMark || MODULE_QUIZ_PASS_PERCENT;
-    const best = tries.reduce((top: number, attempt: any) => Math.max(top, attempt.totalQuestions > 0 ? Math.round((attempt.score / attempt.totalQuestions) * 100) : 0), 0);
-    const passed = tries.some((attempt: any) => attempt.totalQuestions > 0 && (attempt.score / attempt.totalQuestions) * 100 >= passMark);
-    return { tries: tries.length, passMark, best, passed, left: Math.max(0, QUIZ_ATTEMPTS - tries.length) };
+      </li>
+    );
   };
 
-  const examsByCohort = myExams.reduce((groups: Record<string, any[]>, exam: any) => {
-    const key = exam.batchId || "";
-    (groups[key] = groups[key] || []).push(exam);
-    return groups;
-  }, {});
+  const workRow = (row: Extract<AssessmentRow, { type: "work" }>) => {
+    const item = row.item;
+    const id = item.id;
+    const submitted = item.my_response || item.myResponse;
+    const score = item.trainer_score ?? item.trainerScore;
+    const comment = item.trainer_comment || item.trainerComment;
+    const marked = score != null;
+    const fileUrl = safeFileHref(item.file_url || item.fileUrl);
+    const batch = cohortName(pickField(item, "batch_id", "batchId"));
+    const draft = workDrafts[id] ?? readDraft(id);
+    return (
+      <li key={row.key} className="space-y-3 px-5 py-4" aria-label={item.title} data-testid={`row-work-${id}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-sl-ink">{item.title}</h3>
+            <p className="text-sm text-sl-muted">{["Written work", batch, row.due ? `due ${fmtWhen(row.due)}` : ""].filter(Boolean).join(" · ")}</p>
+          </div>
+          {marked ? (
+            <Chip tone="done">Marked · {score} / 100</Chip>
+          ) : submitted ? (
+            <Chip>Submitted · waiting for your trainer's mark</Chip>
+          ) : row.closed ? (
+            <Chip testId={`chip-closed-${id}`}>Closed</Chip>
+          ) : (
+            <Chip tone="done">Open</Chip>
+          )}
+        </div>
+        <div>
+          <p className="text-[15px] font-semibold text-sl-ink">Instructions</p>
+          <p className="whitespace-pre-wrap text-[15px] text-sl-ink">{item.instructions}</p>
+          {fileUrl && (
+            <a className={`text-sm font-medium ${LINK}`} href={fileUrl} target="_blank" rel="noopener noreferrer">
+              Open {item.file_name || item.fileName || "the file"}
+            </a>
+          )}
+        </div>
+        {submitted ? (
+          <div className="space-y-2">
+            {comment && (
+              <div className="rounded-lg bg-sl-ground px-4 py-3">
+                <p className="text-[13px] font-semibold text-sl-neutral">Comment from your trainer</p>
+                <p className="text-[15px] text-sl-ink">{comment}</p>
+              </div>
+            )}
+            {shownAnswers[id] ? (
+              <div>
+                <p className="text-[15px] font-semibold text-sl-ink">Your answer</p>
+                <p className="whitespace-pre-wrap text-[15px] text-sl-ink">{submitted}</p>
+              </div>
+            ) : null}
+            <button type="button" className={`min-h-[44px] ${LINK}`} onClick={() => setShownAnswers((current) => ({ ...current, [id]: !current[id] }))}>
+              {shownAnswers[id] ? "Hide your answer" : "Show your answer"}
+            </button>
+          </div>
+        ) : row.closed ? (
+          <p className="text-sm text-sl-muted">This work is closed: its deadline has passed, so it can no longer be handed in.</p>
+        ) : (
+          <div className="space-y-2">
+            <label htmlFor={`answer-${id}`} className="block text-[15px] font-semibold text-sl-ink">Your answer</label>
+            <textarea
+              id={`answer-${id}`}
+              rows={7}
+              className={FIELD}
+              value={draft}
+              onChange={(e) => setWorkDrafts((current) => ({ ...current, [id]: e.target.value }))}
+            />
+            <p className="text-[13px] text-sl-muted">
+              {draftSavedAt[id] ? `Draft saved on this device at ${draftSavedAt[id]}. ` : ""}Your trainer sees it only after you submit.
+            </p>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                className={BTN_SECONDARY}
+                disabled={!draft.trim()}
+                onClick={() => {
+                  writeDraft(id, draft);
+                  setDraftSavedAt((current) => ({ ...current, [id]: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }));
+                }}
+              >
+                Save draft
+              </button>
+              <button
+                type="button"
+                className={BTN_PRIMARY}
+                disabled={!draft.trim() || submitWork.isPending}
+                onClick={() => submitWork.mutate({ id, response: draft })}
+              >
+                Submit answer
+              </button>
+            </div>
+          </div>
+        )}
+      </li>
+    );
+  };
 
-  const quizzesView = (
+  const assessmentsView = (
     <>
       <PageHeading
-        title="Quizzes"
-        sub={<>Exams your trainer assigned. Lesson file quizzes are on each module page in <a href="?tab=learning" className={LINK} onClick={goTab("learning")}>Learning</a>.</>}
+        title="Assessments"
+        sub={<>Exams and written work from your trainers{cohortNames ? ` in ${cohortNames}` : ""}, what needs doing first. Quizzes on lesson files are on each module page in <a href="?tab=learning" className={LINK} onClick={goTab("learning")}>Learning</a>.</>}
       />
-      <Panel title="Your exams" id="your-exams" testId="card-teacher-exams">
-        {examsLoading ? (
-          <SkeletonRows label="Loading your exams" rows={3} />
-        ) : myExams.length === 0 ? (
-          <Empty title="No exams yet." body="When your trainer assigns one, it appears here with its due date, pass mark and tries." />
+      <Panel title="Your assessments" id="my-work" testId="card-teacher-work">
+        {workLoading || examsLoading ? (
+          <SkeletonRows label="Loading your assessments" rows={3} />
+        ) : assessmentRows.length === 0 ? (
+          <Empty title="Nothing assigned yet." body="When your trainer sets an exam or written work, it appears here with its due date." />
         ) : (
-          <div className="space-y-5 px-5 py-4">
-            {Object.entries(examsByCohort).map(([batchId, exams]) => (
-              <div key={batchId || "none"} className="space-y-2">
-                {batchId && cohortName(batchId) && (
-                  <h3 className="text-base font-semibold text-sl-ink">{cohortName(batchId)} <span className="font-normal text-sl-muted">· {exams.length} exam{exams.length === 1 ? "" : "s"}</span></h3>
-                )}
-                <ul className="space-y-2">
-                  {exams.map((exam: any) => {
-                    const standing = examStanding(exam);
-                    const paper = exam.kind === "paper";
-                    const finished = standing.passed || (standing.tries > 0 && standing.left === 0);
-                    const closed = isPastDue(exam.dueDate, now);
-                    const action = closed ? "Review answers" : paper ? "Open" : finished ? "Review answers" : standing.tries > 0 ? "Try again" : "Start";
-                    return (
-                      <li key={exam.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sl-line px-4 py-3">
-                        <div className="min-w-0">
-                          <p className="text-[15px] text-sl-ink">
-                            <span className="font-semibold">{exam.title}</span>
-                            <span className="text-sl-muted">{exam.dueDate ? ` · due ${fmtWhen(exam.dueDate)}` : ""}</span>
-                          </p>
-                          {paper ? (
-                            <p className="text-[13px] text-sl-muted">Opens as a document: read the paper on the left, write your answers on the right.</p>
-                          ) : standing.passed ? (
-                            <Chip tone="done">Passed · {standing.best}%</Chip>
-                          ) : standing.tries === 0 ? (
-                            <Chip>Not started · pass at {standing.passMark}% · {QUIZ_ATTEMPTS} tries</Chip>
-                          ) : (
-                            <Chip tone={standing.left === 0 ? "neutral" : "attention"}>
-                              Not passed · {standing.best}% · {standing.left === 0 ? "no tries left" : `${standing.left} ${standing.left === 1 ? "try" : "tries"} left`}
-                            </Chip>
-                          )}
-                          {!paper && exam.kind === "written" && <p className="text-[13px] text-sl-muted">Written exam</p>}
-                        </div>
-                        <button
-                          type="button"
-                          className={action === "Start" || action === "Try again" ? BTN_PRIMARY : BTN_SECONDARY}
-                          onClick={() => setLocation(`/teacher/exams/${exam.id}`)}
-                          data-testid={`link-exam-${exam.id}`}
-                        >
-                          {action}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-            <p className="text-[13px] text-sl-muted">After each try you see which answers were right. The correct answers show after your last try.</p>
+          <div data-testid="card-teacher-exams">
+            {workPager.slice.map((row, index) => {
+              const group = assessmentGroup(row);
+              const first = index === 0 || assessmentGroup(workPager.slice[index - 1]) !== group;
+              return (
+                <div key={row.key}>
+                  {first && <h3 className="border-b border-sl-line bg-sl-ground/50 px-5 py-2 text-sm font-semibold text-sl-ink">{ASSESSMENT_GROUP_TITLES[group]}</h3>}
+                  <ul className="border-b border-sl-line">{row.type === "exam" ? examRow(row) : workRow(row)}</ul>
+                </div>
+              );
+            })}
+            {workPager.pages > 1 && <div className="border-t border-sl-line px-5 py-4"><PageStrip page={workPager.page} pages={workPager.pages} setPage={workPager.setPage} /></div>}
+            <p className="border-t border-sl-line px-5 py-3 text-[13px] text-sl-muted">
+              After each exam try you see which answers were right. The correct answers show after your last try. A closed item stays here with its deadline, but cannot be sat or handed in.
+            </p>
           </div>
         )}
       </Panel>
+      <p className="text-sm text-sl-muted">Sessions and deadlines are on the <a href="/calendar" className={LINK} onClick={(event) => { event.preventDefault(); setLocation("/calendar"); }}>Calendar</a>.</p>
     </>
   );
 
@@ -1321,6 +1343,11 @@ export default function TeacherDashboard() {
         {!pathLoading && cohorts.length === 0 && (
           <Panel title="Cohorts" id="progress-none">
             <Empty title="You are not in a cohort yet." body="An Admin places you in one. Your courses, attendance and medals appear here." />
+          </Panel>
+        )}
+        {!weeksLoading && uniqueCourses.length > 0 && (
+          <Panel title="Progress by course" id="progress-chart" sub="How far you are through each course, out of 100%">
+            <CourseProgressChart rows={courseProgressRows(uniqueCourses.map((course: any) => ({ name: course.courseName, pct: courseState({ completed: false }, course).pct })))} />
           </Panel>
         )}
         <div className="space-y-6" data-testid={medalRows.length > 0 ? "card-teacher-medals" : undefined}>
@@ -1697,65 +1724,65 @@ export default function TeacherDashboard() {
 
   // ── Messages ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-  const peers = deskPeers.map((peer: any) => ({ id: peer.id as string, name: peer.name as string, role: (peer.role || "trainer") as string }));
+  // Trainers first, then the Admins who wrote to this Fellow (the server lists them). One thread each.
+  const peers = [
+    ...deskPeers.map((peer: any) => ({ id: peer.id as string, name: peer.name as string, role: (peer.role || "trainer") as string })),
+    ...adminThreads.map((peer: any) => ({ id: peer.id as string, name: peer.name as string, role: "admin" as string })),
+  ];
+  const peersAreLoading = peersLoading || adminThreadsLoading;
   const activePeer = peers.find((peer) => peer.id === deskPeerId) || peers[0] || null;
+  const roleWord = (role: string) => (role === "admin" ? "Admin" : "Trainer");
 
   const messagesView = (
     <>
-      <PageHeading title="Messages" sub="Desk mail with your trainers, their feedback, and notes from the academy." />
-      <Panel title="Desk mail with your trainer" id="desk-mail-panel" sub="Private: only you and that trainer read a thread.">
-        <div className="flex flex-wrap">
-          <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1 border-sl-line px-5 py-4 md:border-r">
-            <h3 className="mb-1 text-[15px] font-semibold text-sl-ink">Threads</h3>
-            {peersLoading ? (
-              <Loading label="Loading your threads" className="space-y-2">
-                <SkeletonBar className="h-11 w-full" />
-                <SkeletonBar className="h-11 w-full" />
-              </Loading>
-            ) : peers.length === 0 ? (
-              <>
-                <p className="text-[15px] font-medium text-sl-ink">No threads yet.</p>
-                <p className="text-sm text-sl-muted">Each trainer you write to gets one thread here.</p>
-              </>
-            ) : (
-              <ul className="space-y-1">
-                {peers.map((peer) => (
-                  <li key={peer.id}>
-                    <button
-                      type="button"
-                      aria-current={peer.id === activePeer?.id ? "true" : undefined}
-                      onClick={() => setDeskPeerId(peer.id)}
-                      className={`flex min-h-[44px] w-full items-center rounded-lg px-3 text-left text-[15px] ${peer.id === activePeer?.id ? "bg-sl-accent-soft font-semibold text-sl-accent" : "text-sl-ink hover:bg-sl-neutral-soft"}`}
-                    >
-                      {peer.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="min-w-0 flex-[2_1_380px] space-y-3 px-5 py-4">
-            <h3 className="text-[15px] font-semibold text-sl-ink">New message</h3>
-            {peers.length > 0 && (
-              <div className="max-w-sm space-y-1.5">
-                <label htmlFor="desk-to" className="text-sm font-medium text-sl-ink">To</label>
-                <select id="desk-to" className={`${FIELD} min-h-[44px]`} value={activePeer?.id || ""} onChange={(e) => setDeskPeerId(e.target.value)}>
+      <PageHeading title="Messages" sub="Desk mail first, then feedback and notices from the academy." />
+      <Panel title="Desk mail" id="desk-mail-panel" sub="Private: only you and the person you write to read a thread.">
+        {!peersAreLoading && peers.length === 0 ? (
+          <Empty title="No threads yet." body="Each Trainer you write to, and each Admin who writes to you, gets one thread here." />
+        ) : (
+          <div className="flex flex-wrap">
+            <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1 border-sl-line px-5 py-4 md:border-r">
+              <h3 className="mb-1 text-[15px] font-semibold text-sl-ink">Threads</h3>
+              {peersAreLoading ? (
+                <Loading label="Loading your threads" className="space-y-2">
+                  <SkeletonBar className="h-11 w-full" />
+                  <SkeletonBar className="h-11 w-full" />
+                </Loading>
+              ) : (
+                <ul className="space-y-1">
                   {peers.map((peer) => (
-                    <option key={peer.id} value={peer.id}>{peer.name}</option>
+                    <li key={peer.id}>
+                      <button
+                        type="button"
+                        aria-current={peer.id === activePeer?.id ? "true" : undefined}
+                        onClick={() => setDeskPeerId(peer.id)}
+                        className={`flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-[15px] ${peer.id === activePeer?.id ? "bg-sl-accent-soft font-semibold text-sl-accent" : "text-sl-ink hover:bg-sl-neutral-soft"}`}
+                      >
+                        <span className="min-w-0 truncate">{peer.name}</span>
+                        <span className="shrink-0 text-xs font-normal text-sl-muted">{roleWord(peer.role)}</span>
+                      </button>
+                    </li>
                   ))}
-                </select>
-              </div>
-            )}
-            <DeskMail peer={activePeer} selfLabel={teacher?.name || "Fellow"} bare loading={peersLoading} />
+                </ul>
+              )}
+            </div>
+            <div className="min-w-0 flex-[2_1_380px] space-y-3 px-5 py-4">
+              <h3 className="text-[15px] font-semibold text-sl-ink">{activePeer ? `With ${activePeer.name}` : "Conversation"}</h3>
+              <DeskMail key={activePeer?.id || "none"} peer={activePeer} selfLabel={teacher?.name || "Fellow"} bare loading={peersAreLoading} />
+            </div>
           </div>
-        </div>
+        )}
       </Panel>
 
+      {/* Feedback and notices show only when there is something, or while they load; one line says when both are empty. */}
+      {!commentsLoading && !noticesLoading && trainerComments.length === 0 && deskNotices.length === 0 && (
+        <p className="text-sm text-sl-muted" data-testid="messages-nothing-else">No feedback or notices yet. They appear here, newest first.</p>
+      )}
+
+      {(commentsLoading || trainerComments.length > 0) && (
       <Panel title="Trainer feedback" id="trainer-feedback" sub="Comments your trainers leave on your progress. Read only.">
         {commentsLoading ? (
           <SkeletonRows label="Loading your trainer's feedback" rows={2} />
-        ) : trainerComments.length === 0 ? (
-          <Empty title="No feedback yet." body="Feedback appears here marked Progress, Improvement or General." />
         ) : (
           <div className="px-5 py-4">
             <ul className="space-y-2">
@@ -1773,12 +1800,12 @@ export default function TeacherDashboard() {
           </div>
         )}
       </Panel>
+      )}
 
+      {(noticesLoading || deskNotices.length > 0) && (
       <Panel title="From the academy" id="academy-notices" sub="Academy notices from your Admin and cohort notes from your trainers. Read only.">
         {noticesLoading ? (
           <SkeletonRows label="Loading notices from the academy" rows={2} />
-        ) : deskNotices.length === 0 ? (
-          <Empty title="Nothing yet." body={`Notices for every Fellow and notes to ${cohortNames || "your cohorts"} appear here, newest first.`} />
         ) : (
           <div className="px-5 py-4">
             <ul className="space-y-2">
@@ -1793,6 +1820,7 @@ export default function TeacherDashboard() {
           </div>
         )}
       </Panel>
+      )}
     </>
   );
 
@@ -1834,8 +1862,7 @@ export default function TeacherDashboard() {
       <div className="space-y-6" data-testid="fellow-desk">
         {tab === "home" && home}
         {tab === "learning" && learningView}
-        {tab === "work" && workView}
-        {tab === "quizzes" && quizzesView}
+        {tab === "assessments" && assessmentsView}
         {tab === "progress" && progressView}
         {tab === "reflect" && reflectView}
         {tab === "messages" && messagesView}

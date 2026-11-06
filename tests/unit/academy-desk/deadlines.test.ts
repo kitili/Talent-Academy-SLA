@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DEADLINE_PASSED, fellowStillSees, isPastDue } from "../../../shared/academyPath.ts";
+import { DEADLINE_PASSED, isPastDue } from "../../../shared/academyPath.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const source = (path: string) => readFileSync(join(root, path), "utf8").replace(/\r\n/g, "\n");
@@ -26,15 +26,6 @@ describe("a deadline", () => {
     assert.equal(isPastDue(null, now), false);
     assert.equal(isPastDue("", now), false);
     assert.equal(isPastDue("not a date", now), false);
-  });
-
-  it("keeps the old list rule working for the Fellow page, the only reader left until task T2-F", () => {
-    assert.match(source("client/src/pages/teacher-dashboard.tsx"), /fellowStillSees/);
-    assert.doesNotMatch(routes, /fellowStillSees/);
-    assert.equal(fellowStillSees("2026-10-28T00:00:00Z", false, now), false);
-    assert.equal(fellowStillSees("2026-10-28T00:00:00Z", true, now), true);
-    assert.equal(fellowStillSees("2026-10-30T00:00:00Z", false, now), true);
-    assert.equal(fellowStillSees(null, false, now), true);
   });
 });
 

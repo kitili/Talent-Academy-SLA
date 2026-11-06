@@ -15,7 +15,7 @@ test('each desk lists the board\'s items in order', () => {
     const labels = (desk: keyof typeof DESK_MENUS) => DESK_MENUS[desk].map((item) => item.label)
     assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Messages', 'Calendar / Schedule', 'Attendance', 'Analytics', 'Certificates'])
     assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Live sessions', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Calendar / Schedule'])
-    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Calendar / Schedule', 'Certificates'])
+    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Assessments', 'Progress', 'Reflect', 'Messages', 'Calendar / Schedule', 'Certificates'])
 })
 
 test('the Trainer\'s sessions live on the Calendar page: no Schedule item of its own', () => {
@@ -39,7 +39,7 @@ test('a person\'s or a cohort\'s own pages keep their menu item current', () => 
     assert.equal(deskItemForLocation('admin', '/courses/12/weeks/3'), 'cohorts')
     assert.equal(deskItemForLocation('trainer', '/cohorts/abc'), 'cohorts')
     assert.equal(deskItemForLocation('fellow', '/teacher/week/9/content'), 'learning')
-    assert.equal(deskItemForLocation('fellow', '/teacher/exams/5'), 'quizzes')
+    assert.equal(deskItemForLocation('fellow', '/teacher/exams/5'), 'assessments')
     assert.equal(deskItemForLocation('fellow', '/teacher/certificates/1'), 'certificates')
 })
 
@@ -78,7 +78,7 @@ test('Admin items keep the admin-nav-* hooks the tour and tests use; other desks
 })
 
 test('each phone bar holds four of its desk\'s items, the rest go under More', () => {
-    assert.deepEqual(DESK_PHONE_BAR.fellow, ['home', 'learning', 'work', 'messages'])
+    assert.deepEqual(DESK_PHONE_BAR.fellow, ['home', 'learning', 'assessments', 'messages'])
     for (const desk of ['admin', 'trainer', 'fellow'] as const) {
         const keys = DESK_MENUS[desk].map((item) => item.key)
         assert.equal(DESK_PHONE_BAR[desk].length, 4, desk)
