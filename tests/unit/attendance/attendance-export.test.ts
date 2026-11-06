@@ -65,6 +65,12 @@ describe("attendance CSV rows", () => {
     assert.ok(attendanceCsv([mark({ person: 'A, "B"' })]).includes('"A, ""B""","In-house Fellow"'));
   });
 
+  it("keeps a name's letters, with the byte order mark Excel needs to read them", () => {
+    const csv = attendanceCsv([mark({ person: "Wanjirũ" })]);
+    assert.ok(csv.startsWith("﻿"));
+    assert.ok(csv.includes('"Wanjirũ"'));
+  });
+
   it("prefixes a value a spreadsheet would run, and leaves ordinary values alone", () => {
     for (const value of ["=1+1", "+254700", "-2+3", "@SUM(A1)", "\t=1+1", "\r=1+1", "  =1+1", "=HYPERLINK(\"http://x\")"]) {
       assert.ok(csvCell(value).startsWith(`"'`), `${JSON.stringify(value)} must open as text`);
@@ -215,7 +221,8 @@ describe("attendance export wiring (text contracts)", () => {
   it("offers a real download link and the browser's print, with no PDF library", () => {
     assert.match(board, /export function AttendanceExportButtons\(\{ csvHref \}: \{ csvHref: string \}\)/);
     assert.match(board, /<a href=\{csvHref\} download [^>]*>Download CSV<\/a>/);
-    assert.match(board, /onClick=\{\(\) => window\.print\(\)\}[^>]*>Download PDF<\/button>/);
+    assert.match(board, /onClick=\{printAttendance\}[^>]*>Download PDF<\/button>/);
+    assert.match(board, /function printAttendance\(\) \{[\s\S]*?window\.print\(\);\r?\n\}/);
     assert.doesNotMatch(board + page, /jspdf|html2pdf|pdf-lib|pdfkit/i);
   });
 
