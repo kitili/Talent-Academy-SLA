@@ -76,7 +76,7 @@ certificates are untouched. Quizzes already had an audience (`assigned_quiz_teac
 - Email to a Fellow a Trainer registered. The Trainer tells them to open Sign in, choose Fellow, and create a password.
 - A month-grid view of the calendar. It is a dated list grouped by month.
 - Narrowing pre-service Fellows to assessments only. Both kinds see everything, as asked.
-- Simplifying cohorts, steps and courses beyond the Admin page (the Trainer's cohort room, the Fellow's path and Analytics still say "step"; the data model is unchanged): filed as `tasks/unprioritised/simplify-cohorts-batches-and-courses-into-one-chain.md`.
+- Simplifying cohorts, steps and courses beyond the Admin page (the Trainer's cohort room, the Fellow's path and Analytics still say "step"; the data model is unchanged): filed as `tasks/prioritised/replace-steps-with-reusable-curriculums.md`.
 
 ## See also
 

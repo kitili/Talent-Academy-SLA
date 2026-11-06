@@ -24,6 +24,7 @@ Work in this order. The steering engineer reorders freely.
 | # | Task | Family | Added | Blocked on |
 |---|---|---|---|---|
 | 1 | [Mark attendance per session](prioritised/mark-attendance-per-session.md) | Certificates and records | 2026-10-27 | |
+| 2 | [Replace steps with reusable curriculums](prioritised/replace-steps-with-reusable-curriculums.md) | Academy setup and roles | 2026-11-06 | The decisions in the task, and the live database comparison |
 
 ## Unprioritised
 
@@ -43,7 +44,6 @@ Not ranked.
 
 | Task | Added | Blocked on |
 |---|---|---|
-| [Simplify cohorts, batches and courses into one chain](unprioritised/simplify-cohorts-batches-and-courses-into-one-chain.md) | 2026-10-29 | Whether to start stage 2 (stage 1 done on the Admin page) |
 
 ### Certificates and records
 

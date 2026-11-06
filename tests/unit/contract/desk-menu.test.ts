@@ -6,14 +6,15 @@ import {
     DESK_PHONE_BAR,
     deskItemForLocation,
     deskItemHook,
+    deskMenuFor,
 } from '../../../client/src/components/deskMenu.ts'
 
 /** The shell's menus (design/board/Shell.dc.html): which item a location makes current, and the hooks each item carries. */
 
 test('each desk lists the board\'s items in order', () => {
     const labels = (desk: keyof typeof DESK_MENUS) => DESK_MENUS[desk].map((item) => item.label)
-    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Calendar', 'Attendance', 'Analytics', 'Certificates'])
-    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule', 'Calendar'])
+    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Messages', 'Calendar', 'Attendance', 'Analytics', 'Certificates'])
+    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Live sessions', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule', 'Calendar'])
     assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Calendar', 'Certificates'])
 })
 
@@ -77,4 +78,11 @@ test('each phone bar holds four of its desk\'s items, the rest go under More', (
         assert.equal(DESK_PHONE_BAR[desk].length, 4, desk)
         for (const key of DESK_PHONE_BAR[desk]) assert.ok(keys.includes(key), `${desk}: ${key}`)
     }
+})
+
+test('Live sessions is on the menu of an instructional Trainer only', () => {
+    const keys = (type?: string) => deskMenuFor('trainer', type).map((item) => item.key)
+    assert.ok(keys('instructional').includes('live-sessions'))
+    assert.ok(!keys('in_house').includes('live-sessions'))
+    assert.ok(!keys(undefined).includes('live-sessions'))
 })

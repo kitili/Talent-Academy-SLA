@@ -14,6 +14,8 @@ export type DeskMenuItem = {
   also?: readonly string[];
   /** A guided-tour target (`data-tour`) this item carries instead of `nav-<desk>-<test>`. */
   tour?: string;
+  /** Shown only to an instructional Trainer. */
+  instructionalOnly?: boolean;
 };
 
 export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
@@ -22,6 +24,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "approvals", label: "Approvals", href: "/approvals", test: "approvals" },
     { key: "people", label: "People", href: "/admin/people", test: "people", also: ["/admin/trainers", "/admin/teachers"] },
     { key: "cohorts", label: "Cohorts", href: "/admin/batches", test: "cohorts", also: ["/cohorts", "/courses", "/course"] },
+    { key: "messages", label: "Messages", href: "/admin/messages", test: "messages" },
     { key: "calendar", label: "Calendar", href: "/calendar", test: "calendar" },
     { key: "attendance", label: "Attendance", href: "/admin/attendance", test: "attendance" },
     { key: "analytics", label: "Analytics", href: "/admin/analytics", test: "analytics" },
@@ -32,6 +35,7 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "cohorts", label: "Cohorts", href: "/trainer/batches?tab=cohorts", test: "cohorts", also: ["/cohorts", "/courses", "/course", "/trainer/teachers"] },
     { key: "fellows", label: "Fellows", href: "/trainer/fellows", test: "fellows" },
     { key: "courses", label: "Courses", href: "/trainer/courses", test: "courses" },
+    { key: "live-sessions", label: "Live sessions", href: "/trainer/live-sessions", test: "live-sessions", instructionalOnly: true },
     { key: "assessments", label: "Assessments", href: "/trainer/batches?tab=assessments", test: "assessments" },
     { key: "progress", label: "Progress", href: "/trainer/batches?tab=progress", test: "progress" },
     { key: "attendance", label: "Attendance", href: "/trainer/batches?tab=attendance", test: "attendance" },
@@ -51,6 +55,11 @@ export const DESK_MENUS: Record<Desk, readonly DeskMenuItem[]> = {
     { key: "certificates", label: "Certificates", href: "/teacher/certificates", test: "certificates", tour: "teacher-certificates" },
   ],
 };
+
+/** The items this person sees on their desk. */
+export function deskMenuFor(desk: Desk, trainerType?: string | null): readonly DeskMenuItem[] {
+  return DESK_MENUS[desk].filter((item) => !item.instructionalOnly || trainerType === "instructional");
+}
 
 export const DESK_LABELS: Record<Desk, string> = { admin: "Admin", trainer: "Trainer", fellow: "Fellow" };
 

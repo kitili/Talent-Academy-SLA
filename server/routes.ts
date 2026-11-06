@@ -64,6 +64,11 @@ import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
+import { registerDeadlineRoutes } from "./deadlineRoutes";
+import { registerMaterialRoutes } from "./materialRoutes";
+import { registerAdminMailRoutes } from "./adminMailRoutes";
+import { registerAttendanceExportRoutes } from "./attendanceExportRoutes";
+import { registerDailyLineRoutes } from "./dailyLineRoutes";
 import { audienceWithNames, canRunOnlineSessions, countKinds, fellowTypeOf, FELLOW_TYPES, parseOnlineFields, trainerTypeOf, TRAINER_TYPES } from "@shared/academyPeople";
 import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
@@ -6715,6 +6720,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   registerAcademyPathRoutes(app, isAuthenticated, isAdmin, isTeacherAuthenticated);
   registerAcademyDeskRoutes(app, isAuthenticated, isTrainer, isAdmin);
+  const guards = { isAuthenticated, isAuthenticatedAny, isTrainer, isAdmin, isTeacherAuthenticated };
+  registerDeadlineRoutes(app, guards);
+  registerMaterialRoutes(app, guards);
+  registerAdminMailRoutes(app, guards);
+  registerAttendanceExportRoutes(app, guards);
+  registerDailyLineRoutes(app, guards);
 
   const httpServer = createServer(app);
   return httpServer;
