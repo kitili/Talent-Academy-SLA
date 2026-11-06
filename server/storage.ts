@@ -115,12 +115,14 @@ import {
   cohortTrainers,
   cohortBatches,
   assignedQuizTeachers,
+  deadlineReopenings,
   type OpenEndedReview,
   type InsertOpenEndedReview,
   type QuizQuestion,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql as sqlOp, desc, max, inArray } from "drizzle-orm";
+import { eq, and, or, sql as sqlOp, desc, asc, lt, max, inArray } from "drizzle-orm";
+import type { DeadlineKind } from "@shared/academyPath";
 import { quizVisibleToTeacher, summarizeTrainerDesk, type TrainerCohortSummary } from "@shared/trainerDesk";
 import { assignmentRoster, audienceWithNames } from "@shared/academyPeople";
 import { courseHealth, quizStoppedReason } from "./cohortAccess";
@@ -151,7 +153,7 @@ export function utcTimestamps<T extends Record<string, unknown>>(rows: T[], keys
   });
 }
 import { TALENT_SIGNATORY_1, TALENT_SIGNATORY_2 } from "@shared/talentCertificate";
-import { kindForIssue, wordingForIssue } from "@shared/certificateDesigns";
+import { kindForIssue } from "@shared/certificateDesigns";
 
 const PostgresSessionStore = connectPg(session);
 const sessionDatabaseUrl = resolveDatabaseUrl();
@@ -341,6 +343,7 @@ export interface IStorage {
     occasion: "graduation" | "course";
     courseId?: string;
     batchId?: string;
+    appreciationText: string;
   }): Promise<TeacherCertificate>;
   updateTeacherCertificate(certificateId: string, updates: Partial<Pick<TeacherCertificate, 'teacherName' | 'courseName' | 'appreciationText' | 'adminName1' | 'adminName2'>>): Promise<TeacherCertificate | undefined>;
   
@@ -1479,6 +1482,58 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  /** This Fellow's own deadline on one item, if it was reopened for them. */
+  async getDeadlineReopening(kind: DeadlineKind, itemId: string, teacherId: string): Promise<Date | null> {
+    const [row] = await db.select({ dueDate: deadlineReopenings.dueDate }).from(deadlineReopenings)
+      .where(and(eq(deadlineReopenings.kind, kind), eq(deadlineReopenings.itemId, itemId), eq(deadlineReopenings.teacherId, teacherId)))
+      .orderBy(desc(deadlineReopenings.createdAt))
+      .limit(1);
+    return row?.dueDate ?? null;
+  }
+
+  /** This Fellow's own deadlines on every item of a kind, by item id. */
+  async getDeadlineReopeningsForTeacher(kind: DeadlineKind, teacherId: string): Promise<Record<string, Date>> {
+    const rows = await db.select({ itemId: deadlineReopenings.itemId, dueDate: deadlineReopenings.dueDate }).from(deadlineReopenings)
+      .where(and(eq(deadlineReopenings.kind, kind), eq(deadlineReopenings.teacherId, teacherId)))
+      .orderBy(asc(deadlineReopenings.createdAt));
+    return Object.fromEntries(rows.map((row) => [row.itemId, row.dueDate]));
+  }
+
+  /** Everyone with their own deadline on one item. */
+  async listDeadlineReopenings(kind: DeadlineKind, itemId: string): Promise<Array<{ teacherId: string; dueDate: Date }>> {
+    const rows = await db.select({ teacherId: deadlineReopenings.teacherId, dueDate: deadlineReopenings.dueDate }).from(deadlineReopenings)
+      .where(and(eq(deadlineReopenings.kind, kind), eq(deadlineReopenings.itemId, itemId)))
+      .orderBy(asc(deadlineReopenings.createdAt));
+    return Array.from(new Map(rows.map((row) => [row.teacherId, row])).values());
+  }
+
+  /**
+   * Update, then insert. `server/db.ts` creates `idx_deadline_reopenings_unique` at start-up, so two reopenings racing
+   * no longer leave two rows: the second insert is refused and that request fails. If the index could not be created
+   * (that step only logs on failure) they can leave two, the readers above take the newest, and the next update moves both.
+   */
+  async upsertDeadlineReopening(row: { kind: DeadlineKind; itemId: string; teacherId: string; dueDate: Date; createdBy: string | null }) {
+    const [updated] = await db.update(deadlineReopenings)
+      .set({ dueDate: row.dueDate, createdBy: row.createdBy })
+      .where(and(eq(deadlineReopenings.kind, row.kind), eq(deadlineReopenings.itemId, row.itemId), eq(deadlineReopenings.teacherId, row.teacherId)))
+      .returning();
+    if (updated) return updated;
+    const [created] = await db.insert(deadlineReopenings).values(row).returning();
+    return created;
+  }
+
+  /**
+   * An item's own due date has moved: a Fellow's reopening earlier than it would hold them to less time than everyone
+   * else, so it goes. No due date at all means nobody has a deadline, so every reopening goes. A later one stays.
+   */
+  async dropSupersededReopenings(kind: DeadlineKind, itemId: string, due: Date | null) {
+    await db.delete(deadlineReopenings).where(and(
+      eq(deadlineReopenings.kind, kind),
+      eq(deadlineReopenings.itemId, itemId),
+      due ? lt(deadlineReopenings.dueDate, due) : undefined,
+    ));
+  }
+
   async resetTeacherQuizAttempts(quizId: string, teacherId: string): Promise<void> {
     await db
       .delete(teacherQuizAttempts)
@@ -2067,6 +2122,7 @@ export class DatabaseStorage implements IStorage {
     occasion: "graduation" | "course";
     courseId?: string;
     batchId?: string;
+    appreciationText: string;
   }): Promise<TeacherCertificate> {
     const teacher = await this.getTeacher(input.teacherId);
     if (!teacher) throw new Error("Teacher not found");
@@ -2093,7 +2149,7 @@ export class DatabaseStorage implements IStorage {
       kind: kindForIssue(input.design, input.occasion),
       teacherName: teacher.name,
       courseName,
-      appreciationText: wordingForIssue(input.design, input.occasion, courseName),
+      appreciationText: input.appreciationText,
       adminName1: TALENT_SIGNATORY_1.name,
       adminName2: TALENT_SIGNATORY_2.name,
       completionPercentage: 100,
@@ -2202,8 +2258,10 @@ export class DatabaseStorage implements IStorage {
         JOIN batch_courses bc ON bc.batch_id = wa.batch_id
         JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
         WHERE bc.course_id = ${course.id}
-          AND wa.due_date IS NOT NULL
-          AND wa.due_date < NOW()
+          AND COALESCE(
+            (SELECT MAX(r.due_date) FROM deadline_reopenings r WHERE r.kind = 'assignment' AND r.item_id = wa.id AND r.teacher_id = bt.teacher_id),
+            wa.due_date
+          ) < NOW()
           AND NOT EXISTS (
             SELECT 1 FROM assignment_submissions s
             WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id
@@ -2624,8 +2682,10 @@ export class DatabaseStorage implements IStorage {
       SELECT COUNT(*)::int AS count
       FROM written_assignments wa
       JOIN batch_teachers bt ON bt.batch_id = wa.batch_id
-      WHERE wa.due_date IS NOT NULL
-        AND wa.due_date < NOW()
+      WHERE COALESCE(
+          (SELECT MAX(r.due_date) FROM deadline_reopenings r WHERE r.kind = 'assignment' AND r.item_id = wa.id AND r.teacher_id = bt.teacher_id),
+          wa.due_date
+        ) < NOW()
         AND NOT EXISTS (
           SELECT 1 FROM assignment_submissions s
           WHERE s.assignment_id = wa.id AND s.teacher_id = bt.teacher_id

@@ -122,7 +122,7 @@ export const TRAINER_TOUR: TourStep[] = [
   },
   {
     title: "The side menu",
-    body: "Home shows what needs you today. Then Cohorts, Assessments, Progress, Attendance, Messages, and Schedule. Open a cohort to see its Fellows; Progress shows where each one is.",
+    body: "Home shows what needs you today. Then Cohorts, Assessments, Progress, Attendance, Messages, and Calendar / Schedule. Open a cohort to see its Fellows; Progress shows where each one is.",
     target: "trainer-tools",
   },
   {
@@ -148,7 +148,7 @@ export const TEACHER_TOUR: TourStep[] = [
   },
   {
     title: "Your progress",
-    body: "Progress shows each cohort's courses, attendance and medals, and how far you are on the academy path. Written work is on Work.",
+    body: "Progress shows each cohort's courses, attendance and medals, and how far you are on the academy path. Exams and written work are on Assessments.",
     target: "teacher-progress",
   },
   {

@@ -24,7 +24,7 @@ type CohortOwner = { trainerId?: string | null; trainerIds?: string[] | null };
 /**
  * Whether the caller may read or change a cohort's certificate rows (C4, N6): an admin reaches every cohort, a
  * trainer only the cohorts they run. A missing cohort is its own answer, so the route sends 404 and never treats
- * "no cohort" as "any staff may" (`staffCanAccessBatch(user, undefined)` would).
+ * "no cohort" as "any staff may".
  */
 export async function certificateCohortAccess(
   user: Parameters<typeof trainerOwnsBatch>[0],

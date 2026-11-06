@@ -6,8 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AttendanceBoard } from "@/components/AttendanceBoard";
-import type { AttendancePerson } from "@shared/attendanceDesk";
+import { AttendanceBoard, AttendanceExportButtons } from "@/components/AttendanceBoard";
+import { markDateLabel, type AttendancePerson } from "@shared/attendanceDesk";
 
 type Payload = {
   teachers: AttendancePerson[];
@@ -39,12 +39,6 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 
 function longDate(date: Date) {
   return date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-}
-
-function shortDate(iso?: string | null) {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 /** The people no mark has reached, in one plain line per kind of person. */
@@ -118,12 +112,15 @@ export default function AdminAttendance() {
       scene="hall"
     >
       <div className="flex max-w-[1040px] flex-col gap-6" data-testid="admin-attendance">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-[28px] font-semibold text-sl-ink">Attendance</h1>
-          <p className="text-sm text-sl-muted">Mark Fellows and Trainers for a day. Today is {longDate(new Date())}</p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-[28px] font-semibold text-sl-ink">Attendance</h1>
+            <p className="text-sm text-sl-muted print:hidden">Mark Fellows and Trainers for a day. Today is {longDate(new Date())}</p>
+          </div>
+          <AttendanceExportButtons csvHref="/api/admin/attendance.csv" />
         </div>
 
-        <section aria-labelledby="attendance-mark" className="flex flex-col gap-4 rounded-xl border border-sl-line bg-sl-surface p-5">
+        <section aria-labelledby="attendance-mark" className="flex flex-col gap-4 rounded-xl border border-sl-line bg-sl-surface p-5 print:hidden">
           <h2 id="attendance-mark" className="text-lg font-semibold text-sl-ink">Mark attendance</h2>
           <form
             aria-labelledby="attendance-mark"
@@ -229,13 +226,13 @@ export default function AdminAttendance() {
                     const chip = STATUSES.find((item) => item.value === row.status);
                     return (
                       <tr key={`${row.role}-${row.id}`} className="border-t border-sl-neutral-soft" data-testid={`attendance-row-${row.id}`}>
-                        <td className="px-5 py-3 text-sl-muted">{shortDate(row.date)}</td>
+                        <td className="px-5 py-3 text-sl-muted">{markDateLabel(row.date)}</td>
                         <td className="px-3 py-3 text-sl-ink">
                           {row.name} <span className="text-sl-muted">· {row.role === "trainer" ? "Trainer" : "Fellow"}</span>
                         </td>
                         <td className="px-3 py-3 text-sl-ink">{row.batchName || "—"}</td>
                         <td className="px-5 py-3">
-                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${chip?.chip ?? "bg-sl-neutral-soft text-sl-neutral"}`}>
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold [print-color-adjust:exact] ${chip?.chip ?? "bg-sl-neutral-soft text-sl-neutral"}`}>
                             {chip?.label ?? row.status}
                           </span>
                         </td>

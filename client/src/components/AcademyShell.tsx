@@ -18,11 +18,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
-import logoImage from "@assets/Screenshot 2025-10-14 214034_1761029433045.png";
+import logoImage from "@assets/silverleaf-logo.png";
 import { SceneBackdrop, type SceneName } from "@/components/SceneBackdrop";
 import {
   DESK_LABELS,
-  DESK_MENUS,
+  deskMenuFor,
   DESK_NAV_TOUR,
   DESK_PHONE_BAR,
   deskItemForLocation,
@@ -138,6 +138,8 @@ const itemClass = (on: boolean) =>
 /** The desk's side menu: a column at 1024 px and wider, a wrapped strip above the page on narrower screens. */
 export function DeskNav({ desk, current, onNavigate }: { desk: Desk; current?: string; onNavigate?: (key: string) => void }) {
   const on = useCurrentItem(desk, current);
+  const { user } = useAuth();
+  const items = deskMenuFor(desk, (user as { trainerType?: string } | null)?.trainerType);
   return (
     <nav
       aria-label={`${DESK_LABELS[desk]} desk`}
@@ -146,7 +148,7 @@ export function DeskNav({ desk, current, onNavigate }: { desk: Desk; current?: s
       className="hidden shrink-0 border-b border-sl-line bg-sl-nav print:hidden sm:block lg:max-w-[280px] lg:flex-[1_1_232px] lg:overflow-y-auto lg:border-b-0 lg:border-r"
     >
       <div className="flex flex-wrap gap-1 px-4 py-2 sm:px-6 lg:flex-col lg:flex-nowrap lg:px-3 lg:py-5">
-        {DESK_MENUS[desk].map((item) => (
+        {items.map((item) => (
           <DeskLink key={item.key} desk={desk} item={item} on={on === item.key} onNavigate={onNavigate} hooks className={itemClass(on === item.key)}>
             {item.label}
           </DeskLink>
@@ -160,7 +162,8 @@ export function DeskNav({ desk, current, onNavigate }: { desk: Desk; current?: s
 export function DeskPhoneBar({ desk, current, onNavigate }: { desk: Desk; current?: string; onNavigate?: (key: string) => void }) {
   const on = useCurrentItem(desk, current);
   const [moreOpen, setMoreOpen] = useState(false);
-  const items = DESK_MENUS[desk];
+  const { user } = useAuth();
+  const items = deskMenuFor(desk, (user as { trainerType?: string } | null)?.trainerType);
   const bar = DESK_PHONE_BAR[desk].map((key) => items.find((item) => item.key === key)).filter((item): item is DeskMenuItem => !!item);
   const rest = items.filter((item) => !bar.includes(item));
   const moreOn = rest.some((item) => item.key === on);

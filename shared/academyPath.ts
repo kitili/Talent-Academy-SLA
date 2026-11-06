@@ -115,12 +115,61 @@ export function isPastDue(due: unknown, now: Date = new Date()) {
   return date !== null && date.getTime() <= now.getTime();
 }
 
+/** What a deadline can be reopened on: `quiz` is an assigned quiz or exam, `assignment` a written assignment or assessment. */
+export type DeadlineKind = "quiz" | "assignment";
+
+type DeadlineValue = string | Date | null | undefined;
+
+/** A Fellow's own deadline: their `deadline_reopenings.due_date` when a row exists, otherwise the item's due date. */
+export function effectiveDeadline(itemDue: DeadlineValue, reopenedDue?: DeadlineValue) {
+  return reopenedDue ?? itemDue ?? null;
+}
+
+/** The deadline this Fellow works to, and whether it has passed for them. `closed` takes away the way to submit, not the item. */
+export function fellowDeadline(itemDue: DeadlineValue, reopenedDue?: DeadlineValue, now: Date = new Date()) {
+  const dueDate = effectiveDeadline(itemDue, reopenedDue);
+  return { dueDate, closed: isPastDue(dueDate, now) };
+}
+
 /**
- * Past-due work leaves a Fellow's lists. Work they already handed in or tried stays, read-only, so they keep their
- * mark; answering is refused either way once the deadline passes.
+ * All a Fellow gets of a closed quiz or exam they never tried. Named fields only, so a question, paper or file added
+ * to the table later cannot ride along. `id`, `batchId`, `kind` and `closed` let the screen place it; `kind` says the
+ * sort of work and carries no link.
  */
-export function fellowStillSees(due: unknown, handedIn: boolean, now: Date = new Date()) {
-  return handedIn || !isPastDue(due, now);
+export function closedQuizItem(
+  quiz: { id: string; batchId: string; title?: string | null; description?: string | null },
+  kind: string,
+  dueDate: DeadlineValue,
+) {
+  return {
+    id: quiz.id,
+    batchId: quiz.batchId,
+    kind,
+    title: quiz.title ?? null,
+    description: quiz.description ?? null,
+    dueDate: dueDate ?? null,
+    closed: true as const,
+  };
+}
+
+/**
+ * All a Fellow gets of a closed written assignment they never handed in. The row is raw SQL, so its columns are snake
+ * case (`file_url`, `file_name`): named fields keep those out, where a list of `fileUrl`-style names to remove would not.
+ */
+export function closedAssignmentItem(
+  row: { id: string; batch_id?: string | null; kind?: string | null; title?: string | null; instructions?: string | null },
+  dueDate: DeadlineValue,
+) {
+  return {
+    id: row.id,
+    batch_id: row.batch_id ?? null,
+    kind: row.kind ?? null,
+    title: row.title ?? null,
+    instructions: row.instructions ?? null,
+    due_date: dueDate ?? null,
+    dueDate: dueDate ?? null,
+    closed: true as const,
+  };
 }
 
 export const DEADLINE_PASSED = "The deadline has passed";

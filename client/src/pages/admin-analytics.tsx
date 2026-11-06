@@ -122,7 +122,7 @@ function StatusChip({ tone, children }: { tone: "risk" | "attention" | "done" | 
   return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
-// Traffic light: green is on track, yellow needs attention, red is at risk.
+// Traffic light: the server sends green, yellow and red; they show as done (blue), attention (amber) and risk (red).
 function TrafficLightBadge({ status }: { status: string }) {
   if (status === "green") return <StatusChip tone="done">On track</StatusChip>;
   if (status === "yellow") return <StatusChip tone="attention">Moderate</StatusChip>;
@@ -1019,7 +1019,7 @@ export default function AdminAnalytics() {
                     label="Participation Rate"
                     value={`${pipelineData?.participationRate ?? 0}%`}
                     icon={TrendingUp}
-                    color="green"
+                    color="blue"
                     subtitle={`${pipelineData?.activeLast30Days ?? 0} active in the last 30 days`}
                   />
                   <KPICard
@@ -2683,7 +2683,7 @@ export default function AdminAnalytics() {
                           <ChartTooltip content={<ChartTooltipContent />} />
                           <Bar dataKey="avgCompletion" radius={[4, 4, 0, 0]}>
                             {performanceData.batchComparison.map((entry: any, index: number) => {
-                              let color = CHART_COLORS[2]; // green
+                              let color = CHART_COLORS[2]; // blue
                               if (entry.avgCompletion < 30) color = CHART_COLORS[4]; // red
                               else if (entry.avgCompletion < 60) color = CHART_COLORS[3]; // amber
                               return <Cell key={index} fill={color} />;

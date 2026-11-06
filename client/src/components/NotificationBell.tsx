@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { SkeletonRows } from "@/components/Skeletons";
 
 interface Notification {
   id: string;
+  recipientType?: string;
   type: string;
   title: string;
   message: string;
@@ -17,8 +19,30 @@ interface Notification {
   metadata?: any;
 }
 
+/**
+ * Where a notice takes its reader, read off the row so notices already sent work too. Null when the notice is the whole
+ * of what there is to read: a cohort note, an academy notice, a star.
+ */
+export function noticeHref(notice: Pick<Notification, "recipientType" | "type" | "metadata">): string | null {
+  const metadata = notice.metadata || {};
+  if (metadata.fromId) {
+    if (notice.recipientType === "admin") return "/admin/messages";
+    if (notice.recipientType === "trainer") return "/trainer/batches?tab=messages";
+    return "/teacher/dashboard?tab=messages";
+  }
+  if (notice.recipientType !== "teacher") return null;
+  if (metadata.materialId || metadata.opens === "learning") return "/teacher/dashboard?tab=learning";
+  if (notice.type === "session_reminder") return "/calendar";
+  if (notice.type === "deadline" || metadata.assignmentId || metadata.quizId) return "/teacher/dashboard?tab=assessments";
+  return null;
+}
+
+/** The label beside a notice. Anything else, `general` included, carries none: the stored words are code, not copy. */
+const TYPE_LABELS: Record<string, string> = { deadline: "Deadline", session_reminder: "Session" };
+
 export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" }) {
   const [open, setOpen] = useState(false);
+  const [, setLocation] = useLocation();
 
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
@@ -64,6 +88,14 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
 
   const handleOpen = () => {
     setOpen(true);
+  };
+
+  const followNotice = (notice: Notification) => {
+    if (notice.isRead === "no") markReadMutation.mutate(notice.id);
+    const href = noticeHref(notice);
+    if (!href) return;
+    setOpen(false);
+    setLocation(href);
   };
 
   return (
@@ -116,33 +148,33 @@ export function NotificationBell({ tone = "dark" }: { tone?: "dark" | "light" })
             ) : (
               <div className="divide-y">
                 {notifications.map((n) => (
-                  <div
+                  <button
+                    type="button"
                     key={n.id}
-                    className={`px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+                    className={`block w-full px-4 py-3 text-left cursor-pointer hover:bg-muted/50 transition-colors ${
                       n.isRead === "no" ? "bg-sl-accent-soft" : ""
                     }`}
-                    onClick={() => {
-                      if (n.isRead === "no") markReadMutation.mutate(n.id);
-                    }}
+                    onClick={() => followNotice(n)}
+                    data-testid={`notification-${n.id}`}
                   >
                     <div className="flex items-start gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{n.title}</p>
+                          <p className="text-sm font-medium break-words">{n.title}</p>
                           {n.isRead === "no" && (
                             <span className="h-2 w-2 rounded-full bg-sl-accent flex-shrink-0" aria-label="Unread" />
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap break-words">{n.message}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {n.createdAt ? new Date(n.createdAt).toLocaleString() : ""}
                         </p>
                       </div>
-                      {n.type && (
-                        <Badge variant="outline" className="text-xs flex-shrink-0 capitalize">{n.type}</Badge>
+                      {TYPE_LABELS[n.type] && (
+                        <Badge variant="outline" className="text-xs flex-shrink-0">{TYPE_LABELS[n.type]}</Badge>
                       )}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

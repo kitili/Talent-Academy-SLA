@@ -272,7 +272,7 @@ async function main() {
 
   const past = new Date(Date.now() - 3_600_000).toISOString();
   const late = await trainer.post(`/api/batches/${cohortId}/assignments`, { title: "Already closed", instructions: "x", kind: "assessment", dueDate: past });
-  check("Work past its deadline is not on the Fellow's list", !((await fellowB.get("/api/teacher/assignments")).json || []).some((w: any) => w.id === late.json?.id));
+  check("Work past its deadline stays on the Fellow's list, closed", ((await fellowB.get("/api/teacher/assignments")).json || []).find((w: any) => w.id === late.json?.id)?.closed === true);
   const lateAnswer = await fellowB.post(`/api/teacher/assignments/${late.json?.id}/submit`, { response: "too late" });
   check("An answer after the deadline is refused", lateAnswer.status === 410, JSON.stringify(lateAnswer));
   const closing = await trainer.post(`/api/batches/${cohortId}/assignments`, { title: "Handed in before it closed", instructions: "x", kind: "assessment", dueDate: soon });
@@ -313,6 +313,97 @@ async function main() {
   check("The Trainer's figures count uploaded assessments and answers to mark", deskFigures.assessments >= 2 && deskFigures.toMark >= 1, JSON.stringify({ a: deskFigures.assessments, m: deskFigures.toMark }));
   const pipeline = (await admin.get("/api/admin/analytics/pipeline")).json || {};
   check("Participation counts Fellows active in the last 30 days", pipeline.activeLast30Days >= 2 && pipeline.enrolled >= 2, JSON.stringify(pipeline));
+
+  // ── 12. SLA feedback: four kinds, closed work, reopening, materials, Admin mail, calendar right, exports, lines ──
+  await trainer.patch(`/api/trainer/fellows/${fellowBId}/type`, { fellowType: "in_house" });
+  const trainerList = (await admin.get("/api/admin/trainers")).json || [];
+  const fellowList = (await admin.get("/api/admin/teachers")).json || [];
+  const kindOf = (rows: any[], id: string, field: string) => rows.find((row) => row.id === id)?.[field];
+  check("People lists name an instructional Trainer", kindOf(trainerList, trainerRow?.id, "trainerType") === "instructional");
+  check("People lists name an in-house Trainer", kindOf(trainerList, otherRow?.id, "trainerType") === "in_house");
+  const kindA = kindOf(fellowList, fellowAId, "fellowType");
+  const kindB = kindOf(fellowList, fellowBId, "fellowType");
+  check("People lists name in-house and pre-service Fellows", new Set([kindA, kindB]).size === 2 && [kindA, kindB].every(Boolean), `${kindA} ${kindB}`);
+  check("A Trainer's own kind comes back on sign-in", (await trainer.get("/api/user")).json?.trainerType === "instructional");
+  check("A Fellow's own kind comes back on sign-in", (await fellowA.get("/api/user")).json?.fellowType === kindA);
+
+  const closedRow = ((await fellowB.get("/api/teacher/assignments")).json || []).find((w: any) => w.id === late.json?.id);
+  check("A closed item never handed in carries no file", closedRow?.closed === true && closedRow.fileUrl === undefined, JSON.stringify(closedRow));
+  const badReopen = await trainer.post("/api/deadlines/reopen", { kind: "assignment", itemId: late.json?.id, scope: "everyone", dueDate: past });
+  check("A reopened deadline must be in the future", badReopen.status === 400, JSON.stringify(badReopen));
+  const reopenByOutsider = await other.post("/api/deadlines/reopen", { kind: "assignment", itemId: late.json?.id, scope: "fellow", teacherId: fellowBId, dueDate: soon });
+  check("A Trainer of another cohort cannot reopen it", reopenByOutsider.status === 403, JSON.stringify(reopenByOutsider));
+  const reopenByFellow = await fellowB.post("/api/deadlines/reopen", { kind: "assignment", itemId: late.json?.id, scope: "fellow", teacherId: fellowBId, dueDate: soon });
+  check("A Fellow cannot reopen it", reopenByFellow.status === 401 || reopenByFellow.status === 403, String(reopenByFellow.status));
+  const reopenOne = await trainer.post("/api/deadlines/reopen", { kind: "assignment", itemId: late.json?.id, scope: "fellow", teacherId: fellowBId, dueDate: soon });
+  check("The Trainer reopens it for one Fellow", reopenOne.status === 200, JSON.stringify(reopenOne));
+  const openForB = ((await fellowB.get("/api/teacher/assignments")).json || []).find((w: any) => w.id === late.json?.id);
+  const stillClosedForA = ((await fellowA.get("/api/teacher/assignments")).json || []).find((w: any) => w.id === late.json?.id);
+  check("It is open for that Fellow", openForB?.closed === false, JSON.stringify(openForB));
+  check("It stays closed for everyone else", stillClosedForA?.closed === true, JSON.stringify(stillClosedForA));
+  check("That Fellow can now hand it in", (await fellowB.post(`/api/teacher/assignments/${late.json?.id}/submit`, { response: "reopened" })).status === 200);
+  check("Nobody else can", (await fellowA.post(`/api/teacher/assignments/${late.json?.id}/submit`, { response: "no" })).status === 410);
+  const reopenings = (await trainer.get(`/api/deadlines/reopenings?kind=assignment&itemId=${late.json?.id}`)).json || [];
+  check("The Trainer sees who has their own deadline", reopenings.length === 1 && reopenings[0].teacherId === fellowBId, JSON.stringify(reopenings));
+  const reopenAll = await admin.post("/api/deadlines/reopen", { kind: "assignment", itemId: late.json?.id, scope: "everyone", dueDate: soon });
+  check("The Admin reopens it for everyone", reopenAll.status === 200, JSON.stringify(reopenAll));
+  check("It is now open for the rest", ((await fellowA.get("/api/teacher/assignments")).json || []).find((w: any) => w.id === late.json?.id)?.closed === false);
+
+  const named = await trainer.post(`/api/batches/${cohortId}/materials`, { title: "For one Fellow", linkUrl: "https://example.com/notes", teacherIds: [fellowAId] });
+  check("The Trainer shares a material with one Fellow", named.status === 201, JSON.stringify(named));
+  const toCohort = await trainer.post(`/api/batches/${cohortId}/materials`, { title: "For the cohort", linkUrl: "https://example.com/all" });
+  check("The Trainer shares a material with the whole cohort", toCohort.status === 201, JSON.stringify(toCohort));
+  const titles = async (person: Person) => ((await person.get("/api/teacher/materials")).json || []).map((m: any) => m.title);
+  const seenA = await titles(fellowA);
+  const seenB = await titles(fellowB);
+  check("The named Fellow receives both", seenA.includes("For one Fellow") && seenA.includes("For the cohort"), JSON.stringify(seenA));
+  check("Another Fellow receives only the cohort's", !seenB.includes("For one Fellow") && seenB.includes("For the cohort"), JSON.stringify(seenB));
+  check("A script link is refused", (await trainer.post(`/api/batches/${cohortId}/materials`, { title: "Bad", linkUrl: "javascript:alert(1)" })).status === 400);
+  check("A file not uploaded here is refused", (await trainer.post(`/api/batches/${cohortId}/materials`, { title: "Bad", fileUrl: "javascript:alert(1)" })).status === 400);
+  check("A Trainer of another cohort cannot read them", (await other.get(`/api/batches/${cohortId}/materials`)).status === 403);
+  check("A script address is refused on an assessment file", (await trainer.post(`/api/batches/${cohortId}/assignments`, { title: "Bad file", instructions: "x", kind: "assessment", fileUrl: "javascript:alert(1)" })).status === 400);
+  check("A Trainer of another cohort cannot read its attendance", (await other.get(`/api/batches/${cohortId}/attendance`)).status === 403);
+  check("...or its attendance summary", (await other.get(`/api/batches/${cohortId}/attendance/summary`)).status === 403);
+
+  const peers = (await admin.get("/api/admin/desk-peers")).json || [];
+  check("The Admin can find Trainers and Fellows to write to", peers.some((p: any) => p.id === trainerRow?.id) && peers.some((p: any) => p.id === fellowAId));
+  check("A Trainer cannot read the Admin's list", (await trainer.get("/api/admin/desk-peers")).status === 403);
+  const adminId = (await admin.get("/api/user")).json?.id;
+  check("The Admin writes to a Trainer", (await admin.post("/api/desk-messages", { toId: trainerRow?.id, toRole: "trainer", body: "Hello Trainer" })).status < 300);
+  check("The Admin writes to a Fellow", (await admin.post("/api/desk-messages", { toId: fellowAId, toRole: "teacher", body: "Hello Fellow" })).status < 300);
+  check("The Trainer finds the Admin's thread", ((await trainer.get("/api/trainer/admin-threads")).json || []).some((p: any) => p.id === adminId));
+  check("The Trainer answers", (await trainer.post("/api/desk-messages", { toId: adminId, toRole: "admin", body: "Hello Admin" })).status < 300);
+  const adminThread = (await admin.get(`/api/desk-messages?withId=${trainerRow?.id}`)).json || [];
+  check("The Admin reads the Trainer's answer", adminThread.some((m: any) => m.body === "Hello Admin"), JSON.stringify(adminThread));
+  check("The Fellow finds the Admin's thread", ((await fellowA.get("/api/teacher/admin-threads")).json || []).some((p: any) => p.id === adminId));
+  check("Another Fellow has no such thread", ((await fellowB.get("/api/teacher/admin-threads")).json || []).length === 0);
+  await fellowA.post("/api/desk-messages", { toId: adminId, toRole: "admin", body: "Hello from a Fellow" });
+  const named2 = ((await admin.get(`/api/desk-messages?withId=${fellowAId}`)).json || []).find((m: any) => m.body === "Hello from a Fellow");
+  check("A Fellow's mail carries their real name", named2 && !/^teacher$/i.test(String(named2.fromName || "")), JSON.stringify(named2));
+
+  const entryBody = { title: "Trainer's holiday", kind: "holiday", startDate: "2027-02-01" };
+  check("A Trainer with no right is refused the calendar", (await trainer.post("/api/admin/academy-calendar", entryBody)).status === 403);
+  check("A Trainer cannot grant it to themselves", (await trainer.patch(`/api/admin/trainers/${trainerRow?.id}/calendar-rights`, { canEditCalendar: true })).status === 403);
+  check("The Admin grants the right", (await admin.patch(`/api/admin/trainers/${trainerRow?.id}/calendar-rights`, { canEditCalendar: true })).status === 200);
+  const added = await trainer.post("/api/admin/academy-calendar", entryBody);
+  check("That Trainer adds to the calendar, published at once", added.status < 300 && Boolean(added.json?.publishedAt), JSON.stringify(added));
+  check("A Fellow sees it straight away", ((await fellowA.get("/api/academy-calendar")).json || []).some((e: any) => e.id === added.json?.id));
+  check("That Trainer cannot change the Admin's entry", (await trainer.del(`/api/admin/academy-calendar/${entry.json?.id}`)).status === 403);
+  check("That Trainer removes their own entry", (await trainer.del(`/api/admin/academy-calendar/${added.json?.id}`)).status < 300);
+  check("That Trainer still cannot press Done", (await trainer.post("/api/admin/academy-calendar/publish", {})).status === 403);
+  await admin.patch(`/api/admin/trainers/${trainerRow?.id}/calendar-rights`, { canEditCalendar: false });
+  check("Taking the right away works at once", (await trainer.post("/api/admin/academy-calendar", entryBody)).status === 403);
+
+  const cohortCsv = await trainer.get(`/api/batches/${cohortId}/attendance.csv`);
+  check("The Trainer downloads the cohort's attendance", cohortCsv.status === 200 && /person/i.test(String(cohortCsv.json)), String(cohortCsv.status));
+  check("A Trainer of another cohort cannot", (await other.get(`/api/batches/${cohortId}/attendance.csv`)).status === 403);
+  check("The Admin downloads the academy's attendance", (await admin.get("/api/admin/attendance.csv")).status === 200);
+  check("A Trainer cannot", (await trainer.get("/api/admin/attendance.csv")).status === 403);
+
+  const lines = await Promise.all([admin, trainer, fellowA].map(async (person) => (await person.get("/api/daily-line")).json?.line));
+  check("Each role gets a daily line, all different", lines.every(Boolean) && new Set(lines).size === 3, JSON.stringify(lines));
+  check("The same person sees the same line all day", (await fellowA.get("/api/daily-line")).json?.line === lines[2]);
+  check("A signed-out visitor gets no line", (await anon.get("/api/daily-line")).status === 401);
 
   await trainer.del(`/api/events/${sessionId}`);
   check("The owning Trainer can remove their session", ((await trainer.get("/api/timetable")).json || []).every((e: any) => e.id !== sessionId));

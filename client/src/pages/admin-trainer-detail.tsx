@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TRAINER_TYPES, TRAINER_TYPE_LABELS, trainerTypeOf } from "@shared/academyPeople";
+import { Switch } from "@/components/ui/switch";
 import { useLocation, useRoute } from "wouter";
 import { AcademyShell } from "@/components/AcademyShell";
 import { deskName } from "@shared/deskName";
@@ -34,6 +35,7 @@ interface TrainerDetail {
   approvalStatus: string;
   createdAt: string;
   trainerType?: string;
+  canEditCalendar?: boolean;
   lastLogin?: string;
   cohortCount?: number;
   completedLessons?: string[];
@@ -67,6 +69,17 @@ export default function AdminTrainerDetail() {
       toast({ title: "Kind of Trainer saved" });
     },
     onError: (error: Error) => toast({ title: "Could not change the kind", description: error.message, variant: "destructive" }),
+  });
+  const calendarRight = useMutation({
+    mutationFn: async (canEditCalendar: boolean) => {
+      const res = await apiRequest("PATCH", `/api/admin/trainers/${trainerId}/calendar-rights`, { canEditCalendar });
+      return res.json();
+    },
+    onSuccess: (data: { canEditCalendar: boolean }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/trainers", trainerId] });
+      toast({ title: data.canEditCalendar ? "This Trainer may now add to the academy calendar" : "This Trainer may no longer add to the academy calendar" });
+    },
+    onError: (error: Error) => toast({ title: "Could not change the calendar right", description: error.message, variant: "destructive" }),
   });
 
   // Fetch trainer details
@@ -155,6 +168,15 @@ export default function AdminTrainerDetail() {
             >
               {TRAINER_TYPES.map((type) => <option key={type} value={type}>{TRAINER_TYPE_LABELS[type]}</option>)}
             </select>
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-sm text-sl-muted">
+            May add to the academy calendar
+            <Switch
+              checked={trainer.canEditCalendar === true}
+              disabled={calendarRight.isPending}
+              onCheckedChange={(checked) => calendarRight.mutate(checked)}
+              data-testid="switch-trainer-calendar"
+            />
           </label>
           <button type="button" className={secondaryButton} onClick={() => setResetOpen(true)} data-testid="button-reset-person-password">
             Reset password…

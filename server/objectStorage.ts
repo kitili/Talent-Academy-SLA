@@ -23,6 +23,14 @@ function usesLocalObjectStorage(): boolean {
   return !process.env.PRIVATE_OBJECT_DIR && !usesBlobStorage();
 }
 
+/**
+ * An upload's id is always a UUID (`randomUUID` below). The routes pass `:id` straight here, and an encoded `..%2F`
+ * would otherwise walk out of the upload folder, and a short id would match any Blob by prefix.
+ */
+export function isLocalObjectId(id: unknown): id is string {
+  return typeof id === "string" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+}
+
 export function localObjectId(objectPath: string): string | null {
   const match = objectPath.match(/(?:\/api\/local-objects\/|\/objects\/local\/)([0-9a-fA-F-]{36})/);
   return match?.[1] || null;
@@ -90,6 +98,7 @@ export class ObjectStorageService {
   }
 
   async saveLocalObject(id: string, data: Buffer): Promise<void> {
+    if (!isLocalObjectId(id)) throw new ObjectNotFoundError();
     if (usesBlobStorage()) {
       await put(`training/${id}`, data, {
         access: "public",
@@ -103,6 +112,7 @@ export class ObjectStorageService {
   }
 
   async readLocalObject(id: string): Promise<Buffer> {
+    if (!isLocalObjectId(id)) throw new ObjectNotFoundError();
     if (usesBlobStorage()) {
       const { blobs } = await list({ prefix: `training/${id}` });
       if (!blobs[0]?.url) throw new ObjectNotFoundError();

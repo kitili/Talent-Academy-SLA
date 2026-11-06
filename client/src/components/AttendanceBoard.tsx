@@ -51,6 +51,32 @@ function totalsFor(teachers: TeacherRow[]) {
   return { totals, marked, rate };
 }
 
+const EXPORT_BUTTON =
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-sl-control bg-sl-surface px-3.5 py-2.5 text-sm text-sl-ink no-underline hover:bg-sl-neutral-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sl-accent";
+
+/** The browser's print dialog, in the light theme: paper is white, whatever the screen is. */
+function printAttendance() {
+  const root = document.documentElement;
+  if (root.classList.contains("dark")) {
+    root.classList.remove("dark");
+    window.addEventListener("afterprint", () => root.classList.add("dark"), { once: true });
+  }
+  window.print();
+}
+
+/**
+ * Download CSV is the server's export. Download PDF is the browser's print-to-PDF, as certificates are: the shell's
+ * header and menus hide themselves on paper, and a page marks anything else that should stay off it with `print:hidden`.
+ */
+export function AttendanceExportButtons({ csvHref }: { csvHref: string }) {
+  return (
+    <div className="flex flex-wrap gap-2 print:hidden" data-testid="attendance-export">
+      <a href={csvHref} download className={EXPORT_BUTTON} data-testid="link-download-attendance-csv">Download CSV</a>
+      <button type="button" onClick={printAttendance} className={EXPORT_BUTTON} data-testid="button-download-attendance-pdf">Download PDF</button>
+    </div>
+  );
+}
+
 /** One white line of figures: the rate, then each status. */
 function SummaryLine({ totals, marked, rate }: { totals: Record<StatusKey, number>; marked: number; rate: number | null }) {
   const figures: Array<[string, string | number]> = [
@@ -67,7 +93,7 @@ function SummaryLine({ totals, marked, rate }: { totals: Record<StatusKey, numbe
         ))}
       </p>
       {marked > 0 && (
-        <div className="flex h-2 gap-[2px] overflow-hidden rounded-full bg-sl-neutral-soft" role="img" aria-label="Attendance split by status">
+        <div className="flex h-2 gap-[2px] overflow-hidden rounded-full bg-sl-neutral-soft [print-color-adjust:exact]" role="img" aria-label="Attendance split by status">
           {STATUSES.filter((status) => totals[status.key] > 0).map((status) => (
             <span
               key={status.key}
@@ -96,7 +122,7 @@ function CohortRates({ trainers, allCohorts, loading }: { trainers: TrainerRow[]
   const unmarked = allCohorts.filter((cohort) => !seen.has(cohort.id));
   return (
     <section className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" aria-labelledby="attendance-by-cohort" data-testid="attendance-cohort-chart">
-      <h2 id="attendance-by-cohort" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink">By cohort</h2>
+      <h2 id="attendance-by-cohort" className="border-b border-sl-line px-5 py-4 text-lg font-semibold text-sl-ink break-after-avoid">By cohort</h2>
       {loading ? (
         <SkeletonRows label="Loading cohorts" rows={3} />
       ) : (
@@ -130,7 +156,7 @@ function CohortRates({ trainers, allCohorts, loading }: { trainers: TrainerRow[]
 function PeopleTable({ title, head, rows, empty, testId }: { title: string; head: string[]; rows: Array<{ id: string; cells: (string | number)[] }>; empty: string; testId: string }) {
   return (
     <section className="overflow-hidden rounded-xl border border-sl-line bg-sl-surface" data-testid={testId}>
-      <h3 className="border-b border-sl-line px-5 py-3.5 text-base font-semibold text-sl-ink">{title}</h3>
+      <h3 className="border-b border-sl-line px-5 py-3.5 text-base font-semibold text-sl-ink break-after-avoid">{title}</h3>
       {rows.length === 0 ? (
         <p className="px-5 py-5 text-sm text-sl-muted">{empty}</p>
       ) : (

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loading, SkeletonBar } from "@/components/Skeletons";
 import { Settings } from "lucide-react";
+import { KindBadge } from "@/components/KindBadge";
 
 interface ProfileSettingsDialogProps {
   /** 'admin' for admin/trainer users, 'teacher' for teacher users */
@@ -224,6 +225,7 @@ export function ProfileSettingsDialog({
               </Loading>
             )}
             <div className="space-y-4" hidden={profileLoading}>
+            <KindBadge />
             {userType === "admin" ? (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">

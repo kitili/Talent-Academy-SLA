@@ -99,7 +99,7 @@ test('assigned-quiz reads and submit use the quiz\'s pass mark and QUIZ_ATTEMPTS
     assert.doesNotMatch(region, />= 80\b/)
     assert.doesNotMatch(region, /(>=|<) 3\b|3 - attempt/)
     assert.match(handler('app.post("/api/assigned-quizzes/:quizId/submit"'), /assignedQuizStanding\(existingAttempts, passMark\)/)
-    assert.match(handler('app.get("/api/assigned-quizzes/:quizId/attempts"'), /assignedQuizStanding\(attempts, passMarkOf\(quiz\?\.passMark\)\)[\s\S]*quiz: quiz \? attemptQuizView\(quiz, standing\) : quiz/)
+    assert.match(handler('app.get("/api/assigned-quizzes/:quizId/attempts"'), /assignedQuizStanding\(attempts, passMarkOf\(stored\?\.passMark\)\)[\s\S]*quiz: quiz \? attemptQuizView\(quiz, standing\) : quiz/)
     assert.match(handler('app.get("/api/teacher/quiz-attempts"'), /quiz: quiz \? attemptQuizView\(quiz, standing\) : null/)
 })
 

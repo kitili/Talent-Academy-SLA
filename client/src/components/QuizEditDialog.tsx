@@ -210,7 +210,7 @@ export function QuizEditDialog({
                         title="Mark as correct"
                       >
                         <CheckCircle
-                          className={`h-4 w-4 ${opt && q.correctAnswer === opt ? "text-green-500" : "text-muted-foreground/30"}`}
+                          className={`h-4 w-4 ${opt && q.correctAnswer === opt ? "text-sl-done" : "text-muted-foreground/30"}`}
                         />
                       </button>
                       <Input

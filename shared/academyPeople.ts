@@ -57,6 +57,23 @@ export function canRunOnlineSessions(actor: { role?: string | null; trainerType?
   return actor.role === "trainer" && trainerTypeOf(actor.trainerType) === "instructional";
 }
 
+/** Who may write to the academy calendar: an Admin, or a Trainer the Admin gave the right to. Nobody else, ever. */
+export function canEditAcademyCalendar(actor: { role?: string | null; canEditCalendar?: boolean | null } | null | undefined) {
+  if (!actor) return false;
+  if (actor.role === "admin") return true;
+  return actor.role === "trainer" && actor.canEditCalendar === true;
+}
+
+/** Which entries they may edit or remove: the Admin any, a Trainer with the right only the ones they created. */
+export function canChangeCalendarEntry(
+  actor: { id?: string | null; role?: string | null; canEditCalendar?: boolean | null } | null | undefined,
+  entry: { createdBy?: string | null },
+) {
+  if (!canEditAcademyCalendar(actor)) return false;
+  if (actor!.role === "admin") return true;
+  return Boolean(actor!.id) && entry.createdBy === actor!.id;
+}
+
 /** Both kinds of Fellow see every lesson, quiz and assessment. The type labels a person; it never narrows access. */
 export function fellowSeesAllLearning(_type: unknown) {
   return true;

@@ -26,6 +26,8 @@ export const users = pgTable("users", {
   role: varchar("role").notNull().default("trainer"), // 'admin' or 'trainer'
   approvalStatus: varchar("approval_status").notNull().default("pending"), // 'pending', 'approved', 'rejected'
   passwordSet: varchar("password_set").notNull().default("yes"),
+  // An Admin may let a Trainer add to the academy calendar. Off unless granted.
+  canEditCalendar: boolean("can_edit_calendar").notNull().default(false),
   trainerType: varchar("trainer_type").notNull().default("in_house"), // 'in_house' or 'instructional'
   approvedBy: varchar("approved_by"), // ID of admin who approved (null if pending)
   approvedAt: timestamp("approved_at"), // timestamp when approved
@@ -1018,6 +1020,42 @@ export const writtenAssignmentTeachers = pgTable("written_assignment_teachers", 
 }, (table) => [
   primaryKey({ columns: [table.assignmentId, table.teacherId] }),
 ]);
+
+// A deadline reopened for one Fellow: their own new deadline for one quiz, exam or written assessment.
+// Reopening for everyone changes the item's own due date instead, so it needs no row here.
+export const deadlineReopenings = pgTable("deadline_reopenings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  kind: varchar("kind").notNull(), // 'quiz' (assigned_quizzes) or 'assignment' (written_assignments)
+  itemId: varchar("item_id").notNull(),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: "cascade" }),
+  dueDate: timestamp("due_date").notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_deadline_reopenings_unique").on(table.kind, table.itemId, table.teacherId),
+]);
+
+export type DeadlineReopening = typeof deadlineReopenings.$inferSelect;
+
+// A file or link a Trainer shares with a cohort or named Fellows. It has no submission or mark, so it
+// stays apart from written_assignments, whose readers all expect work to hand in.
+export const sharedMaterials = pgTable("shared_materials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  batchId: varchar("batch_id").notNull().references(() => batches.id, { onDelete: "cascade" }),
+  title: varchar("title").notNull(),
+  note: text("note"),
+  fileUrl: text("file_url"),
+  fileName: varchar("file_name"),
+  linkUrl: text("link_url"),
+  // Fellow ids. Empty means the whole cohort, as with quizzes and assessments.
+  teacherIds: jsonb("teacher_ids").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_shared_materials_batch").on(table.batchId),
+]);
+
+export type SharedMaterial = typeof sharedMaterials.$inferSelect;
 
 export type InsertWrittenAssignment = z.infer<typeof insertWrittenAssignmentSchema>;
 export type WrittenAssignment = typeof writtenAssignments.$inferSelect;

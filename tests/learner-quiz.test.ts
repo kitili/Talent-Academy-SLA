@@ -205,7 +205,9 @@ describe("route wiring (text contract)", () => {
 
   it("every teacher read of an assigned quiz strips the answers until no retake is left", () => {
     assert.match(handler('app.get("/api/assigned-quizzes/:quizId", isTeacherAuthenticated'), /questions: learnerQuestions\(questions\)/);
-    assert.match(handler('app.get("/api/teacher/quizzes"'), /\.\.\.learnerQuiz\(quiz\)/);
+    // The list row is built in server/deadlineRoutes.ts; tests/unit/deadlines/ drives it.
+    assert.match(handler('app.get("/api/teacher/quizzes"'), /fellowQuizItem\(quiz, /);
+    assert.match(read("server/deadlineRoutes.ts"), /\.\.\.learnerQuiz\(quiz\)/);
     // Attempt reads reveal answers only after a pass or the last attempt (Track B; attemptQuizView in tests/unit/quiz/).
     assert.match(handler('app.get("/api/assigned-quizzes/:quizId/attempts"'), /quiz: quiz \? attemptQuizView\(quiz, standing\) : quiz/);
     assert.match(handler('app.get("/api/teacher/quiz-attempts"'), /quiz: quiz \? attemptQuizView\(quiz, standing\) : null/);

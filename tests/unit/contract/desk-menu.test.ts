@@ -6,15 +6,22 @@ import {
     DESK_PHONE_BAR,
     deskItemForLocation,
     deskItemHook,
+    deskMenuFor,
 } from '../../../client/src/components/deskMenu.ts'
 
 /** The shell's menus (design/board/Shell.dc.html): which item a location makes current, and the hooks each item carries. */
 
 test('each desk lists the board\'s items in order', () => {
     const labels = (desk: keyof typeof DESK_MENUS) => DESK_MENUS[desk].map((item) => item.label)
-    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Calendar', 'Attendance', 'Analytics', 'Certificates'])
-    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Schedule', 'Calendar'])
-    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Work', 'Quizzes', 'Progress', 'Reflect', 'Messages', 'Calendar', 'Certificates'])
+    assert.deepEqual(labels('admin'), ['Home', 'Approvals', 'People', 'Cohorts', 'Messages', 'Calendar / Schedule', 'Attendance', 'Analytics', 'Certificates'])
+    assert.deepEqual(labels('trainer'), ['Home', 'Cohorts', 'Fellows', 'Courses', 'Live sessions', 'Assessments', 'Progress', 'Attendance', 'Messages', 'Calendar / Schedule'])
+    assert.deepEqual(labels('fellow'), ['Home', 'Learning', 'Assessments', 'Progress', 'Reflect', 'Messages', 'Calendar / Schedule', 'Certificates'])
+})
+
+test('the Trainer\'s sessions live on the Calendar page: no Schedule item of its own', () => {
+    assert.equal(DESK_MENUS.trainer.some((item) => item.key === 'schedule' || item.test === 'schedule'), false)
+    assert.equal(DESK_MENUS.trainer.find((item) => item.key === 'calendar')?.href, '/calendar')
+    assert.equal(deskItemForLocation('trainer', '/trainer/batches', '?tab=schedule'), 'home')
 })
 
 test('/admin opens Home, and each admin page names its own item', () => {
@@ -32,13 +39,13 @@ test('a person\'s or a cohort\'s own pages keep their menu item current', () => 
     assert.equal(deskItemForLocation('admin', '/courses/12/weeks/3'), 'cohorts')
     assert.equal(deskItemForLocation('trainer', '/cohorts/abc'), 'cohorts')
     assert.equal(deskItemForLocation('fellow', '/teacher/week/9/content'), 'learning')
-    assert.equal(deskItemForLocation('fellow', '/teacher/exams/5'), 'quizzes')
+    assert.equal(deskItemForLocation('fellow', '/teacher/exams/5'), 'assessments')
     assert.equal(deskItemForLocation('fellow', '/teacher/certificates/1'), 'certificates')
 })
 
 test('Trainer and Fellow sections follow ?tab=, and a desk page with no tab opens on Home', () => {
     assert.equal(deskItemForLocation('trainer', '/trainer/batches', 'tab=messages'), 'messages')
-    assert.equal(deskItemForLocation('trainer', '/trainer/batches', '?tab=schedule'), 'schedule')
+    assert.equal(deskItemForLocation('trainer', '/trainer/batches', '?tab=progress'), 'progress')
     assert.equal(deskItemForLocation('trainer', '/trainer/batches', ''), 'home')
     assert.equal(deskItemForLocation('fellow', '/teacher/dashboard', 'tab=reflect'), 'reflect')
     assert.equal(deskItemForLocation('fellow', '/teacher/dashboard'), 'home')
@@ -71,10 +78,17 @@ test('Admin items keep the admin-nav-* hooks the tour and tests use; other desks
 })
 
 test('each phone bar holds four of its desk\'s items, the rest go under More', () => {
-    assert.deepEqual(DESK_PHONE_BAR.fellow, ['home', 'learning', 'work', 'messages'])
+    assert.deepEqual(DESK_PHONE_BAR.fellow, ['home', 'learning', 'assessments', 'messages'])
     for (const desk of ['admin', 'trainer', 'fellow'] as const) {
         const keys = DESK_MENUS[desk].map((item) => item.key)
         assert.equal(DESK_PHONE_BAR[desk].length, 4, desk)
         for (const key of DESK_PHONE_BAR[desk]) assert.ok(keys.includes(key), `${desk}: ${key}`)
     }
+})
+
+test('Live sessions is on the menu of an instructional Trainer only', () => {
+    const keys = (type?: string) => deskMenuFor('trainer', type).map((item) => item.key)
+    assert.ok(keys('instructional').includes('live-sessions'))
+    assert.ok(!keys('in_house').includes('live-sessions'))
+    assert.ok(!keys(undefined).includes('live-sessions'))
 })

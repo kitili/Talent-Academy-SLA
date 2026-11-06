@@ -12,6 +12,10 @@ import { deadlineLocalValue, parseDeadline } from "@shared/academyPath";
 import { deskName } from "@shared/deskName";
 import { audienceLabel } from "@shared/academyPeople";
 import { AcademyShell } from "@/components/AcademyShell";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import { ReopenDialog, type ReopenTarget } from "@/components/ReopenDialog";
+import { cohortTabFromSearch } from "@/components/deskSections";
+import { apiErrorText, canReopen, materialBody } from "@/components/trainerDeskRules";
 import { SkeletonBar, SkeletonCard, SkeletonFigures, SkeletonRows } from "@/components/Skeletons";
 
 // Buttons, fields and chips follow design/board/CohortRoom.dc.html with the sl-* tokens.
@@ -51,9 +55,10 @@ export default function CohortWorkspace() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user, isAdmin, logoutMutation } = useAuth();
-  // `?tab=work&work=<id>` opens one assessment's marking straight from the Trainer's Assessments page.
+  // `?tab=work&work=<id>` opens one assessment's marking straight from the Trainer's Assessments page. `?tab=quizzes` and
+  // `?tab=work` are the one Assessments tab now (components/deskSections.ts).
   const linked = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
-  const [tab, setTab] = useState(linked.get("tab") || "people");
+  const [tab, setTab] = useState(cohortTabFromSearch(linked.get("tab")));
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
   const [addEmail, setAddEmail] = useState("");
@@ -70,6 +75,13 @@ export default function CohortWorkspace() {
   const [eventTitle, setEventTitle] = useState("");
   const [eventType, setEventType] = useState("session");
   const [eventStart, setEventStart] = useState("");
+  const [reopenTarget, setReopenTarget] = useState<ReopenTarget | null>(null);
+  const [materialTitle, setMaterialTitle] = useState("");
+  const [materialNote, setMaterialNote] = useState("");
+  const [materialLink, setMaterialLink] = useState("");
+  const [materialFile, setMaterialFile] = useState<{ url: string; name: string } | null>(null);
+  const [materialAudience, setMaterialAudience] = useState<string[]>([]);
+  const [materialProblem, setMaterialProblem] = useState("");
 
   const { data: batch, isLoading } = useQuery<any>({
     queryKey: ["/api/batches", batchId],
@@ -131,6 +143,16 @@ export default function CohortWorkspace() {
     queryKey: ["/api/batches", batchId, "announcements"],
     queryFn: async () => {
       const res = await fetch(`/api/batches/${batchId}/announcements`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: Boolean(batchId),
+  });
+
+  const { data: materials = [], isLoading: materialsLoading } = useQuery<any[]>({
+    queryKey: ["/api/batches", batchId, "materials"],
+    queryFn: async () => {
+      const res = await fetch(`/api/batches/${batchId}/materials`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -235,6 +257,42 @@ export default function CohortWorkspace() {
       queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "assignments"] });
     },
     onError: () => toast({ title: "Could not save the deadline", variant: "destructive" }),
+  });
+
+  const shareMaterial = useMutation({
+    mutationFn: async () => {
+      const built = materialBody({
+        title: materialTitle,
+        note: materialNote,
+        fileUrl: materialFile?.url ?? null,
+        fileName: materialFile?.name ?? null,
+        linkUrl: materialLink,
+        teacherIds: materialAudience,
+      });
+      if ("error" in built) throw new Error(built.error);
+      const res = await apiRequest("POST", `/api/batches/${batchId}/materials`, built.body);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Shared with the cohort" });
+      setMaterialTitle("");
+      setMaterialNote("");
+      setMaterialLink("");
+      setMaterialFile(null);
+      setMaterialAudience([]);
+      setMaterialProblem("");
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "materials"] });
+    },
+    onError: (error: Error) => setMaterialProblem(apiErrorText(error, "Could not share the material")),
+  });
+
+  const removeMaterial = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/batches/${batchId}/materials/${id}`),
+    onSuccess: () => {
+      toast({ title: "Material removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/batches", batchId, "materials"] });
+    },
+    onError: (error: Error) => toast({ title: "Could not remove the material", description: apiErrorText(error, "Try again"), variant: "destructive" }),
   });
 
   const createEvent = useMutation({
@@ -359,12 +417,12 @@ export default function CohortWorkspace() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList aria-label="Cohort room" className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-sl-line bg-transparent p-0 text-sl-neutral">
           <TabsTrigger value="people" className={TAB_TRIGGER}>People</TabsTrigger>
-          <TabsTrigger value="quizzes" className={TAB_TRIGGER}>Quizzes</TabsTrigger>
+          <TabsTrigger value="assessments" className={TAB_TRIGGER}>Assessments</TabsTrigger>
+          <TabsTrigger value="materials" className={TAB_TRIGGER}>Materials</TabsTrigger>
           <TabsTrigger value="performance" className={TAB_TRIGGER}>Gradebook</TabsTrigger>
           <TabsTrigger value="graduates" className={TAB_TRIGGER}>Graduates</TabsTrigger>
           <TabsTrigger value="announce" className={TAB_TRIGGER}>Announce</TabsTrigger>
           <TabsTrigger value="calendar" className={TAB_TRIGGER}>Calendar</TabsTrigger>
-          <TabsTrigger value="work" className={TAB_TRIGGER}>Assessments</TabsTrigger>
           <TabsTrigger value="import" className={TAB_TRIGGER}>Import</TabsTrigger>
         </TabsList>
 
@@ -457,7 +515,8 @@ export default function CohortWorkspace() {
           </section>
         </TabsContent>
 
-        <TabsContent value="quizzes" className="mt-5 space-y-3">
+        <TabsContent value="assessments" className="mt-5 space-y-4">
+          <h2 className="text-lg font-semibold text-sl-ink">Quizzes and exams</h2>
           {quizzesLoading || fileQuizzesLoading ? (
             <>
               <SkeletonCard label="Loading quizzes" lines={1} />
@@ -474,6 +533,17 @@ export default function CohortWorkspace() {
                     <Chip tone="neutral">{quiz.status || "ready"}</Chip>
                   </div>
                   <p className="mt-1 text-sm text-sl-muted">{quiz.description || "Module quiz for this cohort"}</p>
+                  <p className="text-sm text-sl-muted">{quiz.dueDate ? `Due ${new Date(quiz.dueDate).toLocaleString()}` : "No due date"} · Given to {audienceLabel(quiz.audience)}</p>
+                  {canReopen(quiz.dueDate) && (
+                    <button
+                      type="button"
+                      className={`${BTN_SECONDARY} mt-2`}
+                      onClick={() => setReopenTarget({ kind: "quiz", itemId: quiz.id, title: quiz.title || "Module quiz", batchId: batchId!, audience: quiz.audience, dueDate: quiz.dueDate })}
+                      data-testid={`button-reopen-quiz-${quiz.id}`}
+                    >
+                      Reopen
+                    </button>
+                  )}
                 </div>
               ))}
               {fileQuizzes.map((quiz: any) => (
@@ -484,6 +554,191 @@ export default function CohortWorkspace() {
               ))}
             </>
           )}
+          <h2 className="pt-2 text-lg font-semibold text-sl-ink">Written assessments</h2>
+          <>
+          <div className={`${PANEL} space-y-3 px-5 py-4`}>
+            <div>
+              <h3 className="text-base font-semibold text-sl-ink">Assign an assessment</h3>
+              <p className="text-sm text-sl-muted">Besides quizzes — written assessments with a due date.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="work-title" className={LABEL}>Title</label>
+              <input id="work-title" className={FIELD} value={workTitle} onChange={(e) => setWorkTitle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="work-instructions" className={LABEL}>Instructions</label>
+              <textarea id="work-instructions" rows={3} className={`${FIELD} resize-y`} value={workInstructions} onChange={(e) => setWorkInstructions(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="work-due" className={LABEL}>Due</label>
+              <input id="work-due" className={FIELD} type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} />
+            </div>
+            <fieldset className="space-y-1.5" data-testid="work-audience">
+              <legend className={LABEL}>Who sits this</legend>
+              <p className="text-xs text-sl-muted">Tick Fellows to give it only to them. Leave every box empty for the whole cohort.</p>
+              {teachers.length === 0 ? (
+                <p className="text-xs text-sl-muted">No Fellows are in this cohort yet.</p>
+              ) : (
+                <div className="max-h-36 space-y-1 overflow-y-auto">
+                  {teachers.map((teacher: any) => (
+                    <label key={teacher.id} className="flex items-center gap-2 text-sm text-sl-ink">
+                      <input
+                        type="checkbox"
+                        checked={workAudience.includes(teacher.id)}
+                        onChange={(e) => setWorkAudience((ids) => e.target.checked ? [...ids, teacher.id] : ids.filter((id) => id !== teacher.id))}
+                        data-testid={`check-work-teacher-${teacher.id}`}
+                      />
+                      {teacher.name || teacher.email || "Fellow"}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+            <button type="button" className={BTN_PRIMARY} disabled={!workTitle.trim() || !workInstructions.trim() || createWork.isPending} onClick={() => createWork.mutate()}>
+              Assign assessment
+            </button>
+          </div>
+          {assignmentsLoading ? (
+            <>
+              <SkeletonCard label="Loading assessments" lines={2} />
+              <SkeletonCard label="Loading assessments" lines={2} />
+            </>
+          ) : assessments.length === 0 ? (
+            <Empty text="No assessments in this cohort yet." />
+          ) : assessments.map((item: any) => (
+            <div key={item.id} id={`work-${item.id}`} className={`${PANEL} scroll-mt-20 space-y-3 px-5 py-4`}>
+              <div>
+                <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
+                <p className="mt-1 text-sm text-sl-muted">{item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
+                <p className="text-sm text-sl-muted" data-testid={`work-given-to-${item.id}`}>Given to {audienceLabel(item.audience)}</p>
+                <button
+                  type="button"
+                  className="mt-1 text-sm text-sl-risk underline"
+                  disabled={deleteWork.isPending}
+                  onClick={() => { if (window.confirm(`Delete "${item.title}" and every answer handed in for it?`)) deleteWork.mutate(item.id); }}
+                  data-testid={`button-delete-work-${item.id}`}
+                >
+                  Delete assessment
+                </button>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1.5">
+                  <label htmlFor={`work-deadline-${item.id}`} className={LABEL}>Deadline</label>
+                  <input
+                    id={`work-deadline-${item.id}`}
+                    className={FIELD}
+                    type="datetime-local"
+                    value={dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate)}
+                    onChange={(event) => setDueDrafts((drafts) => ({ ...drafts, [item.id]: event.target.value }))}
+                    data-testid={`input-work-deadline-${item.id}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={BTN_SECONDARY}
+                  disabled={saveWorkDue.isPending}
+                  onClick={() => {
+                    const draft = dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate);
+                    const due = parseDeadline(draft);
+                    saveWorkDue.mutate({ id: item.id, dueDate: due ? due.toISOString() : null });
+                  }}
+                  data-testid={`button-save-work-deadline-${item.id}`}
+                >
+                  Save deadline
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={openWorkId === item.id ? BTN_PRIMARY : BTN_SECONDARY}
+                  aria-expanded={openWorkId === item.id}
+                  onClick={() => setOpenWorkId(openWorkId === item.id ? null : item.id)}
+                >
+                  {openWorkId === item.id ? "Hide submissions" : "Mark submissions"}
+                </button>
+                {canReopen(item.dueDate) && (
+                  <button
+                    type="button"
+                    className={BTN_SECONDARY}
+                    onClick={() => setReopenTarget({ kind: "assignment", itemId: item.id, title: item.title, batchId: batchId!, audience: item.audience, dueDate: item.dueDate })}
+                    data-testid={`button-reopen-work-${item.id}`}
+                  >
+                    Reopen
+                  </button>
+                )}
+              </div>
+              {openWorkId === item.id && (
+                <div className="space-y-4">
+                  {submissionsLoading ? (
+                    <SkeletonRows label="Loading submissions" rows={2} className="-mx-5" />
+                  ) : submissions.length === 0 ? (
+                    <p className="text-sm text-sl-muted">Nobody sits this yet.</p>
+                  ) : submissions.map((row: any) => {
+                    const teacherId = row.teacher_id || row.teacherId;
+                    const draft = markDrafts[teacherId] || {
+                      score: row.trainer_score ?? row.trainerScore ?? "",
+                      comment: row.trainer_comment || row.trainerComment || "",
+                    };
+                    if (row.submitted === false) {
+                      return (
+                        <div key={row.id} className="flex items-center justify-between gap-2 border-t border-sl-line pt-3" data-testid={`waiting-${teacherId}`}>
+                          <p className="font-medium text-sl-ink">{row.teacher_name}</p>
+                          <p className="text-sm text-sl-muted">Not submitted yet</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={row.id} className="space-y-2 border-t border-sl-line pt-3">
+                        <p className="font-medium text-sl-ink">
+                          {row.teacher_name || row.teacherName}
+                          {row.submitted_at && <span className="ml-2 text-xs font-normal text-sl-muted">Submitted {new Date(row.submitted_at).toLocaleString()}</span>}
+                        </p>
+                        <p className="whitespace-pre-wrap text-sm text-sl-muted">{row.response}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            className={`${FIELD} w-24`}
+                            type="number"
+                            min={0}
+                            max={100}
+                            aria-label={`Score for ${row.teacher_name || row.teacherName}`}
+                            placeholder="Score"
+                            value={draft.score}
+                            onChange={(e) => setMarkDrafts((current) => ({
+                              ...current,
+                              [teacherId]: { ...draft, score: e.target.value },
+                            }))}
+                          />
+                          <input
+                            className={`${FIELD} min-w-[180px] flex-1`}
+                            aria-label={`Comment for ${row.teacher_name || row.teacherName}`}
+                            placeholder="Comment / rubric note"
+                            value={draft.comment}
+                            onChange={(e) => setMarkDrafts((current) => ({
+                              ...current,
+                              [teacherId]: { ...draft, comment: e.target.value },
+                            }))}
+                          />
+                          <button
+                            type="button"
+                            className={BTN_PRIMARY}
+                            disabled={markWork.isPending}
+                            onClick={() => markWork.mutate({
+                              teacherId,
+                              trainerScore: String(draft.score),
+                              trainerComment: draft.comment,
+                            })}
+                          >
+                            Save mark
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+          </>
         </TabsContent>
 
         <TabsContent value="performance" className="mt-5 space-y-3">
@@ -604,26 +859,48 @@ export default function CohortWorkspace() {
           ))}
         </TabsContent>
 
-        <TabsContent value="work" className="mt-5 space-y-4">
+        <TabsContent value="materials" className="mt-5 space-y-4">
           <div className={`${PANEL} space-y-3 px-5 py-4`}>
             <div>
-              <h3 className="text-base font-semibold text-sl-ink">Assign an assessment</h3>
-              <p className="text-sm text-sl-muted">Besides quizzes — written assessments with a due date.</p>
+              <h3 className="text-base font-semibold text-sl-ink">Share a file or link</h3>
+              <p className="text-sm text-sl-muted">Slides, a reading or a link. Fellows see it on their own desk. It is not a course.</p>
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="work-title" className={LABEL}>Title</label>
-              <input id="work-title" className={FIELD} value={workTitle} onChange={(e) => setWorkTitle(e.target.value)} />
+              <label htmlFor="material-title" className={LABEL}>Title</label>
+              <input id="material-title" className={FIELD} value={materialTitle} onChange={(e) => setMaterialTitle(e.target.value)} data-testid="input-material-title" />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="work-instructions" className={LABEL}>Instructions</label>
-              <textarea id="work-instructions" rows={3} className={`${FIELD} resize-y`} value={workInstructions} onChange={(e) => setWorkInstructions(e.target.value)} />
+              <label htmlFor="material-note" className={LABEL}>Note (optional)</label>
+              <textarea id="material-note" rows={2} className={`${FIELD} resize-y`} value={materialNote} onChange={(e) => setMaterialNote(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="work-due" className={LABEL}>Due</label>
-              <input id="work-due" className={FIELD} type="datetime-local" value={workDue} onChange={(e) => setWorkDue(e.target.value)} />
+              <p className={LABEL}>File</p>
+              {materialFile ? (
+                <p className="flex flex-wrap items-center gap-3 text-sm text-sl-ink" data-testid="material-file-chosen">
+                  {materialFile.name}
+                  <button type="button" className="text-sl-risk underline" onClick={() => setMaterialFile(null)}>Remove file</button>
+                </p>
+              ) : (
+                <ObjectUploader
+                  maxNumberOfFiles={1}
+                  onGetUploadParameters={async () => {
+                    const res = await apiRequest("POST", "/api/objects/upload");
+                    const { uploadURL } = await res.json();
+                    return { method: "PUT" as const, url: uploadURL };
+                  }}
+                  onComplete={(result) => {
+                    const first = result.successful?.find((file) => file.uploadURL);
+                    if (first) setMaterialFile({ url: String(first.uploadURL), name: first.name || "File" });
+                  }}
+                />
+              )}
             </div>
-            <fieldset className="space-y-1.5" data-testid="work-audience">
-              <legend className={LABEL}>Who sits this</legend>
+            <div className="space-y-1.5">
+              <label htmlFor="material-link" className={LABEL}>Or a link</label>
+              <input id="material-link" className={FIELD} placeholder="https://" value={materialLink} onChange={(e) => setMaterialLink(e.target.value)} data-testid="input-material-link" />
+            </div>
+            <fieldset className="space-y-1.5" data-testid="material-audience">
+              <legend className={LABEL}>Who gets this</legend>
               <p className="text-xs text-sl-muted">Tick Fellows to give it only to them. Leave every box empty for the whole cohort.</p>
               {teachers.length === 0 ? (
                 <p className="text-xs text-sl-muted">No Fellows are in this cohort yet.</p>
@@ -633,9 +910,9 @@ export default function CohortWorkspace() {
                     <label key={teacher.id} className="flex items-center gap-2 text-sm text-sl-ink">
                       <input
                         type="checkbox"
-                        checked={workAudience.includes(teacher.id)}
-                        onChange={(e) => setWorkAudience((ids) => e.target.checked ? [...ids, teacher.id] : ids.filter((id) => id !== teacher.id))}
-                        data-testid={`check-work-teacher-${teacher.id}`}
+                        checked={materialAudience.includes(teacher.id)}
+                        onChange={(e) => setMaterialAudience((ids) => e.target.checked ? [...ids, teacher.id] : ids.filter((id) => id !== teacher.id))}
+                        data-testid={`check-material-teacher-${teacher.id}`}
                       />
                       {teacher.name || teacher.email || "Fellow"}
                     </label>
@@ -643,136 +920,40 @@ export default function CohortWorkspace() {
                 </div>
               )}
             </fieldset>
-            <button type="button" className={BTN_PRIMARY} disabled={!workTitle.trim() || !workInstructions.trim() || createWork.isPending} onClick={() => createWork.mutate()}>
-              Assign assessment
+            {materialProblem && <p role="alert" className="text-sm font-medium text-sl-risk" data-testid="material-error">{materialProblem}</p>}
+            <button
+              type="button"
+              className={BTN_PRIMARY}
+              disabled={shareMaterial.isPending}
+              onClick={() => { setMaterialProblem(""); shareMaterial.mutate(); }}
+              data-testid="button-share-material"
+            >
+              {shareMaterial.isPending ? "Sharing…" : "Share"}
             </button>
           </div>
-          {assignmentsLoading ? (
-            <>
-              <SkeletonCard label="Loading assessments" lines={2} />
-              <SkeletonCard label="Loading assessments" lines={2} />
-            </>
-          ) : assessments.length === 0 ? (
-            <Empty text="No assessments in this cohort yet." />
-          ) : assessments.map((item: any) => (
-            <div key={item.id} id={`work-${item.id}`} className={`${PANEL} scroll-mt-20 space-y-3 px-5 py-4`}>
-              <div>
-                <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
-                <p className="mt-1 text-sm text-sl-muted">{item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : "No due date"}</p>
-                <p className="text-sm text-sl-muted" data-testid={`work-given-to-${item.id}`}>Given to {audienceLabel(item.audience)}</p>
-                <button
-                  type="button"
-                  className="mt-1 text-sm text-sl-risk underline"
-                  disabled={deleteWork.isPending}
-                  onClick={() => { if (window.confirm(`Delete "${item.title}" and every answer handed in for it?`)) deleteWork.mutate(item.id); }}
-                  data-testid={`button-delete-work-${item.id}`}
-                >
-                  Delete assessment
-                </button>
-              </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="space-y-1.5">
-                  <label htmlFor={`work-deadline-${item.id}`} className={LABEL}>Deadline</label>
-                  <input
-                    id={`work-deadline-${item.id}`}
-                    className={FIELD}
-                    type="datetime-local"
-                    value={dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate)}
-                    onChange={(event) => setDueDrafts((drafts) => ({ ...drafts, [item.id]: event.target.value }))}
-                    data-testid={`input-work-deadline-${item.id}`}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={BTN_SECONDARY}
-                  disabled={saveWorkDue.isPending}
-                  onClick={() => {
-                    const draft = dueDrafts[item.id] ?? deadlineLocalValue(item.dueDate);
-                    const due = parseDeadline(draft);
-                    saveWorkDue.mutate({ id: item.id, dueDate: due ? due.toISOString() : null });
-                  }}
-                  data-testid={`button-save-work-deadline-${item.id}`}
-                >
-                  Save deadline
-                </button>
-              </div>
+          {materialsLoading ? (
+            <SkeletonCard label="Loading materials" lines={2} />
+          ) : materials.length === 0 ? (
+            <Empty text="Nothing shared with this cohort yet." />
+          ) : materials.map((item: any) => (
+            <div key={item.id} className={`${PANEL} space-y-1 px-5 py-4`} data-testid={`material-${item.id}`}>
+              <h3 className="text-base font-semibold text-sl-ink">{item.title}</h3>
+              {item.note && <p className="text-sm text-sl-muted">{item.note}</p>}
+              <p className="text-sm text-sl-muted">
+                {item.fileUrl && <a className="text-sl-accent underline" href={item.fileUrl} target="_blank" rel="noopener noreferrer">{item.fileName || "Open the file"}</a>}
+                {item.fileUrl && item.linkUrl && " · "}
+                {item.linkUrl && <a className="text-sl-accent underline" href={item.linkUrl} target="_blank" rel="noopener noreferrer">{item.linkUrl}</a>}
+              </p>
+              <p className="text-sm text-sl-muted" data-testid={`material-given-to-${item.id}`}>Given to {audienceLabel(item.audience)}</p>
               <button
                 type="button"
-                className={openWorkId === item.id ? BTN_PRIMARY : BTN_SECONDARY}
-                aria-expanded={openWorkId === item.id}
-                onClick={() => setOpenWorkId(openWorkId === item.id ? null : item.id)}
+                className="text-sm text-sl-risk underline"
+                disabled={removeMaterial.isPending}
+                onClick={() => { if (window.confirm(`Remove "${item.title}" for everyone it was shared with?`)) removeMaterial.mutate(item.id); }}
+                data-testid={`button-remove-material-${item.id}`}
               >
-                {openWorkId === item.id ? "Hide submissions" : "Mark submissions"}
+                Remove
               </button>
-              {openWorkId === item.id && (
-                <div className="space-y-4">
-                  {submissionsLoading ? (
-                    <SkeletonRows label="Loading submissions" rows={2} className="-mx-5" />
-                  ) : submissions.length === 0 ? (
-                    <p className="text-sm text-sl-muted">Nobody sits this yet.</p>
-                  ) : submissions.map((row: any) => {
-                    const teacherId = row.teacher_id || row.teacherId;
-                    const draft = markDrafts[teacherId] || {
-                      score: row.trainer_score ?? row.trainerScore ?? "",
-                      comment: row.trainer_comment || row.trainerComment || "",
-                    };
-                    if (row.submitted === false) {
-                      return (
-                        <div key={row.id} className="flex items-center justify-between gap-2 border-t border-sl-line pt-3" data-testid={`waiting-${teacherId}`}>
-                          <p className="font-medium text-sl-ink">{row.teacher_name}</p>
-                          <p className="text-sm text-sl-muted">Not submitted yet</p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div key={row.id} className="space-y-2 border-t border-sl-line pt-3">
-                        <p className="font-medium text-sl-ink">
-                          {row.teacher_name || row.teacherName}
-                          {row.submitted_at && <span className="ml-2 text-xs font-normal text-sl-muted">Submitted {new Date(row.submitted_at).toLocaleString()}</span>}
-                        </p>
-                        <p className="whitespace-pre-wrap text-sm text-sl-muted">{row.response}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <input
-                            className={`${FIELD} w-24`}
-                            type="number"
-                            min={0}
-                            max={100}
-                            aria-label={`Score for ${row.teacher_name || row.teacherName}`}
-                            placeholder="Score"
-                            value={draft.score}
-                            onChange={(e) => setMarkDrafts((current) => ({
-                              ...current,
-                              [teacherId]: { ...draft, score: e.target.value },
-                            }))}
-                          />
-                          <input
-                            className={`${FIELD} min-w-[180px] flex-1`}
-                            aria-label={`Comment for ${row.teacher_name || row.teacherName}`}
-                            placeholder="Comment / rubric note"
-                            value={draft.comment}
-                            onChange={(e) => setMarkDrafts((current) => ({
-                              ...current,
-                              [teacherId]: { ...draft, comment: e.target.value },
-                            }))}
-                          />
-                          <button
-                            type="button"
-                            className={BTN_PRIMARY}
-                            disabled={markWork.isPending}
-                            onClick={() => markWork.mutate({
-                              teacherId,
-                              trainerScore: String(draft.score),
-                              trainerComment: draft.comment,
-                            })}
-                          >
-                            Save mark
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           ))}
         </TabsContent>
@@ -834,6 +1015,7 @@ export default function CohortWorkspace() {
           ))}
         </TabsContent>
       </Tabs>
+      <ReopenDialog target={reopenTarget} onClose={() => setReopenTarget(null)} />
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="border-sl-line bg-sl-surface text-sl-ink">

@@ -76,8 +76,8 @@ export function FilePreview({ fileName, fileUrl, className = "" }: FilePreviewPr
   
   if (isExcel) {
     return (
-      <div className={`flex items-center justify-center bg-green-50 dark:bg-green-950/20 ${className}`}>
-        <FileSpreadsheet className={iconClassName} style={{ color: '#217346' }} />
+      <div className={`flex items-center justify-center bg-sl-done-soft ${className}`}>
+        <FileSpreadsheet className={`${iconClassName} text-sl-done`} />
       </div>
     );
   }

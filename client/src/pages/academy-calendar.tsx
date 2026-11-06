@@ -13,6 +13,8 @@ import { SessionLinks } from "@/components/SessionLinks";
 import {
   CALENDAR_KINDS,
   CALENDAR_KIND_LABELS,
+  canChangeCalendarEntry,
+  canEditAcademyCalendar,
   canRunOnlineSessions,
   groupByMonth,
   monthTitle,
@@ -61,9 +63,10 @@ type YearEntry = {
   startDate: string;
   endDate?: string | null;
   publishedAt?: string | null;
+  createdBy?: string | null;
 };
 
-const SECTIONS = ["timetable", "year"] as const;
+const SECTIONS = ["schedule", "year"] as const;
 type Section = (typeof SECTIONS)[number];
 
 function Chip({ kind, label }: { kind: string; label: string }) {
@@ -113,6 +116,9 @@ function Timetable({ desk }: { desk: Desk }) {
       toast({ title: "Session removed" });
       queryClient.invalidateQueries({ queryKey: ["/api/timetable"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/events"] });
+      // The Trainer's Home counts today's sessions from these.
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "/api/batches" && query.queryKey[2] === "events" });
+      queryClient.invalidateQueries({ queryKey: ["/api/trainer/desk"] });
     },
     onError: (error: Error) => toast({ title: "Could not remove the session", description: error.message, variant: "destructive" }),
   });
@@ -155,11 +161,11 @@ function Timetable({ desk }: { desk: Desk }) {
       )}
       {isLoading ? (
         <>
-          <SkeletonCard label="Loading the timetable" lines={2} />
-          <SkeletonCard label="Loading the timetable" lines={2} />
+          <SkeletonCard label="Loading the schedule" lines={2} />
+          <SkeletonCard label="Loading the schedule" lines={2} />
         </>
       ) : isError ? (
-        <Empty>The timetable could not be loaded. Refresh the page.</Empty>
+        <Empty>The schedule could not be loaded. Refresh the page.</Empty>
       ) : months.length === 0 ? (
         <Empty>
           {desk === "trainer"
@@ -193,7 +199,7 @@ function Timetable({ desk }: { desk: Desk }) {
                     type="button"
                     className={BTN_SECONDARY}
                     disabled={remove.isPending}
-                    onClick={() => { if (window.confirm(`Remove "${session.title}" from the timetable?`)) remove.mutate(session.id); }}
+                    onClick={() => { if (window.confirm(`Remove "${session.title}" from the schedule?`)) remove.mutate(session.id); }}
                     data-testid={`button-remove-session-${session.id}`}
                   >
                     Remove
@@ -214,8 +220,15 @@ function dateInput(value?: string | null) {
   return value ? new Date(value).toISOString().slice(0, 10) : "";
 }
 
-/** The academy year. An Admin adds and edits it; Trainers and Fellows read the same rows. */
-function AcademyYear({ canEdit }: { canEdit: boolean }) {
+/**
+ * The academy calendar. The Admin adds and changes any entry and presses Done; a Trainer the Admin allows adds entries
+ * that publish at once and changes only their own; everyone reads the same rows. The server enforces all of this; the
+ * page only hides what it would refuse.
+ */
+function AcademyYear() {
+  const { user } = useAuth();
+  const canEdit = canEditAcademyCalendar(user);
+  const isAdmin = user?.role === "admin";
   const { toast } = useToast();
   const { data: entries = [], isLoading, isError } = useQuery<YearEntry[]>({ queryKey: ["/api/academy-calendar"] });
   const [form, setForm] = useState(emptyForm);
@@ -247,7 +260,7 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: editingId ? "Entry saved" : "Added to the academy year" });
+      toast({ title: editingId ? "Entry saved" : "Added to the academy calendar" });
       setForm(emptyForm);
       setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/academy-calendar"] });
@@ -260,7 +273,7 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
       await apiRequest("DELETE", `/api/admin/academy-calendar/${id}`);
     },
     onSuccess: () => {
-      toast({ title: "Removed from the academy year" });
+      toast({ title: "Removed from the academy calendar" });
       queryClient.invalidateQueries({ queryKey: ["/api/academy-calendar"] });
     },
     onError: (error: Error) => toast({ title: "Could not remove", description: error.message, variant: "destructive" }),
@@ -280,12 +293,14 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="space-y-4" data-testid="academy-year">
       <p className="text-sm text-sl-muted">
-        {canEdit
+        {isAdmin
           ? "New entries are drafts only you see. Press Done to show them to every Trainer and Fellow."
-          : "Terms, holidays, training weeks and exams, set by the Admin."}
+          : canEdit
+            ? "Entries you add show to every Trainer and Fellow at once. You can change only the ones you added."
+            : "Terms, holidays, training weeks and exams for the whole academy."}
       </p>
 
-      {canEdit && drafts > 0 && (
+      {isAdmin && drafts > 0 && (
         <div className={`${PANEL} flex flex-wrap items-center justify-between gap-3 px-5 py-4`} data-testid="year-drafts">
           <p className="text-sm text-sl-ink">
             <span className="font-semibold">{drafts} {drafts === 1 ? "draft" : "drafts"}</span> not yet shown to Trainers and Fellows.
@@ -303,9 +318,9 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
             event.preventDefault();
             save.mutate();
           }}
-          aria-label={editingId ? "Edit a calendar entry" : "Add to the academy year"}
+          aria-label={editingId ? "Edit a calendar entry" : "Add to the academy calendar"}
         >
-          <h3 className="text-base font-semibold text-sl-ink">{editingId ? "Edit entry" : "Add to the academy year"}</h3>
+          <h3 className="text-base font-semibold text-sl-ink">{editingId ? "Edit entry" : "Add to the academy calendar"}</h3>
           <div className="space-y-1.5">
             <label htmlFor="year-title" className={LABEL}>Title</label>
             <input id="year-title" className={FIELD} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Term 2 begins" data-testid="input-year-title" required />
@@ -345,13 +360,13 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
 
       {isLoading ? (
         <>
-          <SkeletonCard label="Loading the academy year" lines={2} />
-          <SkeletonCard label="Loading the academy year" lines={2} />
+          <SkeletonCard label="Loading the academy calendar" lines={2} />
+          <SkeletonCard label="Loading the academy calendar" lines={2} />
         </>
       ) : isError ? (
-        <Empty>The academy year could not be loaded. Refresh the page.</Empty>
+        <Empty>The academy calendar could not be loaded. Refresh the page.</Empty>
       ) : months.length === 0 ? (
-        <Empty>{canEdit ? "The academy year is empty. Add the first term, holiday or exam above." : "The Admin has not added the academy year yet."}</Empty>
+        <Empty>{canEdit ? "The academy calendar is empty. Add the first term, holiday or exam above." : "Nothing is on the academy calendar yet."}</Empty>
       ) : months.map((month) => (
         <section key={month.key} aria-labelledby={`year-month-${month.key}`} className="space-y-2">
           <h3 id={`year-month-${month.key}`} className="text-base font-semibold text-sl-ink">{monthTitle(month.key)}</h3>
@@ -361,14 +376,14 @@ function AcademyYear({ canEdit }: { canEdit: boolean }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-base font-semibold text-sl-ink">{entry.title}</h4>
                   <Chip kind={entry.kind} label={CALENDAR_KIND_LABELS[entry.kind] ?? entry.kind} />
-                  {canEdit && !entry.publishedAt && (
+                  {isAdmin && !entry.publishedAt && (
                     <span className="rounded-full border border-dashed border-sl-control px-2.5 py-0.5 text-xs font-semibold text-sl-muted">Draft</span>
                   )}
                 </div>
                 <p className="text-sm text-sl-muted">{dayRange(entry.startDate, entry.endDate)}</p>
                 {entry.description && <p className="text-sm text-sl-ink">{entry.description}</p>}
               </div>
-              {canEdit && (
+              {canChangeCalendarEntry(user, entry) && (
                 <div className="flex gap-2">
                   <button type="button" className={BTN_SECONDARY} onClick={() => startEdit(entry)} data-testid={`button-year-edit-${entry.id}`}>Edit</button>
                   <button type="button" className={BTN_SECONDARY} disabled={remove.isPending} onClick={() => remove.mutate(entry.id)} data-testid={`button-year-delete-${entry.id}`}>Remove</button>
@@ -386,23 +401,23 @@ export default function AcademyCalendarPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const tab = new URLSearchParams(useSearch()).get("tab");
-  const section: Section = SECTIONS.find((key) => key === tab) ?? "timetable";
+  const section: Section = SECTIONS.find((key) => key === tab) ?? "schedule";
   const desk: Desk = user?.role === "admin" ? "admin" : user?.role === "trainer" ? "trainer" : "fellow";
 
   return (
-    <AcademyShell title="Calendar" desk={desk} current="calendar">
+    <AcademyShell title="Calendar / Schedule" desk={desk} current="calendar">
       <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 sm:px-6">
         <div>
-          <h1 className="text-2xl font-semibold text-sl-ink">Calendar</h1>
-          <p className="text-sm text-sl-muted">Your timetable, and the academy year the Admin sets for everyone.</p>
+          <h1 className="text-2xl font-semibold text-sl-ink">Calendar / Schedule</h1>
+          <p className="text-sm text-sl-muted">The schedule of your sessions, and the academy calendar for the year.</p>
         </div>
         <Tabs value={section} onValueChange={(value) => setLocation(`/calendar?tab=${value}`)}>
           <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-sl-line bg-transparent p-0">
-            <TabsTrigger value="timetable" className={TAB_TRIGGER} data-testid="tab-calendar-timetable">Timetable</TabsTrigger>
-            <TabsTrigger value="year" className={TAB_TRIGGER} data-testid="tab-calendar-year">Academy year</TabsTrigger>
+            <TabsTrigger value="schedule" className={TAB_TRIGGER} data-testid="tab-calendar-schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="year" className={TAB_TRIGGER} data-testid="tab-calendar-year">Academy calendar</TabsTrigger>
           </TabsList>
-          <TabsContent value="timetable" className="mt-5"><Timetable desk={desk} /></TabsContent>
-          <TabsContent value="year" className="mt-5"><AcademyYear canEdit={desk === "admin"} /></TabsContent>
+          <TabsContent value="schedule" className="mt-5"><Timetable desk={desk} /></TabsContent>
+          <TabsContent value="year" className="mt-5"><AcademyYear /></TabsContent>
         </Tabs>
       </div>
     </AcademyShell>

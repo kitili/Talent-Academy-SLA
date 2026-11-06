@@ -14,8 +14,8 @@ const HOW: Record<MedalKind, string> = {
 };
 
 /**
- * One even grid of a cohort's medals, earned first. An earned medal has a green check and what earned it; one not yet
- * earned has a dashed circle and what earns it. Colour here means status only: green is earned.
+ * One even grid of a cohort's medals, earned first. An earned medal has a blue check and what earned it; one not yet
+ * earned has a dashed circle and what earns it. Colour here means status only: blue is earned.
  */
 export function CohortMedals({ medals, showCount = true, loading = false }: { medals: Medal[]; showCount?: boolean; loading?: boolean }) {
   // `loading` is set by a page whose medals have not arrived: the grid in outline, not an empty one.

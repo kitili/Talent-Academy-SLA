@@ -1,3 +1,4 @@
+import { csvCell } from "@shared/attendanceDesk";
 export const APPROVAL_HISTORY_PAGE_SIZE = 8;
 
 export function approvalHistoryPage(page: unknown, pageSize = APPROVAL_HISTORY_PAGE_SIZE) {
@@ -61,15 +62,13 @@ const CSV_COLUMNS = [
   "performed_by_role",
 ] as const;
 
-function csvCell(value: unknown) {
+function historyCell(value: unknown) {
   if (value instanceof Date) return value.toISOString();
-  const text = value == null ? "" : String(value);
-  if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
-  return text;
+  return csvCell(value == null ? "" : String(value));
 }
 
 export function approvalHistoryToCsv(rows: Array<Record<string, unknown>>) {
-  const lines = rows.map((row) => CSV_COLUMNS.map((column) => csvCell(row[column])).join(","));
+  const lines = rows.map((row) => CSV_COLUMNS.map((column) => historyCell(row[column])).join(","));
   return [CSV_COLUMNS.join(","), ...lines].join("\n");
 }
 

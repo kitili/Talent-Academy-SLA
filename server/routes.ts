@@ -26,8 +26,10 @@ import {
   mapApprovalHistoryRow,
 } from "./approvalHistoryQuery";
 import { isAcademyStaff, trainerOwnsBatch } from "./access";
-import { isAttendanceStatus } from "@shared/attendanceDesk";
-import { DEADLINE_PASSED, fellowStillSees, isPastDue, parseDeadline } from "@shared/academyPath";
+import { csvCell, isAttendanceStatus } from "@shared/attendanceDesk";
+import { cleanCertificateWording } from "@shared/certificateDesigns";
+import { deskName } from "@shared/deskName";
+import { DEADLINE_PASSED, effectiveDeadline, fellowDeadline, isPastDue, parseDeadline } from "@shared/academyPath";
 import { ASSIGNED_QUIZ_DEFAULT_PASS_PERCENT, QUIZ_ATTEMPTS, refusal } from "@shared/constants";
 import { cohortIsOpen, trainerMayEditCourse } from "./scope";
 import { cohortsInScope, trainerCohortCounts } from "./cohortRoster";
@@ -64,6 +66,11 @@ import { setupSso, ssoStatus } from "./sso";
 import { lessonFromPackage } from "./scormImport";
 import { registerAcademyPathRoutes } from "./academyPathRoutes";
 import { publicFellow, registerAcademyDeskRoutes } from "./academyDesk";
+import { fellowAssignmentItem, fellowQuizItem, quizForAttemptRead, registerDeadlineRoutes } from "./deadlineRoutes";
+import { isMaterialFileUrl, registerMaterialRoutes } from "./materialRoutes";
+import { registerAdminMailRoutes } from "./adminMailRoutes";
+import { registerAttendanceExportRoutes } from "./attendanceExportRoutes";
+import { registerDailyLineRoutes } from "./dailyLineRoutes";
 import { audienceWithNames, canRunOnlineSessions, countKinds, fellowTypeOf, FELLOW_TYPES, parseOnlineFields, trainerTypeOf, TRAINER_TYPES } from "@shared/academyPeople";
 import { certificateCohortAccess, certificateRefusal, listEligibleFellows, loadEligibilityRows } from "./certificateEligibility";
 import { loadAttendanceLists } from "./attendanceBoard";
@@ -109,12 +116,37 @@ function isStrictAdmin(req: Request, res: Response, next: NextFunction) {
   res.status(403).json({ message: "Forbidden: Admin-only access required" });
 }
 
-function staffCanAccessBatch(
+/**
+ * A cohort that cannot be found is nobody's: not any staff member's, and not an Admin's, whom `trainerOwnsBatch` passes
+ * without looking at the cohort. Routes keyed on a cohort id answer 404 first.
+ */
+export function staffCanAccessBatch(
   user?: Express.User,
   batch?: { trainerId?: string | null; trainerIds?: string[] | null } | null,
 ) {
-  if (batch === undefined) return isAcademyStaff(user);
+  if (!batch) return false;
   return trainerOwnsBatch(user, batch);
+}
+
+const FILE_NOT_OURS = "That file was not uploaded here. Upload it again.";
+
+/**
+ * A Fellow opens a stored address as a link, so a route that stores one refuses anything but a file we hold. Blank is
+ * no file, not a bad one. This is on write: rows already stored keep what they have.
+ */
+export function fileAddressRefused(value: unknown) {
+  if (value === undefined || value === null || value === "") return false;
+  return !isMaterialFileUrl(value);
+}
+
+/** A mark the screen does not offer, in a bulk marking. A row with no status is skipped by the route, as it always was. */
+export function attendanceStatusRefused(records: Array<{ status?: unknown } | null | undefined>) {
+  return records.some((record) => Boolean(record?.status) && !isAttendanceStatus(record?.status));
+}
+
+/** The bell notice for a desk message: who it is from, and the start of what they wrote. */
+export function deskMessageNotice(fromName: string, body: string) {
+  return { title: `Message from ${fromName}`, message: body.slice(0, 160) };
 }
 
 /**
@@ -178,6 +210,17 @@ async function notifyBatchTeachers(batchId: string, title: string, message: stri
   }
 }
 
+/** The notice when a Fellow joins a cohort, from whichever route added them. `opens` is where the bell sends them. */
+function noticeFellowJoined(teacherId: string, batch: { id: string; name: string }) {
+  return notifyTeacher(
+    teacherId,
+    "You're in",
+    `You have been added to ${batch.name}. Open Learning to continue.`,
+    "general",
+    { batchId: batch.id, opens: "learning" },
+  );
+}
+
 function cleanTeacherIds(value: unknown) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((id): id is string => typeof id === "string" && id.trim().length > 0))];
@@ -193,7 +236,7 @@ async function resolveQuizAudience(batchId: string, requested: unknown) {
   return { teacherIds };
 }
 
-async function notifyQuizTeachers(batchId: string, teacherIds: string[], title: string, message: string) {
+export async function notifyQuizTeachers(batchId: string, teacherIds: string[], title: string, message: string) {
   if (teacherIds.length === 0) {
     await notifyBatchTeachers(batchId, title, message, "deadline");
     return;
@@ -1308,6 +1351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await objectStorageService.saveLocalObject(req.params.id, data);
       res.sendStatus(200);
     } catch (error) {
+      if (error instanceof ObjectNotFoundError) return res.sendStatus(404);
       console.error("[UPLOAD ERROR] Local object save failed:", error);
       res.status(500).json({ error: "Internal server error" });
     }
@@ -2651,13 +2695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teacherId: teacher.id,
       });
 
-      await notifyTeacher(
-        teacher.id,
-        "You're in",
-        `You have been added to ${batch.name}. Open your dashboard to continue learning.`,
-        "general",
-        { batchId: batch.id },
-      );
+      await noticeFellowJoined(teacher.id, batch);
 
       res.status(201).json({ message: "Teacher added to batch", teacher: { id: teacher.teacherId, name: teacher.name } });
     } catch (error) {
@@ -2687,13 +2725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           await storage.addTeacherToBatch({ batchId: req.params.batchId, teacherId: tid });
           added++;
-          await notifyTeacher(
-            tid,
-            "You're in",
-            `You have been added to ${batch.name}. Open your dashboard to continue learning.`,
-            "general",
-            { batchId: batch.id },
-          );
+          await noticeFellowJoined(tid, batch);
         } catch (err: any) {
           // Unique constraint violation = already enrolled
           if (err?.code === "23505" || String(err?.message).includes("duplicate")) {
@@ -2810,7 +2842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.params.batchId,
         audience.teacherIds,
         "A quiz is ready",
-        `${title || "A module quiz"} is ready for ${batch.name}. Open your exams to write it.`,
+        `${title || "A module quiz"} is ready for ${batch.name}. Open Assessments to write it.`,
       ).catch((error) => console.error("Quiz ready notice failed:", error));
     } catch (error) {
       console.error("Error assigning quiz:", error);
@@ -2892,7 +2924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.params.batchId,
         audience.teacherIds,
         "A quiz is ready",
-        `${title || selectedFile.fileName || "A slide quiz"} is ready for ${batch.name}. Open your exams to write it.`,
+        `${title || selectedFile.fileName || "A slide quiz"} is ready for ${batch.name}. Open Assessments to write it.`,
       ).catch((error) => console.error("Quiz ready notice failed:", error));
     } catch (error: any) {
       console.error("Error assigning file quiz:", error);
@@ -2908,6 +2940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const paperUrl = String(req.body?.paperUrl || "").trim();
       if (!paperUrl) return res.status(400).json({ error: "Upload the exam paper first" });
+      if (fileAddressRefused(paperUrl)) return res.status(400).json({ error: FILE_NOT_OURS });
       const saved = await saveWritingExam(req.params.batchId, req.user!.id, {
         title: req.body?.title,
         description: req.body?.description,
@@ -2951,7 +2984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.params.batchId,
         saved.teacherIds || [],
         "An exam is ready",
-        `${req.body?.title || "An exam"} is ready for ${batch.name}. Open your exams and write your answers.`,
+        `${req.body?.title || "An exam"} is ready for ${batch.name}. Open Assessments and write your answers.`,
       ).catch((error) => console.error("Open exam notice failed:", error));
     } catch (error) {
       console.error("Error assigning open exam:", error);
@@ -3096,6 +3129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(hasDueDate ? { dueDate: parseDeadline(req.body.dueDate) } : {}),
         });
       }
+      if (hasDueDate) await storage.dropSupersededReopenings("quiz", quiz.id, parseDeadline(req.body.dueDate));
       const updated = await storage.getAssignedQuiz(req.params.quizId);
       res.json(updated);
       if (hasDueDate) {
@@ -3179,11 +3213,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const quizzes = await storage.getAssignedQuizzesForTeacher(req.teacherId!);
       const tried = new Set((await storage.getAllTeacherQuizAttempts(req.teacherId!)).map((attempt) => attempt.assignedQuizId));
+      const reopened = await storage.getDeadlineReopeningsForTeacher("quiz", req.teacherId!);
       const now = new Date();
-      res.json(quizzes.filter((quiz) => fellowStillSees(quiz.dueDate, tried.has(quiz.id), now)).map((quiz) => ({
-        ...learnerQuiz(quiz),
-        kind: quiz.paperUrl ? "paper" : isWritingExam(quiz) ? "written" : "quiz",
-      })));
+      res.json(quizzes.map((quiz) => fellowQuizItem(quiz, reopened[quiz.id], tried.has(quiz.id), now)));
     } catch (error) {
       console.error("Error fetching teacher quizzes:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -3202,13 +3234,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
       }
-      if (isPastDue(quiz.dueDate)) {
+      const { dueDate, closed } = fellowDeadline(quiz.dueDate, await storage.getDeadlineReopening("quiz", quiz.id, req.teacherId!));
+      if (closed) {
         const tries = await storage.getTeacherQuizAttemptsByQuiz(req.teacherId!, quiz.id);
         if (tries.length === 0) return res.status(410).json({ error: DEADLINE_PASSED });
       }
       const writing = isWritingExam(quiz);
       const questions = writing || quiz.shuffleQuestions === "no" ? quiz.questions : shuffleQuestions(quiz.questions);
-      res.json({ ...quiz, questions: learnerQuestions(questions), passMark: passMarkOf(quiz.passMark) });
+      res.json({ ...quiz, dueDate, closed, questions: learnerQuestions(questions), passMark: passMarkOf(quiz.passMark) });
     } catch (error) {
       console.error("Error fetching quiz:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -3229,7 +3262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visible.some((item) => item.id === quiz.id)) {
         return res.status(403).json({ error: "This exam is not assigned to you" });
       }
-      if (isPastDue(quiz.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
+      const reopened = await storage.getDeadlineReopening("quiz", quiz.id, req.teacherId!);
+      if (isPastDue(effectiveDeadline(quiz.dueDate, reopened))) return res.status(410).json({ error: DEADLINE_PASSED });
 
       // Get all existing attempts for this quiz
       const existingAttempts = await storage.getTeacherQuizAttemptsByQuiz(
@@ -3339,19 +3373,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         averageScore: avgScore,
       });
 
-      if (passed === "no") {
-        const failCount = existingAttempts.filter((a) => a.passed === "no").length + 1;
-        if (failCount >= 2) {
-          notifyTeacher(
-            req.teacherId!,
-            "Quiz needs another try",
-            `You have missed this quiz ${failCount} times. Open the module again before the last attempt.`,
-            "general",
-            { quizId: req.params.quizId },
-          ).catch((error) => console.error("Fail-streak notice failed:", error));
-        }
-      }
-
       res.json({
         score,
         totalQuestions,
@@ -3411,10 +3432,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Get quiz details for enrichment
-      const quiz = await storage.getAssignedQuiz(req.params.quizId);
-      
+      const stored = await storage.getAssignedQuiz(req.params.quizId);
+      const tried = attempts.length > 0;
+      const sits = tried || (await storage.getAssignedQuizzesForTeacher(req.teacherId!)).some((item) => item.id === stored?.id);
+      const quiz = stored
+        ? quizForAttemptRead(stored, { tried, sits, reopenedDue: await storage.getDeadlineReopening("quiz", stored.id, req.teacherId!) })
+        : stored;
+
       // Calculate quiz status at the quiz's own pass mark; answers show only once no retake is left.
-      const standing = assignedQuizStanding(attempts, passMarkOf(quiz?.passMark));
+      const standing = assignedQuizStanding(attempts, passMarkOf(stored?.passMark));
 
       res.json({
         attempts,
@@ -3451,11 +3477,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/quiz-attempts", isTeacherAuthenticated, async (req, res) => {
     try {
       const attempts = await storage.getAllTeacherQuizAttempts(req.teacherId!);
+      const reopened = await storage.getDeadlineReopeningsForTeacher("quiz", req.teacherId!);
 
       // Enrich with quiz details; answers show only once no retake is left on that quiz.
       const enrichedAttempts = await Promise.all(
         attempts.map(async (attempt) => {
-          const quiz = await storage.getAssignedQuiz(attempt.assignedQuizId);
+          const stored = await storage.getAssignedQuiz(attempt.assignedQuizId);
+          const quiz = stored && { ...stored, dueDate: effectiveDeadline(stored.dueDate, reopened[stored.id]) };
           const standing = assignedQuizStanding(
             attempts.filter((other) => other.assignedQuizId === attempt.assignedQuizId),
             passMarkOf(quiz?.passMark),
@@ -3573,12 +3601,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const teacher of teachers) {
         const reportCard = await storage.refreshTeacherReportCard(teacher.id);
         const figures = cohortCourseFigures(await cohortPath(teacher.id, batch, readers));
-        const csvEscape = (value: string | number | null | undefined) =>
-          `"${String(value ?? "").replace(/"/g, '""')}"`;
         lines.push([
-          csvEscape(teacher.name),
-          csvEscape(teacher.email),
-          csvEscape(teacher.teacherId),
+          csvCell(String(teacher.name ?? "")),
+          csvCell(String(teacher.email ?? "")),
+          csvCell(String(teacher.teacherId ?? "")),
           figures.overallPercentage,
           reportCard?.averageScore ?? 0,
           reportCard?.totalQuizzesTaken ?? 0,
@@ -3655,7 +3681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (trainer) {
             peers.push({
               id: trainer.id,
-              name: trainer.username,
+              name: deskName(trainer),
               role: trainer.role,
             });
           }
@@ -3793,8 +3819,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           recipientId: teacher.id,
           recipientType: "teacher",
           type: "general",
-          title: "A trainer star",
-          message: `${req.user!.username || "Your trainer"} gave you a star in ${batch.name}.`,
+          title: "A star from your Trainer",
+          message: `${deskName(req.user!)} gave you a star in ${batch.name}.`,
         });
       } catch {
         /* the star still stands if the notice cannot be saved */
@@ -4191,6 +4217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cohortCounts = await trainerCohortCounts(allTrainers.map((trainer) => trainer.id));
       const trainersData = allTrainers.map((trainer: any) => ({
         id: trainer.id,
+        trainerType: trainer.trainerType,
         username: trainer.username,
         email: trainer.email,
         role: trainer.role,
@@ -4242,6 +4269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const summary = summaries.get(teacher.id) || emptyTeacherSummary();
         return {
           id: teacher.id,
+          fellowType: teacher.fellowType,
           teacherId: teacher.teacherId,
           name: teacher.name,
           email: teacher.email,
@@ -4613,6 +4641,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (occasion === "course" && !courseId) {
         return res.status(400).json({ error: "courseId is required for course completion certificates" });
       }
+      const wording = cleanCertificateWording(req.body?.appreciationText);
+      if ("error" in wording) return res.status(400).json({ error: wording.error });
       if (!(await storage.getTeacher(teacherId))) return res.status(404).json({ error: "Teacher not found" });
       if (occasion === "course" && !(await storage.getCourse(courseId!))) return res.status(404).json({ error: "Course not found" });
       // D4: a course certificate needs every module of the course; Fellowship and Advanced need the academy path done.
@@ -4624,6 +4654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         occasion,
         courseId,
         batchId,
+        appreciationText: wording.wording,
       });
       res.status(201).json(cert);
     } catch (error) {
@@ -4674,8 +4705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get certificate by ID: an admin sees any; a trainer sees it when the Fellow is in a cohort they run (C4)
-  app.get("/api/certificates/:certId", isAuthenticated, async (req, res) => {
+  // Get certificate by ID: an admin sees any; a trainer sees it when the Fellow is in a cohort they run (C4); a Fellow
+  // sees their own. `isAuthenticatedAny`, because a Fellow's session is not a passport login.
+  app.get("/api/certificates/:certId", isAuthenticatedAny, async (req, res) => {
     try {
       const cert = await storage.getTeacherCertificateById(req.params.certId);
       if (!cert) {
@@ -4691,7 +4723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update certificate (admin/trainer only)
+  // Update certificate (Admin only)
   app.patch("/api/certificates/:certId", isAuthenticated, isStrictAdmin, async (req, res) => {
     try {
       const { teacherName, courseName, appreciationText, adminName1, adminName2 } = req.body;
@@ -4699,7 +4731,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates: any = {};
       if (teacherName !== undefined) updates.teacherName = teacherName;
       if (courseName !== undefined) updates.courseName = courseName;
-      if (appreciationText !== undefined) updates.appreciationText = appreciationText;
+      if (appreciationText !== undefined) {
+        const wording = cleanCertificateWording(appreciationText);
+        if ("error" in wording) return res.status(400).json({ error: wording.error });
+        updates.appreciationText = wording.wording;
+      }
       if (adminName1 !== undefined) updates.adminName1 = adminName1;
       if (adminName2 !== undefined) updates.adminName2 = adminName2;
       
@@ -5595,6 +5631,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batch = await storage.getBatch(batchId);
       if (!batch) return res.status(404).json({ error: "Batch not found" });
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
+      if (attendanceStatusRefused(records)) {
+        return res.status(400).json({ error: "Attendance can only be present, late, absent or excused" });
+      }
       // Only Fellows enrolled in this cohort can be marked in it.
       const enrolled = new Set((await storage.getTeachersInBatch(batchId)).map((teacher) => teacher.id));
       const markerId = (req.user as any)?.id;
@@ -5623,6 +5662,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/batches/:batchId/attendance", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { batchId } = req.params;
+      const batch = await storage.getBatch(batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const dateStr = req.query.date as string | undefined;
       const date = dateStr ? new Date(dateStr) : undefined;
       const records = await storage.getAttendanceByBatch(batchId, date);
@@ -5637,6 +5679,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/batches/:batchId/attendance/summary", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const { batchId } = req.params;
+      const batch = await storage.getBatch(batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+      if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const summary = await storage.getBatchAttendanceSummary(batchId);
       res.json(summary);
     } catch (error) {
@@ -5676,6 +5721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/batches/:batchId/announcements", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
       if (!staffCanAccessBatch(req.user, batch)) {
         return res.status(403).json({ error: "Access denied" });
       }
@@ -5832,10 +5878,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const fromId = req.teacherId || (req.user as any)?.id;
       const fromRole = req.teacherId ? "teacher" : (req.user as any)?.role;
-      const fromName = req.teacherId
-        ? String((req as any).teacherName || "Teacher")
-        : `${(req.user as any)?.firstName || ""} ${(req.user as any)?.lastName || ""}`.trim() || (req.user as any)?.username || "Staff";
       if (!fromId || !fromRole) return res.status(401).json({ error: "Not authenticated" });
+      // The sender's own row: a session whose Fellow is gone writes nothing, rather than mail signed by no one.
+      const sender = req.teacherId ? await storage.getTeacher(req.teacherId) : req.user;
+      if (!sender) return res.status(401).json({ error: "Not authenticated" });
+      const fromName = deskName(sender);
       // Who may write to whom: a Fellow to staff; a Trainer to staff or their own Fellows; an Admin to anyone. The
       // recipient must exist with the role given, so a message cannot be addressed to an id that is not that person.
       if (toRole === "teacher") {
@@ -5852,8 +5899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientId: toId,
         recipientType: toRole,
         type: "general",
-        title: "New desk message",
-        message: body.slice(0, 160),
+        ...deskMessageNotice(fromName, body),
         metadata: { fromId, fromRole },
       });
       res.status(201).json(row);
@@ -6145,13 +6191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.addTeacherToBatch({ batchId: batch.id, teacherId: teacher.id });
           alreadyIn.add(teacher.id);
           enrolled++;
-          await notifyTeacher(
-            teacher.id,
-            "You're in",
-            `You have been added to ${batch.name}. Open your dashboard to continue learning.`,
-            "general",
-            { batchId: batch.id },
-          );
+          await noticeFellowJoined(teacher.id, batch);
         } catch (error: any) {
           if (String(error?.message || "").includes("duplicate") || String(error?.code) === "23505") {
             skipped++;
@@ -6171,6 +6211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/batches/:batchId/assignments", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       res.json(await storage.getWrittenAssignments(req.params.batchId));
     } catch (error) {
@@ -6187,6 +6228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { title, instructions, dueDate, fileUrl, fileName, kind } = req.body;
       const assignmentKind = kind === "assessment" ? "assessment" : "assignment";
       if (!title || (!instructions && !fileUrl)) return res.status(400).json({ error: "title and instructions are required" });
+      if (fileAddressRefused(fileUrl)) return res.status(400).json({ error: FILE_NOT_OURS });
       const audience = await resolveQuizAudience(batch.id, req.body?.teacherIds);
       if (audience.error) return res.status(400).json({ error: audience.error });
       const assignment = await storage.createWrittenAssignment({
@@ -6204,7 +6246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batch.id,
         audience.teacherIds,
         "Written work is ready",
-        `${title} is waiting in ${batch.name}. Open Work on your dashboard.`,
+        `${title} is waiting in ${batch.name}. Open Assessments to write it.`,
       ).catch((error) => console.error("Assignment notice failed:", error));
       res.status(201).json({ ...assignment, teacherIds: audience.teacherIds });
     } catch (error) {
@@ -6244,6 +6286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : assignment;
       if (has("dueDate")) {
         const due = updates.dueDate ?? null;
+        await storage.dropSupersededReopenings("assignment", assignment.id, due);
         const audience = (await storage.getWrittenAssignmentAudienceMap([assignment.id]))[assignment.id] || [];
         notifyQuizTeachers(
           batch.id,
@@ -6280,6 +6323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/batches/:batchId/assignments/:assignmentId/submissions", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
       if (!batch || !assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
@@ -6293,6 +6337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/batches/:batchId/assignments/:assignmentId/submissions/:teacherId", isAuthenticated, isTrainer, async (req, res) => {
     try {
       const batch = await storage.getBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
       if (!staffCanAccessBatch(req.user, batch)) return res.status(403).json({ error: "Access denied" });
       const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
       if (!batch || !assignment || assignment.batchId !== batch.id) return res.status(404).json({ error: "Assignment not found" });
@@ -6314,7 +6359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       notifyTeacher(
         req.params.teacherId,
         "Written work marked",
-        comment ? `Score ${score ?? "—"}. ${comment}` : `Your written work was marked${score != null ? `: ${score}` : ""}.`,
+        `${assignment.title} was marked${score != null ? `: ${score}` : ""}.${comment ? ` ${comment}` : ""}`,
         "general",
         { batchId: req.params.batchId, assignmentId: req.params.assignmentId },
       ).catch((error) => console.error("Mark notice failed:", error));
@@ -6375,8 +6420,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teacher/assignments", isTeacherAuthenticated, async (req, res) => {
     try {
       const rows = (await storage.getWrittenAssignmentsForTeacher(req.teacherId!)) as any[];
+      const reopened = await storage.getDeadlineReopeningsForTeacher("assignment", req.teacherId!);
       const now = new Date();
-      res.json(rows.filter((row) => fellowStillSees(row.due_date, Boolean(row.my_response), now)));
+      res.json(rows.map((row) => fellowAssignmentItem(row, reopened[row.id], now)));
     } catch (error) {
       console.error("Error listing teacher assignments:", error);
       res.status(500).json({ error: "Failed to list assignments" });
@@ -6391,7 +6437,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "This work is not assigned to you" });
       }
       const assignment = await storage.getWrittenAssignment(req.params.assignmentId);
-      if (isPastDue(assignment?.dueDate)) return res.status(410).json({ error: DEADLINE_PASSED });
+      const reopened = await storage.getDeadlineReopening("assignment", req.params.assignmentId, req.teacherId!);
+      if (isPastDue(effectiveDeadline(assignment?.dueDate, reopened))) return res.status(410).json({ error: DEADLINE_PASSED });
       const row = await storage.upsertAssignmentSubmission(req.params.assignmentId, req.teacherId!, response);
       res.json(row);
     } catch (error) {
@@ -6436,7 +6483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       notifyBatchTeachers(
         batchId,
         "New on the calendar",
-        `${title} is scheduled for this cohort.`,
+        `${title} is scheduled for ${batch.name}.`,
         eventType === "deadline" ? "deadline" : "session_reminder",
       ).catch((error) => console.error("Calendar notice failed:", error));
       res.json(event);
@@ -6679,8 +6726,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const completed = completions.filter((c) => c.status === "completed").length;
         const overall = assignedCourses.length > 0 ? Math.round((completed / assignedCourses.length) * 100) : 0;
         const status = overall >= 100 ? "Completed" : overall > 0 ? "In Progress" : "Not Started";
-        const safe = (v: string) => `"${String(v || "").replace(/"/g, '""')}"`;
-        lines.push([safe(teacher.name), safe(teacher.email), assignedCourses.length, completed, overall, status].join(","));
+        lines.push([csvCell(String(teacher.name ?? "")), csvCell(String(teacher.email ?? "")), assignedCourses.length, completed, overall, status].join(","));
       }
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename="${batch.name.replace(/[^a-z0-9]+/gi, "-")}-cohort.csv"`);
@@ -6715,6 +6761,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   registerAcademyPathRoutes(app, isAuthenticated, isAdmin, isTeacherAuthenticated);
   registerAcademyDeskRoutes(app, isAuthenticated, isTrainer, isAdmin);
+  const guards = { isAuthenticated, isAuthenticatedAny, isTrainer, isAdmin, isTeacherAuthenticated };
+  registerDeadlineRoutes(app, guards);
+  registerMaterialRoutes(app, guards);
+  registerAdminMailRoutes(app, guards);
+  registerAttendanceExportRoutes(app, guards);
+  registerDailyLineRoutes(app, guards);
 
   const httpServer = createServer(app);
   return httpServer;

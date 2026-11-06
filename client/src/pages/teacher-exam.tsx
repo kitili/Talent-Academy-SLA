@@ -1,4 +1,3 @@
-import { isPastDue } from "@shared/academyPath";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
@@ -41,6 +40,9 @@ export default function TeacherExam() {
   const percentOf = (attempt: any) => (attempt.totalQuestions > 0 ? Math.round((attempt.score / attempt.totalQuestions) * 100) : 0);
   const passed = mine.some((attempt) => attempt.totalQuestions > 0 && (attempt.score / attempt.totalQuestions) * 100 >= passMark);
   const finished = passed || mine.length >= QUIZ_ATTEMPTS;
+  // The server says whether the deadline has passed for this Fellow (their own, when it was reopened for them). A closed
+  // exam they tried stays readable; no new try or answer can be sent.
+  const closed = Boolean(quiz?.closed);
   // A try finished on this visit keeps the runner on screen, so its right / wrong review stays visible.
   const [triedHere, setTriedHere] = useState(false);
   const writing = quiz ? isWritingExam(quiz) : false;
@@ -91,21 +93,27 @@ export default function TeacherExam() {
 
   return (
     <AcademyShell
-      title="Quizzes"
+      title="Assessments"
       userLabel={user?.username}
       onLogout={() => logoutMutation.mutate()}
       desk="fellow"
-      current="quizzes"
+      current="assessments"
     >
-      <Link href="/teacher/dashboard?tab=quizzes" className="inline-flex items-center gap-1 self-start text-sm text-sl-accent underline">
+      <Link href="/teacher/dashboard?tab=assessments" className="inline-flex items-center gap-1 self-start text-sm text-sl-accent underline">
         <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" />
-        Back to Quizzes
+        Back to Assessments
       </Link>
       <div className="flex flex-col gap-1">
         <h1 className="m-0 text-[28px] font-semibold text-sl-ink" data-testid="exam-title">
           {isLoading ? <><span className="sr-only">Exam</span><SkeletonBar className="inline-block h-8 w-64 max-w-full align-middle" /></> : quiz?.title || "Exam"}
         </h1>
-        {ready && !writing && (
+        {ready && closed && (
+          <p className="m-0 flex flex-wrap items-center gap-2 text-sm text-sl-muted" data-testid="exam-closed">
+            <span className="rounded-full bg-sl-neutral-soft px-2.5 py-0.5 text-xs font-semibold text-sl-neutral">Closed</span>
+            {quiz?.dueDate ? `The deadline was ${new Date(quiz.dueDate).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}. You can read what you sent; nothing more can be sent.` : "The deadline has passed. You can read what you sent; nothing more can be sent."}
+          </p>
+        )}
+        {ready && !writing && !closed && (
           <span className="text-sm text-sl-muted">{mine.length >= QUIZ_ATTEMPTS ? `All ${QUIZ_ATTEMPTS} tries used` : `Try ${mine.length + 1} of ${QUIZ_ATTEMPTS}`}</span>
         )}
       </div>
@@ -114,7 +122,7 @@ export default function TeacherExam() {
           <QuizSkeleton label="Opening the exam" />
         </section>
       )}
-      {error && <p className="m-0 text-sm text-sl-risk">{String((error as Error).message || "").startsWith("410") ? "The deadline for this exam has passed." : "This exam is not on your desk."}</p>}
+      {error && <p className="m-0 text-sm text-sl-risk">{String((error as Error).message || "").startsWith("410") ? "This exam is closed: its deadline has passed." : "This exam is not on your desk."}</p>}
       {ready && writing && (
         <div className="grid gap-4 lg:grid-cols-2" data-testid="exam-split">
           <section className="flex min-h-[24rem] flex-col rounded-xl border border-sl-line bg-sl-surface p-4 text-sl-ink" data-testid="exam-paper">
@@ -145,7 +153,7 @@ export default function TeacherExam() {
                 type="button"
                 className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-sl-accent-strong px-[18px] text-[15px] font-semibold text-white disabled:opacity-50"
                 onClick={() => submit.mutate()}
-                disabled={submit.isPending || mine.length >= QUIZ_ATTEMPTS || isPastDue(quiz?.dueDate)}
+                disabled={submit.isPending || mine.length >= QUIZ_ATTEMPTS || closed}
                 data-testid="button-submit-exam"
               >
                 {submit.isPending ? "Sending…" : "Send answers"}
@@ -154,10 +162,10 @@ export default function TeacherExam() {
           </section>
         </div>
       )}
-      {ready && !writing && finished && !triedHere && (
+      {ready && !writing && (finished || closed) && !triedHere && (
         <section className="flex flex-col gap-3 rounded-xl border border-sl-line bg-sl-surface p-5" data-testid="exam-finished">
           <span className={`self-start rounded-full px-2.5 py-0.5 text-xs font-semibold ${passed ? "bg-sl-done-soft text-sl-done" : "bg-sl-neutral-soft text-sl-neutral"}`}>
-            {passed ? `Passed · best ${Math.max(...mine.map(percentOf))}%` : `All ${QUIZ_ATTEMPTS} tries used · best ${Math.max(0, ...mine.map(percentOf))}%`}
+            {passed ? `Passed · best ${Math.max(...mine.map(percentOf))}%` : mine.length < QUIZ_ATTEMPTS ? `Closed · best ${Math.max(0, ...mine.map(percentOf))}%` : `All ${QUIZ_ATTEMPTS} tries used · best ${Math.max(0, ...mine.map(percentOf))}%`}
           </span>
           <h2 className="m-0 text-lg font-semibold text-sl-ink">Your tries</h2>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -168,10 +176,10 @@ export default function TeacherExam() {
               </li>
             ))}
           </ul>
-          <p className="m-0 text-sm text-sl-muted">This exam is finished; there is no try left to take.</p>
+          <p className="m-0 text-sm text-sl-muted">{closed && !finished ? "This exam is closed, so no more tries can be taken." : "This exam is finished; there is no try left to take."}</p>
         </section>
       )}
-      {ready && !writing && (!finished || triedHere) && (
+      {ready && !writing && ((!finished && !closed) || triedHere) && (
         <section className="rounded-xl border border-sl-line bg-sl-surface p-5">
           <QuizRunner
             questions={quiz.questions || []}

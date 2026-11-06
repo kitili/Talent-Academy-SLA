@@ -135,7 +135,7 @@ describe("trainer desk wiring", () => {
     // The shell draws the side menu from DESK_MENUS.trainer; the page names the current section and switches it in place.
     assert.match(trainer, /desk="trainer"/);
     assert.match(trainer, /onNavigate=/);
-    assert.match(trainer, /DESK_MENUS\.trainer\.map/);
+    assert.match(read("client/src/components/deskSections.ts"), /DESK_MENUS\.trainer\r?\n?\s*\.filter/);
     assert.equal(trainer.includes('data-testid="trainer-sidebar"'), false);
     assert.equal(trainer.includes("button-back-to-desk"), false);
     for (const item of DESK_MENUS.trainer.filter((entry) => entry.href.startsWith("/trainer/batches"))) assert.match(trainer, new RegExp(`\\b${item.key}: render`));
@@ -144,7 +144,7 @@ describe("trainer desk wiring", () => {
     assert.equal(trainer.includes('id: "assessments", label: "Assessments", icon'), false);
     assert.equal(trainer.includes('id: "quizzes", label: "Quizzes", icon'), false);
     assert.equal(trainer.includes('id: "teachers", label: "Teachers", icon'), false);
-    assert.match(trainer, /new URLSearchParams\(search\)\.get\("tab"\)/);
+    assert.match(read("client/src/components/deskSections.ts"), /new URLSearchParams\(search\)\.get\("tab"\)/);
     assert.match(trainer, /data-testid="trainer-quizzes"/);
     assert.match(trainer, /data-testid="trainer-assessments"/);
     assert.match(trainer, /dueDate: deadlineIso/);
