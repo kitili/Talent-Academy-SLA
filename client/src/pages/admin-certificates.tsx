@@ -5,6 +5,7 @@ import { AcademyShell } from "@/components/AcademyShell";
 import { SilverleafCertificate } from "@/components/SilverleafCertificate";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
@@ -13,6 +14,8 @@ import { SkeletonRows } from "@/components/Skeletons";
 import {
   CERTIFICATE_DESIGNS,
   CERTIFICATE_SIGNERS,
+  CERTIFICATE_WORDING_MAX,
+  cleanCertificateWording,
   designFromCertificate,
   wordingForIssue,
   type CertificateDesignId,
@@ -82,6 +85,8 @@ export default function AdminCertificates() {
   const [teacherId, setTeacherId] = useState("");
   const [courseId, setCourseId] = useState("");
   const [refusalText, setRefusalText] = useState("");
+  // What the Admin has typed; null follows the wording of the kind and course chosen.
+  const [typedWording, setTypedWording] = useState<string | null>(null);
 
   const { data: teachers = [] } = useQuery<Teacher[]>({ queryKey: ["/api/admin/teachers"] });
   const { data: courses = [] } = useQuery<Course[]>({ queryKey: ["/api/courses"] });
@@ -125,6 +130,8 @@ export default function AdminCertificates() {
         ? `${courseStatus.doneModules} of ${courseStatus.totalModules} modules complete. ${courseStatus.complete ? "Ready for a course certificate." : "Not ready: every module must be complete."}`
         : "";
   const choose = (nextTeacherId: string, nextOccasion: CertificateOccasion, nextCourseId = "") => {
+    // Another kind or course starts from its own wording. Another Fellow keeps what was typed, for a run of the same wording.
+    if (nextOccasion !== occasion || nextCourseId !== courseId) setTypedWording(null);
     setTeacherId(nextTeacherId);
     setOccasion(nextOccasion);
     setCourseId(nextCourseId);
@@ -136,10 +143,14 @@ export default function AdminCertificates() {
     document.getElementById("issue")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   };
   const previewName = teacher?.name || "";
-  const previewBody = useMemo(
+  const startingWording = useMemo(
     () => wordingForIssue(design, occasion, occasion === "course" ? course?.name : undefined),
     [design, occasion, course?.name],
   );
+  const wordingText = typedWording ?? startingWording;
+  const wordingCheck = cleanCertificateWording(wordingText);
+  // A blank box shows a blank certificate: `SilverleafCertificate` draws the template's wording only when given none.
+  const previewBody = wordingText.trim() || " ";
 
   const issueMutation = useMutation({
     mutationFn: () =>
@@ -148,6 +159,7 @@ export default function AdminCertificates() {
         design,
         occasion,
         courseId: occasion === "course" ? courseId : undefined,
+        appreciationText: wordingText,
       }),
     onSuccess: () => {
       setRefusalText("");
@@ -168,7 +180,7 @@ export default function AdminCertificates() {
     );
   }
 
-  const canIssue = Boolean(teacherId) && (occasion === "graduation" || Boolean(courseId));
+  const canIssue = Boolean(teacherId) && (occasion === "graduation" || Boolean(courseId)) && "wording" in wordingCheck;
   const cardClass = (on: boolean) =>
     `flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-[15px] text-sl-ink ${on ? "border-sl-accent bg-sl-accent-soft" : "border-sl-control bg-sl-surface"}`;
   // Course certificate keeps whichever template was last chosen; Fellowship and Advanced Level choose the template.
@@ -178,7 +190,7 @@ export default function AdminCertificates() {
       value: id,
       label: CERTIFICATE_DESIGNS[id].label,
       on: occasion === "graduation" && design === id,
-      pick: () => { setDesign(id); choose(teacherId, "graduation"); },
+      pick: () => { setDesign(id); setTypedWording(null); choose(teacherId, "graduation"); },
       testId: `button-template-${id}`,
     })),
   ];
@@ -328,6 +340,29 @@ export default function AdminCertificates() {
                   </SelectContent>
                 </Select>
                 <span className="text-[13px] text-sl-muted">Only for a course certificate.</span>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="certificate-wording">Wording</Label>
+                <Textarea
+                  id="certificate-wording"
+                  value={wordingText}
+                  onChange={(event) => setTypedWording(event.target.value)}
+                  rows={6}
+                  className="border-sl-control bg-sl-surface text-[15px] text-sl-ink"
+                  aria-describedby="certificate-wording-help"
+                  data-testid="input-certificate-wording"
+                />
+                <span id="certificate-wording-help" className={`text-[13px] ${"error" in wordingCheck ? "text-sl-risk" : "text-sl-muted"}`} data-testid="text-certificate-wording-help">
+                  {"error" in wordingCheck
+                    ? wordingCheck.error
+                    : `Starts from this kind's wording. Change it or clear it and write your own. ${wordingCheck.wording.length} of ${CERTIFICATE_WORDING_MAX} characters.`}
+                </span>
+                {typedWording !== null && typedWording !== startingWording && (
+                  <button type="button" className="self-start text-[13px] text-sl-accent underline" onClick={() => setTypedWording(null)} data-testid="button-certificate-wording-reset">
+                    Go back to this kind's wording
+                  </button>
+                )}
               </div>
 
               {selectionStatus && (

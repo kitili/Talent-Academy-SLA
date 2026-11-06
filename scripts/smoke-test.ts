@@ -333,7 +333,7 @@ async function main() {
   const issuedCert = fellow?.id
     ? await request("/api/admin/certificates/issue", {
       method: "POST",
-      body: JSON.stringify({ teacherId: fellow.id, design: "fellowship", occasion: "graduation" }),
+      body: JSON.stringify({ teacherId: fellow.id, design: "fellowship", occasion: "graduation", appreciationText: "In recognition of completing the smoke test." }),
     }, cookies)
     : { status: 0, json: null as any };
   record(
